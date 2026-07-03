@@ -133,7 +133,17 @@ function ProjectBurnPage() {
 
   const totalBurn = byProject.reduce((s, p) => s + p.burn, 0);
   const totalHours = byProject.reduce((s, p) => s + p.hours, 0);
-  const totalSalaryPool = useMemo(() => Array.from(salaryByUser.values()).reduce((s, v) => s + v, 0), [salaryByUser]);
+  // Pool includes signed-up salaries + pending grants (people who will get that salary once they sign up)
+  const totalSalaryPool = useMemo(() => {
+    const signedUp = Array.from(salaryByUser.values()).reduce((s, v) => s + v, 0);
+    const profileEmails = new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]);
+    const pending = (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())).reduce((s, g) => s + Number(g.default_monthly_salary ?? 0), 0);
+    return signedUp + pending;
+  }, [salaryByUser, profiles, grants]);
+  const pendingCount = useMemo(() => {
+    const profileEmails = new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]);
+    return (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())).length;
+  }, [profiles, grants]);
 
   // Daily trend for selected project (or all)
   const daysInMonth = useMemo(() => {

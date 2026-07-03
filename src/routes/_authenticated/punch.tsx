@@ -141,34 +141,30 @@ function PunchPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Tasks worked on</Label>
+              <Label>Time entries — project, hours & comments are required</Label>
               {entries.map((e, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2 items-start">
-                  <div className="col-span-6">
-                    <Input placeholder="What did you work on?" value={e.task_description} onChange={(ev) => setEntries((p) => p.map((x, idx) => idx === i ? { ...x, task_description: ev.target.value } : x))} />
+                <div key={i} className="rounded-lg border border-border/60 p-3 space-y-2">
+                  <div className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-8">
+                      <Select value={e.project_id ?? ""} onValueChange={(v) => {
+                        const p = projects?.find((pr) => pr.id === v);
+                        setEntries((prev) => prev.map((x, idx) => idx === i ? { ...x, project_id: v, project_code: p?.code ?? null, project_name: p?.name ?? null } : x));
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Select project (name + ID)" /></SelectTrigger>
+                        <SelectContent>
+                          {projects?.map((p) => <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
+                      <Input type="number" step="0.25" min="0" placeholder="hours" value={e.hours || ""} onChange={(ev) => setEntries((p) => p.map((x, idx) => idx === i ? { ...x, hours: Number(ev.target.value) } : x))} />
+                    </div>
+                    <Button variant="ghost" size="icon" className="col-span-1" onClick={() => setEntries((p) => p.filter((_, idx) => idx !== i))} disabled={entries.length === 1}><Trash2 className="h-4 w-4" /></Button>
                   </div>
-                  <div className="col-span-3">
-                    <Select value={e.task_id ?? "other"} onValueChange={(v) => {
-                      if (v === "other") setEntries((p) => p.map((x, idx) => idx === i ? { ...x, task_id: null, project_id: null } : x));
-                      else {
-                        const t = assignedTasks?.find((t) => t.id === v);
-                        setEntries((p) => p.map((x, idx) => idx === i ? { ...x, task_id: v, project_id: t?.project_id ?? null, task_description: x.task_description || t?.title || "" } : x));
-                      }
-                    }}>
-                      <SelectTrigger><SelectValue placeholder="Link task" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="other">Unassigned / Other</SelectItem>
-                        {assignedTasks?.map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Input type="number" step="0.25" min="0" placeholder="hrs" value={e.hours || ""} onChange={(ev) => setEntries((p) => p.map((x, idx) => idx === i ? { ...x, hours: Number(ev.target.value) } : x))} />
-                  </div>
-                  <Button variant="ghost" size="icon" className="col-span-1" onClick={() => setEntries((p) => p.filter((_, idx) => idx !== i))} disabled={entries.length === 1}><Trash2 className="h-4 w-4" /></Button>
+                  <Textarea rows={2} placeholder="Comments — what did you do on this project?" value={e.comments} onChange={(ev) => setEntries((p) => p.map((x, idx) => idx === i ? { ...x, comments: ev.target.value } : x))} />
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={() => setEntries((p) => [...p, { task_description: "", hours: 0 }])}><Plus className="h-4 w-4 mr-1" /> Add another task</Button>
+              <Button variant="outline" size="sm" onClick={() => setEntries((p) => [...p, { project_id: null, project_code: null, project_name: null, hours: 0, comments: "" }])}><Plus className="h-4 w-4 mr-1" /> Add another project</Button>
               <div className="text-right text-sm text-muted-foreground">Total: <span className="font-semibold text-foreground">{totalHours.toFixed(2)} h</span></div>
             </div>
             <div className="space-y-2"><Label>What did you complete today?</Label><Textarea rows={3} value={dailyNote} onChange={(e) => setDailyNote(e.target.value)} placeholder="Quick recap…" /></div>

@@ -243,6 +243,75 @@ function ProjectsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <EditProjectDialog project={editProject} onClose={() => setEditProject(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["projects"] })} />
     </div>
   );
 }
+
+function EditProjectDialog({ project, onClose, onSaved }: { project: any | null; onClose: () => void; onSaved: () => void }) {
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [client, setClient] = useState("");
+  const [desc, setDesc] = useState("");
+  const [status, setStatus] = useState<"active"|"on_hold"|"completed">("active");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+
+  useMemo(() => {
+    setCode(project?.code ?? "");
+    setName(project?.name ?? "");
+    setClient(project?.client_name ?? "");
+    setDesc(project?.description ?? "");
+    setStatus((project?.status ?? "active") as any);
+    setStart(project?.start_date ?? "");
+    setEnd(project?.end_date ?? "");
+  }, [project]);
+
+  async function save() {
+    if (!project) return;
+    if (!code.trim()) return toast.error("Project ID required");
+    if (!name.trim()) return toast.error("Name required");
+    const { error } = await supabase.from("projects").update({
+      code: code.trim().toUpperCase(),
+      name: name.trim(),
+      client_name: client.trim() || null,
+      description: desc.trim() || null,
+      status,
+      start_date: start || null,
+      end_date: end || null,
+    }).eq("id", project.id);
+    if (error) return toast.error(error.message);
+    toast.success("Project updated");
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <Dialog open={!!project} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-display">Edit project</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Project ID</Label><Input value={code} onChange={(e) => setCode(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+          </div>
+          <div className="space-y-1"><Label>Client</Label><Input value={client} onChange={(e) => setClient(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Description</Label><Textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1"><Label>Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="on_hold">On Hold</SelectItem><SelectItem value="completed">Completed</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label>Start date</Label><Input type="date" value={start ?? ""} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-1"><Label>End date</Label><Input type="date" value={end ?? ""} onChange={(e) => setEnd(e.target.value)} /></div>
+          </div>
+        </div>
+        <DialogFooter><Button onClick={save} className="gradient-primary">Save</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

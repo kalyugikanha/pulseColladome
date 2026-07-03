@@ -1,28 +1,30 @@
-## Changes
+## Provision pending users (super-admin action)
 
-### 1. "View as" dropdown shows all employees (including pending signups)
-In `src/components/top-bar.tsx`, also query `role_grants` and merge with `profiles`:
-- Signed-up users → use their profile id (works as today, switches session context).
-- Pending invitees (in `role_grants` but no matching profile by email) → show in the list, disabled/greyed with a "Pending signup" badge and not selectable (nothing to switch into — no user id exists yet).
-Sort combined list by name/email.
+Sweksha (and every other invitee still in `role_grants` without a `profiles` row) has no auth account, so there's nothing to view. Add a super-admin action that creates real accounts for all pending invitees.
 
-### 2. Saturday rotation + Sunday as weekly off
-In `src/hooks/use-holidays.ts`, add helpers:
-- `isSundayOff(date)` → Sundays are always holidays.
-- `isSaturdayOff(date)` → 2nd and 4th Saturdays of the month are off; 1st, 3rd, 5th are working.
-- `isWeeklyOff(date)` → combines the two.
-- Update `nextHoliday(list)` to return the nearest of: next seeded holiday, next Sunday, or next off-Saturday — with a synthetic `{ name: "Sunday" | "2nd Saturday" | "4th Saturday" }` entry when the weekly off wins.
+### Server function: `provisionPendingUsers`
+New file `src/lib/admin-users.functions.ts`:
+- `createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(...)`
+- Verify caller: `context.supabase.rpc('is_super_admin', { _user_id: context.userId })` → throw 403 if not.
+- Dynamically `await import('@/integrations/supabase/client.server')` to get `supabaseAdmin`.
+- Query `role_grants`; for each row whose email has no matching `profiles.email` (case-insensitive):
+  - `supabaseAdmin.auth.admin.createUser({ email, password: "Test@123", email_confirm: true, user_metadata: { full_name: <derived from email local-part> } })`.
+  - The existing `handle_new_user` trigger already creates the profile, applies the role from `role_grants`, seeds salary from `default_monthly_salary`, and sets `must_change_password = true` — no extra writes needed.
+- Return `{ created: string[], skipped: string[], errors: {email, message}[] }`.
 
-Also mark weekly-off days on the team calendar in `src/routes/_authenticated/calendar.tsx` using the same helper (subtle styling, alongside the seeded holidays already shown).
+### UI: "Provision pending users" button on `/finances`
+In `src/routes/_authenticated/finances.tsx` header (super-admin only):
+- Button with `useMutation` calling `useServerFn(provisionPendingUsers)`.
+- Toast summarizing counts; invalidate `["viewas-profiles"]`, `["profiles-with-salaries"]`, `["viewas-grants"]`, and the finances profile query so the new users appear immediately.
+- Disabled while pending; shows spinner.
 
-### 3. Top bar next-holiday chip
-No structural change — it already reads `nextHoliday(holidays)`. With the helper update above, it will now automatically surface Sunday / 2nd- or 4th-Saturday when those are closer than the next seeded public holiday.
+### After it runs
+- Sweksha (and everyone else pending) becomes selectable in the View-as dropdown.
+- Their salaries appear in Finances (already seeded by trigger from `role_grants.default_monthly_salary`).
+- On their first real sign-in with `Test@123`, the existing forced password-change flow kicks in.
 
-## Not doing
-- No schema/migration changes — Saturday rotation is derived from the date, not stored.
-- No changes to leave-balance math (weekly offs already aren't counted as leave days).
+### Files touched
+- `src/lib/admin-users.functions.ts` — new
+- `src/routes/_authenticated/finances.tsx` — add button + mutation
 
-## Files touched
-- `src/hooks/use-holidays.ts` — add weekly-off helpers, extend `nextHoliday`.
-- `src/components/top-bar.tsx` — merge `role_grants` into the View-as list; render pending rows disabled.
-- `src/routes/_authenticated/calendar.tsx` — mark Sundays and 2nd/4th Saturdays as off.
+No schema changes. No changes to auth config.

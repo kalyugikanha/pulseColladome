@@ -42,6 +42,10 @@ function AuthPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (password === "Test@123") {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) await supabase.from("profiles").update({ must_change_password: true }).eq("id", user.id);
+        }
       }
       router.navigate({ to: "/dashboard", replace: true });
     } catch (err) {

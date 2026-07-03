@@ -75,16 +75,18 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, canManageProjects, 
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {isAdmin && (
+        {(isAdmin || canManageProjects) && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith("/team")}>
-                    <Link to="/team"><Users /><span>Team</span></Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {isAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/team")}>
+                      <Link to="/team"><Users /><span>Team</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {isFinanceAdmin && (
                   <>
                     <SidebarMenuItem>
@@ -99,13 +101,15 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, canManageProjects, 
                     </SidebarMenuItem>
                   </>
                 )}
+                {canManageProjects && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
+                      <Link to="/hours-editor"><Clock /><span>Hours Editor</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {isSuperAdmin && (
                   <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
-                        <Link to="/hours-editor"><Clock /><span>Hours Editor</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/vendors")}>
                         <Link to="/vendors"><Handshake /><span>Vendors</span></Link>
@@ -123,6 +127,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, canManageProjects, 
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="flex items-center gap-2 px-1 py-1">

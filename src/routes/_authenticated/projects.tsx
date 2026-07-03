@@ -62,6 +62,24 @@ function ProjectsPage() {
   });
   const logTotal = (timeLog ?? []).reduce((s, r) => s + r.hours, 0);
 
+  const { data: vendorPayments } = useQuery({
+    queryKey: ["vendor-payments-by-project"],
+    enabled: !!me?.isSuperAdmin,
+    queryFn: async () => (await supabase.from("vendor_payments").select("project_id, amount, status")).data ?? [],
+  });
+  const paySummary = (projectId: string) => {
+    const rows = (vendorPayments ?? []).filter((r: any) => r.project_id === projectId);
+    return rows.reduce(
+      (acc: { pending: number; paid: number }, r: any) => {
+        if (r.status === "paid") acc.paid += Number(r.amount);
+        else acc.pending += Number(r.amount);
+        return acc;
+      },
+      { pending: 0, paid: 0 },
+    );
+  };
+
+
   async function createProject() {
     if (!pName) return toast.error("Name required");
     if (!pCode.trim()) return toast.error("Project ID required (e.g. CLDM00XXX)");

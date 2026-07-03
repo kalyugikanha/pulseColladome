@@ -61,8 +61,8 @@ function AuthPage() {
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
       <div className="hidden lg:flex relative overflow-hidden gradient-surface p-12 flex-col justify-between border-r border-border">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary shadow-glow">
-            <Activity className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-black shadow-glow overflow-hidden">
+            <img src={logo.url} alt="Colladome" className="h-10 w-10 object-contain" />
           </div>
           <div>
             <div className="font-display text-lg font-bold">Colladome Pulse</div>

@@ -208,6 +208,59 @@ export type Database = {
         }
         Relationships: []
       }
+      punch_sessions: {
+        Row: {
+          comments: string | null
+          created_at: string
+          hours: number | null
+          id: string
+          project_code: string | null
+          project_id: string | null
+          project_name: string | null
+          punch_in_time: string
+          punch_out_time: string | null
+          session_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          hours?: number | null
+          id?: string
+          project_code?: string | null
+          project_id?: string | null
+          project_name?: string | null
+          punch_in_time?: string
+          punch_out_time?: string | null
+          session_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          hours?: number | null
+          id?: string
+          project_code?: string | null
+          project_id?: string | null
+          project_name?: string | null
+          punch_in_time?: string
+          punch_out_time?: string | null
+          session_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "punch_sessions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_grants: {
         Row: {
           created_at: string
@@ -368,6 +421,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_finance_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {

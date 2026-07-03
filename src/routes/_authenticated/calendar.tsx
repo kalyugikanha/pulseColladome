@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { addMonths, endOfMonth, format, isWithinInterval, startOfMonth, startOfWeek, endOfWeek, addDays } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, PartyPopper } from "lucide-react";
+import { useHolidays } from "@/hooks/use-holidays";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
@@ -38,6 +39,8 @@ function CalendarPage() {
 
   const days: Date[] = [];
   for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) days.push(d);
+  const { data: holidays } = useHolidays();
+  const holidayByDate = new Map((holidays ?? []).map((h) => [h.holiday_date, h.name]));
 
   return (
     <div className="space-y-6">
@@ -57,6 +60,7 @@ function CalendarPage() {
         {Object.entries(TYPE_COLOR).map(([k, cls]) => (
           <span key={k} className={`inline-flex items-center rounded-md border px-2 py-0.5 capitalize ${cls}`}>{k}</span>
         ))}
+        <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 text-warning px-2 py-0.5"><PartyPopper className="h-3 w-3" />Holiday</span>
       </div>
 
       <Card>
@@ -68,12 +72,19 @@ function CalendarPage() {
             {days.map((d) => {
               const inMonth = d.getMonth() === cursor.getMonth();
               const dayLeaves = (leaves ?? []).filter((l: any) => isWithinInterval(d, { start: new Date(l.start_date), end: new Date(l.end_date) }));
+              const iso = format(d, "yyyy-MM-dd");
+              const holiday = holidayByDate.get(iso);
               return (
-                <div key={d.toISOString()} className={`min-h-[90px] rounded-md border border-border/50 p-2 ${inMonth ? "bg-surface/40" : "bg-transparent opacity-50"}`}>
+                <div key={d.toISOString()} className={`min-h-[90px] rounded-md border p-2 ${holiday ? "border-warning/50 bg-warning/10" : "border-border/50"} ${inMonth ? holiday ? "" : "bg-surface/40" : "bg-transparent opacity-50"}`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium">{format(d, "d")}</span>
                     {dayLeaves.length > 0 && <Badge variant="outline" className="h-4 px-1 text-[10px]">{dayLeaves.length}</Badge>}
                   </div>
+                  {holiday && (
+                    <div className="mb-1 truncate rounded px-1.5 py-0.5 text-[10px] font-semibold border border-warning/40 bg-warning/20 text-warning" title={holiday}>
+                      🎉 {holiday}
+                    </div>
+                  )}
                   <div className="space-y-0.5">
                     {dayLeaves.slice(0, 3).map((l: any) => (
                       <div key={l.id} className={`truncate rounded px-1.5 py-0.5 text-[10px] border ${TYPE_COLOR[l.leave_type]} ${l.status === "pending" ? "opacity-60 border-dashed" : ""}`} title={`${l.user?.full_name ?? "Someone"} · ${l.leave_type}`}>

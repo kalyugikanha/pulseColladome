@@ -18,6 +18,7 @@ import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedResourcesRouteImport } from './routes/_authenticated/resources'
 import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/punch'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
+import { Route as AuthenticatedProjectBurnRouteImport } from './routes/_authenticated/project-burn'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -68,6 +69,12 @@ const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedProjectBurnRoute =
+  AuthenticatedProjectBurnRouteImport.update({
+    id: '/project-burn',
+    path: '/project-burn',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedLeaveRoute = AuthenticatedLeaveRouteImport.update({
   id: '/leave',
   path: '/leave',
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
+  '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
@@ -118,6 +126,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
+  '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
@@ -135,6 +144,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
+  '/_authenticated/project-burn': typeof AuthenticatedProjectBurnRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/punch': typeof AuthenticatedPunchRoute
   '/_authenticated/resources': typeof AuthenticatedResourcesRoute
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/finances'
     | '/leave'
+    | '/project-burn'
     | '/projects'
     | '/punch'
     | '/resources'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/finances'
     | '/leave'
+    | '/project-burn'
     | '/projects'
     | '/punch'
     | '/resources'
@@ -183,6 +195,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/finances'
     | '/_authenticated/leave'
+    | '/_authenticated/project-burn'
     | '/_authenticated/projects'
     | '/_authenticated/punch'
     | '/_authenticated/resources'
@@ -262,6 +275,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/project-burn': {
+      id: '/_authenticated/project-burn'
+      path: '/project-burn'
+      fullPath: '/project-burn'
+      preLoaderRoute: typeof AuthenticatedProjectBurnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/leave': {
       id: '/_authenticated/leave'
       path: '/leave'
@@ -306,6 +326,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
+  AuthenticatedProjectBurnRoute: typeof AuthenticatedProjectBurnRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedPunchRoute: typeof AuthenticatedPunchRoute
   AuthenticatedResourcesRoute: typeof AuthenticatedResourcesRoute
@@ -319,6 +340,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
+  AuthenticatedProjectBurnRoute: AuthenticatedProjectBurnRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedPunchRoute: AuthenticatedPunchRoute,
   AuthenticatedResourcesRoute: AuthenticatedResourcesRoute,

@@ -56,6 +56,27 @@ export type Database = {
         }
         Relationships: []
       }
+      holidays: {
+        Row: {
+          created_at: string
+          holiday_date: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          holiday_date: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          holiday_date?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       leave_balances: {
         Row: {
           allocated: number
@@ -264,18 +285,21 @@ export type Database = {
       role_grants: {
         Row: {
           created_at: string
+          default_monthly_salary: number | null
           email: string
           is_super_admin: boolean
           role: Database["public"]["Enums"]["app_role"]
         }
         Insert: {
           created_at?: string
+          default_monthly_salary?: number | null
           email: string
           is_super_admin?: boolean
           role?: Database["public"]["Enums"]["app_role"]
         }
         Update: {
           created_at?: string
+          default_monthly_salary?: number | null
           email?: string
           is_super_admin?: boolean
           role?: Database["public"]["Enums"]["app_role"]

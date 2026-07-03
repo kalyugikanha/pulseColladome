@@ -200,7 +200,22 @@ function ProjectsPage() {
                   </div>
                 ))}
               </div>
+              {me?.isSuperAdmin && (() => {
+                const s = paySummary(p.id);
+                return (
+                  <div className="mt-3 flex items-center justify-between rounded-lg border border-border/60 bg-surface/40 p-2 text-xs">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Wallet className="h-3.5 w-3.5" /> Vendor payments
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span>Pending: <span className="font-semibold text-foreground">₹ {s.pending.toLocaleString("en-IN")}</span></span>
+                      <span>Paid: <span className="font-semibold text-foreground">₹ {s.paid.toLocaleString("en-IN")}</span></span>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
+
           </Card>
         ))}
       </div>

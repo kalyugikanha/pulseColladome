@@ -113,9 +113,9 @@ function AuthPage() {
                 <form onSubmit={handleEmail} className="space-y-3 pt-2">
                   <div className="space-y-1"><Label htmlFor="n2">Full name</Label><Input id="n2" required value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
                   <div className="space-y-1"><Label htmlFor="e2">Work email</Label><Input id="e2" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-                  <div className="space-y-1"><Label htmlFor="p2">Password</Label><Input id="p2" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+                  <div className="space-y-1"><Label htmlFor="p2">Password</Label><Input id="p2" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Test@123" /></div>
                   <Button type="submit" className="w-full" disabled={loading}>Create account</Button>
-                  <p className="text-xs text-muted-foreground">First registered account becomes the workspace admin.</p>
+                  <p className="text-xs text-muted-foreground">Tip: use the shared default <code className="rounded bg-muted px-1">Test@123</code> — you'll set your own password right after first sign-in.</p>
                 </form>
               </TabsContent>
             </Tabs>

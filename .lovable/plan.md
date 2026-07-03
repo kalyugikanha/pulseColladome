@@ -1,23 +1,36 @@
-## Restrict signup to invited emails only
+## Goal
 
-Only emails in `role_grants` (which already includes shubham@colladome.com and arti@colladome.com) may create an account. Anyone else attempting signup gets rejected.
+Open the portal so anyone can sign up / log in with any email. Keep the super-admin-only "view as employee" toggle that already exists so only Shubham and Arti can impersonate other employees.
 
-### Change
-Add a `BEFORE INSERT` trigger on `auth.users` — `public.enforce_invite_only_signup()` — that:
-- Checks `lower(NEW.email)` against `role_grants.email`.
-- If no match, `RAISE EXCEPTION 'Signups are restricted. Ask an admin to invite %.', NEW.email USING ERRCODE = '22023';`.
-- Otherwise returns NEW, and the existing `handle_new_user` `AFTER INSERT` trigger then provisions profile/role/salary as today.
+## Changes
 
-Supabase surfaces the exception message to the client, so the auth page just shows "Signups are restricted…".
+### 1. Remove invite-only signup restriction (migration)
 
-### UI copy (optional, small)
-Update the sign-up form helper text on `/auth` to say "Only invited email addresses can sign up. Contact an admin if you need access." — no logic change.
+Drop the trigger and function added in the previous turn:
 
-### Not doing
-- No change to `handle_new_user` (still runs after insert for invited users).
-- No change to login flow — password login and Google OAuth already only work for existing users, so no extra gate needed there.
-- No change to role assignment — `role_grants` already drives roles and Shubham/Arti already have `is_finance_admin`.
+```sql
+DROP TRIGGER IF EXISTS enforce_invite_only_signup_trg ON auth.users;
+DROP FUNCTION IF EXISTS public.enforce_invite_only_signup();
+```
 
-### Files touched
-- New migration: trigger + function.
-- `src/routes/auth.tsx` — one line of helper text (optional).
+After this, `auth.users` accepts any new signup. The existing `handle_new_user` trigger continues to run and:
+- Creates a `profile` row
+- Applies any pre-assigned `role_grants` (so if Shubham pre-adds an email on the Access page, that role/salary still applies on first sign-in)
+- Otherwise defaults new users to the `employee` role
+- Seeds default leave balances
+
+### 2. Update auth page copy
+
+In `src/routes/auth.tsx`, remove the "Only invited email addresses can sign up…" helper text (if present) so the UI reflects open signup.
+
+### 3. Nothing else changes
+
+- **Impersonation is already built:** `useViewAs` + `use-current-user` already lets super admins switch the app view to any employee via the selector in the top bar. Non-super-admins never see the selector. No code changes needed here.
+- **Access & Roles page** (`/access`) stays super-admin-only for Shubham/Arti to pre-assign admin/finance/super-admin roles by email — still useful even with open signup.
+- No changes to login flow, Google OAuth, RLS, or any other route.
+
+## Result
+
+- Anyone can sign up at `/auth` and lands as a regular employee.
+- Shubham and Arti (super admins) keep the "View as" selector in the top bar to impersonate any employee's view.
+- Shubham and Arti keep the Access page to grant admin/super-admin privileges by email.

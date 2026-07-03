@@ -98,7 +98,7 @@ function ProjectsPage() {
             <CardHeader className="flex flex-row items-start justify-between">
               <div>
                 <CardTitle className="font-display flex items-center gap-2"><FolderKanban className="h-4 w-4 text-primary" />{p.name}</CardTitle>
-                <CardDescription>{p.client_name ?? "Internal"} · <Badge variant="outline" className="capitalize ml-1">{p.status.replace("_", " ")}</Badge></CardDescription>
+                <CardDescription><span className="font-mono text-xs mr-2">{p.code}</span>· {p.client_name ?? "Internal"} · <Badge variant="outline" className="capitalize ml-1">{p.status.replace("_", " ")}</Badge></CardDescription>
               </div>
               {me?.isAdmin && (
                 <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>

@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Wallet, TrendingUp, IndianRupee, Users } from "lucide-react";
+import { Wallet, TrendingUp, IndianRupee, Users, UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/finances")({
 
 type Profile = { id: string; full_name: string | null; email: string | null };
 type Salary = { id: string; user_id: string; monthly_salary: number; currency: string; effective_from: string };
+type Grant = { email: string; role: string; default_monthly_salary: number | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
 
 function monthKey(d: string | Date) {
@@ -38,6 +40,12 @@ function FinancesPage() {
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
+  });
+
+  const { data: grants } = useQuery({
+    queryKey: ["finances-grants"],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => (await supabase.from("role_grants").select("email, role, default_monthly_salary").order("email")).data as Grant[] ?? [],
   });
 
   const { data: salaries } = useQuery({

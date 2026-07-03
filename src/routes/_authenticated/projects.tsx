@@ -30,7 +30,7 @@ function ProjectsPage() {
 
   const { data: projects } = useQuery({
     queryKey: ["projects"],
-    queryFn: async () => (await supabase.from("projects").select("*, tasks(id,title,status,priority,due_date,assignee_id,assignee:profiles!tasks_assignee_id_fkey(full_name))").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => (await supabase.from("projects").select("*, tasks(id,title,status,priority,due_date,assignee_id,assignee:profiles!tasks_assignee_profile_fkey(full_name))").order("created_at", { ascending: false })).data ?? [],
   });
 
   const { data: people } = useQuery({

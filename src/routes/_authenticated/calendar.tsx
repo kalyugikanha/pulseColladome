@@ -29,7 +29,7 @@ function CalendarPage() {
 
   const { data: leaves } = useQuery({
     queryKey: ["team-leave", format(monthStart, "yyyy-MM")],
-    queryFn: async () => (await supabase.from("leave_requests").select("id,user_id,leave_type,start_date,end_date,status,user:profiles!leave_requests_user_id_fkey(full_name)")
+    queryFn: async () => (await supabase.from("leave_requests").select("id,user_id,leave_type,start_date,end_date,status,user:profiles!leave_requests_user_profile_fkey(full_name)")
       .in("status", me?.isAdmin ? ["approved", "pending"] : ["approved"])
       .lte("start_date", format(gridEnd, "yyyy-MM-dd"))
       .gte("end_date", format(gridStart, "yyyy-MM-dd"))

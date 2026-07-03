@@ -32,7 +32,7 @@ function TeamPage() {
       const [people, todayAtt, pending, roles] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email"),
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", today),
-        supabase.from("leave_requests").select("*, user:profiles!leave_requests_user_id_fkey(full_name, email)").eq("status", "pending").order("created_at", { ascending: false }),
+        supabase.from("leave_requests").select("*, user:profiles!leave_requests_user_profile_fkey(full_name, email)").eq("status", "pending").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
       ]);
       return { people: people.data ?? [], todayAtt: todayAtt.data ?? [], pending: pending.data ?? [], roles: roles.data ?? [] };

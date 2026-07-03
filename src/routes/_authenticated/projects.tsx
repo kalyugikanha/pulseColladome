@@ -180,6 +180,30 @@ function ProjectsPage() {
           </Card>
         ))}
       </div>
+
+      <Dialog open={!!logFor} onOpenChange={(o) => !o && setLogFor(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Time log · {logFor?.name}</DialogTitle>
+            <div className="text-xs text-muted-foreground"><span className="font-mono">{logFor?.code}</span> · Total: <span className="font-semibold text-foreground">{logTotal.toFixed(2)} h</span> across {timeLog?.length ?? 0} entries</div>
+          </DialogHeader>
+          <div className="space-y-2 mt-2">
+            {(timeLog?.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">No time logged on this project yet.</p>}
+            {timeLog?.map((r, i) => (
+              <div key={i} className="rounded-lg border border-border/60 p-3">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="font-medium">{r.user}</div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{format(new Date(r.date), "EEE, MMM d")}</span>
+                    <Badge variant="outline">{r.hours.toFixed(2)}h</Badge>
+                  </div>
+                </div>
+                {r.comments && <div className="mt-1 text-xs text-muted-foreground">{r.comments}</div>}
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

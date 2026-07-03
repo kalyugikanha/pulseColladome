@@ -437,6 +437,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -449,7 +450,7 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "employee"
+      app_role: "admin" | "employee" | "project_manager"
       leave_status: "pending" | "approved" | "rejected"
       leave_type: "casual" | "sick" | "earned" | "unpaid"
       project_status: "active" | "on_hold" | "completed"
@@ -582,7 +583,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "employee"],
+      app_role: ["admin", "employee", "project_manager"],
       leave_status: ["pending", "approved", "rejected"],
       leave_type: ["casual", "sick", "earned", "unpaid"],
       project_status: ["active", "on_hold", "completed"],

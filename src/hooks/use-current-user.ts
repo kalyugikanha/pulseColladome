@@ -12,9 +12,11 @@ export type CurrentUser = {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isFinanceAdmin: boolean;
+  canManageProjects: boolean;
   mustChangePassword: boolean;
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
+
 };
 
 export function useCurrentUser() {
@@ -42,6 +44,8 @@ export function useCurrentUser() {
       let vIsAdmin = realAdmin;
       let vIsSuper = isSuperAdmin;
       let vIsFinance = realFinance;
+      let vCanManageProjects = realAdmin || !!roles?.some((r) => r.role === "project_manager");
+
       if (isSuperAdmin && viewAsUserId && viewAsUserId !== user.id) {
         const { data: other } = await supabase.from("profiles").select("full_name, email").eq("id", viewAsUserId).maybeSingle();
         if (other) {
@@ -53,6 +57,7 @@ export function useCurrentUser() {
           vIsSuper = !!otherSa;
           vIsAdmin = vIsSuper || !!otherRoles?.some((r) => r.role === "admin");
           vIsFinance = !!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase());
+          vCanManageProjects = vIsAdmin || !!otherRoles?.some((r) => r.role === "project_manager");
         }
       }
 
@@ -64,10 +69,12 @@ export function useCurrentUser() {
         isAdmin: vIsAdmin,
         isSuperAdmin: vIsSuper,
         isFinanceAdmin: vIsFinance,
+        canManageProjects: vCanManageProjects,
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         viewingAs,
         realIsSuperAdmin: isSuperAdmin,
       };
+
     },
   });
 }

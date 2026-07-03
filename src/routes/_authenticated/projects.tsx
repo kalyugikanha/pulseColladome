@@ -36,13 +36,13 @@ function ProjectsPage() {
 
   const { data: people } = useQuery({
     queryKey: ["profiles-all"],
-    enabled: !!me?.isAdmin,
+    enabled: !!me?.canManageProjects,
     queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
   });
 
   const { data: timeLog } = useQuery({
     queryKey: ["project-time-log", logFor?.code],
-    enabled: !!logFor && !!me?.isAdmin,
+    enabled: !!logFor && !!me?.canManageProjects,
     queryFn: async () => {
       const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks");
       const { data: profs } = await supabase.from("profiles").select("id, full_name, email");
@@ -84,9 +84,9 @@ function ProjectsPage() {
       <header className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-3xl font-bold">Projects</h1>
-          <p className="text-muted-foreground text-sm mt-1">{me?.isAdmin ? "Create projects and assign tasks to the team." : "Projects you can log time against."}</p>
+          <p className="text-muted-foreground text-sm mt-1">{me?.canManageProjects ? "Create projects and assign tasks to the team." : "Projects you can log time against."}</p>
         </div>
-        {me?.isAdmin && (
+        {me?.canManageProjects && (
           <Dialog open={openProject} onOpenChange={setOpenProject}>
             <DialogTrigger asChild><Button className="gradient-primary"><Plus className="h-4 w-4 mr-1" /> New project</Button></DialogTrigger>
             <DialogContent>
@@ -122,10 +122,10 @@ function ProjectsPage() {
                 <CardDescription><span className="font-mono text-xs mr-2">{p.code}</span>· {p.client_name ?? "Internal"} · <Badge variant="outline" className="capitalize ml-1">{p.status.replace("_", " ")}</Badge></CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                {me?.isAdmin && (
+                {me?.canManageProjects && (
                   <Button size="sm" variant="outline" onClick={() => setLogFor({ id: p.id, code: p.code, name: p.name })}><Clock className="h-4 w-4 mr-1" /> Time log</Button>
                 )}
-                {me?.isAdmin && (
+                {me?.canManageProjects && (
                   <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>
                     <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Task</Button></DialogTrigger>
                     <DialogContent>

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, FolderKanban } from "lucide-react";
+import { Plus, FolderKanban, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -24,6 +24,7 @@ function ProjectsPage() {
   const qc = useQueryClient();
   const [openProject, setOpenProject] = useState(false);
   const [openTask, setOpenTask] = useState<string | null>(null);
+  const [logFor, setLogFor] = useState<{ id: string; code: string; name: string } | null>(null);
 
   const [pName, setPName] = useState(""); const [pCode, setPCode] = useState(""); const [pClient, setPClient] = useState(""); const [pDesc, setPDesc] = useState(""); const [pStatus, setPStatus] = useState<"active"|"on_hold"|"completed">("active");
   const [tTitle, setTTitle] = useState(""); const [tDesc, setTDesc] = useState(""); const [tDue, setTDue] = useState(""); const [tPri, setTPri] = useState<"low"|"medium"|"high">("medium"); const [tAssign, setTAssign] = useState<string>("");
@@ -38,6 +39,26 @@ function ProjectsPage() {
     enabled: !!me?.isAdmin,
     queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
   });
+
+  const { data: timeLog } = useQuery({
+    queryKey: ["project-time-log", logFor?.code],
+    enabled: !!logFor && !!me?.isAdmin,
+    queryFn: async () => {
+      const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks");
+      const { data: profs } = await supabase.from("profiles").select("id, full_name, email");
+      const nameOf = (uid: string) => profs?.find((p) => p.id === uid)?.full_name ?? profs?.find((p) => p.id === uid)?.email ?? "Unknown";
+      const rows: { date: string; user: string; hours: number; comments: string }[] = [];
+      (data ?? []).forEach((log: any) => {
+        (log.tasks ?? []).forEach((t: any) => {
+          if (t.project_code === logFor!.code || t.project_id === logFor!.id) {
+            rows.push({ date: log.date, user: nameOf(log.user_id), hours: Number(t.hours) || 0, comments: t.comments ?? "" });
+          }
+        });
+      });
+      return rows.sort((a, b) => b.date.localeCompare(a.date));
+    },
+  });
+  const logTotal = (timeLog ?? []).reduce((s, r) => s + r.hours, 0);
 
   async function createProject() {
     if (!pName) return toast.error("Name required");
@@ -100,34 +121,39 @@ function ProjectsPage() {
                 <CardTitle className="font-display flex items-center gap-2"><FolderKanban className="h-4 w-4 text-primary" />{p.name}</CardTitle>
                 <CardDescription><span className="font-mono text-xs mr-2">{p.code}</span>· {p.client_name ?? "Internal"} · <Badge variant="outline" className="capitalize ml-1">{p.status.replace("_", " ")}</Badge></CardDescription>
               </div>
-              {me?.isAdmin && (
-                <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>
-                  <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Task</Button></DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader><DialogTitle className="font-display">Assign task in {p.name}</DialogTitle></DialogHeader>
-                    <div className="space-y-3">
-                      <div className="space-y-1"><Label>Title</Label><Input value={tTitle} onChange={(e) => setTTitle(e.target.value)} /></div>
-                      <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={tDesc} onChange={(e) => setTDesc(e.target.value)} /></div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1"><Label>Due date</Label><Input type="date" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
-                        <div className="space-y-1"><Label>Priority</Label>
-                          <Select value={tPri} onValueChange={(v) => setTPri(v as any)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent>
+              <div className="flex items-center gap-2">
+                {me?.isAdmin && (
+                  <Button size="sm" variant="outline" onClick={() => setLogFor({ id: p.id, code: p.code, name: p.name })}><Clock className="h-4 w-4 mr-1" /> Time log</Button>
+                )}
+                {me?.isAdmin && (
+                  <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>
+                    <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Task</Button></DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle className="font-display">Assign task in {p.name}</DialogTitle></DialogHeader>
+                      <div className="space-y-3">
+                        <div className="space-y-1"><Label>Title</Label><Input value={tTitle} onChange={(e) => setTTitle(e.target.value)} /></div>
+                        <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={tDesc} onChange={(e) => setTDesc(e.target.value)} /></div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1"><Label>Due date</Label><Input type="date" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
+                          <div className="space-y-1"><Label>Priority</Label>
+                            <Select value={tPri} onValueChange={(v) => setTPri(v as any)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-1"><Label>Assign to</Label>
+                          <Select value={tAssign} onValueChange={setTAssign}>
+                            <SelectTrigger><SelectValue placeholder="Team member" /></SelectTrigger>
+                            <SelectContent>{people?.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>)}</SelectContent>
                           </Select>
                         </div>
                       </div>
-                      <div className="space-y-1"><Label>Assign to</Label>
-                        <Select value={tAssign} onValueChange={setTAssign}>
-                          <SelectTrigger><SelectValue placeholder="Team member" /></SelectTrigger>
-                          <SelectContent>{people?.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter><Button onClick={() => createTask(p.id)} className="gradient-primary">Assign</Button></DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
+                      <DialogFooter><Button onClick={() => createTask(p.id)} className="gradient-primary">Assign</Button></DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {p.description && <p className="text-sm text-muted-foreground mb-3">{p.description}</p>}
@@ -154,6 +180,30 @@ function ProjectsPage() {
           </Card>
         ))}
       </div>
+
+      <Dialog open={!!logFor} onOpenChange={(o) => !o && setLogFor(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Time log · {logFor?.name}</DialogTitle>
+            <div className="text-xs text-muted-foreground"><span className="font-mono">{logFor?.code}</span> · Total: <span className="font-semibold text-foreground">{logTotal.toFixed(2)} h</span> across {timeLog?.length ?? 0} entries</div>
+          </DialogHeader>
+          <div className="space-y-2 mt-2">
+            {(timeLog?.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">No time logged on this project yet.</p>}
+            {timeLog?.map((r, i) => (
+              <div key={i} className="rounded-lg border border-border/60 p-3">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="font-medium">{r.user}</div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{format(new Date(r.date), "EEE, MMM d")}</span>
+                    <Badge variant="outline">{r.hours.toFixed(2)}h</Badge>
+                  </div>
+                </div>
+                {r.comments && <div className="mt-1 text-xs text-muted-foreground">{r.comments}</div>}
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

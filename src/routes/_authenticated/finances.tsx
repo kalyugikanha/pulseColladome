@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Wallet, TrendingUp, IndianRupee, Users } from "lucide-react";
+import { Wallet, IndianRupee, Users, UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/finances")({
 
 type Profile = { id: string; full_name: string | null; email: string | null };
 type Salary = { id: string; user_id: string; monthly_salary: number; currency: string; effective_from: string };
+type Grant = { email: string; role: string; default_monthly_salary: number | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
 
 function monthKey(d: string | Date) {
@@ -38,6 +40,12 @@ function FinancesPage() {
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
+  });
+
+  const { data: grants } = useQuery({
+    queryKey: ["finances-grants"],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => (await supabase.from("role_grants").select("email, role, default_monthly_salary").order("email")).data as Grant[] ?? [],
   });
 
   const { data: salaries } = useQuery({
@@ -127,6 +135,26 @@ function FinancesPage() {
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
   const usersWithSalary = currentSalaryByUser.size;
 
+  // Merge profiles + grants so uninvited-but-signed-up and invited-but-unsigned users both appear
+  const profileEmails = useMemo(() => new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]), [profiles]);
+  const pendingGrants = useMemo(() => (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())), [grants, profileEmails]);
+  const grantByEmail = useMemo(() => {
+    const m = new Map<string, Grant>();
+    for (const g of grants ?? []) m.set(g.email.toLowerCase(), g);
+    return m;
+  }, [grants]);
+  const nameFromEmail = (e: string) => e.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const totalConfiguredPool = useMemo(() => {
+    let sum = 0;
+    for (const p of profiles ?? []) {
+      const s = currentSalaryByUser.get(p.id);
+      if (s) sum += Number(s.monthly_salary);
+      else if (p.email) sum += Number(grantByEmail.get(p.email.toLowerCase())?.default_monthly_salary ?? 0);
+    }
+    for (const g of pendingGrants) sum += Number(g.default_monthly_salary ?? 0);
+    return sum;
+  }, [profiles, currentSalaryByUser, grantByEmail, pendingGrants]);
+
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {
     throw redirect({ to: "/dashboard" });
@@ -147,17 +175,18 @@ function FinancesPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs logged`} />
-        <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${profiles?.length ?? 0} total`} />
-        <StatCard icon={<TrendingUp className="h-4 w-4" />} label="Projects with activity" value={String(burnByProject.size)} sub="this month" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="all salaries incl. pending" />
+        <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${(profiles?.length ?? 0) + pendingGrants.length} on roster`} />
+        <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(pendingGrants.length)} sub="invite sent, not registered" />
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Salaries</CardTitle>
-            <CardDescription>Only super admins can view or edit.</CardDescription>
+            <CardDescription>Every invited employee — pending signups show their configured salary but need to register first.</CardDescription>
           </div>
           <SalaryDialog profiles={profiles ?? []} onSaved={() => qc.invalidateQueries({ queryKey: ["finances-salaries"] })} />
         </CardHeader>
@@ -167,6 +196,7 @@ function FinancesPage() {
               <TableRow>
                 <TableHead>Employee</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Monthly salary</TableHead>
                 <TableHead>Effective from</TableHead>
               </TableRow>
@@ -174,15 +204,33 @@ function FinancesPage() {
             <TableBody>
               {(profiles ?? []).map((p) => {
                 const s = currentSalaryByUser.get(p.id);
+                const grant = p.email ? grantByEmail.get(p.email.toLowerCase()) : undefined;
+                const grantSalary = grant?.default_monthly_salary != null ? Number(grant.default_monthly_salary) : null;
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.email}</TableCell>
-                    <TableCell className="text-right">{s ? inr(Number(s.monthly_salary)) : <span className="text-muted-foreground">Not set</span>}</TableCell>
+                    <TableCell><Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/40">Active</Badge></TableCell>
+                    <TableCell className="text-right">
+                      {s ? inr(Number(s.monthly_salary))
+                        : grantSalary != null ? <span className="text-muted-foreground">{inr(grantSalary)} <span className="text-[10px]">(from invite)</span></span>
+                        : <span className="text-muted-foreground">Not set</span>}
+                    </TableCell>
                     <TableCell>{s?.effective_from ?? "—"}</TableCell>
                   </TableRow>
                 );
               })}
+              {pendingGrants.map((g) => (
+                <TableRow key={g.email} className="opacity-70">
+                  <TableCell className="font-medium">{nameFromEmail(g.email)}</TableCell>
+                  <TableCell className="text-muted-foreground">{g.email}</TableCell>
+                  <TableCell><Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Pending signup</Badge></TableCell>
+                  <TableCell className="text-right">
+                    {g.default_monthly_salary != null ? inr(Number(g.default_monthly_salary)) : <span className="text-muted-foreground">Not set</span>}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>

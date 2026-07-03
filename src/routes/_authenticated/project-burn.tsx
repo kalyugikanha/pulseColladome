@@ -33,6 +33,12 @@ function ProjectBurnPage() {
     queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data as Profile[] ?? [],
   });
 
+  const { data: grants } = useQuery({
+    queryKey: ["pb-grants"],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => (await supabase.from("role_grants").select("email, default_monthly_salary")).data as Array<{ email: string; default_monthly_salary: number | null }> ?? [],
+  });
+
   const { data: salaries } = useQuery({
     queryKey: ["pb-salaries"],
     enabled: !!me?.isFinanceAdmin,
@@ -127,7 +133,17 @@ function ProjectBurnPage() {
 
   const totalBurn = byProject.reduce((s, p) => s + p.burn, 0);
   const totalHours = byProject.reduce((s, p) => s + p.hours, 0);
-  const totalSalaryPool = useMemo(() => Array.from(salaryByUser.values()).reduce((s, v) => s + v, 0), [salaryByUser]);
+  // Pool includes signed-up salaries + pending grants (people who will get that salary once they sign up)
+  const totalSalaryPool = useMemo(() => {
+    const signedUp = Array.from(salaryByUser.values()).reduce((s, v) => s + v, 0);
+    const profileEmails = new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]);
+    const pending = (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())).reduce((s, g) => s + Number(g.default_monthly_salary ?? 0), 0);
+    return signedUp + pending;
+  }, [salaryByUser, profiles, grants]);
+  const pendingCount = useMemo(() => {
+    const profileEmails = new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]);
+    return (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())).length;
+  }, [profiles, grants]);
 
   // Daily trend for selected project (or all)
   const daysInMonth = useMemo(() => {
@@ -173,7 +189,7 @@ function ProjectBurnPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <Stat icon={<IndianRupee className="h-4 w-4" />} label="Burned this month" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs`} />
-        <Stat icon={<TrendingUp className="h-4 w-4" />} label="Salary pool" value={inr(totalSalaryPool)} sub={`${salaryByUser.size} employees`} />
+        <Stat icon={<TrendingUp className="h-4 w-4" />} label="Salary pool" value={inr(totalSalaryPool)} sub={`${salaryByUser.size} active${pendingCount ? ` · ${pendingCount} pending` : ""}`} />
         <Stat icon={<Flame className="h-4 w-4" />} label="Coverage" value={totalSalaryPool > 0 ? `${((totalBurn / totalSalaryPool) * 100).toFixed(0)}%` : "—"} sub="of salary pool allocated" />
         <Stat icon={<CalendarDays className="h-4 w-4" />} label="Active projects" value={String(byProject.length)} sub="with logged hours" />
       </div>

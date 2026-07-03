@@ -33,6 +33,12 @@ function ProjectBurnPage() {
     queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data as Profile[] ?? [],
   });
 
+  const { data: grants } = useQuery({
+    queryKey: ["pb-grants"],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => (await supabase.from("role_grants").select("email, default_monthly_salary")).data as Array<{ email: string; default_monthly_salary: number | null }> ?? [],
+  });
+
   const { data: salaries } = useQuery({
     queryKey: ["pb-salaries"],
     enabled: !!me?.isFinanceAdmin,

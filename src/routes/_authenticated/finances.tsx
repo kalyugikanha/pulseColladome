@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Wallet, TrendingUp, IndianRupee, Users, UserPlus } from "lucide-react";
+import { Wallet, IndianRupee, Users, UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,

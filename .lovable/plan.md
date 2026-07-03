@@ -1,46 +1,28 @@
-## Why most salaries are blank
+## Changes
 
-Only 3 people have actually signed up so far: **Arti, Jagjeet, Shubham**. Everyone else is on the invite list (`role_grants`) with a configured salary, but has no auth account yet — and a `salaries` row needs a real user id, so we can't create one until they sign up. The `handle_new_user` trigger will insert their salary automatically the moment they log in for the first time.
+### 1. "View as" dropdown shows all employees (including pending signups)
+In `src/components/top-bar.tsx`, also query `role_grants` and merge with `profiles`:
+- Signed-up users → use their profile id (works as today, switches session context).
+- Pending invitees (in `role_grants` but no matching profile by email) → show in the list, disabled/greyed with a "Pending signup" badge and not selectable (nothing to switch into — no user id exists yet).
+Sort combined list by name/email.
 
-Sweksha is a separate case: she signed up with `sweksha.colladome@gmail.com` but her invite is under `sweksha@colladome.in`, so the two don't link.
+### 2. Saturday rotation + Sunday as weekly off
+In `src/hooks/use-holidays.ts`, add helpers:
+- `isSundayOff(date)` → Sundays are always holidays.
+- `isSaturdayOff(date)` → 2nd and 4th Saturdays of the month are off; 1st, 3rd, 5th are working.
+- `isWeeklyOff(date)` → combines the two.
+- Update `nextHoliday(list)` to return the nearest of: next seeded holiday, next Sunday, or next off-Saturday — with a synthetic `{ name: "Sunday" | "2nd Saturday" | "4th Saturday" }` entry when the weekly off wins.
 
-Here's the current state:
+Also mark weekly-off days on the team calendar in `src/routes/_authenticated/calendar.tsx` using the same helper (subtle styling, alongside the seeded holidays already shown).
 
-```text
-Signed up + salary set: Arti, Jagjeet, Shubham
-Signed up, no match:    Sweksha (email mismatch)
-Not signed up yet (14): Akash, Anjali, Arpit, Chirag, Deepak, Hemanth,
-                        Juhi, Kanishka, Manvi, Neetu, Riyanshi, Sandeep,
-                        Shraddha, Trisha
-```
+### 3. Top bar next-holiday chip
+No structural change — it already reads `nextHoliday(holidays)`. With the helper update above, it will now automatically surface Sunday / 2nd- or 4th-Saturday when those are closer than the next seeded public holiday.
 
-## What I'll change
+## Not doing
+- No schema/migration changes — Saturday rotation is derived from the date, not stored.
+- No changes to leave-balance math (weekly offs already aren't counted as leave days).
 
-### 1. Show the full team on Finances + Project Burn, not just signed-up users
-
-Union `profiles` with `role_grants` so every invited employee appears. Rows with no profile show a **"Pending signup"** badge, use their `default_monthly_salary` from the grant for display, and are excluded from burn math (no logged hours yet anyway).
-
-Salary column shows:
-- Signed up + salary set → actual salary
-- Not signed up → grant salary + "Pending signup" badge
-- Signed up but no salary/grant → "Not set"
-
-### 2. Fix Sweksha's link
-
-Add a data fix so her existing profile (`sweksha.colladome@gmail.com`) gets the ₹5,000 salary row, and add `sweksha.colladome@gmail.com` to `role_grants` as an alias so future re-runs stay consistent.
-
-### 3. Small UX addition on Finances
-
-Add a "Pending invites" count card and a list of who hasn't signed up yet, so you can chase them.
-
-## Technical notes
-
-- New migration: (a) insert salary row for Sweksha's profile id at ₹5,000, (b) add grant row for `sweksha.colladome@gmail.com`.
-- `src/routes/_authenticated/finances.tsx`: query `role_grants` too, merge with `profiles` by lowercased email, render unified rows with status.
-- `src/routes/_authenticated/project-burn.tsx`: same merged list feeds the "salary pool" stat so it reflects total configured salaries, not just signed-up ones.
-- No schema change to the `salaries` table — its `user_id` FK stays intact.
-
-## What I won't do (unless you ask)
-
-- Bulk-create auth accounts for the 14 pending users. Per the earlier decision you chose "Self sign-up + forced change", so they'll sign up themselves with `Test@123` and get forced to change it.
-- Change salaries to be email-keyed. Keeping them tied to a real user id keeps RLS clean.
+## Files touched
+- `src/hooks/use-holidays.ts` — add weekly-off helpers, extend `nextHoliday`.
+- `src/components/top-bar.tsx` — merge `role_grants` into the View-as list; render pending rows disabled.
+- `src/routes/_authenticated/calendar.tsx` — mark Sundays and 2nd/4th Saturdays as off.

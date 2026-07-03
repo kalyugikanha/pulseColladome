@@ -143,8 +143,12 @@ function ProjectsPage() {
               </div>
               <div className="flex items-center gap-2">
                 {me?.canManageProjects && (
+                  <Button size="sm" variant="outline" onClick={() => setEditProject(p)}><Pencil className="h-4 w-4 mr-1" /> Edit</Button>
+                )}
+                {me?.canManageProjects && (
                   <Button size="sm" variant="outline" onClick={() => setLogFor({ id: p.id, code: p.code, name: p.name })}><Clock className="h-4 w-4 mr-1" /> Time log</Button>
                 )}
+
                 {me?.canManageProjects && (
                   <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>
                     <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Task</Button></DialogTrigger>

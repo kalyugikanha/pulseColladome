@@ -143,7 +143,7 @@ function AuthenticatedLayout() {
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />
             <div className="flex-1" />
-            <TopBar realUserId={user.realId} isSuperAdmin={user.isSuperAdmin || user.realId === user.id && user.viewingAs === false && user.isSuperAdmin} viewingAs={user.viewingAs} />
+            <TopBar realUserId={user.realId} isSuperAdmin={user.realIsSuperAdmin} viewingAs={user.viewingAs} />
           </header>
           <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto"><Outlet /></main>
         </div>

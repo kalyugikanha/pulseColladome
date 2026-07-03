@@ -14,6 +14,7 @@ export type CurrentUser = {
   isFinanceAdmin: boolean;
   mustChangePassword: boolean;
   viewingAs: boolean;
+  realIsSuperAdmin: boolean;
 };
 
 export function useCurrentUser() {
@@ -65,6 +66,7 @@ export function useCurrentUser() {
         isFinanceAdmin: vIsFinance,
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         viewingAs,
+        realIsSuperAdmin: isSuperAdmin,
       };
     },
   });

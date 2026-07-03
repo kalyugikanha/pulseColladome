@@ -1,36 +1,70 @@
 ## Goal
 
-Open the portal so anyone can sign up / log in with any email. Keep the super-admin-only "view as employee" toggle that already exists so only Shubham and Arti can impersonate other employees.
+1. Let super admins edit any project's details from the Projects page.
+2. Add a Vendors module with vendor list (seeded with Yash, Akash, Sufi) and per-project vendor payment tracking.
 
-## Changes
+## 1. Edit any project
 
-### 1. Remove invite-only signup restriction (migration)
+- Add `end_date DATE` column to `projects` (for full edit).
+- On the Projects page, add a pencil "Edit" button on each project card, visible only when `me.canManageProjects` (admins + project managers, which already includes super admins).
+- Opens a dialog pre-filled with all fields: Project ID (code), Name, Client, Description, Status, Start date, End date. Save → `update` on `projects`.
+- RLS already lets admins/super admins/project managers update projects; no policy change needed.
 
-Drop the trigger and function added in the previous turn:
+## 2. Vendors module
+
+### Schema (new migration)
 
 ```sql
-DROP TRIGGER IF EXISTS enforce_invite_only_signup_trg ON auth.users;
-DROP FUNCTION IF EXISTS public.enforce_invite_only_signup();
+CREATE TABLE public.vendors (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  email text,
+  phone text,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.vendor_payments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  project_id uuid REFERENCES projects(id) ON DELETE SET NULL,
+  amount numeric(12,2) NOT NULL,
+  currency text NOT NULL DEFAULT 'INR',
+  payment_date date NOT NULL DEFAULT CURRENT_DATE,
+  status text NOT NULL DEFAULT 'pending', -- pending | paid
+  description text,
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
 ```
 
-After this, `auth.users` accepts any new signup. The existing `handle_new_user` trigger continues to run and:
-- Creates a `profile` row
-- Applies any pre-assigned `role_grants` (so if Shubham pre-adds an email on the Access page, that role/salary still applies on first sign-in)
-- Otherwise defaults new users to the `employee` role
-- Seeds default leave balances
+- GRANTs to `authenticated` and `service_role`.
+- RLS: only super admins can select/insert/update/delete (`is_super_admin(auth.uid())`).
+- `updated_at` triggers on both.
+- Seed: insert Yash, Akash, Sufi into `vendors`.
 
-### 2. Update auth page copy
+### New page `/vendors` (super admin only)
 
-In `src/routes/auth.tsx`, remove the "Only invited email addresses can sign up…" helper text (if present) so the UI reflects open signup.
+- Sidebar link "Vendors" (icon: Users/Handshake), visible only when `me.isSuperAdmin`.
+- Route file `src/routes/_authenticated/vendors.tsx`. Redirects non-super-admins to `/dashboard`.
+- Layout:
+  - Section "Vendors": list with add / edit / delete. Fields: name, email, phone, notes.
+  - Section "Payments": table of all vendor payments with filters by vendor and project. "Log payment" dialog: vendor (select), project (select, optional), amount, currency (INR default), date, status, description. Row actions: edit, mark paid/pending, delete.
+  - Summary chips: total pending, total paid (current month).
 
-### 3. Nothing else changes
+### Projects page addition
 
-- **Impersonation is already built:** `useViewAs` + `use-current-user` already lets super admins switch the app view to any employee via the selector in the top bar. Non-super-admins never see the selector. No code changes needed here.
-- **Access & Roles page** (`/access`) stays super-admin-only for Shubham/Arti to pre-assign admin/finance/super-admin roles by email — still useful even with open signup.
-- No changes to login flow, Google OAuth, RLS, or any other route.
+- Under each project card, show a compact "Vendor payments" line for super admins: total pending + total paid on that project, with a "View" button that opens the same vendor payment log filtered to this project (dialog).
 
-## Result
+## Out of scope
 
-- Anyone can sign up at `/auth` and lands as a regular employee.
-- Shubham and Arti (super admins) keep the "View as" selector in the top bar to impersonate any employee's view.
-- Shubham and Arti keep the Access page to grant admin/super-admin privileges by email.
+- No invoice numbers, attachments, or payment methods (basic log only).
+- No changes to existing role model — super admin = Shubham + Arti.
+
+## Technical Details
+
+- Files touched: `supabase/migrations/*` (2 migrations: end_date + vendor schema/seed), `src/routes/_authenticated/vendors.tsx` (new), `src/routes/_authenticated/route.tsx` (sidebar link), `src/routes/_authenticated/projects.tsx` (edit dialog + per-project vendor payment strip).
+- All new writes use the browser Supabase client under RLS restricted to super admins.
+- No new secrets or connectors.

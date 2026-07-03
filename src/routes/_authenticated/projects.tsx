@@ -121,34 +121,39 @@ function ProjectsPage() {
                 <CardTitle className="font-display flex items-center gap-2"><FolderKanban className="h-4 w-4 text-primary" />{p.name}</CardTitle>
                 <CardDescription><span className="font-mono text-xs mr-2">{p.code}</span>· {p.client_name ?? "Internal"} · <Badge variant="outline" className="capitalize ml-1">{p.status.replace("_", " ")}</Badge></CardDescription>
               </div>
-              {me?.isAdmin && (
-                <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>
-                  <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Task</Button></DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader><DialogTitle className="font-display">Assign task in {p.name}</DialogTitle></DialogHeader>
-                    <div className="space-y-3">
-                      <div className="space-y-1"><Label>Title</Label><Input value={tTitle} onChange={(e) => setTTitle(e.target.value)} /></div>
-                      <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={tDesc} onChange={(e) => setTDesc(e.target.value)} /></div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1"><Label>Due date</Label><Input type="date" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
-                        <div className="space-y-1"><Label>Priority</Label>
-                          <Select value={tPri} onValueChange={(v) => setTPri(v as any)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent>
+              <div className="flex items-center gap-2">
+                {me?.isAdmin && (
+                  <Button size="sm" variant="outline" onClick={() => setLogFor({ id: p.id, code: p.code, name: p.name })}><Clock className="h-4 w-4 mr-1" /> Time log</Button>
+                )}
+                {me?.isAdmin && (
+                  <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>
+                    <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Task</Button></DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader><DialogTitle className="font-display">Assign task in {p.name}</DialogTitle></DialogHeader>
+                      <div className="space-y-3">
+                        <div className="space-y-1"><Label>Title</Label><Input value={tTitle} onChange={(e) => setTTitle(e.target.value)} /></div>
+                        <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={tDesc} onChange={(e) => setTDesc(e.target.value)} /></div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1"><Label>Due date</Label><Input type="date" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
+                          <div className="space-y-1"><Label>Priority</Label>
+                            <Select value={tPri} onValueChange={(v) => setTPri(v as any)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="medium">Medium</SelectItem><SelectItem value="high">High</SelectItem></SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-1"><Label>Assign to</Label>
+                          <Select value={tAssign} onValueChange={setTAssign}>
+                            <SelectTrigger><SelectValue placeholder="Team member" /></SelectTrigger>
+                            <SelectContent>{people?.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>)}</SelectContent>
                           </Select>
                         </div>
                       </div>
-                      <div className="space-y-1"><Label>Assign to</Label>
-                        <Select value={tAssign} onValueChange={setTAssign}>
-                          <SelectTrigger><SelectValue placeholder="Team member" /></SelectTrigger>
-                          <SelectContent>{people?.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter><Button onClick={() => createTask(p.id)} className="gradient-primary">Assign</Button></DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
+                      <DialogFooter><Button onClick={() => createTask(p.id)} className="gradient-primary">Assign</Button></DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {p.description && <p className="text-sm text-muted-foreground mb-3">{p.description}</p>}

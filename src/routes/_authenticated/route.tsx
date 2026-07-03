@@ -121,6 +121,14 @@ function AppSidebar({ isAdmin, isSuperAdmin, fullName, email }: { isAdmin: boole
 
 function AuthenticatedLayout() {
   const { data: user, isLoading } = useCurrentUser();
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    if (user?.mustChangePassword && pathname !== "/change-password") {
+      router.navigate({ to: "/change-password", replace: true });
+    }
+  }, [user, pathname, router]);
 
   if (isLoading || !user) {
     return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading workspace…</div>;

@@ -277,6 +277,30 @@ function FinancesPage() {
   );
 }
 
+function ProvisionButton({ pendingCount }: { pendingCount: number }) {
+  const qc = useQueryClient();
+  const run = useServerFn(provisionPendingUsers);
+  const mut = useMutation({
+    mutationFn: () => run(),
+    onSuccess: (res) => {
+      const parts: string[] = [];
+      if (res.created.length) parts.push(`${res.created.length} created`);
+      if (res.skipped.length) parts.push(`${res.skipped.length} skipped`);
+      if (res.errors.length) parts.push(`${res.errors.length} failed`);
+      toast.success(`Provisioning done — ${parts.join(", ") || "nothing to do"}.`);
+      if (res.errors.length) toast.error(res.errors.map((e) => `${e.email}: ${e.message}`).join("\n"));
+      qc.invalidateQueries();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Provisioning failed"),
+  });
+  return (
+    <Button size="sm" variant="outline" onClick={() => mut.mutate()} disabled={mut.isPending || pendingCount === 0}>
+      {mut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5 mr-1.5" />}
+      Provision pending ({pendingCount})
+    </Button>
+  );
+}
+
 function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub: string }) {
   return (
     <Card>

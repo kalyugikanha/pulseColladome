@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Wallet, IndianRupee, Users, UserPlus } from "lucide-react";
+import { Wallet, IndianRupee, Users, UserPlus, Loader2 } from "lucide-react";
+import { provisionPendingUsers } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
@@ -170,6 +172,7 @@ function FinancesPage() {
           <p className="text-sm text-muted-foreground">Salaries and monthly project burn (salary-share allocation).</p>
         </div>
         <div className="flex items-center gap-2">
+          {me?.realIsSuperAdmin && <ProvisionButton pendingCount={pendingGrants.length} />}
           <Label htmlFor="month" className="text-xs text-muted-foreground">Month</Label>
           <Input id="month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
         </div>

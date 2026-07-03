@@ -2,7 +2,8 @@ import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } fr
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet } from "lucide-react";
+import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame } from "lucide-react";
+import { TopBar } from "@/components/top-bar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -142,10 +143,7 @@ function AuthenticatedLayout() {
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />
             <div className="flex-1" />
-            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-              Live
-            </div>
+            <TopBar realUserId={user.realId} isSuperAdmin={user.isSuperAdmin || user.realId === user.id && user.viewingAs === false && user.isSuperAdmin} viewingAs={user.viewingAs} />
           </header>
           <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto"><Outlet /></main>
         </div>

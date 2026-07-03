@@ -44,6 +44,8 @@ export function useCurrentUser() {
       let vIsAdmin = realAdmin;
       let vIsSuper = isSuperAdmin;
       let vIsFinance = realFinance;
+      let vCanManageProjects = realAdmin || !!roles?.some((r) => r.role === "project_manager");
+
       if (isSuperAdmin && viewAsUserId && viewAsUserId !== user.id) {
         const { data: other } = await supabase.from("profiles").select("full_name, email").eq("id", viewAsUserId).maybeSingle();
         if (other) {

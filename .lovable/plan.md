@@ -1,13 +1,18 @@
-## Fix salary total (₹299,000 → ₹294,000)
+## Delete user — Sweksha Jadon (`sweksha.colladome@gmail.com`)
 
-Sweksha has two invite rows in `role_grants` — `sweksha@colladome.in` (₹5,000) and the alias `sweksha.colladome@gmail.com` (₹5,000). Because she hasn't signed up yet, both count as pending and inflate the pool by ₹5,000.
+Auth user id: `97151baf-852f-4dd0-93e7-2c74c604dda4`.
 
-### Change
-- Delete the alias `sweksha.colladome@gmail.com` from `role_grants` (data-only change via insert tool).
-- Keep `sweksha@colladome.in` — that's the invite the super-admin "Provision pending users" button will convert into a real account.
+### Steps
+1. **Delete from `auth.users`** via a one-off server call using `supabaseAdmin.auth.admin.deleteUser(id)`. This cascades to `profiles`, `user_roles`, `super_admins`, `leave_balances`, `leave_requests`, `salaries`, `punch_sessions`, `attendance_logs` — every table has `ON DELETE CASCADE` from the `auth.users` FK.
+2. **No changes to `role_grants`** — she already has no invite row (the only alias was `sweksha.colladome@gmail.com` and I removed it in the last turn; `sweksha@colladome.in` remains for the intended employee).
 
-Total pool becomes ₹294,000, matching the 15-employee roster.
+I'll trigger the delete by invoking the existing admin server function path — easiest is to add a tiny one-shot `deleteUser` server function scoped to super admin, or run it via a temporary migration using the auth admin API isn't possible from SQL. So: add `deleteUserById` server fn (super-admin only), call it once with her id from a shell/dev call, then leave the function in place for future use.
+
+Actually simpler for this one-off: run it through the existing invoke-server-function tool right after adding the function. The function stays available for future super-admin use.
+
+### Files touched
+- `src/lib/admin-users.functions.ts` — add `deleteUserById` (super-admin gated).
 
 ### Not doing
-- No schema or UI changes. The existing merge logic (profiles + pending grants) is correct as long as `role_grants` has one row per person.
-- No code guard against future alias duplicates — trivial to add later if invite aliases become common.
+- No UI button this turn; just the server capability + the one-shot invocation for Sweksha.
+- No changes to the `sweksha@colladome.in` invite.

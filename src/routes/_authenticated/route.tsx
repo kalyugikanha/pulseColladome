@@ -30,7 +30,7 @@ const employeeItems = [
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
 ] as const;
 
-function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, canManageProjects, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; canManageProjects: boolean; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();
@@ -75,16 +75,18 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, fullName, email }: 
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {isAdmin && (
+        {(isAdmin || canManageProjects) && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith("/team")}>
-                    <Link to="/team"><Users /><span>Team</span></Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {isAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/team")}>
+                      <Link to="/team"><Users /><span>Team</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {isFinanceAdmin && (
                   <>
                     <SidebarMenuItem>
@@ -99,13 +101,15 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, fullName, email }: 
                     </SidebarMenuItem>
                   </>
                 )}
+                {canManageProjects && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
+                      <Link to="/hours-editor"><Clock /><span>Hours Editor</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {isSuperAdmin && (
                   <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
-                        <Link to="/hours-editor"><Clock /><span>Hours Editor</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/vendors")}>
                         <Link to="/vendors"><Handshake /><span>Vendors</span></Link>
@@ -123,6 +127,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, fullName, email }: 
             </SidebarGroupContent>
           </SidebarGroup>
         )}
+
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="flex items-center gap-2 px-1 py-1">
@@ -158,7 +163,7 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} fullName={user.fullName} email={user.email} />
+        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} canManageProjects={user.canManageProjects} fullName={user.fullName} email={user.email} />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />

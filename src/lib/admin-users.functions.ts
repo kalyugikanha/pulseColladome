@@ -1,6 +1,54 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+type Role = "admin" | "employee" | "project_manager";
+
+export const createTeamUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    email: string;
+    full_name?: string;
+    role?: Role;
+    is_super_admin?: boolean;
+    default_monthly_salary?: number | null;
+  }) => input)
+  .handler(async ({ data, context }) => {
+    const { data: isSuper, error: rpcErr } = await context.supabase.rpc("is_super_admin", { _user_id: context.userId });
+    if (rpcErr) throw new Error(rpcErr.message);
+    if (!isSuper) throw new Error("Forbidden");
+
+    const email = (data.email ?? "").trim().toLowerCase();
+    if (!email || !email.includes("@")) throw new Error("Valid email required");
+    const role: Role = data.role ?? "employee";
+    const full_name = (data.full_name ?? email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())).trim();
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error: grantErr } = await supabaseAdmin.from("role_grants").upsert({
+      email,
+      role,
+      is_super_admin: !!data.is_super_admin,
+      default_monthly_salary: data.default_monthly_salary ?? null,
+    }, { onConflict: "email" });
+    if (grantErr) throw new Error(grantErr.message);
+
+    const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: "Test@123",
+      email_confirm: true,
+      user_metadata: { full_name },
+    });
+    if (error) throw new Error(error.message);
+
+    if (created?.user?.id) {
+      await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", created.user.id);
+    }
+
+    return { ok: true, email, temporary_password: "Test@123" as const };
+  });
+
+
+
 export const provisionPendingUsers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

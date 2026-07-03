@@ -35,8 +35,9 @@ function HoursEditorPage() {
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (!meLoading && me && !me.isSuperAdmin) navigate({ to: "/dashboard", replace: true });
+    if (!meLoading && me && !me.canManageProjects) navigate({ to: "/dashboard", replace: true });
   }, [me, meLoading, navigate]);
+
 
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;

@@ -1,5 +1,5 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -23,9 +23,16 @@ type Vendor = { id: string; name: string; email: string | null; phone: string | 
 type Payment = { id: string; vendor_id: string; project_id: string | null; amount: number; currency: string; payment_date: string; status: "pending" | "paid"; description: string | null };
 
 function VendorsPage() {
-  const { data: me } = useCurrentUser();
+  const { data: me, isLoading: meLoading } = useCurrentUser();
+  const navigate = useNavigate();
   const qc = useQueryClient();
-  if (me && !me.isSuperAdmin) throw redirect({ to: "/dashboard" });
+
+  useEffect(() => {
+    if (!meLoading && me && !me.isSuperAdmin) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [me, meLoading, navigate]);
+
 
   const [openVendor, setOpenVendor] = useState<Vendor | "new" | null>(null);
   const [openPay, setOpenPay] = useState<Payment | "new" | null>(null);

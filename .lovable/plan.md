@@ -1,70 +1,26 @@
-## Goal
+## Diagnosis
 
-1. Let super admins edit any project's details from the Projects page.
-2. Add a Vendors module with vendor list (seeded with Yash, Akash, Sufi) and per-project vendor payment tracking.
+Two separate issues:
 
-## 1. Edit any project
+1. **Arti is not actually a super admin in the database.** In `role_grants` she is set as `role='employee', is_super_admin=false`, and she has no row in `super_admins` and no entry in `user_roles`. So `me.isSuperAdmin` is false for her — and every gate (Vendors page, project edit, etc.) correctly denies her.
 
-- Add `end_date DATE` column to `projects` (for full edit).
-- On the Projects page, add a pencil "Edit" button on each project card, visible only when `me.canManageProjects` (admins + project managers, which already includes super admins).
-- Opens a dialog pre-filled with all fields: Project ID (code), Name, Client, Description, Status, Start date, End date. Save → `update` on `projects`.
-- RLS already lets admins/super admins/project managers update projects; no policy change needed.
+2. **The Vendors page crashes for any non-super-admin** because `VendorsPage` does `throw redirect({ to: "/dashboard" })` inside the component render. TanStack Router treats that as a render error, not a navigation, so the error boundary shows "Something went wrong" — which is what Arti sees.
 
-## 2. Vendors module
+## Fix
 
-### Schema (new migration)
+### 1. Promote Arti to super admin (migration)
+- Update `role_grants` for `arti@colladome.com`: set `role='admin'`, `is_super_admin=true`.
+- Backfill for her existing account (id `9869d739-…`):
+  - Insert into `super_admins`.
+  - Insert `('admin')` into `user_roles` (ON CONFLICT DO NOTHING).
 
-```sql
-CREATE TABLE public.vendors (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  email text,
-  phone text,
-  notes text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
+### 2. Fix the Vendors route guard (frontend only)
+In `src/routes/_authenticated/vendors.tsx`:
+- Remove `throw redirect(...)` from the component body.
+- While `me` is loading, render a small loading state.
+- Once `me` is loaded and `!me.isSuperAdmin`, use `useEffect` + `useNavigate` to send them to `/dashboard`, and render nothing meanwhile.
 
-CREATE TABLE public.vendor_payments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  vendor_id uuid NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
-  project_id uuid REFERENCES projects(id) ON DELETE SET NULL,
-  amount numeric(12,2) NOT NULL,
-  currency text NOT NULL DEFAULT 'INR',
-  payment_date date NOT NULL DEFAULT CURRENT_DATE,
-  status text NOT NULL DEFAULT 'pending', -- pending | paid
-  description text,
-  created_by uuid REFERENCES auth.users(id),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-```
+### 3. Hide the Vendors sidebar link for non-super-admins
+In `src/routes/_authenticated/route.tsx`, only render the "Vendors" nav item when `me?.isSuperAdmin`, so employees like Arti wouldn't have seen the link before promotion.
 
-- GRANTs to `authenticated` and `service_role`.
-- RLS: only super admins can select/insert/update/delete (`is_super_admin(auth.uid())`).
-- `updated_at` triggers on both.
-- Seed: insert Yash, Akash, Sufi into `vendors`.
-
-### New page `/vendors` (super admin only)
-
-- Sidebar link "Vendors" (icon: Users/Handshake), visible only when `me.isSuperAdmin`.
-- Route file `src/routes/_authenticated/vendors.tsx`. Redirects non-super-admins to `/dashboard`.
-- Layout:
-  - Section "Vendors": list with add / edit / delete. Fields: name, email, phone, notes.
-  - Section "Payments": table of all vendor payments with filters by vendor and project. "Log payment" dialog: vendor (select), project (select, optional), amount, currency (INR default), date, status, description. Row actions: edit, mark paid/pending, delete.
-  - Summary chips: total pending, total paid (current month).
-
-### Projects page addition
-
-- Under each project card, show a compact "Vendor payments" line for super admins: total pending + total paid on that project, with a "View" button that opens the same vendor payment log filtered to this project (dialog).
-
-## Out of scope
-
-- No invoice numbers, attachments, or payment methods (basic log only).
-- No changes to existing role model — super admin = Shubham + Arti.
-
-## Technical Details
-
-- Files touched: `supabase/migrations/*` (2 migrations: end_date + vendor schema/seed), `src/routes/_authenticated/vendors.tsx` (new), `src/routes/_authenticated/route.tsx` (sidebar link), `src/routes/_authenticated/projects.tsx` (edit dialog + per-project vendor payment strip).
-- All new writes use the browser Supabase client under RLS restricted to super admins.
-- No new secrets or connectors.
+No RLS changes, no changes to vendor schema or business logic.

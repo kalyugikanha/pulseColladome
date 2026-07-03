@@ -57,6 +57,7 @@ export function useCurrentUser() {
           vIsSuper = !!otherSa;
           vIsAdmin = vIsSuper || !!otherRoles?.some((r) => r.role === "admin");
           vIsFinance = !!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase());
+          vCanManageProjects = vIsAdmin || !!otherRoles?.some((r) => r.role === "project_manager");
         }
       }
 
@@ -68,10 +69,12 @@ export function useCurrentUser() {
         isAdmin: vIsAdmin,
         isSuperAdmin: vIsSuper,
         isFinanceAdmin: vIsFinance,
+        canManageProjects: vCanManageProjects,
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         viewingAs,
         realIsSuperAdmin: isSuperAdmin,
       };
+
     },
   });
 }

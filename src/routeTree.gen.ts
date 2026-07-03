@@ -21,6 +21,7 @@ import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProjectBurnRouteImport } from './routes/_authenticated/project-burn'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
+import { Route as AuthenticatedHoursEditorRouteImport } from './routes/_authenticated/hours-editor'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
@@ -86,6 +87,12 @@ const AuthenticatedLeaveRoute = AuthenticatedLeaveRouteImport.update({
   path: '/leave',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedHoursEditorRoute =
+  AuthenticatedHoursEditorRouteImport.update({
+    id: '/hours-editor',
+    path: '/hours-editor',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFinancesRoute = AuthenticatedFinancesRouteImport.update({
   id: '/finances',
   path: '/finances',
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof AuthenticatedCalendarRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/finances': typeof AuthenticatedFinancesRoute
+  '/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -132,6 +140,7 @@ export interface FileRoutesByTo {
   '/calendar': typeof AuthenticatedCalendarRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/finances': typeof AuthenticatedFinancesRoute
+  '/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -151,6 +160,7 @@ export interface FileRoutesById {
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
+  '/_authenticated/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
   '/_authenticated/project-burn': typeof AuthenticatedProjectBurnRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/dashboard'
     | '/finances'
+    | '/hours-editor'
     | '/leave'
     | '/project-burn'
     | '/projects'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/dashboard'
     | '/finances'
+    | '/hours-editor'
     | '/leave'
     | '/project-burn'
     | '/projects'
@@ -205,6 +217,7 @@ export interface FileRouteTypes {
     | '/_authenticated/calendar'
     | '/_authenticated/dashboard'
     | '/_authenticated/finances'
+    | '/_authenticated/hours-editor'
     | '/_authenticated/leave'
     | '/_authenticated/project-burn'
     | '/_authenticated/projects'
@@ -308,6 +321,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLeaveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/hours-editor': {
+      id: '/_authenticated/hours-editor'
+      path: '/hours-editor'
+      fullPath: '/hours-editor'
+      preLoaderRoute: typeof AuthenticatedHoursEditorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/finances': {
       id: '/_authenticated/finances'
       path: '/finances'
@@ -344,6 +364,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
+  AuthenticatedHoursEditorRoute: typeof AuthenticatedHoursEditorRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
   AuthenticatedProjectBurnRoute: typeof AuthenticatedProjectBurnRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
@@ -359,6 +380,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
+  AuthenticatedHoursEditorRoute: AuthenticatedHoursEditorRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
   AuthenticatedProjectBurnRoute: AuthenticatedProjectBurnRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,

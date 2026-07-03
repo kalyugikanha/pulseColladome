@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { addMonths, endOfMonth, format, isWithinInterval, startOfMonth, startOfWeek, endOfWeek, addDays } from "date-fns";
 import { ChevronLeft, ChevronRight, PartyPopper } from "lucide-react";
-import { useHolidays } from "@/hooks/use-holidays";
+import { useHolidays, weeklyOffLabel } from "@/hooks/use-holidays";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
@@ -61,6 +61,7 @@ function CalendarPage() {
           <span key={k} className={`inline-flex items-center rounded-md border px-2 py-0.5 capitalize ${cls}`}>{k}</span>
         ))}
         <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 text-warning px-2 py-0.5"><PartyPopper className="h-3 w-3" />Holiday</span>
+        <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 text-muted-foreground px-2 py-0.5">Weekly off</span>
       </div>
 
       <Card>
@@ -74,8 +75,14 @@ function CalendarPage() {
               const dayLeaves = (leaves ?? []).filter((l: any) => isWithinInterval(d, { start: new Date(l.start_date), end: new Date(l.end_date) }));
               const iso = format(d, "yyyy-MM-dd");
               const holiday = holidayByDate.get(iso);
+              const offLabel = weeklyOffLabel(d);
+              const bg = holiday
+                ? "border-warning/50 bg-warning/10"
+                : offLabel
+                ? "border-border bg-muted/40"
+                : "border-border/50";
               return (
-                <div key={d.toISOString()} className={`min-h-[90px] rounded-md border p-2 ${holiday ? "border-warning/50 bg-warning/10" : "border-border/50"} ${inMonth ? holiday ? "" : "bg-surface/40" : "bg-transparent opacity-50"}`}>
+                <div key={d.toISOString()} className={`min-h-[90px] rounded-md border p-2 ${bg} ${inMonth ? (holiday || offLabel) ? "" : "bg-surface/40" : "bg-transparent opacity-50"}`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium">{format(d, "d")}</span>
                     {dayLeaves.length > 0 && <Badge variant="outline" className="h-4 px-1 text-[10px]">{dayLeaves.length}</Badge>}
@@ -83,6 +90,11 @@ function CalendarPage() {
                   {holiday && (
                     <div className="mb-1 truncate rounded px-1.5 py-0.5 text-[10px] font-semibold border border-warning/40 bg-warning/20 text-warning" title={holiday}>
                       🎉 {holiday}
+                    </div>
+                  )}
+                  {!holiday && offLabel && (
+                    <div className="mb-1 truncate rounded px-1.5 py-0.5 text-[10px] font-medium border border-border bg-background/40 text-muted-foreground" title={offLabel}>
+                      {offLabel}
                     </div>
                   )}
                   <div className="space-y-0.5">

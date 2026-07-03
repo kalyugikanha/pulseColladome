@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +7,8 @@ import { useViewAs } from "@/hooks/use-view-as";
 import { useHolidays, nextHoliday } from "@/hooks/use-holidays";
 import { CalendarClock, Eye } from "lucide-react";
 import { differenceInCalendarDays, format } from "date-fns";
+
+type Row = { id: string; label: string; sub?: string; pending?: boolean };
 
 export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: string; isSuperAdmin: boolean; viewingAs: boolean }) {
   const { viewAsUserId, setViewAsUserId } = useViewAs();
@@ -18,6 +21,25 @@ export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: st
     staleTime: 5 * 60_000,
     queryFn: async () => (await supabase.from("profiles").select("id, full_name, email").order("full_name")).data ?? [],
   });
+
+  const { data: grants } = useQuery({
+    queryKey: ["viewas-grants"],
+    enabled: isSuperAdmin,
+    staleTime: 5 * 60_000,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    queryFn: async () => ((await (supabase as any).from("role_grants").select("email")).data ?? []) as { email: string }[],
+  });
+
+  const rows = useMemo<Row[]>(() => {
+    const profileEmails = new Set((profiles ?? []).map((p) => (p.email ?? "").toLowerCase()));
+    const activeRows: Row[] = (profiles ?? [])
+      .filter((p) => p.id !== realUserId)
+      .map((p) => ({ id: p.id, label: p.full_name || p.email || "—", sub: p.email ?? undefined }));
+    const pendingRows: Row[] = (grants ?? [])
+      .filter((g) => g.email && !profileEmails.has(g.email.toLowerCase()))
+      .map((g) => ({ id: `pending:${g.email}`, label: g.email, pending: true }));
+    return [...activeRows, ...pendingRows].sort((a, b) => a.label.localeCompare(b.label));
+  }, [profiles, grants, realUserId]);
 
   return (
     <div className="flex items-center gap-3 flex-wrap justify-end">
@@ -33,12 +55,23 @@ export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: st
       {isSuperAdmin && (
         <div className="flex items-center gap-2">
           {viewingAs && <Badge variant="outline" className="text-[10px] gap-1"><Eye className="h-3 w-3" />Viewing as</Badge>}
-          <Select value={viewAsUserId ?? realUserId} onValueChange={(v) => setViewAsUserId(v === realUserId ? null : v)}>
-            <SelectTrigger className="h-8 w-[200px] text-xs"><SelectValue placeholder="View as…" /></SelectTrigger>
-            <SelectContent>
+          <Select
+            value={viewAsUserId ?? realUserId}
+            onValueChange={(v) => {
+              if (v.startsWith("pending:")) return;
+              setViewAsUserId(v === realUserId ? null : v);
+            }}
+          >
+            <SelectTrigger className="h-8 w-[220px] text-xs"><SelectValue placeholder="View as…" /></SelectTrigger>
+            <SelectContent className="max-h-[360px]">
               <SelectItem value={realUserId}>Myself (default)</SelectItem>
-              {(profiles ?? []).filter((p) => p.id !== realUserId).map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
+              {rows.map((r) => (
+                <SelectItem key={r.id} value={r.id} disabled={r.pending}>
+                  <span className="flex items-center gap-2">
+                    <span className={r.pending ? "text-muted-foreground" : ""}>{r.label}</span>
+                    {r.pending && <span className="text-[9px] rounded border border-border px-1 py-0 text-muted-foreground">Pending signup</span>}
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

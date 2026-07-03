@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, FolderKanban, Clock } from "lucide-react";
+import { Plus, FolderKanban, Clock, Pencil, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -25,9 +25,11 @@ function ProjectsPage() {
   const [openProject, setOpenProject] = useState(false);
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [logFor, setLogFor] = useState<{ id: string; code: string; name: string } | null>(null);
+  const [editProject, setEditProject] = useState<any | null>(null);
 
   const [pName, setPName] = useState(""); const [pCode, setPCode] = useState(""); const [pClient, setPClient] = useState(""); const [pDesc, setPDesc] = useState(""); const [pStatus, setPStatus] = useState<"active"|"on_hold"|"completed">("active");
   const [tTitle, setTTitle] = useState(""); const [tDesc, setTDesc] = useState(""); const [tDue, setTDue] = useState(""); const [tPri, setTPri] = useState<"low"|"medium"|"high">("medium"); const [tAssign, setTAssign] = useState<string>("");
+
 
   const { data: projects } = useQuery({
     queryKey: ["projects"],
@@ -59,6 +61,24 @@ function ProjectsPage() {
     },
   });
   const logTotal = (timeLog ?? []).reduce((s, r) => s + r.hours, 0);
+
+  const { data: vendorPayments } = useQuery({
+    queryKey: ["vendor-payments-by-project"],
+    enabled: !!me?.isSuperAdmin,
+    queryFn: async () => (await supabase.from("vendor_payments").select("project_id, amount, status")).data ?? [],
+  });
+  const paySummary = (projectId: string) => {
+    const rows = (vendorPayments ?? []).filter((r: any) => r.project_id === projectId);
+    return rows.reduce(
+      (acc: { pending: number; paid: number }, r: any) => {
+        if (r.status === "paid") acc.paid += Number(r.amount);
+        else acc.pending += Number(r.amount);
+        return acc;
+      },
+      { pending: 0, paid: 0 },
+    );
+  };
+
 
   async function createProject() {
     if (!pName) return toast.error("Name required");
@@ -123,8 +143,12 @@ function ProjectsPage() {
               </div>
               <div className="flex items-center gap-2">
                 {me?.canManageProjects && (
+                  <Button size="sm" variant="outline" onClick={() => setEditProject(p)}><Pencil className="h-4 w-4 mr-1" /> Edit</Button>
+                )}
+                {me?.canManageProjects && (
                   <Button size="sm" variant="outline" onClick={() => setLogFor({ id: p.id, code: p.code, name: p.name })}><Clock className="h-4 w-4 mr-1" /> Time log</Button>
                 )}
+
                 {me?.canManageProjects && (
                   <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>
                     <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Task</Button></DialogTrigger>
@@ -176,7 +200,22 @@ function ProjectsPage() {
                   </div>
                 ))}
               </div>
+              {me?.isSuperAdmin && (() => {
+                const s = paySummary(p.id);
+                return (
+                  <div className="mt-3 flex items-center justify-between rounded-lg border border-border/60 bg-surface/40 p-2 text-xs">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Wallet className="h-3.5 w-3.5" /> Vendor payments
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span>Pending: <span className="font-semibold text-foreground">₹ {s.pending.toLocaleString("en-IN")}</span></span>
+                      <span>Paid: <span className="font-semibold text-foreground">₹ {s.paid.toLocaleString("en-IN")}</span></span>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
+
           </Card>
         ))}
       </div>
@@ -204,6 +243,75 @@ function ProjectsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <EditProjectDialog project={editProject} onClose={() => setEditProject(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["projects"] })} />
     </div>
   );
 }
+
+function EditProjectDialog({ project, onClose, onSaved }: { project: any | null; onClose: () => void; onSaved: () => void }) {
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [client, setClient] = useState("");
+  const [desc, setDesc] = useState("");
+  const [status, setStatus] = useState<"active"|"on_hold"|"completed">("active");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+
+  useMemo(() => {
+    setCode(project?.code ?? "");
+    setName(project?.name ?? "");
+    setClient(project?.client_name ?? "");
+    setDesc(project?.description ?? "");
+    setStatus((project?.status ?? "active") as any);
+    setStart(project?.start_date ?? "");
+    setEnd(project?.end_date ?? "");
+  }, [project]);
+
+  async function save() {
+    if (!project) return;
+    if (!code.trim()) return toast.error("Project ID required");
+    if (!name.trim()) return toast.error("Name required");
+    const { error } = await supabase.from("projects").update({
+      code: code.trim().toUpperCase(),
+      name: name.trim(),
+      client_name: client.trim() || null,
+      description: desc.trim() || null,
+      status,
+      start_date: start || null,
+      end_date: end || null,
+    }).eq("id", project.id);
+    if (error) return toast.error(error.message);
+    toast.success("Project updated");
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <Dialog open={!!project} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="font-display">Edit project</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Project ID</Label><Input value={code} onChange={(e) => setCode(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+          </div>
+          <div className="space-y-1"><Label>Client</Label><Input value={client} onChange={(e) => setClient(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Description</Label><Textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1"><Label>Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="on_hold">On Hold</SelectItem><SelectItem value="completed">Completed</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label>Start date</Label><Input type="date" value={start ?? ""} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-1"><Label>End date</Label><Input type="date" value={end ?? ""} onChange={(e) => setEnd(e.target.value)} /></div>
+          </div>
+        </div>
+        <DialogFooter><Button onClick={save} className="gradient-primary">Save</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

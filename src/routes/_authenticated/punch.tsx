@@ -19,14 +19,14 @@ export const Route = createFileRoute("/_authenticated/punch")({
   component: PunchPage,
 });
 
-type TaskEntry = { task_description: string; hours: number; project_id?: string | null; task_id?: string | null };
+type TaskEntry = { project_id: string | null; project_code: string | null; project_name: string | null; hours: number; comments: string };
 
 function PunchPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const today = format(new Date(), "yyyy-MM-dd");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [entries, setEntries] = useState<TaskEntry[]>([{ task_description: "", hours: 0 }]);
+  const [entries, setEntries] = useState<TaskEntry[]>([{ project_id: null, project_code: null, project_name: null, hours: 0, comments: "" }]);
   const [dailyNote, setDailyNote] = useState("");
   const [nextActions, setNextActions] = useState("");
 
@@ -36,10 +36,10 @@ function PunchPage() {
     queryFn: async () => (await supabase.from("attendance_logs").select("*").eq("user_id", me!.id).eq("date", today).maybeSingle()).data,
   });
 
-  const { data: assignedTasks } = useQuery({
-    queryKey: ["my-tasks-for-log", me?.id],
+  const { data: projects } = useQuery({
+    queryKey: ["projects-for-log"],
     enabled: !!me,
-    queryFn: async () => (await supabase.from("tasks").select("id, title, project_id, project:projects(name)").eq("assignee_id", me!.id)).data ?? [],
+    queryFn: async () => (await supabase.from("projects").select("id, code, name").order("code")).data ?? [],
   });
 
   const { data: history } = useQuery({

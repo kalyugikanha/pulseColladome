@@ -146,6 +146,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          must_change_password: boolean
           updated_at: string
         }
         Insert: {
@@ -154,6 +155,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          must_change_password?: boolean
           updated_at?: string
         }
         Update: {
@@ -162,6 +164,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          must_change_password?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -223,6 +226,39 @@ export type Database = {
           email?: string
           is_super_admin?: boolean
           role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
+      salaries: {
+        Row: {
+          created_at: string
+          currency: string
+          effective_from: string
+          id: string
+          monthly_salary: number
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          effective_from?: string
+          id?: string
+          monthly_salary: number
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          effective_from?: string
+          id?: string
+          monthly_salary?: number
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

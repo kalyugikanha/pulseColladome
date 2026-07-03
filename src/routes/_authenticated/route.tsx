@@ -1,11 +1,13 @@
 import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Activity, Shield } from "lucide-react";
+import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import logo from "@/assets/colladome-logo.png.asset.json";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -45,8 +47,8 @@ function AppSidebar({ isAdmin, isSuperAdmin, fullName, email }: { isAdmin: boole
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <Link to="/dashboard" className="flex items-center gap-2 px-2 py-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary shadow-glow">
-            <Activity className="h-4 w-4 text-primary-foreground" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-black overflow-hidden">
+            <img src={logo.url} alt="Colladome" className="h-7 w-7 object-contain" />
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="font-display text-sm font-bold">Colladome Pulse</span>
@@ -83,11 +85,18 @@ function AppSidebar({ isAdmin, isSuperAdmin, fullName, email }: { isAdmin: boole
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 {isSuperAdmin && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/access")}>
-                      <Link to="/access"><Shield /><span>Access & Roles</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/finances")}>
+                        <Link to="/finances"><Wallet /><span>Finances</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/access")}>
+                        <Link to="/access"><Shield /><span>Access & Roles</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
                 )}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -112,6 +121,14 @@ function AppSidebar({ isAdmin, isSuperAdmin, fullName, email }: { isAdmin: boole
 
 function AuthenticatedLayout() {
   const { data: user, isLoading } = useCurrentUser();
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    if (user?.mustChangePassword && pathname !== "/change-password") {
+      router.navigate({ to: "/change-password", replace: true });
+    }
+  }, [user, pathname, router]);
 
   if (isLoading || !user) {
     return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading workspace…</div>;

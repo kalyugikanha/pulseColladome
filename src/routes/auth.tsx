@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Activity } from "lucide-react";
+import logo from "@/assets/colladome-logo.png.asset.json";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -41,6 +42,10 @@ function AuthPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (password === "Test@123") {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) await supabase.from("profiles").update({ must_change_password: true }).eq("id", user.id);
+        }
       }
       router.navigate({ to: "/dashboard", replace: true });
     } catch (err) {
@@ -60,8 +65,8 @@ function AuthPage() {
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
       <div className="hidden lg:flex relative overflow-hidden gradient-surface p-12 flex-col justify-between border-r border-border">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary shadow-glow">
-            <Activity className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-black shadow-glow overflow-hidden">
+            <img src={logo.url} alt="Colladome" className="h-10 w-10 object-contain" />
           </div>
           <div>
             <div className="font-display text-lg font-bold">Colladome Pulse</div>
@@ -112,9 +117,9 @@ function AuthPage() {
                 <form onSubmit={handleEmail} className="space-y-3 pt-2">
                   <div className="space-y-1"><Label htmlFor="n2">Full name</Label><Input id="n2" required value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
                   <div className="space-y-1"><Label htmlFor="e2">Work email</Label><Input id="e2" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-                  <div className="space-y-1"><Label htmlFor="p2">Password</Label><Input id="p2" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+                  <div className="space-y-1"><Label htmlFor="p2">Password</Label><Input id="p2" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Test@123" /></div>
                   <Button type="submit" className="w-full" disabled={loading}>Create account</Button>
-                  <p className="text-xs text-muted-foreground">First registered account becomes the workspace admin.</p>
+                  <p className="text-xs text-muted-foreground">Tip: use the shared default <code className="rounded bg-muted px-1">Test@123</code> — you'll set your own password right after first sign-in.</p>
                 </form>
               </TabsContent>
             </Tabs>

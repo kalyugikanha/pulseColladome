@@ -169,6 +169,7 @@ export type Database = {
       projects: {
         Row: {
           client_name: string | null
+          code: string
           created_at: string
           created_by: string | null
           description: string | null
@@ -180,6 +181,7 @@ export type Database = {
         }
         Insert: {
           client_name?: string | null
+          code: string
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -191,6 +193,7 @@ export type Database = {
         }
         Update: {
           client_name?: string | null
+          code?: string
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -199,6 +202,42 @@ export type Database = {
           start_date?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      role_grants: {
+        Row: {
+          created_at: string
+          email: string
+          is_super_admin: boolean
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          is_super_admin?: boolean
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          is_super_admin?: boolean
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
+      super_admins: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -293,6 +332,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "employee"

@@ -1,11 +1,13 @@
 import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Activity, Shield } from "lucide-react";
+import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import logo from "@/assets/colladome-logo.png.asset.json";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,

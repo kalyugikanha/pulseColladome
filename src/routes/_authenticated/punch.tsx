@@ -58,7 +58,7 @@ function PunchPage() {
   }
 
   function openPunchOut() {
-    setEntries([{ task_description: "", hours: 0 }]);
+    setEntries([{ project_id: null, project_code: null, project_name: null, hours: 0, comments: "" }]);
     setDailyNote(""); setNextActions("");
     setDialogOpen(true);
   }
@@ -66,8 +66,9 @@ function PunchPage() {
   const totalHours = entries.reduce((s, e) => s + (Number(e.hours) || 0), 0);
 
   async function submitPunchOut() {
-    const cleanEntries = entries.filter((e) => e.task_description.trim() && Number(e.hours) > 0);
-    if (cleanEntries.length === 0) { toast.error("Log at least one task with hours."); return; }
+    const cleanEntries = entries.filter((e) => e.project_id && Number(e.hours) > 0 && e.comments.trim());
+    if (cleanEntries.length === 0) { toast.error("Each entry needs a project, hours, and comments."); return; }
+    if (cleanEntries.length !== entries.length) { toast.error("Fill project, hours, and comments for every row (or remove empty rows)."); return; }
     const now = new Date().toISOString();
     const computedTotal = totalHours || (log?.punch_in_time ? differenceInMinutes(new Date(), new Date(log.punch_in_time)) / 60 : 0);
     const { error } = await supabase.from("attendance_logs").update({

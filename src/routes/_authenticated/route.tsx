@@ -29,7 +29,7 @@ const employeeItems = [
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
 ] as const;
 
-function AppSidebar({ isAdmin, isSuperAdmin, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();
@@ -84,19 +84,19 @@ function AppSidebar({ isAdmin, isSuperAdmin, fullName, email }: { isAdmin: boole
                     <Link to="/team"><Users /><span>Team</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {isFinanceAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/finances")}>
+                      <Link to="/finances"><Wallet /><span>Finances</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {isSuperAdmin && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/finances")}>
-                        <Link to="/finances"><Wallet /><span>Finances</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/access")}>
-                        <Link to="/access"><Shield /><span>Access & Roles</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/access")}>
+                      <Link to="/access"><Shield /><span>Access & Roles</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 )}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -137,7 +137,7 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} fullName={user.fullName} email={user.email} />
+        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} fullName={user.fullName} email={user.email} />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />

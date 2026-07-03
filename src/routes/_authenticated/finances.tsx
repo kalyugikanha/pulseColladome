@@ -32,7 +32,7 @@ function FinancesPage() {
 
   const { data: profiles } = useQuery({
     queryKey: ["finances-profiles"],
-    enabled: !!me?.isSuperAdmin,
+    enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
       const { data, error } = await supabase.from("profiles").select("id, full_name, email").order("full_name");
       if (error) throw error;
@@ -42,7 +42,7 @@ function FinancesPage() {
 
   const { data: salaries } = useQuery({
     queryKey: ["finances-salaries"],
-    enabled: !!me?.isSuperAdmin,
+    enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
@@ -56,7 +56,7 @@ function FinancesPage() {
 
   const { data: logs } = useQuery({
     queryKey: ["finances-logs", month],
-    enabled: !!me?.isSuperAdmin,
+    enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
@@ -128,7 +128,7 @@ function FinancesPage() {
   const usersWithSalary = currentSalaryByUser.size;
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
-  if (!me?.isSuperAdmin) {
+  if (!me?.isFinanceAdmin) {
     throw redirect({ to: "/dashboard" });
   }
 

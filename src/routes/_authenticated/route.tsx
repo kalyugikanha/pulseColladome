@@ -102,6 +102,11 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, fullName, email }: 
                 {isSuperAdmin && (
                   <>
                     <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
+                        <Link to="/hours-editor"><Clock /><span>Hours Editor</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/vendors")}>
                         <Link to="/vendors"><Handshake /><span>Vendors</span></Link>
                       </SidebarMenuButton>

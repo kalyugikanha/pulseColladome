@@ -249,7 +249,8 @@ function SalaryDialog({ profiles, onSaved }: { profiles: Profile[]; onSaved: () 
     if (!userId || !amount) return toast.error("Employee and amount are required.");
     setSaving(true);
     try {
-      const { error } = await (supabase.from("salaries" as never) as never).insert({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("salaries").insert({
         user_id: userId,
         monthly_salary: Number(amount),
         effective_from: effective,

@@ -25,7 +25,7 @@ function ProjectsPage() {
   const [openProject, setOpenProject] = useState(false);
   const [openTask, setOpenTask] = useState<string | null>(null);
 
-  const [pName, setPName] = useState(""); const [pClient, setPClient] = useState(""); const [pDesc, setPDesc] = useState(""); const [pStatus, setPStatus] = useState<"active"|"on_hold"|"completed">("active");
+  const [pName, setPName] = useState(""); const [pCode, setPCode] = useState(""); const [pClient, setPClient] = useState(""); const [pDesc, setPDesc] = useState(""); const [pStatus, setPStatus] = useState<"active"|"on_hold"|"completed">("active");
   const [tTitle, setTTitle] = useState(""); const [tDesc, setTDesc] = useState(""); const [tDue, setTDue] = useState(""); const [tPri, setTPri] = useState<"low"|"medium"|"high">("medium"); const [tAssign, setTAssign] = useState<string>("");
 
   const { data: projects } = useQuery({
@@ -41,10 +41,11 @@ function ProjectsPage() {
 
   async function createProject() {
     if (!pName) return toast.error("Name required");
-    const { error } = await supabase.from("projects").insert({ name: pName, client_name: pClient || null, description: pDesc || null, status: pStatus, start_date: format(new Date(), "yyyy-MM-dd"), created_by: me!.id });
+    if (!pCode.trim()) return toast.error("Project ID required (e.g. CLDM00XXX)");
+    const { error } = await supabase.from("projects").insert({ code: pCode.trim().toUpperCase(), name: pName, client_name: pClient || null, description: pDesc || null, status: pStatus, start_date: format(new Date(), "yyyy-MM-dd"), created_by: me!.id });
     if (error) return toast.error(error.message);
     toast.success("Project created");
-    setPName(""); setPClient(""); setPDesc(""); setOpenProject(false);
+    setPName(""); setPCode(""); setPClient(""); setPDesc(""); setOpenProject(false);
     qc.invalidateQueries();
   }
 
@@ -70,7 +71,10 @@ function ProjectsPage() {
             <DialogContent>
               <DialogHeader><DialogTitle className="font-display">New project</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <div className="space-y-1"><Label>Name</Label><Input value={pName} onChange={(e) => setPName(e.target.value)} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><Label>Project ID</Label><Input placeholder="CLDM00XXX" value={pCode} onChange={(e) => setPCode(e.target.value)} /></div>
+                  <div className="space-y-1"><Label>Name</Label><Input value={pName} onChange={(e) => setPName(e.target.value)} /></div>
+                </div>
                 <div className="space-y-1"><Label>Client</Label><Input value={pClient} onChange={(e) => setPClient(e.target.value)} /></div>
                 <div className="space-y-1"><Label>Description</Label><Textarea rows={3} value={pDesc} onChange={(e) => setPDesc(e.target.value)} /></div>
                 <div className="space-y-1"><Label>Status</Label>
@@ -94,7 +98,7 @@ function ProjectsPage() {
             <CardHeader className="flex flex-row items-start justify-between">
               <div>
                 <CardTitle className="font-display flex items-center gap-2"><FolderKanban className="h-4 w-4 text-primary" />{p.name}</CardTitle>
-                <CardDescription>{p.client_name ?? "Internal"} · <Badge variant="outline" className="capitalize ml-1">{p.status.replace("_", " ")}</Badge></CardDescription>
+                <CardDescription><span className="font-mono text-xs mr-2">{p.code}</span>· {p.client_name ?? "Internal"} · <Badge variant="outline" className="capitalize ml-1">{p.status.replace("_", " ")}</Badge></CardDescription>
               </div>
               {me?.isAdmin && (
                 <Dialog open={openTask === p.id} onOpenChange={(o) => setOpenTask(o ? p.id : null)}>

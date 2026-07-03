@@ -19,14 +19,14 @@ export const Route = createFileRoute("/_authenticated/punch")({
   component: PunchPage,
 });
 
-type TaskEntry = { task_description: string; hours: number; project_id?: string | null; task_id?: string | null };
+type TaskEntry = { project_id: string | null; project_code: string | null; project_name: string | null; hours: number; comments: string };
 
 function PunchPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const today = format(new Date(), "yyyy-MM-dd");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [entries, setEntries] = useState<TaskEntry[]>([{ task_description: "", hours: 0 }]);
+  const [entries, setEntries] = useState<TaskEntry[]>([{ project_id: null, project_code: null, project_name: null, hours: 0, comments: "" }]);
   const [dailyNote, setDailyNote] = useState("");
   const [nextActions, setNextActions] = useState("");
 
@@ -36,10 +36,10 @@ function PunchPage() {
     queryFn: async () => (await supabase.from("attendance_logs").select("*").eq("user_id", me!.id).eq("date", today).maybeSingle()).data,
   });
 
-  const { data: assignedTasks } = useQuery({
-    queryKey: ["my-tasks-for-log", me?.id],
+  const { data: projects } = useQuery({
+    queryKey: ["projects-for-log"],
     enabled: !!me,
-    queryFn: async () => (await supabase.from("tasks").select("id, title, project_id, project:projects(name)").eq("assignee_id", me!.id)).data ?? [],
+    queryFn: async () => (await supabase.from("projects").select("id, code, name").order("code")).data ?? [],
   });
 
   const { data: history } = useQuery({
@@ -58,7 +58,7 @@ function PunchPage() {
   }
 
   function openPunchOut() {
-    setEntries([{ task_description: "", hours: 0 }]);
+    setEntries([{ project_id: null, project_code: null, project_name: null, hours: 0, comments: "" }]);
     setDailyNote(""); setNextActions("");
     setDialogOpen(true);
   }
@@ -66,8 +66,9 @@ function PunchPage() {
   const totalHours = entries.reduce((s, e) => s + (Number(e.hours) || 0), 0);
 
   async function submitPunchOut() {
-    const cleanEntries = entries.filter((e) => e.task_description.trim() && Number(e.hours) > 0);
-    if (cleanEntries.length === 0) { toast.error("Log at least one task with hours."); return; }
+    const cleanEntries = entries.filter((e) => e.project_id && Number(e.hours) > 0 && e.comments.trim());
+    if (cleanEntries.length === 0) { toast.error("Each entry needs a project, hours, and comments."); return; }
+    if (cleanEntries.length !== entries.length) { toast.error("Fill project, hours, and comments for every row (or remove empty rows)."); return; }
     const now = new Date().toISOString();
     const computedTotal = totalHours || (log?.punch_in_time ? differenceInMinutes(new Date(), new Date(log.punch_in_time)) / 60 : 0);
     const { error } = await supabase.from("attendance_logs").update({
@@ -140,34 +141,30 @@ function PunchPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Tasks worked on</Label>
+              <Label>Time entries — project, hours & comments are required</Label>
               {entries.map((e, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2 items-start">
-                  <div className="col-span-6">
-                    <Input placeholder="What did you work on?" value={e.task_description} onChange={(ev) => setEntries((p) => p.map((x, idx) => idx === i ? { ...x, task_description: ev.target.value } : x))} />
+                <div key={i} className="rounded-lg border border-border/60 p-3 space-y-2">
+                  <div className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-8">
+                      <Select value={e.project_id ?? ""} onValueChange={(v) => {
+                        const p = projects?.find((pr) => pr.id === v);
+                        setEntries((prev) => prev.map((x, idx) => idx === i ? { ...x, project_id: v, project_code: p?.code ?? null, project_name: p?.name ?? null } : x));
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="Select project (name + ID)" /></SelectTrigger>
+                        <SelectContent>
+                          {projects?.map((p) => <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
+                      <Input type="number" step="0.25" min="0" placeholder="hours" value={e.hours || ""} onChange={(ev) => setEntries((p) => p.map((x, idx) => idx === i ? { ...x, hours: Number(ev.target.value) } : x))} />
+                    </div>
+                    <Button variant="ghost" size="icon" className="col-span-1" onClick={() => setEntries((p) => p.filter((_, idx) => idx !== i))} disabled={entries.length === 1}><Trash2 className="h-4 w-4" /></Button>
                   </div>
-                  <div className="col-span-3">
-                    <Select value={e.task_id ?? "other"} onValueChange={(v) => {
-                      if (v === "other") setEntries((p) => p.map((x, idx) => idx === i ? { ...x, task_id: null, project_id: null } : x));
-                      else {
-                        const t = assignedTasks?.find((t) => t.id === v);
-                        setEntries((p) => p.map((x, idx) => idx === i ? { ...x, task_id: v, project_id: t?.project_id ?? null, task_description: x.task_description || t?.title || "" } : x));
-                      }
-                    }}>
-                      <SelectTrigger><SelectValue placeholder="Link task" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="other">Unassigned / Other</SelectItem>
-                        {assignedTasks?.map((t) => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Input type="number" step="0.25" min="0" placeholder="hrs" value={e.hours || ""} onChange={(ev) => setEntries((p) => p.map((x, idx) => idx === i ? { ...x, hours: Number(ev.target.value) } : x))} />
-                  </div>
-                  <Button variant="ghost" size="icon" className="col-span-1" onClick={() => setEntries((p) => p.filter((_, idx) => idx !== i))} disabled={entries.length === 1}><Trash2 className="h-4 w-4" /></Button>
+                  <Textarea rows={2} placeholder="Comments — what did you do on this project?" value={e.comments} onChange={(ev) => setEntries((p) => p.map((x, idx) => idx === i ? { ...x, comments: ev.target.value } : x))} />
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={() => setEntries((p) => [...p, { task_description: "", hours: 0 }])}><Plus className="h-4 w-4 mr-1" /> Add another task</Button>
+              <Button variant="outline" size="sm" onClick={() => setEntries((p) => [...p, { project_id: null, project_code: null, project_name: null, hours: 0, comments: "" }])}><Plus className="h-4 w-4 mr-1" /> Add another project</Button>
               <div className="text-right text-sm text-muted-foreground">Total: <span className="font-semibold text-foreground">{totalHours.toFixed(2)} h</span></div>
             </div>
             <div className="space-y-2"><Label>What did you complete today?</Label><Textarea rows={3} value={dailyNote} onChange={(e) => setDailyNote(e.target.value)} placeholder="Quick recap…" /></div>

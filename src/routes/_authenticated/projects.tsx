@@ -40,6 +40,26 @@ function ProjectsPage() {
     queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data ?? [],
   });
 
+  const { data: timeLog } = useQuery({
+    queryKey: ["project-time-log", logFor?.code],
+    enabled: !!logFor && !!me?.isAdmin,
+    queryFn: async () => {
+      const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks");
+      const { data: profs } = await supabase.from("profiles").select("id, full_name, email");
+      const nameOf = (uid: string) => profs?.find((p) => p.id === uid)?.full_name ?? profs?.find((p) => p.id === uid)?.email ?? "Unknown";
+      const rows: { date: string; user: string; hours: number; comments: string }[] = [];
+      (data ?? []).forEach((log: any) => {
+        (log.tasks ?? []).forEach((t: any) => {
+          if (t.project_code === logFor!.code || t.project_id === logFor!.id) {
+            rows.push({ date: log.date, user: nameOf(log.user_id), hours: Number(t.hours) || 0, comments: t.comments ?? "" });
+          }
+        });
+      });
+      return rows.sort((a, b) => b.date.localeCompare(a.date));
+    },
+  });
+  const logTotal = (timeLog ?? []).reduce((s, r) => s + r.hours, 0);
+
   async function createProject() {
     if (!pName) return toast.error("Name required");
     if (!pCode.trim()) return toast.error("Project ID required (e.g. CLDM00XXX)");

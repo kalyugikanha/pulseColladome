@@ -82,6 +82,13 @@ function AppSidebar({ isAdmin, isSuperAdmin, fullName, email }: { isAdmin: boole
                     <Link to="/team"><Users /><span>Team</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {isSuperAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/access")}>
+                      <Link to="/access"><Shield /><span>Access & Roles</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

@@ -6,6 +6,7 @@ export type CurrentUser = {
   email: string | null;
   fullName: string | null;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
 };
 
 export function useCurrentUser() {
@@ -15,15 +16,18 @@ export function useCurrentUser() {
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      const [{ data: profile }, { data: roles }] = await Promise.all([
+      const [{ data: profile }, { data: roles }, { data: sa }] = await Promise.all([
         supabase.from("profiles").select("full_name, email").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
+        supabase.from("super_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
       ]);
+      const isSuperAdmin = !!sa;
       return {
         id: user.id,
         email: profile?.email ?? user.email ?? null,
         fullName: profile?.full_name ?? null,
-        isAdmin: !!roles?.some((r) => r.role === "admin"),
+        isAdmin: isSuperAdmin || !!roles?.some((r) => r.role === "admin"),
+        isSuperAdmin,
       };
     },
   });

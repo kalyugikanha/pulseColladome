@@ -44,7 +44,9 @@ function FinancesPage() {
     queryKey: ["finances-salaries"],
     enabled: !!me?.isSuperAdmin,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("salaries" as never) as never)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from("salaries")
         .select("id, user_id, monthly_salary, currency, effective_from")
         .order("effective_from", { ascending: false });
       if (error) throw error;

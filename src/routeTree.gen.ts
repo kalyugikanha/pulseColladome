@@ -19,6 +19,7 @@ import { Route as AuthenticatedResourcesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/punch'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
+import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
@@ -72,6 +73,11 @@ const AuthenticatedLeaveRoute = AuthenticatedLeaveRouteImport.update({
   path: '/leave',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFinancesRoute = AuthenticatedFinancesRouteImport.update({
+  id: '/finances',
+  path: '/finances',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/access': typeof AuthenticatedAccessRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/access': typeof AuthenticatedAccessRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/_authenticated/access': typeof AuthenticatedAccessRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/punch': typeof AuthenticatedPunchRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/access'
     | '/calendar'
     | '/dashboard'
+    | '/finances'
     | '/leave'
     | '/projects'
     | '/punch'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/access'
     | '/calendar'
     | '/dashboard'
+    | '/finances'
     | '/leave'
     | '/projects'
     | '/punch'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/_authenticated/access'
     | '/_authenticated/calendar'
     | '/_authenticated/dashboard'
+    | '/_authenticated/finances'
     | '/_authenticated/leave'
     | '/_authenticated/projects'
     | '/_authenticated/punch'
@@ -257,6 +269,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLeaveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/finances': {
+      id: '/_authenticated/finances'
+      path: '/finances'
+      fullPath: '/finances'
+      preLoaderRoute: typeof AuthenticatedFinancesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -285,6 +304,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccessRoute: typeof AuthenticatedAccessRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedPunchRoute: typeof AuthenticatedPunchRoute
@@ -297,6 +317,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccessRoute: AuthenticatedAccessRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedPunchRoute: AuthenticatedPunchRoute,

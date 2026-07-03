@@ -71,7 +71,10 @@ function ProjectsPage() {
             <DialogContent>
               <DialogHeader><DialogTitle className="font-display">New project</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <div className="space-y-1"><Label>Name</Label><Input value={pName} onChange={(e) => setPName(e.target.value)} /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><Label>Project ID</Label><Input placeholder="CLDM00XXX" value={pCode} onChange={(e) => setPCode(e.target.value)} /></div>
+                  <div className="space-y-1"><Label>Name</Label><Input value={pName} onChange={(e) => setPName(e.target.value)} /></div>
+                </div>
                 <div className="space-y-1"><Label>Client</Label><Input value={pClient} onChange={(e) => setPClient(e.target.value)} /></div>
                 <div className="space-y-1"><Label>Description</Label><Textarea rows={3} value={pDesc} onChange={(e) => setPDesc(e.target.value)} /></div>
                 <div className="space-y-1"><Label>Status</Label>

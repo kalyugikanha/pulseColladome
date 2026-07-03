@@ -25,9 +25,11 @@ function ProjectsPage() {
   const [openProject, setOpenProject] = useState(false);
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [logFor, setLogFor] = useState<{ id: string; code: string; name: string } | null>(null);
+  const [editProject, setEditProject] = useState<any | null>(null);
 
   const [pName, setPName] = useState(""); const [pCode, setPCode] = useState(""); const [pClient, setPClient] = useState(""); const [pDesc, setPDesc] = useState(""); const [pStatus, setPStatus] = useState<"active"|"on_hold"|"completed">("active");
   const [tTitle, setTTitle] = useState(""); const [tDesc, setTDesc] = useState(""); const [tDue, setTDue] = useState(""); const [tPri, setTPri] = useState<"low"|"medium"|"high">("medium"); const [tAssign, setTAssign] = useState<string>("");
+
 
   const { data: projects } = useQuery({
     queryKey: ["projects"],

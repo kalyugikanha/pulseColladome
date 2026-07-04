@@ -1,15 +1,12 @@
 ## Fix
-Replace the native `<input type="month">` on `/timesheet` with two shadcn `Select` dropdowns (Month + Year) that drive the existing `month` state string (`YYYY-MM`).
+Replace the native `<input type="month">` on `/project-burn` with the same Month + Year shadcn `Select` pair used on the Timesheet page, driving the existing `month` state (`YYYY-MM`).
 
 ## Details
-- File: `src/routes/_authenticated/timesheet.tsx`
-- Remove the `Input`/`Label` month field.
-- Add two `Select`s:
-  - **Month**: options Jan–Dec (value = `01`…`12`, label = full month name).
-  - **Year**: options current year and 4 previous years (descending).
-- On change of either, recompose `` `${year}-${month}` `` and call `setMonth(...)`.
-- Keep the CSV filename, card title, empty-state message, and query key using the same `month` string — no other logic changes.
+- File: `src/routes/_authenticated/project-burn.tsx`
+- Remove the `Input`/`Label` month field (and `Input`/`Label` imports if unused elsewhere in the file).
+- Add Month select (Jan–Dec, values `01`–`12`) and Year select (current year + 4 previous).
+- Same on-change behavior: recompose `` `${year}-${month}` `` and `setMonth(...)`.
+- No other logic changes.
 
-## Not doing
-- No calendar popover, no date-fns Calendar component (overkill for month-only).
-- No changes to data fetching, pivot, drill-down, or access control.
+## Also (optional — say yes/no)
+Apply the same swap to `/hours-editor` and `/finances`, which use identical native month inputs. Default is **no** unless you want me to include them.

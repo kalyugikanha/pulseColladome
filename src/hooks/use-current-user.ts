@@ -30,7 +30,7 @@ export function useCurrentUser() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       const [{ data: profile }, { data: roles }, { data: sa }] = await Promise.all([
-        supabase.from("profiles").select("full_name, email, must_change_password").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("full_name, email, must_change_password, onboarding_completed").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase.from("super_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
       ]);
@@ -78,6 +78,7 @@ export function useCurrentUser() {
         isHrAdmin: vIsHr,
         canManageProjects: vCanManageProjects,
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
+        onboardingCompleted: !!(profile as { onboarding_completed?: boolean } | null)?.onboarding_completed,
         viewingAs,
         realIsSuperAdmin: isSuperAdmin,
         realIsHrAdmin,

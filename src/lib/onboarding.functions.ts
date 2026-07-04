@@ -15,7 +15,8 @@ export type OnboardingDocType =
 
 const REQUIRED_PROFILE_FIELDS = [
   "full_name","email","personal_email","phone","permanent_address","date_of_birth",
-  "linkedin_url","github_url","department","joined_on","day_start_time","standup_time",
+  "linkedin_url","github_url","facebook_url","instagram_url","twitter_url",
+  "department","joined_on","day_start_time","standup_time",
 ] as const;
 
 const REQUIRED_BANK_FIELDS = [
@@ -36,11 +37,19 @@ type ProfilePatch = {
   marriage_anniversary?: string | null;
   linkedin_url?: string | null;
   github_url?: string | null;
+  facebook_url?: string | null;
+  instagram_url?: string | null;
+  twitter_url?: string | null;
+  youtube_url?: string | null;
+  pinterest_url?: string | null;
   profile_picture_url?: string | null;
   department?: string | null;
   day_start_time?: string | null;
   standup_time?: string | null;
+  social_follows_confirmed_at?: string | null;
+  reviews_confirmed_at?: string | null;
 };
+
 
 type BankPatch = {
   account_holder_name?: string;

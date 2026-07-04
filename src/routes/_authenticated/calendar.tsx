@@ -432,7 +432,7 @@ function CalendarPage() {
         birthdays={openDay ? birthdaysForDay(openDay) : []}
         anniversaries={openDay ? anniversariesForDay(openDay) : []}
         holiday={openDay ? holidayByDate.get(format(openDay, "yyyy-MM-dd")) : undefined}
-        offLabel={openDay ? weeklyOffLabel(openDay) : ""}
+        offLabel={openDay ? (weeklyOffLabel(openDay) ?? "") : ""}
         colorForDept={colorForDept}
       />
     </div>

@@ -2,9 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 
 function html(body: string, status = 200) {
   return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Google Calendar</title><style>body{font-family:system-ui,sans-serif;background:#0b0b10;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.card{background:#16161d;border:1px solid #2a2a35;border-radius:14px;padding:28px 32px;max-width:420px;text-align:center}.ok{color:#4ade80}.err{color:#f87171}a{color:#8ab4f8}</style></head><body><div class="card">${body}</div><script>setTimeout(function(){try{window.close();}catch(e){}}, 1500);</script></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><title>Google Calendar</title><style>body{font-family:system-ui,sans-serif;background:#0b0b10;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.card{background:#16161d;border:1px solid #2a2a35;border-radius:14px;padding:28px 32px;max-width:420px;text-align:center}.ok{color:#4ade80}.err{color:#f87171}a{color:#8ab4f8}</style></head><body><div class="card">${body}</div></body></html>`,
     { status, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
+}
+
+function redirectToDashboard(origin: string) {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: `${origin}/dashboard` },
+  });
 }
 
 export const Route = createFileRoute("/api/public/google/callback")({
@@ -46,9 +53,7 @@ export const Route = createFileRoute("/api/public/google/callback")({
             );
           if (error) throw new Error(error.message);
 
-          return html(
-            `<h2 class="ok">Google Calendar connected</h2><p>${email ?? ""}</p><p>You can close this window.</p>`,
-          );
+          return redirectToDashboard(url.origin);
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : "Unknown error";
           return html(`<h2 class="err">Connection failed</h2><p>${msg}</p>`, 500);

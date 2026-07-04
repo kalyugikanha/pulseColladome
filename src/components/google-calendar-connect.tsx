@@ -63,11 +63,13 @@ export function GoogleCalendarConnectCard() {
 
   useEffect(() => () => stopPolling(), []);
 
-  const handleConnect = async () => {
+  const openOAuth = async (opts: { disconnectFirst: boolean }) => {
     if (isOpening) return;
 
     setIsOpening(true);
     setPopupBlocked(false);
+    setPendingUrl(null);
+    stopPolling();
 
     const authTab = window.open("about:blank", "_blank");
     if (authTab) {
@@ -77,6 +79,16 @@ export function GoogleCalendarConnectCard() {
     }
 
     try {
+      if (opts.disconnectFirst) {
+        try {
+          await disconnect();
+        } catch (e) {
+          // Non-fatal: continue to OAuth so user can re-link even if row was already gone.
+          console.warn("disconnect before reconnect failed", e);
+        }
+        await qc.invalidateQueries({ queryKey: ["my-google-status"] });
+      }
+
       const { url } = await getUrl();
       setPendingUrl(url);
 
@@ -91,10 +103,14 @@ export function GoogleCalendarConnectCard() {
       if (authTab && !authTab.closed) authTab.close();
       const message = e instanceof Error ? e.message : "Could not start Google sign-in";
       toast.error(message);
+      await qc.invalidateQueries({ queryKey: ["my-google-status"] });
     } finally {
       setIsOpening(false);
     }
   };
+
+  const handleConnect = () => openOAuth({ disconnectFirst: false });
+  const handleReconnect = () => openOAuth({ disconnectFirst: true });
 
   const disconnectMut = useMutation({
     mutationFn: () => disconnect(),
@@ -108,6 +124,7 @@ export function GoogleCalendarConnectCard() {
   if (isLoading) return null;
 
   if (status?.connected) {
+    const busy = isOpening || disconnectMut.isPending;
     return (
       <Card className="border-success/30 bg-success/5">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
@@ -118,13 +135,45 @@ export function GoogleCalendarConnectCard() {
               <div className="text-xs text-muted-foreground">{status.google_email}</div>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => disconnectMut.mutate()} disabled={disconnectMut.isPending}>
-            Disconnect
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleReconnect} disabled={busy}>
+              {isOpening ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin" />Reconnecting…</>
+              ) : (
+                <><ExternalLink className="h-3.5 w-3.5" />Reconnect</>
+              )}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => disconnectMut.mutate()} disabled={busy}>
+              Disconnect
+            </Button>
+          </div>
+          {popupBlocked && pendingUrl && (
+            <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+                <div>
+                  Your browser blocked the new tab.{" "}
+                  <a
+                    className="font-medium text-primary hover:underline"
+                    href={pendingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      setPopupBlocked(false);
+                      startPolling();
+                    }}
+                  >
+                    Open Google sign-in in a new tab
+                  </a>.
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
   }
+
 
   return (
     <Card className="border-primary/30 bg-primary/5">

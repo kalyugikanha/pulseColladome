@@ -1,24 +1,26 @@
-## Plan
+## Goal
+Add a one-click "Reconnect Google Calendar" button to the connected-state card that disconnects the current Google connection, clears local state, and immediately restarts the OAuth flow in a new tab — all from a single user click so the browser doesn't block the new tab.
 
-1. **Make the Google Calendar connect action top-level safe**
-   - Replace the popup-style `window.open(..., noopener/noreferrer)` behavior with a direct user-click anchor/button flow that opens Google in a real new tab.
-   - Keep a visible fallback link so popup blockers do not trap the user.
+## Changes (single file: `src/components/google-calendar-connect.tsx`)
 
-2. **Improve connection detection after Google authorization**
-   - Start polling the calendar connection status as soon as the OAuth tab/link is opened.
-   - Stop polling when the app detects the calendar is connected or after a short timeout.
-   - Show a clear “waiting for Google authorization” state instead of repeatedly saying the popup was blocked.
+1. **Add `handleReconnect` handler**
+   - Guard against double-click via existing `isOpening` state.
+   - Open `about:blank` in a `_blank` tab synchronously first (must happen inside the click handler to survive popup blockers).
+   - `await disconnect()` server fn to revoke/clear the existing connection row.
+   - `await getUrl()` for a fresh Google OAuth URL.
+   - `authTab.location.replace(url)` to send the already-open tab to Google. If the tab was blocked, fall back to the existing `popupBlocked` + `pendingUrl` UI.
+   - Invalidate `["my-google-status"]` and call `startPolling()` so the card flips to "connected" once callback completes.
+   - Toast on failure; if disconnect succeeds but OAuth URL fails, still refresh status so UI reflects the disconnected state.
 
-3. **Return users to the correct app origin**
-   - Keep the callback route using the same origin that started the Google OAuth flow, so preview connects back to preview and published connects back to published.
-   - Leave the Google callback path unchanged: `/api/public/google/callback`.
+2. **Connected-state card UI**
+   - Replace the single `Disconnect` button with a button group:
+     - Primary: `Reconnect` (calls `handleReconnect`, shows `Loader2` + "Reconnecting…" while `isOpening`).
+     - Ghost: `Disconnect` (unchanged behavior).
+   - Both buttons disabled while `isOpening` or `disconnectMut.isPending`.
 
-4. **Add better failure guidance for the common Google-side blocks**
-   - If Google still returns a 403, display practical guidance: use the published app URL, add the signing-in account as a Google OAuth test user, or publish the Google consent screen.
-   - Do not change CORS, app auth providers, or unrelated backend settings.
+3. **State reset**
+   - At the start of `handleReconnect`, clear `pendingUrl`, `popupBlocked`, and stop any prior polling so stale UI from a previous attempt doesn't leak through.
 
-## Technical details
-
-- Update only the Google Calendar connection component unless inspection during implementation reveals a callback-route bug.
-- Do not change OAuth client credentials or redirect URI structure in code.
-- Validate in the preview that clicking “Connect Google Calendar” produces a real `accounts.google.com` URL in a new tab/link flow and no longer loops on the blocked iframe/popup message.
+## Out of scope
+- No changes to server functions, callback route, OAuth scopes, or the disconnected-state card.
+- No changes to polling interval, preview detection, or 403 guidance copy.

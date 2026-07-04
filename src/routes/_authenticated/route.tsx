@@ -30,7 +30,7 @@ const employeeItems = [
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
 ] as const;
 
-function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, canManageProjects, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; canManageProjects: boolean; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();

@@ -22,7 +22,26 @@ function MeetingsPage() {
   const listEvents = useServerFn(listUserUpcomingEvents);
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
 
-  if (!me?.isSuperAdmin) {
+  const isSuper = !!me?.isSuperAdmin;
+
+  const { data: team, isLoading: teamLoading } = useQuery({
+    queryKey: ["team-google-statuses"],
+    queryFn: () => listStatuses(),
+    staleTime: 30_000,
+    enabled: isSuper,
+  });
+
+  const effectiveId = selectedUserId ?? team?.[0]?.user_id;
+  const selected = useMemo(() => (team ?? []).find((t) => t.user_id === effectiveId), [team, effectiveId]);
+
+  const { data: events, isFetching, refetch } = useQuery({
+    queryKey: ["team-google-events", effectiveId],
+    enabled: isSuper && !!effectiveId,
+    queryFn: () => listEvents({ data: { userId: effectiveId!, days: 7 } }),
+    staleTime: 60_000,
+  });
+
+  if (!isSuper) {
     return (
       <div className="mx-auto max-w-md text-center py-16">
         <h1 className="font-display text-2xl font-bold">Restricted</h1>
@@ -31,21 +50,6 @@ function MeetingsPage() {
     );
   }
 
-  const { data: team, isLoading: teamLoading } = useQuery({
-    queryKey: ["team-google-statuses"],
-    queryFn: () => listStatuses(),
-    staleTime: 30_000,
-  });
-
-  const effectiveId = selectedUserId ?? team?.[0]?.user_id;
-  const selected = useMemo(() => (team ?? []).find((t) => t.user_id === effectiveId), [team, effectiveId]);
-
-  const { data: events, isFetching, refetch } = useQuery({
-    queryKey: ["team-google-events", effectiveId],
-    enabled: !!effectiveId,
-    queryFn: () => listEvents({ data: { userId: effectiveId!, days: 7 } }),
-    staleTime: 60_000,
-  });
 
   const connectedCount = (team ?? []).filter((t) => t.connected).length;
 

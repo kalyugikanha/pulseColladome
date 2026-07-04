@@ -118,6 +118,11 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, canManageProjects, 
                 {isSuperAdmin && (
                   <>
                     <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/meetings")}>
+                        <Link to="/meetings"><Video /><span>Team Meetings</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/vendors")}>
                         <Link to="/vendors"><Handshake /><span>Vendors</span></Link>
                       </SidebarMenuButton>

@@ -1,7 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-type Role = "admin" | "employee" | "project_manager";
+type Role = "admin" | "employee" | "project_manager" | "hr_admin";
+type EmploymentType = "full_time" | "intern" | "contract" | "consultant";
+
+async function assertSuperOrHr(supabase: Awaited<ReturnType<typeof requireSupabaseAuth>> extends { supabase: infer S } ? S : never, userId: string) {
+  // Fallback typing: use supabase from context directly
+  return null;
+}
 
 export const createTeamUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -11,15 +17,36 @@ export const createTeamUser = createServerFn({ method: "POST" })
     role?: Role;
     is_super_admin?: boolean;
     default_monthly_salary?: number | null;
+    department?: string | null;
+    date_of_birth?: string | null;
+    joined_on?: string | null;
+    phone?: string | null;
+    employment_type?: EmploymentType | null;
+    notes?: string | null;
   }) => input)
   .handler(async ({ data, context }) => {
-    const { data: superRow, error: rpcErr } = await context.supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle();
-    if (rpcErr) throw new Error(rpcErr.message);
-    if (!superRow) throw new Error("Forbidden");
+    const [{ data: superRow }, { data: roleRows }] = await Promise.all([
+      context.supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle(),
+      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    const isSuper = !!superRow;
+    const isHr = !!roleRows?.some((r) => r.role === "hr_admin");
+    if (!isSuper && !isHr) throw new Error("Forbidden");
 
     const email = (data.email ?? "").trim().toLowerCase();
     if (!email || !email.includes("@")) throw new Error("Valid email required");
-    const role: Role = data.role ?? "employee";
+
+    let role: Role = data.role ?? "employee";
+    let isSuperAdmin = !!data.is_super_admin;
+    let defaultSalary = data.default_monthly_salary ?? null;
+
+    // HR admins can't create admins or super admins, and can't set salaries
+    if (!isSuper) {
+      if (role === "admin" || role === "hr_admin") role = "employee";
+      isSuperAdmin = false;
+      defaultSalary = null;
+    }
+
     const full_name = (data.full_name ?? email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())).trim();
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -27,8 +54,8 @@ export const createTeamUser = createServerFn({ method: "POST" })
     const { error: grantErr } = await supabaseAdmin.from("role_grants").upsert({
       email,
       role,
-      is_super_admin: !!data.is_super_admin,
-      default_monthly_salary: data.default_monthly_salary ?? null,
+      is_super_admin: isSuperAdmin,
+      default_monthly_salary: defaultSalary,
     }, { onConflict: "email" });
     if (grantErr) throw new Error(grantErr.message);
 
@@ -40,26 +67,62 @@ export const createTeamUser = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
 
-    if (created?.user?.id) {
-      await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", created.user.id);
+    const newId = created?.user?.id;
+    if (newId) {
+      const profileUpdate: Record<string, unknown> = { must_change_password: true };
+      if (data.department !== undefined) profileUpdate.department = data.department;
+      if (data.date_of_birth !== undefined) profileUpdate.date_of_birth = data.date_of_birth;
+      if (data.joined_on !== undefined) profileUpdate.joined_on = data.joined_on;
+      if (data.phone !== undefined) profileUpdate.phone = data.phone;
+      if (data.employment_type !== undefined) profileUpdate.employment_type = data.employment_type;
+      if (data.notes !== undefined) profileUpdate.notes = data.notes;
+      await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", newId);
     }
 
-    return { ok: true, email, temporary_password: "Test@123" as const };
+    return { ok: true, email, temporary_password: "Test@123" as const, user_id: newId ?? null };
   });
 
+export const updateEmployeeProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    user_id: string;
+    full_name?: string | null;
+    department?: string | null;
+    date_of_birth?: string | null;
+    joined_on?: string | null;
+    phone?: string | null;
+    employment_type?: EmploymentType | null;
+    notes?: string | null;
+  }) => input)
+  .handler(async ({ data, context }) => {
+    const [{ data: superRow }, { data: roleRows }] = await Promise.all([
+      context.supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle(),
+      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    if (!superRow && !roleRows?.some((r) => r.role === "hr_admin")) throw new Error("Forbidden");
 
+    const patch: Record<string, unknown> = {};
+    for (const k of ["full_name","department","date_of_birth","joined_on","phone","employment_type","notes"] as const) {
+      if (data[k] !== undefined) patch[k] = data[k];
+    }
+    if (Object.keys(patch).length === 0) return { ok: true };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("profiles").update(patch).eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
 
 export const provisionPendingUsers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    // Only super admins may provision users
+    // Only super admins may bulk-provision users
     const { data: superRow, error: rpcErr } = await context.supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle();
     if (rpcErr) throw new Error(rpcErr.message);
     if (!superRow) throw new Error("Forbidden");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Load grants + existing profile emails
     const [{ data: grants, error: gErr }, { data: profiles, error: pErr }] = await Promise.all([
       supabaseAdmin.from("role_grants").select("email"),
       supabaseAdmin.from("profiles").select("email"),
@@ -87,7 +150,6 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
         user_metadata: { full_name: nameFromEmail(email) },
       });
       if (error) {
-        // Account may already exist in auth without a profile row; treat as skipped/known
         if (/already registered|already exists|duplicate/i.test(error.message)) {
           skipped.push(email);
         } else {

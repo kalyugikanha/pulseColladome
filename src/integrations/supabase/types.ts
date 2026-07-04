@@ -64,6 +64,27 @@ export type Database = {
           },
         ]
       }
+      department_settings: {
+        Row: {
+          color: string
+          created_at: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       google_calendar_tokens: {
         Row: {
           access_token: string
@@ -205,33 +226,39 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          date_of_birth: string | null
           department: string | null
           email: string | null
           full_name: string | null
           id: string
           is_placeholder: boolean
+          joined_on: string | null
           must_change_password: boolean
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          date_of_birth?: string | null
           department?: string | null
           email?: string | null
           full_name?: string | null
           id: string
           is_placeholder?: boolean
+          joined_on?: string | null
           must_change_password?: boolean
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
+          date_of_birth?: string | null
           department?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
           is_placeholder?: boolean
+          joined_on?: string | null
           must_change_password?: boolean
           updated_at?: string
         }

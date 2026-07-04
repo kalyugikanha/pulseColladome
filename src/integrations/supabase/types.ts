@@ -579,10 +579,45 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      team_leave_calendar: {
+        Row: {
+          end_date: string | null
+          id: string | null
+          leave_type: Database["public"]["Enums"]["leave_type"] | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["leave_status"] | null
+          user_id: string | null
+        }
+        Insert: {
+          end_date?: string | null
+          id?: string | null
+          leave_type?: Database["public"]["Enums"]["leave_type"] | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["leave_status"] | null
+          user_id?: string | null
+        }
+        Update: {
+          end_date?: string | null
+          id?: string | null
+          leave_type?: Database["public"]["Enums"]["leave_type"] | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["leave_status"] | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_user_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
+      get_leave_reason: { Args: { _leave_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

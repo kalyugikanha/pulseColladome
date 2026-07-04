@@ -387,6 +387,19 @@ export function GoogleCalendarConnectCard() {
               </div>
             </div>
           )}
+          {popupBlocked && isOAuthBlockedContext && !pendingLaunchUrl && (
+            <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+                <div>
+                  Your browser blocked the published dashboard tab.{" "}
+                  <a className="font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+                    Open published dashboard
+                  </a>.
+                </div>
+              </div>
+            </div>
+          )}
           {panel}
         </CardContent>
       </Card>
@@ -434,6 +447,20 @@ export function GoogleCalendarConnectCard() {
                   startPolling();
                 }}>
                   Open Google sign-in in a new tab
+                </a>.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {popupBlocked && isOAuthBlockedContext && !pendingLaunchUrl && (
+          <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+              <div>
+                Your browser blocked the published dashboard tab.{" "}
+                <a className="font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+                  Open published dashboard
                 </a>.
               </div>
             </div>

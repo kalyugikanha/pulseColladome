@@ -107,9 +107,9 @@ export const updateEmployeeProfile = createServerFn({ method: "POST" })
     ]);
     if (!superRow && !roleRows?.some((r) => r.role === "hr_admin")) throw new Error("Forbidden");
 
-    const patch: Record<string, unknown> = {};
+    const patch: ProfilePatch = {};
     for (const k of ["full_name","department","date_of_birth","joined_on","phone","employment_type","notes"] as const) {
-      if (data[k] !== undefined) patch[k] = data[k];
+      if (data[k] !== undefined) (patch as Record<string, unknown>)[k] = data[k];
     }
     if (Object.keys(patch).length === 0) return { ok: true };
 

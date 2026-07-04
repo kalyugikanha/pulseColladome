@@ -601,7 +601,55 @@ export type Database = {
       }
     }
     Functions: {
+      admin_get_leave_requests: {
+        Args: { _status?: Database["public"]["Enums"]["leave_status"] }
+        Returns: {
+          admin_comment: string | null
+          created_at: string
+          days: number
+          decided_at: string | null
+          decided_by: string | null
+          end_date: string
+          id: string
+          leave_type: Database["public"]["Enums"]["leave_type"]
+          reason: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["leave_status"]
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "leave_requests"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
+      get_my_leave_requests: {
+        Args: never
+        Returns: {
+          admin_comment: string | null
+          created_at: string
+          days: number
+          decided_at: string | null
+          decided_by: string | null
+          end_date: string
+          id: string
+          leave_type: Database["public"]["Enums"]["leave_type"]
+          reason: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["leave_status"]
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "leave_requests"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

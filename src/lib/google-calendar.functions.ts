@@ -49,7 +49,7 @@ export const disconnectGoogleCalendar = createServerFn({ method: "POST" })
   });
 
 async function assertSuperAdmin(ctx: { supabase: any; userId: string }) {
-  const { data, error } = await ctx.supabase.rpc("is_super_admin", { _user_id: ctx.userId });
+  const { data, error } = await ctx.supabase.from("super_admins").select("user_id").eq("user_id", ctx.userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Forbidden");
 }

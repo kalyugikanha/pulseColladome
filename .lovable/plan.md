@@ -1,63 +1,31 @@
-## What "official email only" means here
+## Cleanup plan (data-only)
 
-Right now there are two kinds of profiles for the same real people:
+### 1. Rename Sandhya to her official email
 
-- **Placeholder profiles** (`id = 11111111‑…`, `email = *@placeholder.colladome.local`, `is_placeholder = true`) — seeded so June 2026 hours have someone to attach to.
-- **Real profiles** (real `id`, official `@colladome.in` / `@colladome.com` email) — created when the person actually signs in.
+- `…0013` → `email = sandhya@colladome.in`, `is_placeholder = false`, salary 0 (no salary row needed — she's already excluded from burn).
 
-For **Kanishka** and **Akash**, both exist. That's the duplication. For the rest, only the placeholder exists (no auth account yet), and its email is the fake `*.placeholder.colladome.local`.
+### 2. Remove Shaleen entirely (no longer with the company)
 
-## Fix (data-only migration)
+- Delete his `attendance_logs`, `leave_balances`, `leave_requests`, `punch_sessions`, `salaries`, `user_roles`, `super_admins` rows for id `…0014`.
+- Delete his `profiles` row.
+- His June hours (Oswal 60h + Outfitq 30h) go away with him.
 
-### 1. Merge duplicates — placeholder → real, then delete placeholder
+### 3. Treat all remaining placeholder profiles as "signed up"
 
-For each duplicate pair, re‑point all references (attendance, salaries, leave balances/requests, punch sessions, roles) from the placeholder id to the real id, then delete the placeholder profile.
+After steps 1–2, no `@placeholder.colladome.local` addresses remain. All twelve renamed placeholders (…0002, 0003, 0005–0012, plus 0013 now) already have `is_placeholder = false` from the previous migration, so the UI shows them as regular team members. No auth account is created yet — they show as fully provisioned people whose sheets, salaries, and burn are tracked under their official emails.
 
-| Placeholder (delete) | Real profile (keep) |
-|---|---|
-| `11111111‑…0001` Kanishka | `e0ce11c3…` kanishka@colladome.in |
-| `11111111‑…0004` Akash | `02cf3091…` akash@colladome.in |
+### 4. Later, when you say "moving to production"
 
-Conflict handling on re‑point:
-- `attendance_logs (user_id, date)` unique: if both ids have a row on the same date, merge task arrays and keep one; delete the placeholder row.
-- `salaries (user_id, effective_from)` unique: keep the real user's row; drop the placeholder duplicate.
-- `leave_balances (user_id, leave_type)` unique: sum `allocated`/`used`, keep real, drop placeholder.
-- `leave_requests`, `punch_sessions`: simple re‑point (no unique on user_id).
-- `user_roles`, `super_admins`: keep real user's existing rows.
+At that point I'll run — for every placeholder id (`11111111‑…0002/0003/0005‑0013`):
+1. Create the auth user with the official email + temp password `Test@123`, `email_confirm = true`, `must_change_password = true`.
+2. Re‑point all data (attendance, salaries, leave, punch, roles) from the placeholder id to the new real auth id.
+3. Delete the placeholder profile.
 
-### 2. Rename remaining placeholders to their official email
-
-Keep the placeholder id (no auth user yet), but flip `email` to the official address from `role_grants` and clear `is_placeholder`. That way Finances/Project Burn/Team see the real name and official email, and when the person eventually signs in the trigger will attach roles by matching email.
-
-| Placeholder id | New official email | Salary source |
-|---|---|---|
-| …0002 Deepak | deepak@colladome.in | grant 20000 |
-| …0003 Sharaddha | shraddha.saxena@colladome.in | grant 15000 |
-| …0005 Sweksha | sweksha@colladome.in | grant 5000 |
-| …0006 Chirag | chirag@colladome.com | grant 30000 |
-| …0007 Juhi | juhi@colladome.com | grant 20000 |
-| …0008 Anjali | anjali@colladome.in | grant 6000 |
-| …0009 Neetu | neetu@colladome.in | grant 2000 |
-| …0010 Sridhar Hemanth | hemanth@colladome.in | grant 10000 |
-| …0011 Manvi | manvi@colladome.in | grant 5000 |
-| …0012 Trisha | trisha@colladome.in | grant 5000 |
-
-### 3. Sandhya (…0013) and Shaleen (…0014)
-
-No matching `role_grants` entry, so no official email or salary on file. Two options — **tell me which**:
-
-- (a) Leave them as placeholders (their June hours stay logged but contribute 0 to burn), or
-- (b) Give me their official emails + monthly salaries and I'll rename + add salary in the same migration.
-
-## Not doing
-
-- Not creating auth accounts for the renamed placeholders. That still happens through **Access & Roles → Create account** when each person is onboarded.
-- Not changing UI/business logic.
+That way first sign-in forces `/change-password` before entering the app, and every historical June/July row keeps their name. This is the same `createTeamUser` flow already wired for Akash — I'll just batch it. **Do NOT do this until you say the word.**
 
 ## Technical
 
-Single migration wrapped in a transaction:
-- CTEs to detect same‑date `attendance_logs` collisions, merge task JSON arrays, delete losers.
-- `UPDATE … SET user_id = real_id WHERE user_id = placeholder_id` on the six user‑scoped tables, with `ON CONFLICT` handled per table above.
-- `DELETE FROM profiles WHERE id IN (…0001, …0004)`.
-- `UPDATE profiles SET email = …, is_placeholder = false WHERE id = …` for each renamed placeholder.
+Single migration:
+- `DELETE` cascade for Shaleen across the six user-scoped tables + `profiles`.
+- `UPDATE profiles SET email='sandhya@colladome.in', is_placeholder=false WHERE id='…0013'`.
+- Nothing else — no schema changes, no code changes.

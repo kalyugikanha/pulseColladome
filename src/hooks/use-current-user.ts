@@ -12,11 +12,12 @@ export type CurrentUser = {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isFinanceAdmin: boolean;
+  isHrAdmin: boolean;
   canManageProjects: boolean;
   mustChangePassword: boolean;
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
-
+  realIsHrAdmin: boolean;
 };
 
 export function useCurrentUser() {

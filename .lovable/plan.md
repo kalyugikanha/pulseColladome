@@ -1,87 +1,79 @@
+## Goal
 
-## Full Employee Onboarding — Self-Serve on First Login
+Extend the onboarding flow so new hires must (a) provide additional social profile links and (b) confirm they've followed Colladome on social media and left Google reviews for both office locations, before they can complete onboarding.
 
-Extend the existing onboarding module so every new hire fills a complete onboarding form (personal details, bank info, and document uploads) themselves on first login, and cannot access any other part of the tool until it's done.
+## Flow (updated)
 
-### 1. Flow
+```text
+Login → Change password → Complete onboarding
+   ├─ Personal details (+ new social fields)
+   ├─ Work preferences
+   ├─ Bank details
+   ├─ Documents
+   ├─ NEW: Follow & Review Colladome  ← mandatory checklist
+   └─ Submit → app unlocks
+```
 
-1. HR/Super Admin creates the account on `/onboarding` (email + role + joining date, as today). Temporary password `Test@123`, `must_change_password = true`, `onboarding_completed = false`.
-2. New hire logs in → forced to `/change-password` (existing flow).
-3. After password change → forced to new `/complete-onboarding` route.
-4. Only after every required field + document is submitted does `onboarding_completed` flip to `true` and the app unlocks (`/dashboard`, etc.).
+## Changes
 
-Hard block: a root-level guard in `_authenticated/route.tsx` redirects to `/complete-onboarding` for any signed-in user with `onboarding_completed = false` (except the onboarding route itself, `/change-password`, and sign-out). No dashboard, calendar, tasks, punch, etc.
+### 1. Personal details — add social profile fields (all required)
 
-### 2. Onboarding form fields (all required unless noted)
+Extend the Personal section with:
+- Facebook profile URL
+- Instagram profile URL
+- X (Twitter) profile URL
+- YouTube channel URL (optional)
+- Pinterest profile URL (optional)
 
-**Personal**
-- Full name, Official email (read-only, from auth), Personal email
-- Phone number, Permanent address (textarea)
-- Date of birth, Marriage anniversary *(optional)*
-- LinkedIn profile URL, GitHub/GitLab URL
-- Profile picture (image upload)
+Keep existing LinkedIn and GitHub/GitLab fields.
 
-**Work**
-- Job department (dropdown — same list as today)
-- Joining date (pre-filled by HR, read-only)
-- Preferred day-start time, Preferred standup time
+### 2. New section: "Follow & Review Colladome" (mandatory)
 
-**Bank details**
-- Account holder name, Account number, Bank branch, IFSC code, PAN card number
+A single card rendered after Documents. Contains two groups of checkboxes; every item must be ticked before submit is allowed.
 
-**Document uploads** (PDF/JPG/PNG, max 10 MB each)
-- Signed offer letter, Aadhar card, PAN card, Cancelled cheque
-- 10th marksheet, 12th marksheet, Graduation certificate
-- Master's certificate *(optional)*
-- Updated resume
+**Follow our channels** (each row: link opens in new tab + checkbox "I've followed"):
+- Facebook — facebook.com/socialcolladome
+- Instagram — instagram.com/socialcolladome
+- X (Twitter) — x.com/SocialColladome
+- LinkedIn — linkedin.com/company/colladome
+- YouTube — youtube.com/channel/UCYXQcDiCeW6QVr5oBHWs0uQ
+- Pinterest — pinterest.com/SocialColladome
+- WhatsApp channel — whatsapp.com/channel/0029VaCRgsEBA1etwQIXHy2C
 
-### 3. Database changes (one migration)
+**Review us** (each row: link + checkbox "I've left a review"):
+- Google Review — Jaipur location (g.page/r/CWFNs919eeVQEBM/review)
+- Google Review — Hyderabad location (link placeholder — see Open Questions)
+- Glassdoor Review
+- AmbitionBox Review
 
-- `profiles`: add
-  - `personal_email text`, `permanent_address text`
-  - `marriage_anniversary date`
-  - `linkedin_url text`, `github_url text`
-  - `profile_picture_url text`
-  - `day_start_time time`, `standup_time time`
-  - `onboarding_completed boolean not null default false`
-  - `onboarding_completed_at timestamptz`
-- New table `public.employee_bank_details` (1:1 with user): account_holder_name, account_number, bank_branch, ifsc_code, pan_number. RLS: user reads/writes own row; super_admin + hr_admin read all.
-- New table `public.employee_documents`: `user_id`, `doc_type` (enum: offer_letter, aadhar, pan, cancelled_cheque, marksheet_10, marksheet_12, graduation, masters, resume, profile_picture), `storage_path`, `uploaded_at`. Unique `(user_id, doc_type)`. RLS: user inserts/updates own; super_admin + hr_admin read all; user reads own only for uploaded-file confirmation (no download URL rendered on their side per spec).
-- Storage bucket `employee-documents` (private). RLS on `storage.objects`:
-  - User can insert/update objects under `${auth.uid()}/…`.
-  - Only super_admin + hr_admin can `select` (download/signed URL).
-- Grants on all new public tables to `authenticated` + `service_role` (no `anon`).
+The Submit button is disabled until every checkbox is ticked (in addition to the existing personal/bank/document validation).
 
-### 4. Server functions (`src/lib/onboarding.functions.ts`)
+### 3. Persistence
 
-- `getMyOnboarding()` — returns current profile fields + bank row + list of uploaded doc types (self).
-- `saveMyOnboarding({ profile, bank })` — validates with zod, upserts profile fields + bank row for `auth.uid()`.
-- `completeMyOnboarding()` — verifies every required field is filled and every required doc uploaded; sets `onboarding_completed = true, onboarding_completed_at = now()`. Returns typed errors listing missing items.
-- `getEmployeeDocumentUrl({ user_id, doc_type })` — HR/Super only; returns short-lived signed URL from private bucket.
+Add columns to `profiles`:
+- `facebook_url`, `instagram_url`, `twitter_url`, `youtube_url`, `pinterest_url` (text, nullable)
+- `social_follows_confirmed_at` (timestamptz)
+- `reviews_confirmed_at` (timestamptz)
 
-Document uploads use the browser Supabase client directly to storage path `${uid}/${doc_type}.${ext}`, then call a lightweight `recordDocument({ doc_type, storage_path })` server fn to write the `employee_documents` row.
+`saveMyOnboarding` accepts the new fields; `completeMyOnboarding` additionally requires the two confirmation timestamps to be set and all required social URLs to be present, otherwise returns a typed missing-list.
 
-### 5. Frontend
+### 4. Auto-created welcome task
 
-- **New route** `src/routes/_authenticated/complete-onboarding.tsx` — multi-section form (Personal → Work prefs → Bank → Documents → Review & Submit). Progress indicator. Save-as-you-go per section. Final "Complete onboarding" button calls `completeMyOnboarding` and, on success, navigates to `/dashboard`.
-- **Guard** in `_authenticated/route.tsx`: after existing auth check, if `profile.onboarding_completed === false` and pathname ≠ `/complete-onboarding` and ≠ `/change-password`, redirect to `/complete-onboarding`.
-- **HR/Super Admin `/onboarding` page** (existing): keep the create-user form. In the "Team directory" drawer add:
-  - Onboarding status badge (Complete / Pending) + completed date.
-  - Read-only view of submitted personal + bank fields.
-  - Document list with "Download" buttons (signed URLs via `getEmployeeDocumentUrl`).
-- Sidebar/top-bar entries stay hidden for users with incomplete onboarding (guard already blocks navigation anyway).
+On successful `completeMyOnboarding`, insert a task for the new hire titled **"Review Colladome on Google & follow our social channels"** with a description linking all channels + review URLs, priority = medium, due in 3 days. This gives them a persistent reminder even after the checklist is confirmed.
 
-### 6. Out of scope (explicit)
+### 5. Files touched
 
-- Editing documents after submission (v1: user can re-upload same doc type before completing; after `onboarding_completed = true`, only HR/Super can request changes — no self-edit UI yet).
-- Emailing the temp password (HR still shares it manually, as today).
-- Bulk CSV import.
+- `supabase/migrations/<new>.sql` — add profile columns + confirmation timestamps.
+- `src/lib/onboarding.functions.ts` — extend save/complete validators + create the welcome task.
+- `src/routes/_authenticated/complete-onboarding.tsx` — new social inputs + Follow & Review card + submit gating.
+- `src/integrations/supabase/types.ts` — regenerated after migration.
 
-### 7. Technical checklist
+## Out of scope
 
-- Migration: 3 new public tables/columns as above + private storage bucket + RLS policies + grants.
-- Server functions file `src/lib/onboarding.functions.ts` (4 fns).
-- New route `complete-onboarding.tsx`.
-- Update `_authenticated/route.tsx` guard + `use-current-user` to expose `onboardingCompleted`.
-- Extend HR drawer on `/onboarding` with doc viewer.
-- Zod schemas for validation (IFSC regex, PAN regex `[A-Z]{5}[0-9]{4}[A-Z]`, phone digits, URLs).
+- Verifying follows/reviews server-side (we trust the checkbox — same trust model as the rest of the form).
+- Editing social links after onboarding (a Profile page can come later).
+
+## Open questions
+
+1. **Hyderabad Google Review URL** — the pasted email only includes the Jaipur `g.page` link. Do you have the Hyderabad review link, or should I use a Google Maps search link as a placeholder?
+2. **Facebook / Instagram / X profile URLs** — required or optional for the employee's personal profiles? (Plan currently marks them required; YouTube + Pinterest optional.)

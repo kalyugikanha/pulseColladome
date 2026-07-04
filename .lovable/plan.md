@@ -1,21 +1,47 @@
-## Verification result: wiring is correct, but no submission has happened yet to confirm end-to-end
+## Goal
+Add a "New Task" button to the **My Tasks** page so any authenticated employee can create tasks, not just managers from the Projects page.
 
-### Code path (verified by reading `src/routes/_authenticated/complete-onboarding.tsx` + `src/lib/onboarding.functions.ts`)
+## Current State
+- Tasks can only be created by admins/project managers via the Projects page (`/projects`).
+- The `tasks` table RLS has no INSERT policy for regular employees — only managers can insert.
+- The My Tasks page (`/tasks`) is read-only for employees; it shows "No tasks yet. When an admin assigns work to you, it'll appear here."
 
-1. Personal social inputs (`facebook`, `instagram`, `twitter`, `youtube`, `pinterest`) are bound to state and included in `saveDraft()` → sent to `saveMyOnboarding` → written to `profiles.<col>_url` via `supabase.from("profiles").update(...)`.
-2. `submit()` builds `now = new Date().toISOString()` and calls `saveDraft({ social_follows_confirmed_at: now, reviews_confirmed_at: now })` before `completeMyOnboarding()`, so both timestamps land on the profile row.
-3. `completeMyOnboarding` re-reads the profile and rejects with a `missing` list if `social_follows_confirmed_at` / `reviews_confirmed_at` are null, or if any required social URL is empty (Facebook/Instagram/X are in `REQUIRED_PROFILE_FIELDS`; YouTube/Pinterest are optional). Only then does it flip `onboarding_completed = true`.
-4. The seven `FOLLOW_LINKS` and four `REVIEW_LINKS` checkboxes gate `submit()` client-side via `allFollowed` / `allReviewed`, so the timestamps can't be set until every box is ticked.
+## Changes
 
-### DB state (queried `profiles`)
+### 1. Database — new RLS INSERT policy for `tasks`
+Add a policy that lets any authenticated user insert a task row where `created_by = auth.uid()`.
 
-No profile currently has `social_follows_confirmed_at` or `reviews_confirmed_at` populated — nobody has completed onboarding since these fields were added, so there's no live row proving the write. The columns exist and are nullable, matching the code.
+Policy:
+- `CREATE POLICY "tasks: self-create" ON public.tasks FOR INSERT TO authenticated WITH CHECK (created_by = auth.uid());`
 
-### Recommendation
+This is in addition to the existing manager policy — employees can create, managers still have full access.
 
-The plumbing is correct end-to-end; the only way to fully verify is to submit once. Two options:
+### 2. Frontend — "New Task" dialog on `/tasks`
+Update `src/routes/_authenticated/tasks.tsx`:
+- Add a **New Task** button in the page header (visible to all authenticated users).
+- Open a dialog with form fields:
+  - **Project** — dropdown of existing projects (required; `project_id` is NOT NULL).
+  - **Title** — text input (required).
+  - **Description** — textarea (optional).
+  - **Due date** — date picker (optional).
+  - **Priority** — dropdown: Low / Medium / High (default Medium).
+  - **Assign to** — dropdown of team members, defaulting to the current user (optional; can be left unassigned).
+- On submit, insert into `tasks` with `created_by: me.id`, `status: "todo"`.
+- Invalidate the `my-tasks` query so the new task appears immediately.
 
-- **Option A** — you complete onboarding as a test user, then I re-query `profiles` for that user to confirm the five URL columns and both timestamps are written.
-- **Option B** — I add a Playwright script that signs in as a pre-created test user, fills the form, uploads dummy files, ticks every checkbox, submits, and asserts the DB row.
+### 3. Projects query for task creation
+The task dialog needs a list of projects to choose from. Reuse the same Supabase query pattern already used on the Projects page:
+```ts
+supabase.from("projects").select("id, name")
+```
 
-Tell me which you'd like (A is fastest), or if you just want me to trust the code review, no further action is needed.
+## Scope
+- No changes to the Projects page.
+- No changes to manager task assignment flow.
+- No new tables or columns needed.
+- Employee-created tasks start in `todo` status and can be updated by the assignee (existing UPDATE policy covers that).
+
+## Plan
+1. Migration: add `tasks: self-create` INSERT RLS policy.
+2. Code: wire New Task dialog into `/tasks` with the fields above.
+3. Verify: create a task from the My Tasks page, confirm it appears and the DB row has the correct `created_by`.

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getGoogleAuthUrl, getMyGoogleStatus, disconnectGoogleCalendar } from "@/lib/google-calendar.functions";
@@ -14,32 +15,68 @@ export function GoogleCalendarConnectCard() {
   const getStatus = useServerFn(getMyGoogleStatus);
   const disconnect = useServerFn(disconnectGoogleCalendar);
 
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [popupBlocked, setPopupBlocked] = useState(false);
+  const pollRef = useRef<number | null>(null);
+  const pollStopAtRef = useRef<number>(0);
+
   const { data: status, isLoading } = useQuery({
     queryKey: ["my-google-status"],
     queryFn: () => getStatus(),
     staleTime: 30_000,
   });
 
-  const isFramed = typeof window !== "undefined" && window.self !== window.top;
-  const isLovablePreview = typeof window !== "undefined" && /(^|\.)lovable\.app$/.test(window.location.hostname) && window.location.hostname.includes("preview");
+  const isLovablePreview =
+    typeof window !== "undefined" &&
+    /(^|\.)lovable\.app$/.test(window.location.hostname) &&
+    window.location.hostname.includes("preview");
 
-  const navigateToGoogle = (url: string) => {
-    if (isFramed) {
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) window.location.assign(url);
-      return;
+  const stopPolling = () => {
+    if (pollRef.current) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
     }
-    try {
-      window.top?.location.assign(url);
-    } catch {
-      window.location.assign(url);
+  };
+
+  const startPolling = () => {
+    stopPolling();
+    pollStopAtRef.current = Date.now() + 2 * 60 * 1000; // 2 minutes
+    pollRef.current = window.setInterval(async () => {
+      if (Date.now() > pollStopAtRef.current) {
+        stopPolling();
+        return;
+      }
+      await qc.invalidateQueries({ queryKey: ["my-google-status"] });
+    }, 3000);
+  };
+
+  useEffect(() => {
+    if (status?.connected) {
+      stopPolling();
+      setPendingUrl(null);
+      setPopupBlocked(false);
     }
+  }, [status?.connected]);
+
+  useEffect(() => () => stopPolling(), []);
+
+  const openInNewTab = (url: string) => {
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (!win || win.closed || typeof win.closed === "undefined") {
+      setPopupBlocked(true);
+      setPendingUrl(url);
+      return false;
+    }
+    setPopupBlocked(false);
+    setPendingUrl(url);
+    startPolling();
+    return true;
   };
 
   const connectMut = useMutation({
     mutationFn: () => getUrl(),
     onSuccess: ({ url }) => {
-      navigateToGoogle(url);
+      openInNewTab(url);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -85,8 +122,39 @@ export function GoogleCalendarConnectCard() {
           </div>
         </div>
         <Button size="sm" onClick={() => connectMut.mutate()} disabled={connectMut.isPending}>
-          {connectMut.isPending ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Opening…</> : <><ExternalLink className="h-3.5 w-3.5" />Connect Google Calendar</>}
+          {connectMut.isPending ? (
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" />Opening…</>
+          ) : (
+            <><ExternalLink className="h-3.5 w-3.5" />Connect Google Calendar</>
+          )}
         </Button>
+
+        {pendingUrl && !popupBlocked && (
+          <div className="basis-full rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              <span>Waiting for Google authorization in the new tab… this card will update automatically.</span>
+            </div>
+            <a className="mt-1 inline-block font-medium text-primary hover:underline" href={pendingUrl} target="_blank" rel="noopener noreferrer">
+              Reopen Google sign-in
+            </a>
+          </div>
+        )}
+
+        {popupBlocked && pendingUrl && (
+          <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+              <div>
+                Your browser blocked the popup. {" "}
+                <a className="font-medium text-primary hover:underline" href={pendingUrl} target="_blank" rel="noopener noreferrer" onClick={() => startPolling()}>
+                  Click here to open Google sign-in in a new tab
+                </a>.
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="basis-full rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-muted-foreground">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />

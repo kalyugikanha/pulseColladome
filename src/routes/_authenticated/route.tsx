@@ -75,7 +75,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {(isAdmin || canManageProjects) && (
+        {(isAdmin || canManageProjects || isHrAdmin) && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>

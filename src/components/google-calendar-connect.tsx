@@ -3,8 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { getGoogleAuthUrl, getMyGoogleStatus, disconnectGoogleCalendar } from "@/lib/google-calendar.functions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CalendarDays, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+const PUBLISHED_DASHBOARD_URL = "https://colladome-pulse.lovable.app/dashboard";
 
 export function GoogleCalendarConnectCard() {
   const qc = useQueryClient();
@@ -18,7 +20,15 @@ export function GoogleCalendarConnectCard() {
     staleTime: 30_000,
   });
 
+  const isFramed = typeof window !== "undefined" && window.self !== window.top;
+  const isLovablePreview = typeof window !== "undefined" && /(^|\.)lovable\.app$/.test(window.location.hostname) && window.location.hostname.includes("preview");
+
   const navigateToGoogle = (url: string) => {
+    if (isFramed) {
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) window.location.assign(url);
+      return;
+    }
     try {
       window.top?.location.assign(url);
     } catch {
@@ -75,8 +85,21 @@ export function GoogleCalendarConnectCard() {
           </div>
         </div>
         <Button size="sm" onClick={() => connectMut.mutate()} disabled={connectMut.isPending}>
-          {connectMut.isPending ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Opening…</> : "Connect Google Calendar"}
+          {connectMut.isPending ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Opening…</> : <><ExternalLink className="h-3.5 w-3.5" />Connect Google Calendar</>}
         </Button>
+        <div className="basis-full rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-muted-foreground">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+            <div>
+              {isLovablePreview
+                ? "If Google shows 403 in preview, connect from the published app instead. Google may reject OAuth started from the editor preview."
+                : "If Google shows 403, publish the OAuth consent screen or add this account as a test user in Google Cloud."}
+              <a className="ml-1 font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noreferrer">
+                Open published dashboard
+              </a>
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

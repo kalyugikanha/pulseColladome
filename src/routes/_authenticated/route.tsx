@@ -102,11 +102,18 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, canManageProjects, 
                   </>
                 )}
                 {canManageProjects && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
-                      <Link to="/hours-editor"><Clock /><span>Hours Editor</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
+                        <Link to="/hours-editor"><Clock /><span>Hours Editor</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/timesheet")}>
+                        <Link to="/timesheet"><TableProperties /><span>Timesheet</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </>
                 )}
                 {isSuperAdmin && (
                   <>

@@ -12,11 +12,12 @@ export type CurrentUser = {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isFinanceAdmin: boolean;
+  isHrAdmin: boolean;
   canManageProjects: boolean;
   mustChangePassword: boolean;
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
-
+  realIsHrAdmin: boolean;
 };
 
 export function useCurrentUser() {
@@ -37,6 +38,8 @@ export function useCurrentUser() {
       const realAdmin = isSuperAdmin || !!roles?.some((r) => r.role === "admin");
       const realFinance = !!email && FINANCE_EMAILS.includes(email.toLowerCase());
 
+      const realIsHrAdmin = !!roles?.some((r) => r.role === "hr_admin");
+
       // View-as override: only super admins can impersonate view. Data queries keep the real id.
       let viewingAs = false;
       let vName = profile?.full_name ?? null;
@@ -44,6 +47,7 @@ export function useCurrentUser() {
       let vIsAdmin = realAdmin;
       let vIsSuper = isSuperAdmin;
       let vIsFinance = realFinance;
+      let vIsHr = realIsHrAdmin;
       let vCanManageProjects = realAdmin || !!roles?.some((r) => r.role === "project_manager");
 
       if (isSuperAdmin && viewAsUserId && viewAsUserId !== user.id) {
@@ -57,6 +61,7 @@ export function useCurrentUser() {
           vIsSuper = !!otherSa;
           vIsAdmin = vIsSuper || !!otherRoles?.some((r) => r.role === "admin");
           vIsFinance = !!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase());
+          vIsHr = !!otherRoles?.some((r) => r.role === "hr_admin");
           vCanManageProjects = vIsAdmin || !!otherRoles?.some((r) => r.role === "project_manager");
         }
       }
@@ -69,10 +74,12 @@ export function useCurrentUser() {
         isAdmin: vIsAdmin,
         isSuperAdmin: vIsSuper,
         isFinanceAdmin: vIsFinance,
+        isHrAdmin: vIsHr,
         canManageProjects: vCanManageProjects,
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         viewingAs,
         realIsSuperAdmin: isSuperAdmin,
+        realIsHrAdmin,
       };
 
     },

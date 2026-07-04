@@ -229,11 +229,14 @@ export type Database = {
           date_of_birth: string | null
           department: string | null
           email: string | null
+          employment_type: string | null
           full_name: string | null
           id: string
           is_placeholder: boolean
           joined_on: string | null
           must_change_password: boolean
+          notes: string | null
+          phone: string | null
           updated_at: string
         }
         Insert: {
@@ -242,11 +245,14 @@ export type Database = {
           date_of_birth?: string | null
           department?: string | null
           email?: string | null
+          employment_type?: string | null
           full_name?: string | null
           id: string
           is_placeholder?: boolean
           joined_on?: string | null
           must_change_password?: boolean
+          notes?: string | null
+          phone?: string | null
           updated_at?: string
         }
         Update: {
@@ -255,11 +261,14 @@ export type Database = {
           date_of_birth?: string | null
           department?: string | null
           email?: string | null
+          employment_type?: string | null
           full_name?: string | null
           id?: string
           is_placeholder?: boolean
           joined_on?: string | null
           must_change_password?: boolean
+          notes?: string | null
+          phone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -678,7 +687,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "employee" | "project_manager"
+      app_role: "admin" | "employee" | "project_manager" | "hr_admin"
       leave_status: "pending" | "approved" | "rejected"
       leave_type: "casual" | "sick" | "earned" | "unpaid"
       project_status: "active" | "on_hold" | "completed"
@@ -811,7 +820,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "employee", "project_manager"],
+      app_role: ["admin", "employee", "project_manager", "hr_admin"],
       leave_status: ["pending", "approved", "rejected"],
       leave_type: ["casual", "sick", "earned", "unpaid"],
       project_status: ["active", "on_hold", "completed"],

@@ -17,6 +17,8 @@ export function GoogleCalendarConnectCard() {
 
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [popupBlocked, setPopupBlocked] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
+  const [isLovablePreview, setIsLovablePreview] = useState(false);
   const pollRef = useRef<number | null>(null);
   const pollStopAtRef = useRef<number>(0);
 
@@ -26,10 +28,11 @@ export function GoogleCalendarConnectCard() {
     staleTime: 30_000,
   });
 
-  const isLovablePreview =
-    typeof window !== "undefined" &&
-    /(^|\.)lovable\.app$/.test(window.location.hostname) &&
-    window.location.hostname.includes("preview");
+  useEffect(() => {
+    setIsLovablePreview(
+      /(^|\.)lovable\.app$/.test(window.location.hostname) && window.location.hostname.includes("preview"),
+    );
+  }, []);
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -60,26 +63,38 @@ export function GoogleCalendarConnectCard() {
 
   useEffect(() => () => stopPolling(), []);
 
-  const openInNewTab = (url: string) => {
-    const win = window.open(url, "_blank", "noopener,noreferrer");
-    if (!win || win.closed || typeof win.closed === "undefined") {
-      setPopupBlocked(true);
-      setPendingUrl(url);
-      return false;
-    }
-    setPopupBlocked(false);
-    setPendingUrl(url);
-    startPolling();
-    return true;
-  };
+  const handleConnect = async () => {
+    if (isOpening) return;
 
-  const connectMut = useMutation({
-    mutationFn: () => getUrl(),
-    onSuccess: ({ url }) => {
-      openInNewTab(url);
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+    setIsOpening(true);
+    setPopupBlocked(false);
+
+    const authTab = window.open("about:blank", "_blank");
+    if (authTab) {
+      authTab.document.write(
+        "<!doctype html><title>Opening Google</title><body style='font-family:system-ui,sans-serif;padding:24px'>Opening Google sign-in…</body>",
+      );
+    }
+
+    try {
+      const { url } = await getUrl();
+      setPendingUrl(url);
+
+      if (authTab && !authTab.closed) {
+        authTab.location.replace(url);
+        setPopupBlocked(false);
+        startPolling();
+      } else {
+        setPopupBlocked(true);
+      }
+    } catch (e: unknown) {
+      if (authTab && !authTab.closed) authTab.close();
+      const message = e instanceof Error ? e.message : "Could not start Google sign-in";
+      toast.error(message);
+    } finally {
+      setIsOpening(false);
+    }
+  };
 
   const disconnectMut = useMutation({
     mutationFn: () => disconnect(),
@@ -121,8 +136,8 @@ export function GoogleCalendarConnectCard() {
             <div className="text-xs text-muted-foreground">Let super admins see your upcoming meetings.</div>
           </div>
         </div>
-        <Button size="sm" onClick={() => connectMut.mutate()} disabled={connectMut.isPending}>
-          {connectMut.isPending ? (
+        <Button size="sm" onClick={handleConnect} disabled={isOpening}>
+          {isOpening ? (
             <><Loader2 className="h-3.5 w-3.5 animate-spin" />Opening…</>
           ) : (
             <><ExternalLink className="h-3.5 w-3.5" />Connect Google Calendar</>
@@ -146,9 +161,12 @@ export function GoogleCalendarConnectCard() {
             <div className="flex items-start gap-2">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
               <div>
-                Your browser blocked the popup. {" "}
-                <a className="font-medium text-primary hover:underline" href={pendingUrl} target="_blank" rel="noopener noreferrer" onClick={() => startPolling()}>
-                  Click here to open Google sign-in in a new tab
+                Your browser blocked the new tab. {" "}
+                <a className="font-medium text-primary hover:underline" href={pendingUrl} target="_blank" rel="noopener noreferrer" onClick={() => {
+                  setPopupBlocked(false);
+                  startPolling();
+                }}>
+                  Open Google sign-in in a new tab
                 </a>.
               </div>
             </div>

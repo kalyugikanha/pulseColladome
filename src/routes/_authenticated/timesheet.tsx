@@ -4,8 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -158,10 +157,32 @@ function TimesheetPage() {
           <p className="text-sm text-muted-foreground">Hours logged by each employee against each project.</p>
         </div>
         <div className="flex items-end gap-2">
-          <div>
-            <Label htmlFor="month" className="text-xs text-muted-foreground">Month</Label>
-            <Input id="month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
-          </div>
+          {(() => {
+            const [yr, mo] = month.split("-");
+            const now = new Date();
+            const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
+            const months = [
+              ["01", "January"], ["02", "February"], ["03", "March"], ["04", "April"],
+              ["05", "May"], ["06", "June"], ["07", "July"], ["08", "August"],
+              ["09", "September"], ["10", "October"], ["11", "November"], ["12", "December"],
+            ] as const;
+            return (
+              <>
+                <Select value={mo} onValueChange={(v) => setMonth(`${yr}-${v}`)}>
+                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {months.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={yr} onValueChange={(v) => setMonth(`${v}-${mo}`)}>
+                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </>
+            );
+          })()}
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={users.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Export CSV
           </Button>

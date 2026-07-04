@@ -288,9 +288,11 @@ export type Database = {
           department: string | null
           email: string | null
           employment_type: string | null
+          facebook_url: string | null
           full_name: string | null
           github_url: string | null
           id: string
+          instagram_url: string | null
           is_placeholder: boolean
           joined_on: string | null
           linkedin_url: string | null
@@ -302,9 +304,14 @@ export type Database = {
           permanent_address: string | null
           personal_email: string | null
           phone: string | null
+          pinterest_url: string | null
           profile_picture_url: string | null
+          reviews_confirmed_at: string | null
+          social_follows_confirmed_at: string | null
           standup_time: string | null
+          twitter_url: string | null
           updated_at: string
+          youtube_url: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -314,9 +321,11 @@ export type Database = {
           department?: string | null
           email?: string | null
           employment_type?: string | null
+          facebook_url?: string | null
           full_name?: string | null
           github_url?: string | null
           id: string
+          instagram_url?: string | null
           is_placeholder?: boolean
           joined_on?: string | null
           linkedin_url?: string | null
@@ -328,9 +337,14 @@ export type Database = {
           permanent_address?: string | null
           personal_email?: string | null
           phone?: string | null
+          pinterest_url?: string | null
           profile_picture_url?: string | null
+          reviews_confirmed_at?: string | null
+          social_follows_confirmed_at?: string | null
           standup_time?: string | null
+          twitter_url?: string | null
           updated_at?: string
+          youtube_url?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -340,9 +354,11 @@ export type Database = {
           department?: string | null
           email?: string | null
           employment_type?: string | null
+          facebook_url?: string | null
           full_name?: string | null
           github_url?: string | null
           id?: string
+          instagram_url?: string | null
           is_placeholder?: boolean
           joined_on?: string | null
           linkedin_url?: string | null
@@ -354,9 +370,14 @@ export type Database = {
           permanent_address?: string | null
           personal_email?: string | null
           phone?: string | null
+          pinterest_url?: string | null
           profile_picture_url?: string | null
+          reviews_confirmed_at?: string | null
+          social_follows_confirmed_at?: string | null
           standup_time?: string | null
+          twitter_url?: string | null
           updated_at?: string
+          youtube_url?: string | null
         }
         Relationships: []
       }

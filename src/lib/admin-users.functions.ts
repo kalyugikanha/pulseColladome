@@ -13,9 +13,9 @@ export const createTeamUser = createServerFn({ method: "POST" })
     default_monthly_salary?: number | null;
   }) => input)
   .handler(async ({ data, context }) => {
-    const { data: isSuper, error: rpcErr } = await context.supabase.rpc("is_super_admin", { _user_id: context.userId });
+    const { data: superRow, error: rpcErr } = await context.supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle();
     if (rpcErr) throw new Error(rpcErr.message);
-    if (!isSuper) throw new Error("Forbidden");
+    if (!superRow) throw new Error("Forbidden");
 
     const email = (data.email ?? "").trim().toLowerCase();
     if (!email || !email.includes("@")) throw new Error("Valid email required");

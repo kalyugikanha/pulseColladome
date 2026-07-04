@@ -127,3 +127,44 @@ export const listUserUpcomingEvents = createServerFn({ method: "POST" })
       return { connected: true as const, events: [], error: msg };
     }
   });
+
+export const listMyMonthEvents = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { startISO: string; endISO: string }) => input)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { refreshAccessToken, fetchEventsInRange } = await import("./google-calendar.server");
+
+    const { data: tokenRow, error } = await supabaseAdmin
+      .from("google_calendar_tokens")
+      .select("*")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!tokenRow) return { connected: false as const, events: [] };
+
+    let accessToken = tokenRow.access_token;
+    const expiresAt = new Date(tokenRow.expires_at).getTime();
+    if (Date.now() > expiresAt - 60_000) {
+      if (!tokenRow.refresh_token) return { connected: false as const, events: [] };
+      try {
+        const refreshed = await refreshAccessToken(tokenRow.refresh_token);
+        accessToken = refreshed.access_token;
+        const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
+        await supabaseAdmin
+          .from("google_calendar_tokens")
+          .update({ access_token: accessToken, expires_at: newExpiry })
+          .eq("user_id", context.userId);
+      } catch {
+        return { connected: false as const, events: [] };
+      }
+    }
+
+    try {
+      const events = await fetchEventsInRange(accessToken, data.startISO, data.endISO);
+      return { connected: true as const, events };
+    } catch {
+      return { connected: true as const, events: [] };
+    }
+  });
+

@@ -1,22 +1,46 @@
-## Plan
+## Team Calendar — Business Enhancements
 
-1. **Treat embedded preview as a blocked OAuth context**
-   - Detect when the app is running inside the Lovable preview iframe using `window.top !== window.self` and the Lovable referrer/origin.
-   - Do not start Google OAuth from that embedded context, because Google blocks `accounts.google.com` in framed/sandboxed flows.
+Enhance `/calendar` with people-first context so BD/managers can plan around the team at a glance.
 
-2. **Change Connect/Reconnect behavior in preview**
-   - When embedded in preview, make **Connect Google Calendar** / **Reconnect** open the published dashboard (`https://colladome-pulse.lovable.app/dashboard`) in a new top-level tab instead of generating and opening a Google auth URL from preview.
-   - Keep the normal OAuth flow for the published/top-level app.
+### 1. Birthdays & Work Anniversaries
+- Add two optional columns to `profiles`: `date_of_birth` (date) and `joined_on` (date).
+- Surface an editable field on the Profile page (self-serve) and admin People page (HR-managed).
+- On the calendar grid, render a small chip on matching month/day cells: 🎂 name (birthday) and 🎊 name · N yrs (anniversary). Month-day match ignores year so it repeats annually.
 
-3. **Update on-screen copy to be explicit**
-   - Replace the current preview warning with a stronger message: Google Calendar connection must be completed from the published app, not from the Lovable preview.
-   - Update the troubleshooting item for `accounts.google.com is blocked` to say the fix is opening the published dashboard, not retrying from preview.
+### 2. Meetings alongside leave
+- Show meetings from the existing Meetings module on the same grid as compact chips (📅 title), color-tinted by kind (internal vs client).
+- Query current month's meetings once and merge into the per-day render alongside leaves and holidays.
+- If a user has connected Google Calendar, also overlay their own busy/meeting events (read-only) for the month.
 
-4. **Keep existing backend/OAuth security unchanged**
-   - Do not change token storage, OAuth scopes, state signing, callback validation, or database policies.
-   - Keep the launcher route for top-level OAuth handoff, but only use it from safe top-level contexts.
+### 3. Search / filter
+- Add a toolbar above the grid:
+  - Employee search (typeahead over `profiles.full_name`).
+  - Department multi-select (from distinct `profiles.department`).
+  - Type filters: Leave, Meetings, Birthdays, Anniversaries, Holidays.
+- Filters affect which chips render; empty state per day when nothing matches.
 
-5. **Validate**
-   - In the live preview, confirm `window.top !== window.self` is detected.
-   - Confirm the Connect button opens the published dashboard instead of opening `accounts.google.com` from preview.
-   - Confirm the published/top-level flow still uses the Google OAuth launcher.
+### 4. Department colors
+- Assign each department a stable color token (derived from a small palette mapped by department name hash, with admin-overridable mapping stored in a new `department_settings` table: `name`, `color`).
+- Leave/meeting/birthday chips get a left border in the person's department color; legend shows department swatches.
+
+### 5. Click a date for details
+- Clicking a day opens a side sheet / dialog with three sections:
+  - On leave today (name, type, status)
+  - Meetings today (title, time, attendees count, kind)
+  - Available today (everyone else, grouped by department, with a quick "Message" mailto)
+  - Birthdays & anniversaries today
+- Same sheet reused for holiday/weekly-off with the "Available" list suppressed.
+
+### 6. Visual polish
+- Keep dark surface (matches app theme) but lift day cells with a subtle surface tint and stronger today indicator so the grid reads less flat.
+
+### Technical notes
+- Migration: add `date_of_birth`, `joined_on` to `profiles`; create `department_settings(name pk, color text)` with `authenticated` read + admin write; GRANTs on both.
+- New hooks: `useTeamMeetings(month)`, `useBirthdaysAnniversaries(month)`, `useDepartmentColors()`.
+- New component: `DayDetailSheet` (shadcn `Sheet`), `CalendarFilters` (search + multi-select).
+- Refactor `calendar.tsx` to compose filters + grid + sheet; grid cell becomes a small `DayCell` component to keep it readable.
+- No changes to auth, RLS model beyond the two new tables/columns; leave query stays the same.
+
+### Out of scope
+- Editing meetings from the calendar (still done in Meetings page).
+- Two-way Google Calendar sync (read-only overlay only).

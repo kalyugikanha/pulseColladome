@@ -652,7 +652,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
       get_my_leave_requests: {
         Args: never
         Returns: {
@@ -677,16 +676,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_finance_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "employee" | "project_manager"

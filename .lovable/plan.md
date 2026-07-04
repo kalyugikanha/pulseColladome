@@ -1,60 +1,87 @@
-## Employee Onboarding module + HR Admin role
 
-Voice note (translated from Hindi): "Add an Employee Onboarding module. When HR adds a new employee, all details from the form (dates, etc.) are captured and mentioned in one place. Assign `shraddha@colladome.com` an HR Admin role — their job is to Create a New User; when someone is onboarded, all their information (email ID, date of birth, whatever is captured) is stored."
+## Full Employee Onboarding — Self-Serve on First Login
 
-### 1. New `hr_admin` role
-- Extend `app_role` enum with `hr_admin`.
-- HR Admin can:
-  - Create new team members (auth user + profile).
-  - Read & update all profiles (name, department, DOB, joined_on, phone).
-  - Read/manage `role_grants` (assign non-super roles).
-- HR Admin cannot: manage salaries, finance data, or elevate someone to admin / super_admin (super_admin only).
-- Add `private.is_hr_admin(uuid)` helper (SECURITY DEFINER, same private-schema pattern we just adopted, EXECUTE to authenticated).
-- Add matching RLS policies on `profiles` and `role_grants` so HR Admin queries succeed.
+Extend the existing onboarding module so every new hire fills a complete onboarding form (personal details, bank info, and document uploads) themselves on first login, and cannot access any other part of the tool until it's done.
 
-### 2. Grant Shraddha the role
-- Upsert `role_grants` row for `shraddha@colladome.com` with `role='hr_admin'` so:
-  - If she already has a profile → also insert a `user_roles` row for her.
-  - If she signs up later → the existing `handle_new_user()` trigger picks it up.
+### 1. Flow
 
-### 3. New Onboarding page `/onboarding`
-Route under `_authenticated/onboarding.tsx`, visible in top-bar for super_admin + hr_admin.
+1. HR/Super Admin creates the account on `/onboarding` (email + role + joining date, as today). Temporary password `Test@123`, `must_change_password = true`, `onboarding_completed = false`.
+2. New hire logs in → forced to `/change-password` (existing flow).
+3. After password change → forced to new `/complete-onboarding` route.
+4. Only after every required field + document is submitted does `onboarding_completed` flip to `true` and the app unlocks (`/dashboard`, etc.).
 
-**Add Employee form** (single card, grouped sections):
-- Personal: Full name, Email, Phone, Date of birth
-- Work: Department, Role (employee / project_manager; super_admin toggle only for super_admin), Joined on, Employment type (full-time / intern / contract)
-- Compensation (super_admin only): Monthly salary, Currency
-- Notes (optional)
+Hard block: a root-level guard in `_authenticated/route.tsx` redirects to `/complete-onboarding` for any signed-in user with `onboarding_completed = false` (except the onboarding route itself, `/change-password`, and sign-out). No dashboard, calendar, tasks, punch, etc.
 
-**Submit flow** (new server fn `onboardEmployee`, gated by `is_super_admin` OR `is_hr_admin`):
-1. Upsert into `role_grants` (email, role, default_monthly_salary if provided by super_admin).
-2. Call `supabaseAdmin.auth.admin.createUser` with `email` + temp password `Test@123`, `email_confirm: true`, `user_metadata.full_name`.
-3. After profile row exists (via `handle_new_user` trigger), update profile with `department`, `date_of_birth`, `joined_on`, `phone`, `employment_type`, `notes`.
-4. Mark `must_change_password = true` so the user is forced to reset on first login.
-5. Return `{ ok, email, temporary_password }` so HR can copy/share it.
+### 2. Onboarding form fields (all required unless noted)
 
-**Recently onboarded list** (right side / below form):
-- Table of last 20 onboarded team members (name, email, role, department, joined_on, created_at).
-- Search box.
-- Row click → drawer to edit their profile fields (name, department, DOB, joined_on, phone, employment_type, notes, role).
+**Personal**
+- Full name, Official email (read-only, from auth), Personal email
+- Phone number, Permanent address (textarea)
+- Date of birth, Marriage anniversary *(optional)*
+- LinkedIn profile URL, GitHub/GitLab URL
+- Profile picture (image upload)
 
-### 4. Schema additions to `profiles`
-Add nullable columns: `phone text`, `employment_type text` (check: full_time / intern / contract / consultant), `notes text`. `date_of_birth` and `joined_on` already exist.
+**Work**
+- Job department (dropdown — same list as today)
+- Joining date (pre-filled by HR, read-only)
+- Preferred day-start time, Preferred standup time
 
-### 5. Navigation & access
-- Top-bar: add "Onboarding" link visible when `me.isSuperAdmin || me.isHrAdmin`.
-- `use-current-user` hook: expose `isHrAdmin` derived from `user_roles`.
-- Onboarding route guard: redirect to `/dashboard` if neither.
+**Bank details**
+- Account holder name, Account number, Bank branch, IFSC code, PAN card number
 
-### 6. Calendar integration
-- Values entered here (DOB, joined_on, department) flow straight into the existing Team Calendar (birthdays, anniversaries, department colors) — no extra wiring needed beyond the profile update.
+**Document uploads** (PDF/JPG/PNG, max 10 MB each)
+- Signed offer letter, Aadhar card, PAN card, Cancelled cheque
+- 10th marksheet, 12th marksheet, Graduation certificate
+- Master's certificate *(optional)*
+- Updated resume
 
-### Out of scope
-- Sending welcome email (temp password shown in-app for HR to share).
-- Document uploads (IDs, offer letter). Can follow in a later iteration.
-- Bulk CSV onboarding.
+### 3. Database changes (one migration)
 
-### Technical checklist
-- Migration: enum value, `private.is_hr_admin`, RLS policies on `profiles` / `role_grants`, three new columns, `role_grants` upsert for Shraddha.
-- Server fn: `onboardEmployee` (super_admin OR hr_admin) + `listOnboardedEmployees` + `updateEmployeeProfile`.
-- Client: `src/routes/_authenticated/onboarding.tsx`, top-bar entry, `useCurrentUser` update.
+- `profiles`: add
+  - `personal_email text`, `permanent_address text`
+  - `marriage_anniversary date`
+  - `linkedin_url text`, `github_url text`
+  - `profile_picture_url text`
+  - `day_start_time time`, `standup_time time`
+  - `onboarding_completed boolean not null default false`
+  - `onboarding_completed_at timestamptz`
+- New table `public.employee_bank_details` (1:1 with user): account_holder_name, account_number, bank_branch, ifsc_code, pan_number. RLS: user reads/writes own row; super_admin + hr_admin read all.
+- New table `public.employee_documents`: `user_id`, `doc_type` (enum: offer_letter, aadhar, pan, cancelled_cheque, marksheet_10, marksheet_12, graduation, masters, resume, profile_picture), `storage_path`, `uploaded_at`. Unique `(user_id, doc_type)`. RLS: user inserts/updates own; super_admin + hr_admin read all; user reads own only for uploaded-file confirmation (no download URL rendered on their side per spec).
+- Storage bucket `employee-documents` (private). RLS on `storage.objects`:
+  - User can insert/update objects under `${auth.uid()}/…`.
+  - Only super_admin + hr_admin can `select` (download/signed URL).
+- Grants on all new public tables to `authenticated` + `service_role` (no `anon`).
+
+### 4. Server functions (`src/lib/onboarding.functions.ts`)
+
+- `getMyOnboarding()` — returns current profile fields + bank row + list of uploaded doc types (self).
+- `saveMyOnboarding({ profile, bank })` — validates with zod, upserts profile fields + bank row for `auth.uid()`.
+- `completeMyOnboarding()` — verifies every required field is filled and every required doc uploaded; sets `onboarding_completed = true, onboarding_completed_at = now()`. Returns typed errors listing missing items.
+- `getEmployeeDocumentUrl({ user_id, doc_type })` — HR/Super only; returns short-lived signed URL from private bucket.
+
+Document uploads use the browser Supabase client directly to storage path `${uid}/${doc_type}.${ext}`, then call a lightweight `recordDocument({ doc_type, storage_path })` server fn to write the `employee_documents` row.
+
+### 5. Frontend
+
+- **New route** `src/routes/_authenticated/complete-onboarding.tsx` — multi-section form (Personal → Work prefs → Bank → Documents → Review & Submit). Progress indicator. Save-as-you-go per section. Final "Complete onboarding" button calls `completeMyOnboarding` and, on success, navigates to `/dashboard`.
+- **Guard** in `_authenticated/route.tsx`: after existing auth check, if `profile.onboarding_completed === false` and pathname ≠ `/complete-onboarding` and ≠ `/change-password`, redirect to `/complete-onboarding`.
+- **HR/Super Admin `/onboarding` page** (existing): keep the create-user form. In the "Team directory" drawer add:
+  - Onboarding status badge (Complete / Pending) + completed date.
+  - Read-only view of submitted personal + bank fields.
+  - Document list with "Download" buttons (signed URLs via `getEmployeeDocumentUrl`).
+- Sidebar/top-bar entries stay hidden for users with incomplete onboarding (guard already blocks navigation anyway).
+
+### 6. Out of scope (explicit)
+
+- Editing documents after submission (v1: user can re-upload same doc type before completing; after `onboarding_completed = true`, only HR/Super can request changes — no self-edit UI yet).
+- Emailing the temp password (HR still shares it manually, as today).
+- Bulk CSV import.
+
+### 7. Technical checklist
+
+- Migration: 3 new public tables/columns as above + private storage bucket + RLS policies + grants.
+- Server functions file `src/lib/onboarding.functions.ts` (4 fns).
+- New route `complete-onboarding.tsx`.
+- Update `_authenticated/route.tsx` guard + `use-current-user` to expose `onboardingCompleted`.
+- Extend HR drawer on `/onboarding` with doc viewer.
+- Zod schemas for validation (IFSC regex, PAN regex `[A-Z]{5}[0-9]{4}[A-Z]`, phone digits, URLs).

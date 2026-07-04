@@ -28,6 +28,7 @@ import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedHoursEditorRouteImport } from './routes/_authenticated/hours-editor'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_authenticated/complete-onboarding'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
@@ -129,6 +130,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCompleteOnboardingRoute =
+  AuthenticatedCompleteOnboardingRouteImport.update({
+    id: '/complete-onboarding',
+    path: '/complete-onboarding',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
@@ -152,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/access': typeof AuthenticatedAccessRoute
   '/calendar': typeof AuthenticatedCalendarRoute
+  '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hours-editor': typeof AuthenticatedHoursEditorRoute
@@ -175,6 +183,7 @@ export interface FileRoutesByTo {
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/access': typeof AuthenticatedAccessRoute
   '/calendar': typeof AuthenticatedCalendarRoute
+  '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hours-editor': typeof AuthenticatedHoursEditorRoute
@@ -200,6 +209,7 @@ export interface FileRoutesById {
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
+  '/_authenticated/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/hours-editor': typeof AuthenticatedHoursEditorRoute
@@ -225,6 +235,7 @@ export interface FileRouteTypes {
     | '/google-calendar-oauth-launch'
     | '/access'
     | '/calendar'
+    | '/complete-onboarding'
     | '/dashboard'
     | '/finances'
     | '/hours-editor'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/google-calendar-oauth-launch'
     | '/access'
     | '/calendar'
+    | '/complete-onboarding'
     | '/dashboard'
     | '/finances'
     | '/hours-editor'
@@ -272,6 +284,7 @@ export interface FileRouteTypes {
     | '/google-calendar-oauth-launch'
     | '/_authenticated/access'
     | '/_authenticated/calendar'
+    | '/_authenticated/complete-onboarding'
     | '/_authenticated/dashboard'
     | '/_authenticated/finances'
     | '/_authenticated/hours-editor'
@@ -433,6 +446,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/complete-onboarding': {
+      id: '/_authenticated/complete-onboarding'
+      path: '/complete-onboarding'
+      fullPath: '/complete-onboarding'
+      preLoaderRoute: typeof AuthenticatedCompleteOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/calendar': {
       id: '/_authenticated/calendar'
       path: '/calendar'
@@ -460,6 +480,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccessRoute: typeof AuthenticatedAccessRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
+  AuthenticatedCompleteOnboardingRoute: typeof AuthenticatedCompleteOnboardingRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedHoursEditorRoute: typeof AuthenticatedHoursEditorRoute
@@ -479,6 +500,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccessRoute: AuthenticatedAccessRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
+  AuthenticatedCompleteOnboardingRoute: AuthenticatedCompleteOnboardingRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedHoursEditorRoute: AuthenticatedHoursEditorRoute,

@@ -170,8 +170,13 @@ function AuthenticatedLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    if (user?.mustChangePassword && pathname !== "/change-password") {
+    if (!user) return;
+    if (user.mustChangePassword && pathname !== "/change-password") {
       router.navigate({ to: "/change-password", replace: true });
+      return;
+    }
+    if (!user.mustChangePassword && !user.onboardingCompleted && pathname !== "/complete-onboarding" && pathname !== "/change-password") {
+      router.navigate({ to: "/complete-onboarding", replace: true });
     }
   }, [user, pathname, router]);
 

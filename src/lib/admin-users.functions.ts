@@ -75,7 +75,7 @@ export const createTeamUser = createServerFn({ method: "POST" })
 
     const newId = created?.user?.id;
     if (newId) {
-      const profileUpdate: Record<string, unknown> = { must_change_password: true };
+      const profileUpdate: ProfilePatch = { must_change_password: true };
       if (data.department !== undefined) profileUpdate.department = data.department;
       if (data.date_of_birth !== undefined) profileUpdate.date_of_birth = data.date_of_birth;
       if (data.joined_on !== undefined) profileUpdate.joined_on = data.joined_on;

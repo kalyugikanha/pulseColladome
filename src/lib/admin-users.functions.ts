@@ -4,10 +4,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 type Role = "admin" | "employee" | "project_manager" | "hr_admin";
 type EmploymentType = "full_time" | "intern" | "contract" | "consultant";
 
-async function assertSuperOrHr(supabase: Awaited<ReturnType<typeof requireSupabaseAuth>> extends { supabase: infer S } ? S : never, userId: string) {
-  // Fallback typing: use supabase from context directly
-  return null;
-}
+type ProfilePatch = {
+  full_name?: string | null;
+  department?: string | null;
+  date_of_birth?: string | null;
+  joined_on?: string | null;
+  phone?: string | null;
+  employment_type?: EmploymentType | null;
+  notes?: string | null;
+  must_change_password?: boolean;
+};
 
 export const createTeamUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

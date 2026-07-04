@@ -170,9 +170,19 @@ export const completeMyOnboarding = createServerFn({ method: "POST" })
     const uploaded = new Set((docs ?? []).map((d) => d.doc_type as OnboardingDocType));
     for (const d of REQUIRED_DOCS) if (!uploaded.has(d)) missing.push(`document.${d}`);
 
+    if (!p.social_follows_confirmed_at) missing.push("confirm.follow_social_channels");
+    if (!p.reviews_confirmed_at) missing.push("confirm.leave_reviews");
+
     if (missing.length) return { ok: false as const, missing };
 
     const { error } = await context.supabase
+      .from("profiles")
+      .update({ onboarding_completed: true, onboarding_completed_at: new Date().toISOString() })
+      .eq("id", uid);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
       .from("profiles")
       .update({ onboarding_completed: true, onboarding_completed_at: new Date().toISOString() })
       .eq("id", uid);

@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useRef } from "react";
 import { getGoogleAuthUrl, getMyGoogleStatus, disconnectGoogleCalendar } from "@/lib/google-calendar.functions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,8 +11,6 @@ export function GoogleCalendarConnectCard() {
   const getUrl = useServerFn(getGoogleAuthUrl);
   const getStatus = useServerFn(getMyGoogleStatus);
   const disconnect = useServerFn(disconnectGoogleCalendar);
-  const popupRef = useRef<Window | null>(null);
-  const pollRef = useRef<number | null>(null);
 
   const { data: status, isLoading } = useQuery({
     queryKey: ["my-google-status"],
@@ -21,23 +18,18 @@ export function GoogleCalendarConnectCard() {
     staleTime: 30_000,
   });
 
+  const navigateToGoogle = (url: string) => {
+    try {
+      window.top?.location.assign(url);
+    } catch {
+      window.location.assign(url);
+    }
+  };
+
   const connectMut = useMutation({
     mutationFn: () => getUrl(),
     onSuccess: ({ url }) => {
-      const w = window.open(url, "google-oauth", "width=520,height=680");
-      popupRef.current = w;
-      if (!w) {
-        window.location.href = url;
-        return;
-      }
-      if (pollRef.current) window.clearInterval(pollRef.current);
-      pollRef.current = window.setInterval(async () => {
-        if (w.closed) {
-          if (pollRef.current) window.clearInterval(pollRef.current);
-          pollRef.current = null;
-          await qc.invalidateQueries({ queryKey: ["my-google-status"] });
-        }
-      }, 800) as unknown as number;
+      navigateToGoogle(url);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -50,8 +42,6 @@ export function GoogleCalendarConnectCard() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
-
-  useEffect(() => () => { if (pollRef.current) window.clearInterval(pollRef.current); }, []);
 
   if (isLoading) return null;
 

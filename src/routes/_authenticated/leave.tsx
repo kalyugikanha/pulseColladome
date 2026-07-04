@@ -40,7 +40,7 @@ function LeavePage() {
     queryFn: async () => {
       const [balances, requests] = await Promise.all([
         supabase.from("leave_balances").select("*").eq("user_id", me!.id),
-        supabase.from("leave_requests").select("*").eq("user_id", me!.id).order("created_at", { ascending: false }),
+        supabase.rpc("get_my_leave_requests"),
       ]);
       return { balances: balances.data ?? [], requests: requests.data ?? [] };
     },

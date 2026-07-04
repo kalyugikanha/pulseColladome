@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTeamGoogleStatuses, listUserUpcomingEvents } from "@/lib/google-calendar.functions";
 import { useCurrentUser } from "@/hooks/use-current-user";

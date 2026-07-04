@@ -15,6 +15,7 @@ export type CurrentUser = {
   isHrAdmin: boolean;
   canManageProjects: boolean;
   mustChangePassword: boolean;
+  onboardingCompleted: boolean;
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
   realIsHrAdmin: boolean;

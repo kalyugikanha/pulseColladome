@@ -1,0 +1,1 @@
+CREATE POLICY "tasks: self-create" ON public.tasks FOR INSERT TO authenticated WITH CHECK (created_by = auth.uid());

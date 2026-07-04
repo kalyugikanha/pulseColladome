@@ -1,54 +1,63 @@
-## Why June shows no burn
+## What "official email only" means here
 
-Two independent gaps — both are data, not code:
+Right now there are two kinds of profiles for the same real people:
 
-1. **All salary rows are effective from 2026‑07‑01 or later.** Project Burn skips any salary whose `effective_from` is after the selected month's last day, so for June every user resolves to salary 0 → burn 0. Real users with June hours (Arti, Sandeep, Jagjeet, Shubham) are excluded.
-2. **Most June hours sit on placeholder profiles** (`11111111‑…` ids from the initial seed: Kanishka, Deepak, Sharaddha, Akash‑mock, Sweksha, Juhi, Anjali, Neetu, Sridhar Hemanth, Manvi, Trisha, Sandhya, Shaleen). None of those placeholder ids have a `salaries` row, so even with the date fixed they contribute 0 to burn.
+- **Placeholder profiles** (`id = 11111111‑…`, `email = *@placeholder.colladome.local`, `is_placeholder = true`) — seeded so June 2026 hours have someone to attach to.
+- **Real profiles** (real `id`, official `@colladome.in` / `@colladome.com` email) — created when the person actually signs in.
 
-Net effect: the June salary pool the allocator sees is ₹0, so every project shows 0 hrs of burn even though hours are logged.
+For **Kanishka** and **Akash**, both exist. That's the duplication. For the rest, only the placeholder exists (no auth account yet), and its email is the fake `*.placeholder.colladome.local`.
 
-## Fix (data-only, one migration)
+## Fix (data-only migration)
 
-Insert June‑effective salary rows so the allocator has a pool to distribute. No UI or business‑logic changes.
+### 1. Merge duplicates — placeholder → real, then delete placeholder
 
-**A. Real users — backdate June salary** (same monthly value already on file, `effective_from = 2026‑06‑01`, currency INR):
+For each duplicate pair, re‑point all references (attendance, salaries, leave balances/requests, punch sessions, roles) from the placeholder id to the real id, then delete the placeholder profile.
 
-| Name | user_id | Monthly |
+| Placeholder (delete) | Real profile (keep) |
+|---|---|
+| `11111111‑…0001` Kanishka | `e0ce11c3…` kanishka@colladome.in |
+| `11111111‑…0004` Akash | `02cf3091…` akash@colladome.in |
+
+Conflict handling on re‑point:
+- `attendance_logs (user_id, date)` unique: if both ids have a row on the same date, merge task arrays and keep one; delete the placeholder row.
+- `salaries (user_id, effective_from)` unique: keep the real user's row; drop the placeholder duplicate.
+- `leave_balances (user_id, leave_type)` unique: sum `allocated`/`used`, keep real, drop placeholder.
+- `leave_requests`, `punch_sessions`: simple re‑point (no unique on user_id).
+- `user_roles`, `super_admins`: keep real user's existing rows.
+
+### 2. Rename remaining placeholders to their official email
+
+Keep the placeholder id (no auth user yet), but flip `email` to the official address from `role_grants` and clear `is_placeholder`. That way Finances/Project Burn/Team see the real name and official email, and when the person eventually signs in the trigger will attach roles by matching email.
+
+| Placeholder id | New official email | Salary source |
 |---|---|---|
-| Arti | 9869d739… | 60000 |
-| Jagjeet | 58c14ca5… | 28000 |
-| Sandeep | 38290b50… | 13000 |
-| Kanishka | e0ce11c3… | 35000 |
-| Aakash (real) | 02cf3091… | 40000 |
+| …0002 Deepak | deepak@colladome.in | grant 20000 |
+| …0003 Sharaddha | shraddha.saxena@colladome.in | grant 15000 |
+| …0005 Sweksha | sweksha@colladome.in | grant 5000 |
+| …0006 Chirag | chirag@colladome.com | grant 30000 |
+| …0007 Juhi | juhi@colladome.com | grant 20000 |
+| …0008 Anjali | anjali@colladome.in | grant 6000 |
+| …0009 Neetu | neetu@colladome.in | grant 2000 |
+| …0010 Sridhar Hemanth | hemanth@colladome.in | grant 10000 |
+| …0011 Manvi | manvi@colladome.in | grant 5000 |
+| …0012 Trisha | trisha@colladome.in | grant 5000 |
 
-Shubham (`15a70001…`) is finance admin with no salary on file — skipped unless you say otherwise.
+### 3. Sandhya (…0013) and Shaleen (…0014)
 
-**B. Placeholder profiles — add June salary from `role_grants` by name→email** (only rows where a grant exists):
+No matching `role_grants` entry, so no official email or salary on file. Two options — **tell me which**:
 
-| Placeholder | Name | Grant email | Monthly |
-|---|---|---|---|
-| …0001 | Kanishka | kanishka@colladome.in | 35000 |
-| …0002 | Deepak | deepak@colladome.in | 20000 |
-| …0003 | Sharaddha | shraddha.saxena@colladome.in | 15000 |
-| …0004 | Akash (mock) | akash@colladome.in | 40000 |
-| …0005 | Sweksha | sweksha@colladome.in | 5000 |
-| …0006 | Chirag | chirag@colladome.com | 30000 |
-| …0007 | Juhi | juhi@colladome.com | 20000 |
-| …0008 | Anjali | anjali@colladome.in | 6000 |
-| …0009 | Neetu | neetu@colladome.in | 2000 |
-| …0010 | Sridhar Hemanth | hemanth@colladome.in | 10000 |
-| …0011 | Manvi | manvi@colladome.in | 5000 |
-| …0012 | Trisha | trisha@colladome.in | 5000 |
+- (a) Leave them as placeholders (their June hours stay logged but contribute 0 to burn), or
+- (b) Give me their official emails + monthly salaries and I'll rename + add salary in the same migration.
 
-Placeholders **…0013 Sandhya** and **…0014 Shaleen** have no matching grant → no salary added → their June hours (small: RR Pay 4h, Growinsight 10h; Oswal 60h, Outfitq 30h) still contribute 0 burn. Tell me their monthly numbers and I'll include them.
+## Not doing
+
+- Not creating auth accounts for the renamed placeholders. That still happens through **Access & Roles → Create account** when each person is onboarded.
+- Not changing UI/business logic.
 
 ## Technical
 
-- Single migration using `INSERT … ON CONFLICT (user_id, effective_from) DO UPDATE` on `public.salaries`, `effective_from='2026-06-01'`, `currency='INR'`.
-- No changes to `project-burn.tsx`, `handle_new_user`, or role logic.
-- Project Burn's "Salary pool" and per‑project burn for June will populate immediately after the migration.
-
-## Not doing (unless you ask)
-
-- Merging placeholder June hours into real user ids (Akash‑mock → real Akash, Kanishka placeholder → real Kanishka). Keeping placeholders keeps the seed intact.
-- Adding a salary for Shubham, Sandhya, Shaleen.
+Single migration wrapped in a transaction:
+- CTEs to detect same‑date `attendance_logs` collisions, merge task JSON arrays, delete losers.
+- `UPDATE … SET user_id = real_id WHERE user_id = placeholder_id` on the six user‑scoped tables, with `ON CONFLICT` handled per table above.
+- `DELETE FROM profiles WHERE id IN (…0001, …0004)`.
+- `UPDATE profiles SET email = …, is_placeholder = false WHERE id = …` for each renamed placeholder.

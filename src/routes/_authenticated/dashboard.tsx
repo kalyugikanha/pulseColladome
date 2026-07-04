@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, ListChecks, CalendarRange, FolderKanban, Users, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
+import { GoogleCalendarConnectCard } from "@/components/google-calendar-connect";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -83,6 +84,9 @@ function Dashboard() {
           <Link to="/punch">{punchedIn ? "Punch out" : "Punch in"}</Link>
         </Button>
       </header>
+
+      <GoogleCalendarConnectCard />
+
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Clock} label="Status today" value={punchedIn ? "Punched in" : data?.todayLog?.punch_out_time ? "Signed off" : "Not started"} hint={data?.todayLog?.punch_in_time ? `Since ${format(new Date(data.todayLog.punch_in_time), "HH:mm")}` : "Tap punch in to begin"} tone={punchedIn ? "success" : "default"} />

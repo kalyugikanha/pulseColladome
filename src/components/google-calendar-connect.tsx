@@ -31,11 +31,12 @@ type PanelProps = {
   lastError: string | null;
   onClearError: () => void;
   isLovablePreview: boolean;
+  isOAuthBlockedContext: boolean;
   origin: string;
   callbackUrl: string;
 };
 
-function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview, origin, callbackUrl }: PanelProps) {
+function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview, isOAuthBlockedContext, origin, callbackUrl }: PanelProps) {
   const [open, setOpen] = useState(false);
 
   const copy = async (text: string, label: string) => {
@@ -54,7 +55,15 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
     },
     {
       title: 'Chrome shows "accounts.google.com is blocked"',
-      body: <>Google refuses to load inside embedded app previews. Use the Connect or Reconnect button again so the app opens a top-level handoff tab before continuing to Google.</>,
+      body: (
+        <>
+          Google refuses to load inside embedded app previews. Open the published dashboard in a new tab, then connect Google Calendar from there.
+          {isOAuthBlockedContext && " This preview is embedded, so starting OAuth here will keep hitting the blocked page."}
+          <a className="ml-1 font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noreferrer">
+            Open published dashboard
+          </a>
+        </>
+      ),
     },
     {
       title: 'Google shows "Access blocked" or a 403 page',
@@ -186,6 +195,7 @@ export function GoogleCalendarConnectCard() {
   const [popupBlocked, setPopupBlocked] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const [isLovablePreview, setIsLovablePreview] = useState(false);
+  const [isOAuthBlockedContext, setIsOAuthBlockedContext] = useState(false);
   const [origin, setOrigin] = useState("");
   const [lastError, setLastError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
@@ -198,10 +208,14 @@ export function GoogleCalendarConnectCard() {
   });
 
   useEffect(() => {
+    const embedded = window.top !== window.self;
+    const lovablePreview =
+      /(^|\.)(lovable\.app|lovableproject\.com)$/.test(window.location.hostname) &&
+      (window.location.hostname.includes("preview") || document.referrer.includes("lovable.dev") || embedded);
+
     setOrigin(window.location.origin);
-    setIsLovablePreview(
-      /(^|\.)lovable\.app$/.test(window.location.hostname) && window.location.hostname.includes("preview"),
-    );
+    setIsLovablePreview(lovablePreview);
+    setIsOAuthBlockedContext(embedded && lovablePreview);
   }, []);
 
   const callbackUrl = origin ? `${origin}/api/public/google/callback` : "/api/public/google/callback";
@@ -245,6 +259,18 @@ export function GoogleCalendarConnectCard() {
     setPendingUrl(null);
     setLastError(null);
     stopPolling();
+
+    if (isOAuthBlockedContext) {
+      const publishedTab = window.open(PUBLISHED_DASHBOARD_URL, "_blank", "noopener,noreferrer");
+      if (!publishedTab) {
+        setPopupBlocked(true);
+        setLastError("Open the published dashboard in a new tab to connect Google Calendar. Google blocks OAuth inside the embedded preview.");
+      } else {
+        toast.info("Continue Google Calendar connection from the published dashboard tab.");
+      }
+      setIsOpening(false);
+      return;
+    }
 
     const authTab = window.open("about:blank", "_blank");
     if (authTab) {
@@ -309,6 +335,7 @@ export function GoogleCalendarConnectCard() {
       lastError={lastError}
       onClearError={() => setLastError(null)}
       isLovablePreview={isLovablePreview}
+      isOAuthBlockedContext={isOAuthBlockedContext}
       origin={origin}
       callbackUrl={callbackUrl}
     />
@@ -331,7 +358,7 @@ export function GoogleCalendarConnectCard() {
               {isOpening ? (
                 <><Loader2 className="h-3.5 w-3.5 animate-spin" />Reconnecting…</>
               ) : (
-                <><ExternalLink className="h-3.5 w-3.5" />Reconnect</>
+                <><ExternalLink className="h-3.5 w-3.5" />{isOAuthBlockedContext ? "Open published dashboard" : "Reconnect"}</>
               )}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => disconnectMut.mutate()} disabled={busy}>
@@ -360,6 +387,19 @@ export function GoogleCalendarConnectCard() {
               </div>
             </div>
           )}
+          {popupBlocked && isOAuthBlockedContext && !pendingLaunchUrl && (
+            <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+                <div>
+                  Your browser blocked the published dashboard tab.{" "}
+                  <a className="font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+                    Open published dashboard
+                  </a>.
+                </div>
+              </div>
+            </div>
+          )}
           {panel}
         </CardContent>
       </Card>
@@ -380,7 +420,7 @@ export function GoogleCalendarConnectCard() {
           {isOpening ? (
             <><Loader2 className="h-3.5 w-3.5 animate-spin" />Opening…</>
           ) : (
-            <><ExternalLink className="h-3.5 w-3.5" />Connect Google Calendar</>
+            <><ExternalLink className="h-3.5 w-3.5" />{isOAuthBlockedContext ? "Open published dashboard" : "Connect Google Calendar"}</>
           )}
         </Button>
 
@@ -413,11 +453,27 @@ export function GoogleCalendarConnectCard() {
           </div>
         )}
 
+        {popupBlocked && isOAuthBlockedContext && !pendingLaunchUrl && (
+          <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+              <div>
+                Your browser blocked the published dashboard tab.{" "}
+                <a className="font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+                  Open published dashboard
+                </a>.
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="basis-full rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-muted-foreground">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
             <div>
-              {isLovablePreview
+              {isOAuthBlockedContext
+                ? "Google Calendar connection must be completed from the published app. Google blocks accounts.google.com inside the embedded preview."
+                : isLovablePreview
                 ? "If Google shows 403 in preview, connect from the published app instead. Google may reject OAuth started from the editor preview."
                 : "If Google shows 403, publish the OAuth consent screen or add this account as a test user in Google Cloud."}
               <a className="ml-1 font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noreferrer">

@@ -85,6 +85,9 @@ function Dashboard() {
         </Button>
       </header>
 
+      <GoogleCalendarConnectCard />
+
+
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Clock} label="Status today" value={punchedIn ? "Punched in" : data?.todayLog?.punch_out_time ? "Signed off" : "Not started"} hint={data?.todayLog?.punch_in_time ? `Since ${format(new Date(data.todayLog.punch_in_time), "HH:mm")}` : "Tap punch in to begin"} tone={punchedIn ? "success" : "default"} />
         <StatCard icon={TrendingUp} label="Hours this week" value={weekHours.toFixed(1)} hint="Mon–Sun" tone="primary" />

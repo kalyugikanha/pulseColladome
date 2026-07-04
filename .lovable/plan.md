@@ -1,20 +1,22 @@
 ## Plan
 
-1. **Stop navigating Google inside an embedded preview context**
-   - Update the Google Calendar connect flow so OAuth starts from a safe top-level browser window instead of ending up embedded where Google blocks it with `ERR_BLOCKED_BY_RESPONSE`.
-   - Keep the existing pre-opened tab approach, but use a small local launcher page/route when needed so the user lands in a normal top-level page before redirecting to Google.
+1. **Treat embedded preview as a blocked OAuth context**
+   - Detect when the app is running inside the Lovable preview iframe using `window.top !== window.self` and the Lovable referrer/origin.
+   - Do not start Google OAuth from that embedded context, because Google blocks `accounts.google.com` in framed/sandboxed flows.
 
-2. **Improve the fallback link behavior**
-   - Ensure “Reopen Google sign-in” / popup-blocked fallback also opens from the same safe top-level launcher instead of linking directly to `accounts.google.com` from the app preview.
-   - Keep polling the connection state after the launcher opens so the dashboard updates automatically when OAuth completes.
+2. **Change Connect/Reconnect behavior in preview**
+   - When embedded in preview, make **Connect Google Calendar** / **Reconnect** open the published dashboard (`https://colladome-pulse.lovable.app/dashboard`) in a new top-level tab instead of generating and opening a Google auth URL from preview.
+   - Keep the normal OAuth flow for the published/top-level app.
 
-3. **Make the troubleshooting panel explain this exact error**
-   - Add a specific item for `accounts.google.com is blocked` / `ERR_BLOCKED_BY_RESPONSE` explaining that Google refuses to load inside embedded frames and that the flow should be opened in a top-level tab/window.
-   - Keep the existing guidance for 403, redirect URI mismatch, wrong account, and waiting states.
+3. **Update on-screen copy to be explicit**
+   - Replace the current preview warning with a stronger message: Google Calendar connection must be completed from the published app, not from the Lovable preview.
+   - Update the troubleshooting item for `accounts.google.com is blocked` to say the fix is opening the published dashboard, not retrying from preview.
 
-4. **Preserve existing security and OAuth state handling**
-   - Do not change token storage, scopes, state signing, callback validation, or backend permissions.
-   - Only adjust the browser-side launch UX and any minimal route needed to safely hand off to Google.
+4. **Keep existing backend/OAuth security unchanged**
+   - Do not change token storage, OAuth scopes, state signing, callback validation, or database policies.
+   - Keep the launcher route for top-level OAuth handoff, but only use it from safe top-level contexts.
 
 5. **Validate**
-   - Use the preview to confirm the Connect/Reconnect button no longer leaves the user on the embedded Google-blocked error page and instead opens a usable top-level OAuth handoff.
+   - In the live preview, confirm `window.top !== window.self` is detected.
+   - Confirm the Connect button opens the published dashboard instead of opening `accounts.google.com` from preview.
+   - Confirm the published/top-level flow still uses the Google OAuth launcher.

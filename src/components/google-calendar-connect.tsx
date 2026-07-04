@@ -31,11 +31,12 @@ type PanelProps = {
   lastError: string | null;
   onClearError: () => void;
   isLovablePreview: boolean;
+  isOAuthBlockedContext: boolean;
   origin: string;
   callbackUrl: string;
 };
 
-function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview, origin, callbackUrl }: PanelProps) {
+function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview, isOAuthBlockedContext, origin, callbackUrl }: PanelProps) {
   const [open, setOpen] = useState(false);
 
   const copy = async (text: string, label: string) => {
@@ -54,7 +55,9 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
     },
     {
       title: 'Chrome shows "accounts.google.com is blocked"',
-      body: <>Google refuses to load inside embedded app previews. Use the Connect or Reconnect button again so the app opens a top-level handoff tab before continuing to Google.</>,
+      body: (
+        <>
+          Google refuses to load inside embedded app previews.{
     },
     {
       title: 'Google shows "Access blocked" or a 403 page',

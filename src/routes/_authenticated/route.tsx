@@ -115,6 +115,13 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuItem>
                   </>
                 )}
+                {(isSuperAdmin || isHrAdmin) && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/onboarding")}>
+                      <Link to="/onboarding"><UserPlus /><span>Onboarding</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {isSuperAdmin && (
                   <>
                     <SidebarMenuItem>

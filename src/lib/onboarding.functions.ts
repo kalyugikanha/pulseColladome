@@ -99,7 +99,7 @@ export const saveMyOnboarding = createServerFn({ method: "POST" })
         } else {
           // Partial save: update existing row if present, else silently skip
           if (existing) {
-            const patch: Record<string, string> = {};
+            const patch: BankPatch = {};
             for (const k of REQUIRED_BANK_FIELDS) {
               const v = b[k];
               if (v !== undefined) patch[k] = (k === "ifsc_code" || k === "pan_number") ? String(v).toUpperCase() : String(v);

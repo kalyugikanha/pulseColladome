@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, ListChecks, CalendarRange, FolderKanban, Users, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
+import { GoogleCalendarConnectCard } from "@/components/google-calendar-connect";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,

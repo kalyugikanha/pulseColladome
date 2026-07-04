@@ -1,43 +1,39 @@
-## Timesheet — hours × project matrix
+## Goal
+Seed June 2026 `attendance_logs` rows from the pasted list so the Timesheet / Project Burn pages show these hours.
 
-New page `/timesheet` (top-level sidebar item, gated to admins + project managers) showing a pivot table of employee × project hours for a selected month.
+## Name → profile mapping (trust code, skip blanks)
+| Pasted | Profile |
+|---|---|
+| Kanishka | Kanishka Khunteta |
+| Deepak | Deepak |
+| Sandeep | sandeep |
+| Shraddha | Sharaddha |
+| Arti | Arti Kumawat Colladome |
+| Akash | Aakash |
+| Sweksha, Jagjeet, Chirag, Juhi, Anjali, Neetu, Sridhar (→ Sridhar Hemanth), Manvi, Trisha | exact match |
+| Sandhya, Trisha's blank row, Kanishka RR Pay/Eartheon blanks, Deepak Outfitq blank, Anjali Outfitq blank | **skipped** |
 
-### Layout
+Project codes used verbatim from the pasted data (e.g. `CLDM00527` stays "Growinsight (Phase 2)", `CLDM00481` stays "Briskon Technologies", `CLDM00103` stays "Outfitq"), matching the earlier "trust code" decision.
 
-- Header: page title, month picker (defaults to current month), export‑CSV button.
-- Filters row: employee multi‑select (default = all), project multi‑select (default = all).
-- Sticky pivot table:
-  - Left column: Employee (name + role/dept subtitle). Frozen.
-  - Column headers: one column per project active in the month (code + short name). Frozen top.
-  - Cells: total hours logged that month for that employee on that project. Blank = 0. Hover shows day‑by‑day tooltip.
-  - Right‑most column: **Total** hours per employee.
-  - Bottom row: **Total** hours per project + grand total.
-- Empty state: "No hours logged in <month>."
+## Rows to insert (54 entries after skips)
 
-### Interaction
+For each (employee, project, hours) entry:
+- Create one `attendance_logs` row on a distinct **June 2026 weekday** per employee, starting Mon Jun 1 and walking forward across weekdays (skipping Sat/Sun). Each employee's entries land on consecutive weekdays — no two entries share a date, so the `(user_id, date)` unique constraint is safe.
+- Row shape:
+  - `user_id` = mapped profile id
+  - `date` = assigned weekday in June 2026
+  - `punch_in_time` = `date 10:00 IST`, `punch_out_time` = punch_in + hours
+  - `total_hours` = hours
+  - `tasks` = `[{ project_id, project_code, project_name, hours, comments: "June work" }]`
+  - `daily_note` = `"Seeded June entry"`
+- Insert via `ON CONFLICT (user_id, date) DO NOTHING` so re-runs and any existing rows are preserved untouched.
 
-- Click a cell → drawer with day‑by‑day entries (date, hours, comments if any).
-- Rows and columns sortable (by name/code, by total desc).
-- CSV export mirrors the visible matrix (respects filters).
+Largest per-employee entry count is Akash's 13, well within June's 22 weekdays.
 
-### Access
+## Delivery
+Single `supabase--insert` call containing all 54 INSERTs, wrapped in a `WITH proj AS (SELECT id, code FROM projects)` CTE so project_ids are looked up by code (no hard-coded UUIDs).
 
-- Route sits under `_authenticated/timesheet.tsx`; component guard: if not `me.isAdmin && !me.canManageProjects` → redirect to `/dashboard`.
-- Sidebar link visible only when `canManageProjects || isAdmin`.
-
-### Data
-
-- Single Supabase read: `attendance_logs` for the month.
-- Client‑side pivot in `useMemo`. No new tables, no migration, no server functions.
-- Uses the same shape Project Burn already reads (`tasks: [{project_code, project_name, hours}]`).
-
-### Files
-
-- new: `src/routes/_authenticated/timesheet.tsx`
-- edit: sidebar component (add "Timesheet" item with `TableProperties` icon between Hours Editor and Project Burn)
-
-### Not doing
-
-- No editing (that's Hours Editor).
-- No cost/burn column (that's Project Burn).
-- No multi‑month view.
+## Not doing
+- No schema changes.
+- No touching pre-existing attendance rows.
+- No entries for Sandhya or any blank-hours row.

@@ -1,28 +1,20 @@
-## Goal
-Add a collapsible on-screen troubleshooting panel to the Google Calendar connect card that explains common failure modes and gives concrete next steps, so users can self-diagnose when the connect flow doesn't complete.
+## Plan
 
-## Changes (single file: `src/components/google-calendar-connect.tsx`)
+1. **Stop navigating Google inside an embedded preview context**
+   - Update the Google Calendar connect flow so OAuth starts from a safe top-level browser window instead of ending up embedded where Google blocks it with `ERR_BLOCKED_BY_RESPONSE`.
+   - Keep the existing pre-opened tab approach, but use a small local launcher page/route when needed so the user lands in a normal top-level page before redirecting to Google.
 
-1. **New `lastError` state** — capture the message from `handleConnect` / `handleReconnect` / `disconnectMut` failures (currently only toasted) so the panel can display it inline. Cleared when connection status flips to `connected` or a new attempt starts.
+2. **Improve the fallback link behavior**
+   - Ensure “Reopen Google sign-in” / popup-blocked fallback also opens from the same safe top-level launcher instead of linking directly to `accounts.google.com` from the app preview.
+   - Keep polling the connection state after the launcher opens so the dashboard updates automatically when OAuth completes.
 
-2. **New `<GoogleTroubleshootingPanel />` subcomponent** rendered inside both the connected and disconnected cards (basis-full row, below existing content). Structure:
-   - Header row: `HelpCircle` icon + "Having trouble connecting?" + a `ChevronDown`/`ChevronUp` toggle. Collapsed by default; expanded state kept in local `useState`.
-   - When `lastError` is set, show it at the top in a destructive-tinted box with the raw message and a "Copy details" button (uses `navigator.clipboard`).
-   - Expanded body: a list of common issues, each with a short title, one-line explanation, and the fix. Cover:
-     - **New tab didn't open** — popup blocker; click "Reconnect" again and allow popups for this site.
-     - **Google shows "Access blocked" / 403** — OAuth consent screen not published or account not on test-user list; link to `PUBLISHED_DASHBOARD_URL` and note that preview URLs are often rejected.
-     - **"redirect_uri_mismatch"** — the Lovable callback URL isn't in the Google Cloud OAuth client's authorized redirect URIs; show the exact callback path (`/api/public/google/callback` on the current origin) with a copy button.
-     - **Stuck on "Waiting for Google authorization…"** — the callback tab was closed before finishing; click Reconnect to try again.
-     - **Signed in with wrong Google account** — click Reconnect (which now disconnects first) and pick the correct account on the Google chooser.
-     - **Still stuck** — link to Troubleshooting docs (`https://docs.lovable.dev/tips-tricks/troubleshooting`).
-   - Small footer line showing the current origin and whether it's the Lovable preview vs published (reuses existing `isLovablePreview`).
+3. **Make the troubleshooting panel explain this exact error**
+   - Add a specific item for `accounts.google.com is blocked` / `ERR_BLOCKED_BY_RESPONSE` explaining that Google refuses to load inside embedded frames and that the flow should be opened in a top-level tab/window.
+   - Keep the existing guidance for 403, redirect URI mismatch, wrong account, and waiting states.
 
-3. **Wire error capture**
-   - In `openOAuth` catch block: `setLastError(message)` alongside the existing toast.
-   - In `disconnectMut.onError`: `setLastError(e.message)`.
-   - In the `status?.connected` effect: `setLastError(null)`.
+4. **Preserve existing security and OAuth state handling**
+   - Do not change token storage, scopes, state signing, callback validation, or backend permissions.
+   - Only adjust the browser-side launch UX and any minimal route needed to safely hand off to Google.
 
-## Out of scope
-- No server, OAuth scope, or callback route changes.
-- No changes to polling, preview detection, or the existing 403 warning banner (the new panel supersedes it visually but the existing banner stays for at-a-glance guidance).
-- No new dependencies; icons come from existing `lucide-react` import.
+5. **Validate**
+   - Use the preview to confirm the Connect/Reconnect button no longer leaves the user on the embedded Google-blocked error page and instead opens a usable top-level OAuth handoff.

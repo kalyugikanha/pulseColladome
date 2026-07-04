@@ -19,6 +19,13 @@ import { toast } from "sonner";
 
 const PUBLISHED_DASHBOARD_URL = "https://colladome-pulse.lovable.app/dashboard";
 const TROUBLESHOOTING_DOCS_URL = "https://docs.lovable.dev/tips-tricks/troubleshooting";
+const GOOGLE_OAUTH_LAUNCH_PATH = "/google-calendar-oauth-launch";
+
+function googleOAuthLaunchUrl(authUrl: string, baseOrigin: string) {
+  const launchUrl = new URL(GOOGLE_OAUTH_LAUNCH_PATH, baseOrigin || window.location.origin);
+  launchUrl.searchParams.set("to", authUrl);
+  return launchUrl.toString();
+}
 
 type PanelProps = {
   lastError: string | null;
@@ -44,6 +51,10 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
     {
       title: "The new tab never opened",
       body: <>Your browser blocked the popup. Click <strong>Reconnect</strong> again, and if prompted, allow popups for this site.</>,
+    },
+    {
+      title: 'Chrome shows "accounts.google.com is blocked"',
+      body: <>Google refuses to load inside embedded app previews. Use the Connect or Reconnect button again so the app opens a top-level handoff tab before continuing to Google.</>,
     },
     {
       title: 'Google shows "Access blocked" or a 403 page',
@@ -194,6 +205,7 @@ export function GoogleCalendarConnectCard() {
   }, []);
 
   const callbackUrl = origin ? `${origin}/api/public/google/callback` : "/api/public/google/callback";
+  const pendingLaunchUrl = pendingUrl && origin ? googleOAuthLaunchUrl(pendingUrl, origin) : null;
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -252,10 +264,11 @@ export function GoogleCalendarConnectCard() {
       }
 
       const { url } = await getUrl();
+      const launchUrl = googleOAuthLaunchUrl(url, window.location.origin);
       setPendingUrl(url);
 
       if (authTab && !authTab.closed) {
-        authTab.location.replace(url);
+        authTab.location.replace(launchUrl);
         setPopupBlocked(false);
         startPolling();
       } else {
@@ -325,7 +338,7 @@ export function GoogleCalendarConnectCard() {
               Disconnect
             </Button>
           </div>
-          {popupBlocked && pendingUrl && (
+          {popupBlocked && pendingLaunchUrl && (
             <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
               <div className="flex items-start gap-2">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
@@ -333,7 +346,7 @@ export function GoogleCalendarConnectCard() {
                   Your browser blocked the new tab.{" "}
                   <a
                     className="font-medium text-primary hover:underline"
-                    href={pendingUrl}
+                    href={pendingLaunchUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => {
@@ -371,25 +384,25 @@ export function GoogleCalendarConnectCard() {
           )}
         </Button>
 
-        {pendingUrl && !popupBlocked && (
+        {pendingLaunchUrl && !popupBlocked && (
           <div className="basis-full rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
               <span>Waiting for Google authorization in the new tab… this card will update automatically.</span>
             </div>
-            <a className="mt-1 inline-block font-medium text-primary hover:underline" href={pendingUrl} target="_blank" rel="noopener noreferrer">
+            <a className="mt-1 inline-block font-medium text-primary hover:underline" href={pendingLaunchUrl} target="_blank" rel="noopener noreferrer">
               Reopen Google sign-in
             </a>
           </div>
         )}
 
-        {popupBlocked && pendingUrl && (
+        {popupBlocked && pendingLaunchUrl && (
           <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
             <div className="flex items-start gap-2">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
               <div>
                 Your browser blocked the new tab.{" "}
-                <a className="font-medium text-primary hover:underline" href={pendingUrl} target="_blank" rel="noopener noreferrer" onClick={() => {
+                <a className="font-medium text-primary hover:underline" href={pendingLaunchUrl} target="_blank" rel="noopener noreferrer" onClick={() => {
                   setPopupBlocked(false);
                   startPolling();
                 }}>

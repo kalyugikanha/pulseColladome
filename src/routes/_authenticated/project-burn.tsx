@@ -5,8 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Flame, IndianRupee, TrendingUp, CalendarDays } from "lucide-react";
 import { format, getDaysInMonth } from "date-fns";
@@ -175,8 +173,31 @@ function ProjectBurnPage() {
           <p className="text-sm text-muted-foreground">Daily burn allocated from salaries as team logs hours. Salary-share allocation.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Label htmlFor="month" className="text-xs text-muted-foreground">Month</Label>
-          <Input id="month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
+          {(() => {
+            const [yr, mo] = month.split("-");
+            const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+            const months = [
+              ["01", "January"], ["02", "February"], ["03", "March"], ["04", "April"],
+              ["05", "May"], ["06", "June"], ["07", "July"], ["08", "August"],
+              ["09", "September"], ["10", "October"], ["11", "November"], ["12", "December"],
+            ] as const;
+            return (
+              <>
+                <Select value={mo} onValueChange={(v) => setMonth(`${yr}-${v}`)}>
+                  <SelectTrigger className="w-36 h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {months.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={yr} onValueChange={(v) => setMonth(`${v}-${mo}`)}>
+                  <SelectTrigger className="w-24 h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </>
+            );
+          })()}
           <Select value={projectFilter} onValueChange={setProjectFilter}>
             <SelectTrigger className="w-52 h-9 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>

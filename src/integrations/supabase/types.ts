@@ -582,27 +582,12 @@ export type Database = {
       team_leave_calendar: {
         Row: {
           end_date: string | null
+          full_name: string | null
           id: string | null
           leave_type: Database["public"]["Enums"]["leave_type"] | null
           start_date: string | null
           status: Database["public"]["Enums"]["leave_status"] | null
           user_id: string | null
-        }
-        Insert: {
-          end_date?: string | null
-          id?: string | null
-          leave_type?: Database["public"]["Enums"]["leave_type"] | null
-          start_date?: string | null
-          status?: Database["public"]["Enums"]["leave_status"] | null
-          user_id?: string | null
-        }
-        Update: {
-          end_date?: string | null
-          id?: string | null
-          leave_type?: Database["public"]["Enums"]["leave_type"] | null
-          start_date?: string | null
-          status?: Database["public"]["Enums"]["leave_status"] | null
-          user_id?: string | null
         }
         Relationships: [
           {
@@ -617,7 +602,6 @@ export type Database = {
     }
     Functions: {
       can_manage_projects: { Args: { _user_id: string }; Returns: boolean }
-      get_leave_reason: { Args: { _leave_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

@@ -158,3 +158,38 @@ export async function fetchUpcomingEvents(accessToken: string, days: number): Pr
     };
   });
 }
+
+export async function fetchEventsInRange(accessToken: string, timeMinISO: string, timeMaxISO: string): Promise<CalendarEvent[]> {
+  const params = new URLSearchParams({
+    timeMin: timeMinISO,
+    timeMax: timeMaxISO,
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "250",
+  });
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) throw new Error(`Google Calendar list failed (${res.status}): ${await res.text()}`);
+  const json = await res.json();
+  return (json.items ?? []).map((e: any): CalendarEvent => {
+    const start = e.start?.dateTime ?? e.start?.date ?? "";
+    const end = e.end?.dateTime ?? e.end?.date ?? "";
+    return {
+      id: e.id,
+      summary: e.summary ?? "(no title)",
+      description: e.description,
+      start,
+      end,
+      all_day: !e.start?.dateTime,
+      location: e.location,
+      meeting_link: e.hangoutLink ?? e.conferenceData?.entryPoints?.find((p: any) => p.entryPointType === "video")?.uri,
+      attendees_count: Array.isArray(e.attendees) ? e.attendees.length : 0,
+      organizer: e.organizer?.email,
+      status: e.status,
+      html_link: e.htmlLink,
+    };
+  });
+}
+

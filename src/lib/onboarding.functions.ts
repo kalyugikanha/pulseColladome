@@ -183,12 +183,7 @@ export const completeMyOnboarding = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-      .from("profiles")
-      .update({ onboarding_completed: true, onboarding_completed_at: new Date().toISOString() })
-      .eq("id", uid);
-    if (error) throw new Error(error.message);
-    return { ok: true as const };
-  });
+
 
 export const getEmployeeDocumentUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

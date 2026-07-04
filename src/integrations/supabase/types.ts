@@ -85,6 +85,63 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_bank_details: {
+        Row: {
+          account_holder_name: string
+          account_number: string
+          bank_branch: string
+          created_at: string
+          ifsc_code: string
+          pan_number: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_holder_name: string
+          account_number: string
+          bank_branch: string
+          created_at?: string
+          ifsc_code: string
+          pan_number: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_holder_name?: string
+          account_number?: string
+          bank_branch?: string
+          created_at?: string
+          ifsc_code?: string
+          pan_number?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      employee_documents: {
+        Row: {
+          doc_type: Database["public"]["Enums"]["employee_doc_type"]
+          id: string
+          storage_path: string
+          uploaded_at: string
+          user_id: string
+        }
+        Insert: {
+          doc_type: Database["public"]["Enums"]["employee_doc_type"]
+          id?: string
+          storage_path: string
+          uploaded_at?: string
+          user_id: string
+        }
+        Update: {
+          doc_type?: Database["public"]["Enums"]["employee_doc_type"]
+          id?: string
+          storage_path?: string
+          uploaded_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       google_calendar_tokens: {
         Row: {
           access_token: string
@@ -227,48 +284,78 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           date_of_birth: string | null
+          day_start_time: string | null
           department: string | null
           email: string | null
           employment_type: string | null
           full_name: string | null
+          github_url: string | null
           id: string
           is_placeholder: boolean
           joined_on: string | null
+          linkedin_url: string | null
+          marriage_anniversary: string | null
           must_change_password: boolean
           notes: string | null
+          onboarding_completed: boolean
+          onboarding_completed_at: string | null
+          permanent_address: string | null
+          personal_email: string | null
           phone: string | null
+          profile_picture_url: string | null
+          standup_time: string | null
           updated_at: string
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
           date_of_birth?: string | null
+          day_start_time?: string | null
           department?: string | null
           email?: string | null
           employment_type?: string | null
           full_name?: string | null
+          github_url?: string | null
           id: string
           is_placeholder?: boolean
           joined_on?: string | null
+          linkedin_url?: string | null
+          marriage_anniversary?: string | null
           must_change_password?: boolean
           notes?: string | null
+          onboarding_completed?: boolean
+          onboarding_completed_at?: string | null
+          permanent_address?: string | null
+          personal_email?: string | null
           phone?: string | null
+          profile_picture_url?: string | null
+          standup_time?: string | null
           updated_at?: string
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
           date_of_birth?: string | null
+          day_start_time?: string | null
           department?: string | null
           email?: string | null
           employment_type?: string | null
           full_name?: string | null
+          github_url?: string | null
           id?: string
           is_placeholder?: boolean
           joined_on?: string | null
+          linkedin_url?: string | null
+          marriage_anniversary?: string | null
           must_change_password?: boolean
           notes?: string | null
+          onboarding_completed?: boolean
+          onboarding_completed_at?: string | null
+          permanent_address?: string | null
+          personal_email?: string | null
           phone?: string | null
+          profile_picture_url?: string | null
+          standup_time?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -688,6 +775,17 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "employee" | "project_manager" | "hr_admin"
+      employee_doc_type:
+        | "offer_letter"
+        | "aadhar"
+        | "pan"
+        | "cancelled_cheque"
+        | "marksheet_10"
+        | "marksheet_12"
+        | "graduation"
+        | "masters"
+        | "resume"
+        | "profile_picture"
       leave_status: "pending" | "approved" | "rejected"
       leave_type: "casual" | "sick" | "earned" | "unpaid"
       project_status: "active" | "on_hold" | "completed"
@@ -821,6 +919,18 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "employee", "project_manager", "hr_admin"],
+      employee_doc_type: [
+        "offer_letter",
+        "aadhar",
+        "pan",
+        "cancelled_cheque",
+        "marksheet_10",
+        "marksheet_12",
+        "graduation",
+        "masters",
+        "resume",
+        "profile_picture",
+      ],
       leave_status: ["pending", "approved", "rejected"],
       leave_type: ["casual", "sick", "earned", "unpaid"],
       project_status: ["active", "on_hold", "completed"],

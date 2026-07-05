@@ -499,6 +499,7 @@ export type Database = {
       }
       punch_sessions: {
         Row: {
+          allocations: Json
           comments: string | null
           created_at: string
           hours: number | null
@@ -513,6 +514,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allocations?: Json
           comments?: string | null
           created_at?: string
           hours?: number | null
@@ -527,6 +529,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allocations?: Json
           comments?: string | null
           created_at?: string
           hours?: number | null

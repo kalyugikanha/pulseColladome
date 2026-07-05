@@ -1,22 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Clock } from "lucide-react";
+import { Clock, Plus, Trash2 } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/punch")({
   component: PunchPage,
 });
+
+type Allocation = {
+  project_id: string;
+  project_code: string | null;
+  project_name: string | null;
+  hours: number;
+  comments: string;
+};
 
 type Session = {
   id: string;
@@ -29,15 +38,18 @@ type Session = {
   project_code: string | null;
   project_name: string | null;
   comments: string | null;
+  allocations: Allocation[] | null;
 };
+
+type Row = { projectId: string; hours: string; comments: string };
 
 function PunchPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const today = format(new Date(), "yyyy-MM-dd");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [projectId, setProjectId] = useState<string>("");
-  const [comments, setComments] = useState("");
+  const [rows, setRows] = useState<Row[]>([{ projectId: "", hours: "", comments: "" }]);
+  const [submitting, setSubmitting] = useState(false);
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["punch-sessions-today", me?.id],
@@ -70,24 +82,34 @@ function PunchPage() {
   const closedSessions = (sessions ?? []).filter((s) => s.punch_out_time);
   const totalToday = closedSessions.reduce((s, r) => s + Number(r.hours ?? 0), 0);
 
+  const sessionDurationHours = useMemo(() => {
+    if (!openSession) return 0;
+    return Number((differenceInMinutes(new Date(), new Date(openSession.punch_in_time)) / 60).toFixed(2));
+  }, [openSession, dialogOpen]);
+
+  const allocatedTotal = rows.reduce((s, r) => s + (Number(r.hours) || 0), 0);
+
   async function refreshDailyRollup() {
-    if (!sessions || !me) return;
-    // recompute from live query
+    if (!me) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: fresh } = await (supabase as any)
       .from("punch_sessions")
-      .select("punch_in_time, punch_out_time, hours, project_id, project_code, project_name, comments")
+      .select("punch_in_time, punch_out_time, hours, allocations")
       .eq("user_id", me.id)
       .eq("session_date", today)
       .order("punch_in_time", { ascending: true });
-    const rows = (fresh ?? []) as Session[];
-    if (rows.length === 0) return;
-    const ins = rows.map((r) => r.punch_in_time).filter(Boolean).sort();
-    const outs = rows.map((r) => r.punch_out_time).filter(Boolean).sort();
-    const total = rows.reduce((s, r) => s + Number(r.hours ?? 0), 0);
-    const tasks = rows
-      .filter((r) => r.project_code)
-      .map((r) => ({ project_id: r.project_id, project_code: r.project_code, project_name: r.project_name, hours: Number(r.hours ?? 0), comments: r.comments ?? "" }));
+    const rowsFresh = (fresh ?? []) as Session[];
+    if (rowsFresh.length === 0) return;
+    const ins = rowsFresh.map((r) => r.punch_in_time).filter(Boolean).sort();
+    const outs = rowsFresh.map((r) => r.punch_out_time).filter(Boolean).sort();
+    const total = rowsFresh.reduce((s, r) => s + Number(r.hours ?? 0), 0);
+    const tasks = rowsFresh.flatMap((r) => (r.allocations ?? []).map((a) => ({
+      project_id: a.project_id,
+      project_code: a.project_code,
+      project_name: a.project_name,
+      hours: Number(a.hours ?? 0),
+      comments: a.comments ?? "",
+    })));
     await supabase.from("attendance_logs").upsert({
       user_id: me.id,
       date: today,
@@ -107,7 +129,6 @@ function PunchPage() {
       punch_in_time: new Date().toISOString(),
     });
     if (error) { toast.error(error.message); return; }
-    // upsert attendance_logs punch_in_time if not set
     const existing = (await supabase.from("attendance_logs").select("punch_in_time").eq("user_id", me!.id).eq("date", today).maybeSingle()).data;
     if (!existing?.punch_in_time) {
       await supabase.from("attendance_logs").upsert({ user_id: me!.id, date: today, punch_in_time: new Date().toISOString() }, { onConflict: "user_id,date" });
@@ -119,31 +140,65 @@ function PunchPage() {
 
   function openPunchOut() {
     if (!openSession) return;
-    setProjectId("");
-    setComments("");
+    const suggested = Number((differenceInMinutes(new Date(), new Date(openSession.punch_in_time)) / 60).toFixed(2));
+    setRows([{ projectId: "", hours: suggested > 0 ? String(suggested) : "", comments: "" }]);
     setDialogOpen(true);
+  }
+
+  function updateRow(idx: number, patch: Partial<Row>) {
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }
+  function addRow() {
+    setRows((prev) => [...prev, { projectId: "", hours: "", comments: "" }]);
+  }
+  function removeRow(idx: number) {
+    setRows((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
   }
 
   async function submitPunchOut() {
     if (!openSession) return;
-    if (!projectId) { toast.error("Pick a project."); return; }
-    if (!comments.trim()) { toast.error("Add a short comment on what you did."); return; }
-    const p = projects?.find((pr) => pr.id === projectId);
+    if (rows.length === 0) { toast.error("Add at least one project."); return; }
+    for (const [i, r] of rows.entries()) {
+      if (!r.projectId) { toast.error(`Row ${i + 1}: pick a project.`); return; }
+      const h = Number(r.hours);
+      if (!Number.isFinite(h) || h <= 0) { toast.error(`Row ${i + 1}: enter hours (>0).`); return; }
+      if (!r.comments.trim()) { toast.error(`Row ${i + 1}: add a comment.`); return; }
+    }
+    const ids = rows.map((r) => r.projectId);
+    if (new Set(ids).size !== ids.length) { toast.error("Same project listed twice — merge them."); return; }
+
+    const allocations: Allocation[] = rows.map((r) => {
+      const p = projects?.find((pr) => pr.id === r.projectId);
+      return {
+        project_id: r.projectId,
+        project_code: p?.code ?? null,
+        project_name: p?.name ?? null,
+        hours: Number(Number(r.hours).toFixed(2)),
+        comments: r.comments.trim(),
+      };
+    });
+    const totalHours = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
+    const first = allocations[0];
     const now = new Date();
-    const hours = Number((differenceInMinutes(now, new Date(openSession.punch_in_time)) / 60).toFixed(2));
+
+    setSubmitting(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any).from("punch_sessions").update({
       punch_out_time: now.toISOString(),
-      hours,
-      project_id: projectId,
-      project_code: p?.code ?? null,
-      project_name: p?.name ?? null,
-      comments: comments.trim(),
+      hours: totalHours,
+      project_id: first.project_id,
+      project_code: first.project_code,
+      project_name: first.project_name,
+      comments: allocations.length === 1
+        ? first.comments
+        : allocations.map((a) => `[${a.project_code ?? ""}] ${a.hours}h — ${a.comments}`).join("\n"),
+      allocations,
     }).eq("id", openSession.id);
+    setSubmitting(false);
     if (error) { toast.error(error.message); return; }
     await refetchSessions();
     await refreshDailyRollup();
-    toast.success(`Session logged — ${hours.toFixed(2)}h on ${p?.code}`);
+    toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);
     setDialogOpen(false);
     qc.invalidateQueries();
   }
@@ -181,26 +236,42 @@ function PunchPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-display flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Today's sessions</CardTitle>
-          <CardDescription>Each punch-out is logged against a project.</CardDescription>
+          <CardDescription>Each punch-out can log multiple projects with hours allocated to each.</CardDescription>
         </CardHeader>
         <CardContent>
           {(sessions?.length ?? 0) === 0 ? (
             <p className="text-sm text-muted-foreground">No sessions yet today.</p>
           ) : (
-            <div className="grid gap-2">
-              {sessions!.map((s) => (
-                <div key={s.id} className="rounded-lg border border-border/60 p-3 text-sm flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground">{format(new Date(s.punch_in_time), "HH:mm")} → {s.punch_out_time ? format(new Date(s.punch_out_time), "HH:mm") : "…"}</span>
-                    {s.project_code && <Badge variant="secondary" className="font-mono text-xs">{s.project_code}</Badge>}
-                    {s.project_name && <span className="font-medium">{s.project_name}</span>}
+            <div className="grid gap-3">
+              {sessions!.map((s) => {
+                const allocs = (s.allocations ?? []) as Allocation[];
+                return (
+                  <div key={s.id} className="rounded-lg border border-border/60 p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-muted-foreground">{format(new Date(s.punch_in_time), "HH:mm")} → {s.punch_out_time ? format(new Date(s.punch_out_time), "HH:mm") : "…"}</span>
+                      <Badge variant="outline">{s.hours != null ? `${Number(s.hours).toFixed(2)}h` : "open"}</Badge>
+                    </div>
+                    {allocs.length > 0 ? (
+                      <div className="mt-2 grid gap-1.5">
+                        {allocs.map((a, i) => (
+                          <div key={i} className="flex flex-wrap items-start gap-2 rounded-md bg-muted/40 px-2 py-1.5">
+                            {a.project_code && <Badge variant="secondary" className="font-mono text-xs">{a.project_code}</Badge>}
+                            {a.project_name && <span className="font-medium">{a.project_name}</span>}
+                            <Badge variant="outline">{Number(a.hours).toFixed(2)}h</Badge>
+                            {a.comments && <span className="text-muted-foreground flex-1 min-w-0">{a.comments}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (s.project_code || s.comments) ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-muted-foreground">
+                        {s.project_code && <Badge variant="secondary" className="font-mono text-xs">{s.project_code}</Badge>}
+                        {s.project_name && <span className="font-medium text-foreground">{s.project_name}</span>}
+                        {s.comments && <span className="truncate">{s.comments}</span>}
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="flex items-center gap-3">
-                    {s.comments && <span className="text-muted-foreground truncate max-w-md">{s.comments}</span>}
-                    <Badge variant="outline">{s.hours != null ? `${Number(s.hours).toFixed(2)}h` : "open"}</Badge>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -226,31 +297,68 @@ function PunchPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-display">Log this session</DialogTitle>
             <DialogDescription>
-              {openSession && `Started at ${format(new Date(openSession.punch_in_time), "HH:mm")} — about ${(differenceInMinutes(new Date(), new Date(openSession.punch_in_time)) / 60).toFixed(2)}h so far.`}
+              {openSession && `Started at ${format(new Date(openSession.punch_in_time), "HH:mm")} — about ${sessionDurationHours.toFixed(2)}h so far. Split the time across the projects you worked on.`}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Project</Label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger><SelectValue placeholder="Select project (name + ID)" /></SelectTrigger>
-                <SelectContent>
-                  {projects?.map((p) => <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Comments</Label>
-              <Textarea rows={4} placeholder="What did you work on during this session?" value={comments} onChange={(e) => setComments(e.target.value)} />
-            </div>
+
+          <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+            {rows.map((r, idx) => {
+              const used = new Set(rows.filter((_, i) => i !== idx).map((rr) => rr.projectId).filter(Boolean));
+              return (
+                <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-3 bg-muted/20">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">Project {idx + 1}</span>
+                    {rows.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(idx)} className="text-destructive h-7 px-2">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Project</Label>
+                      <Select value={r.projectId} onValueChange={(v) => updateRow(idx, { projectId: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                        <SelectContent>
+                          {projects?.filter((p) => !used.has(p.id)).map((p) => (
+                            <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Hours</Label>
+                      <Input type="number" min="0" step="0.25" placeholder="e.g. 2.5" value={r.hours} onChange={(e) => updateRow(idx, { hours: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">What did you work on?</Label>
+                    <Textarea rows={2} placeholder="Short comment on this project" value={r.comments} onChange={(e) => updateRow(idx, { comments: e.target.value })} />
+                  </div>
+                </div>
+              );
+            })}
+            <Button type="button" variant="outline" size="sm" onClick={addRow} className="w-full">
+              <Plus className="h-4 w-4 mr-1" /> Add another project
+            </Button>
           </div>
+
+          <div className="flex items-center justify-between text-sm px-1">
+            <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{sessionDurationHours.toFixed(2)}h</span></span>
+            <span className={`font-semibold ${Math.abs(allocatedTotal - sessionDurationHours) > 0.25 ? "text-amber-600" : "text-foreground"}`}>
+              Allocated: {allocatedTotal.toFixed(2)}h
+            </span>
+          </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={submitPunchOut} className="gradient-primary">Punch out</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button onClick={submitPunchOut} disabled={submitting} className="gradient-primary">
+              {submitting ? "Saving…" : "Punch out"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

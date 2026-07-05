@@ -1,68 +1,49 @@
 ## Goal
-Fix the Google Calendar connection error, then build a team calendar utility where employees can sync their calendars, view teammates’ blocked time/work context, and book time on a shared team calendar.
 
-## Immediate OAuth fix
-1. Update the Calendar OAuth callback to use the exact published callback URL Google is rejecting unless configured:
-   - `https://colladome-pulse.lovable.app/api/public/google/callback`
-2. Make the app surface a clear setup screen when Google returns `redirect_uri_mismatch`, including the exact values to add in Google Cloud:
-   - Authorized redirect URI: `https://colladome-pulse.lovable.app/api/public/google/callback`
-   - Authorized JavaScript origin: `https://colladome-pulse.lovable.app`
-3. Verify the app is consistently using the same callback URL for both:
-   - the initial Google auth URL
-   - the code-to-token exchange
-4. Fix the current `/auth` hydration mismatch quietly while touching auth-related routes.
+Replace the current `/` redirect-to-dashboard behavior with a bold, founder-voice landing page for Colladome Pulse. The page centers on a motivational vision — "we adapt first, we build the future with AI" — instead of listing product modules. A large inspirational quote rotates every day.
 
-## Google Cloud action you still need to do
-No personal auth token is needed and you should not paste Google access tokens into chat. The required Google-side setup is:
-1. In the same Google Cloud project as the saved Client ID/Secret, open the OAuth Client ID used by this app.
-2. Add this exact Authorized redirect URI:
-   `https://colladome-pulse.lovable.app/api/public/google/callback`
-3. Add this Authorized JavaScript origin:
-   `https://colladome-pulse.lovable.app`
-4. Enable Google Calendar API in that Google Cloud project.
-5. OAuth consent screen:
-   - If Testing: add every employee Google account as a test user.
-   - For org-wide usage: publish the consent screen or configure it as internal for your Google Workspace.
-6. Calendar scopes needed:
-   - `openid`
-   - `email`
-   - `https://www.googleapis.com/auth/calendar.readonly`
-   - for booking shared calendar events, also add `https://www.googleapis.com/auth/calendar.events`
+## Behavior
 
-## Team calendar sync utility
-1. Extend Google Calendar OAuth scopes from read-only to event booking:
-   - keep read access for availability/work visibility
-   - add event write access for creating bookings on the shared team calendar
-2. Add secure backend tables for:
-   - each employee’s synced calendar connection
-   - cached/sanitized calendar events
-   - shared team calendar bookings
-   - sync status/errors per employee
-3. Add server functions to:
-   - sync the signed-in employee’s calendar events
-   - refresh expired Google access tokens safely
-   - list visible team availability across departments
-   - create a booking on the shared team calendar
-4. Add UI to the dashboard/calendar area:
-   - “Sync my calendar” status card
-   - team availability timeline/day view
-   - teammate filters by department/person
-   - booking form for team shared calendar slots
-   - clear connected/error states
-5. Privacy behavior:
-   - show time blocks and work context where available
-   - avoid exposing private event descriptions by default
-   - show enough information for team planning without leaking sensitive personal details
+- Signed-out visitors land on the new hero-first landing page.
+- Signed-in users still go straight to `/dashboard` (existing behavior preserved via a client-side check, not a hard redirect).
+- The daily quote is deterministic per calendar day (same quote for everyone on a given day), rotating automatically at local midnight. No backend needed — a fixed curated list indexed by day-of-year.
 
-## Technical notes
-- Tokens stay server-side only in the backend.
-- Employees never enter or share Google auth tokens manually.
-- Existing saved `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` remain the only app secrets needed unless they belong to the wrong OAuth client.
-- If the OAuth client was edited, connected users may need to reconnect once so Google grants the new calendar event scope.
+## Page structure (`src/routes/index.tsx`)
 
-## Validation
-1. Open published `/google-calendar-connect`.
-2. Confirm Google no longer shows `redirect_uri_mismatch` after the Google Cloud redirect URI is added.
-3. Connect one employee account.
-4. Sync events and confirm they appear in the team calendar view.
-5. Create a test booking on the shared calendar and confirm it appears in Google Calendar.
+1. **Hero (full viewport)**
+   - Small eyebrow: "A note from the founder"
+   - Massive headline in the founder's voice, e.g.:
+     *"The world is being rewritten by AI. We're not watching — we're the ones holding the pen."*
+   - 2–3 supporting motivational lines about adapting first and advocating the shift.
+   - Primary CTA: "Enter Pulse" → `/auth` (or `/dashboard` if signed in). Secondary: "Read the vision" scroll anchor.
+
+2. **Daily Quote block**
+   - Large serif quote, attribution, and a subtle "Quote of the day · {date}" label.
+   - Rotates daily from a curated array (~30+ quotes on adaptation, building, future, AI, courage).
+
+3. **Founder manifesto section**
+   - 3–4 short inspirational statements (not feature bullets), each one line, staggered layout.
+   - Signed "— Founder, Colladome".
+
+4. **Footer CTA**
+   - One line: "Build the future with us." + button to sign in.
+
+## Visual direction
+
+- Dark, cinematic background with a subtle animated gradient / grain.
+- Distinctive typography: a display serif (e.g. Instrument Serif) for the headline + quote, paired with a clean sans (Work Sans / Inter fallback already loaded) for body.
+- Use existing semantic tokens in `src/styles.css`; add a new `--gradient-hero` and `--shadow-glow` if needed. No hardcoded colors.
+- Framer-motion fade/slide-in on hero and quote.
+
+## Technical details
+
+- Convert `src/routes/index.tsx` from a `beforeLoad` redirect to a real `component`. Keep it a public route (no server function calls in loader).
+- Client-side effect: if `supabase.auth.getSession()` returns a session, `navigate({ to: '/dashboard' })`. Otherwise render the landing page.
+- Daily quote selection: `const idx = Math.floor((Date.now() - Date.UTC(new Date().getFullYear(),0,0)) / 86400000) % QUOTES.length`. Pure client, no state, SSR-safe (compute in component using `new Date()` inside `useMemo`).
+- Set proper `head()` metadata: title "Colladome Pulse — Build the future with AI", matching description, og tags.
+- Keep changes UI-only; no DB, no server functions, no new dependencies (framer-motion already in project).
+
+## Out of scope
+
+- No changes to auth, dashboard, punch, or calendar flows.
+- No CMS/admin for quotes — curated in-code list is intentional for v1.

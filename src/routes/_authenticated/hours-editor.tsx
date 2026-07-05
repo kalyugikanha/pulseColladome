@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Clock, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 
 export const Route = createFileRoute("/_authenticated/hours-editor")({
   component: HoursEditorPage,

@@ -150,9 +150,20 @@ function TimesheetPage() {
   }, [logs]);
 
   const projects = useMemo(() => Array.from(pivot.projMap.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code)), [pivot.projMap]);
-  const users = useMemo(() => Array.from(pivot.userSet).map((id) => ({ id, profile: profileById.get(id) })).sort((a, b) => (a.profile?.full_name ?? a.profile?.email ?? "").localeCompare(b.profile?.full_name ?? b.profile?.email ?? "")), [pivot.userSet, profileById]);
+  const users = useMemo(() => Array.from(pivot.userSet)
+    .filter((id) => !hasScope || visibleUserIdSet.has(id))
+    .map((id) => ({ id, profile: profileById.get(id) }))
+    .sort((a, b) => (a.profile?.full_name ?? a.profile?.email ?? "").localeCompare(b.profile?.full_name ?? b.profile?.email ?? "")),
+    [pivot.userSet, profileById, hasScope, visibleUserIdSet]);
   const allDepts = useMemo(() => { const s = new Set<string>(); for (const u of users) if (u.profile?.department) s.add(u.profile.department); return Array.from(s).sort(); }, [users]);
-  const filteredUsers = useMemo(() => deptSel.size === 0 ? users : users.filter((u) => { const d = u.profile?.department; return d ? deptSel.has(d) : deptSel.has(UNASSIGNED); }), [users, deptSel]);
+  const filteredUsers = useMemo(() => users.filter((u) => {
+    if (deptSel.size > 0) {
+      const d = u.profile?.department;
+      if (!(d ? deptSel.has(d) : deptSel.has(UNASSIGNED))) return false;
+    }
+    if (empSel.size > 0 && !empSel.has(u.id)) return false;
+    return true;
+  }), [users, deptSel, empSel]);
   const filteredProjects = useMemo(() => projSel.size === 0 ? projects : projects.filter((p) => projSel.has(p.code)), [projects, projSel]);
   const filteredUserIds = useMemo(() => new Set(filteredUsers.map((u) => u.id)), [filteredUsers]);
   const filteredProjCodes = useMemo(() => new Set(filteredProjects.map((p) => p.code)), [filteredProjects]);

@@ -25,6 +25,7 @@ function ProjectBurnPage() {
   const { data: me, isLoading } = useCurrentUser();
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
 
   const { data: profiles } = useQuery({
     queryKey: ["pb-profiles"],

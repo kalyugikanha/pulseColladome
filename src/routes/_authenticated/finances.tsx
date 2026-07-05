@@ -34,6 +34,7 @@ function FinancesPage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const qc = useQueryClient();
   const [month, setMonth] = useState(() => monthKey(new Date()));
+  const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
 
   const { data: profiles } = useQuery({
     queryKey: ["finances-profiles"],

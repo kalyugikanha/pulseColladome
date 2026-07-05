@@ -201,6 +201,14 @@ function DirectoryPage() {
               className="h-9 pl-8 w-64"
             />
           </div>
+          <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as "active" | "inactive" | "all")}>
+            <SelectTrigger className="h-9 w-36 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={deptFilter} onValueChange={setDeptFilter}>
             <SelectTrigger className="h-9 w-44 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -210,6 +218,7 @@ function DirectoryPage() {
               ))}
             </SelectContent>
           </Select>
+
         </div>
       </header>
 

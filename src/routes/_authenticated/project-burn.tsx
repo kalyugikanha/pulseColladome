@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Flame, IndianRupee, TrendingUp, CalendarDays } from "lucide-react";
 import { format, getDaysInMonth } from "date-fns";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
   component: ProjectBurnPage,

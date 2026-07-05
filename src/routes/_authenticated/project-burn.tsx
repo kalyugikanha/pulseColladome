@@ -294,7 +294,7 @@ function ProjectBurnPage() {
                 <TableHead>Project</TableHead><TableHead>Code</TableHead>
                 <TableHead className="text-right">Active days</TableHead>
                 <TableHead className="text-right">Hours</TableHead>
-                <TableHead className="text-right">Burned so far</TableHead>
+                {showCosts && <TableHead className="text-right">Burned so far</TableHead>}
                 <TableHead className="text-right">% of total</TableHead>
               </TableRow></TableHeader>
               <TableBody>

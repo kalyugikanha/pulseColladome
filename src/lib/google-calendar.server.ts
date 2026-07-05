@@ -40,8 +40,13 @@ export function verifyState(state: string): { userId: string } | null {
 }
 
 export function buildGoogleAuthUrl(opts: { redirectUri: string; state: string; loginHint?: string }) {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  if (!clientId) {
+    throw new Error("Google Calendar OAuth is missing GOOGLE_OAUTH_CLIENT_ID. Save the Calendar OAuth Client ID in project secrets.");
+  }
+
   const params = new URLSearchParams({
-    client_id: process.env.GOOGLE_OAUTH_CLIENT_ID!,
+    client_id: clientId,
     redirect_uri: opts.redirectUri,
     response_type: "code",
     scope: getGoogleScopes(),
@@ -64,10 +69,16 @@ type TokenResponse = {
 };
 
 export async function exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenResponse> {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error("Google Calendar OAuth is missing Client ID or Client Secret in project secrets.");
+  }
+
   const body = new URLSearchParams({
     code,
-    client_id: process.env.GOOGLE_OAUTH_CLIENT_ID!,
-    client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
+    client_id: clientId,
+    client_secret: clientSecret,
     redirect_uri: redirectUri,
     grant_type: "authorization_code",
   });
@@ -81,9 +92,15 @@ export async function exchangeCodeForTokens(code: string, redirectUri: string): 
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error("Google Calendar OAuth is missing Client ID or Client Secret in project secrets.");
+  }
+
   const body = new URLSearchParams({
-    client_id: process.env.GOOGLE_OAUTH_CLIENT_ID!,
-    client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
+    client_id: clientId,
+    client_secret: clientSecret,
     refresh_token: refreshToken,
     grant_type: "refresh_token",
   });

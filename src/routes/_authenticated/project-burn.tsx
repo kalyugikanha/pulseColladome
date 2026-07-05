@@ -293,20 +293,48 @@ function ProjectBurnPage() {
           <CardTitle>{showCosts ? `Daily burn — ${month}` : `Daily hours — ${month}`}</CardTitle>
           <CardDescription>{projectFilter === "all" ? "All projects" : projects.find((p) => p.code === projectFilter)?.name}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-1 h-32">
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-1 h-40">
             {dailyTrend.map((d) => {
-              const metric = showCosts ? d.burn : d.hours;
-              const max = showCosts ? trendMax : Math.max(1, ...dailyTrend.map((x) => x.hours));
+              const totalPct = (d.total / trendMax) * 100;
               return (
-                <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" title={`${d.date}: ${showCosts ? inr(d.burn) + " · " : ""}${d.hours.toFixed(1)}h`}>
-                  <div className="w-full rounded-t bg-primary/70" style={{ height: `${(metric / max) * 100}%`, minHeight: metric > 0 ? 2 : 0 }} />
+                <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1">
+                  <div className="w-full flex flex-col-reverse rounded-t overflow-hidden" style={{ height: `${totalPct}%`, minHeight: d.total > 0 ? 2 : 0 }}>
+                    {employeeSeries.map((emp) => {
+                      const cell = d.perUser.get(emp.userId);
+                      if (!cell) return null;
+                      const val = showCosts ? cell.burn : cell.hours;
+                      if (val <= 0) return null;
+                      const segPct = d.total > 0 ? (val / d.total) * 100 : 0;
+                      return (
+                        <div
+                          key={emp.userId}
+                          style={{ height: `${segPct}%`, background: colorFor(emp.userId) }}
+                          title={`${emp.name} — ${d.date}: ${cell.hours.toFixed(1)}h${showCosts ? ` · ${inr(cell.burn)}` : ""}`}
+                        />
+                      );
+                    })}
+                  </div>
                   <span className="text-[9px] text-muted-foreground">{Number(d.date.slice(8, 10))}</span>
                 </div>
               );
             })}
           </div>
+          {employeeSeries.length > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-2 border-t">
+              {employeeSeries.map((emp) => (
+                <div key={emp.userId} className="flex items-center gap-1.5 text-xs">
+                  <span className="inline-block w-3 h-3 rounded-sm" style={{ background: colorFor(emp.userId) }} />
+                  <span className="font-medium">{emp.name}</span>
+                  <span className="text-muted-foreground">
+                    {emp.hours.toFixed(1)}h{showCosts ? ` · ${inr(emp.burn)}` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
+
       </Card>
 
 

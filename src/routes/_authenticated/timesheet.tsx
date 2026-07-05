@@ -212,7 +212,20 @@ function TimesheetPage() {
               </>
             );
           })()}
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={users.length === 0}>
+          <MultiSelectFilter
+            label="Department"
+            options={allDepts.map((d) => ({ value: d, label: d }))}
+            selected={deptSel}
+            onChange={setDeptSel}
+            includeUnassigned
+          />
+          <MultiSelectFilter
+            label="Projects"
+            options={projects.map((p) => ({ value: p.code, label: p.name, sub: p.code }))}
+            selected={projSel}
+            onChange={setProjSel}
+          />
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredUsers.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Export CSV
           </Button>
         </div>

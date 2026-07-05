@@ -28,6 +28,8 @@ function TimesheetPage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const navigate = useNavigate();
   const [month, setMonth] = useState(() => monthKey(new Date()));
+  const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
+  const [projSel, setProjSel] = useState<Set<string>>(new Set());
   const [drill, setDrill] = useState<{ user: string; code: string; name: string; entries: Array<{ date: string; hours: number; comments?: string }> } | null>(null);
 
   useEffect(() => {

@@ -183,7 +183,7 @@ Never fabricate project codes. Reject requests to modify other users' data, appr
         // Persist assistant message (with proposals attached as JSON if any)
         await ctx.supabase.from("assistant_messages").insert({
           user_id: ctx.userId, role: "assistant",
-          content: proposals.length ? { text: replyText, proposals } : replyText,
+          content: JSON.parse(JSON.stringify(proposals.length ? { text: replyText, proposals } : replyText)),
         });
 
         return new Response(JSON.stringify({ text: replyText, proposals }), {

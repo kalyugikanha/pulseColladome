@@ -14,11 +14,14 @@ export type CurrentUser = {
   isFinanceAdmin: boolean;
   isHrAdmin: boolean;
   canManageProjects: boolean;
+  isDepartmentHead: boolean;
+  headOfDepartments: string[];
   mustChangePassword: boolean;
   onboardingCompleted: boolean;
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
   realIsHrAdmin: boolean;
+
 };
 
 export function useCurrentUser() {

@@ -16,6 +16,7 @@ import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter"
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DayEditorSheet } from "@/components/day-editor-sheet";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/timesheet")({
   component: TimesheetPage,

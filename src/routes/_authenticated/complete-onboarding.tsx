@@ -202,6 +202,13 @@ function CompleteOnboardingPage() {
   }
 
   async function submit() {
+    const isCompleted = !!(data?.profile as { onboarding_completed?: boolean } | null)?.onboarding_completed;
+    if (isCompleted) {
+      await saveDraft();
+      qc.invalidateQueries({ queryKey: ["current-user"] });
+      qc.invalidateQueries({ queryKey: ["my-onboarding"] });
+      return;
+    }
     if (!allFollowed) { toast.error("Please follow all our social channels and tick each box"); return; }
     if (!allReviewed) { toast.error("Please leave a review on each platform and tick each box"); return; }
     setSubmitting(true);

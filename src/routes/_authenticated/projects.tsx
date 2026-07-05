@@ -92,7 +92,7 @@ function ProjectsPage() {
 
   async function createTask(projectId: string) {
     if (!tTitle) return toast.error("Title required");
-    const { error } = await supabase.from("tasks").insert({ project_id: projectId, title: tTitle, description: tDesc || null, due_date: tDue || null, priority: tPri, assignee_id: tAssign || null, created_by: me!.id });
+    const { error } = await supabase.from("tasks").insert({ project_id: projectId, title: tTitle, description: tDesc || null, due_date: tDue || null, priority: tPri, assignee_id: tAssign || null, created_by: me!.realId });
     if (error) return toast.error(error.message);
     toast.success("Task assigned");
     setTTitle(""); setTDesc(""); setTDue(""); setTAssign(""); setOpenTask(null);

@@ -2,6 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const GOOGLE_CALENDAR_CALLBACK_URL = "https://colladome-pulse.lovable.app/api/public/google/callback";
+const GOOGLE_CALENDAR_ORIGIN = "https://colladome-pulse.lovable.app";
+
+function maskOAuthClientId(clientId: string | undefined) {
+  if (!clientId) return null;
+  const trimmed = clientId.trim();
+  if (trimmed.length <= 18) return `${trimmed.slice(0, 4)}…`;
+  return `${trimmed.slice(0, 8)}…${trimmed.slice(-16)}`;
+}
 
 type TokenRow = {
   user_id: string;
@@ -56,6 +64,45 @@ export const getGoogleAuthUrl = createServerFn({ method: "POST" })
       throw new Error("Google Calendar OAuth redirect URI sanity check failed.");
     }
     return { url };
+  });
+
+export const getGoogleCalendarOAuthDiagnostics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { signState, buildGoogleAuthUrl, getGoogleScopes } = await import("./google-calendar.server");
+    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    const hasClientSecret = Boolean(process.env.GOOGLE_OAUTH_CLIENT_SECRET);
+    let redirectUri = GOOGLE_CALENDAR_CALLBACK_URL;
+    let authorizationUrlOk = false;
+    let authorizationUrlError: string | null = null;
+
+    if (clientId) {
+      try {
+        const url = buildGoogleAuthUrl({ redirectUri: GOOGLE_CALENDAR_CALLBACK_URL, state: signState(context.userId) });
+        const parsed = new URL(url);
+        redirectUri = parsed.searchParams.get("redirect_uri") ?? redirectUri;
+        authorizationUrlOk = parsed.searchParams.get("client_id") === clientId && redirectUri === GOOGLE_CALENDAR_CALLBACK_URL;
+      } catch (e: unknown) {
+        authorizationUrlError = e instanceof Error ? e.message : "Could not build Google Calendar OAuth URL.";
+      }
+    } else {
+      authorizationUrlError = "Missing GOOGLE_OAUTH_CLIENT_ID.";
+    }
+
+    return {
+      flow: "google_calendar" as const,
+      usesProvidedGoogleCloudCredentials: Boolean(clientId && hasClientSecret),
+      hasClientId: Boolean(clientId),
+      hasClientSecret,
+      clientIdPreview: maskOAuthClientId(clientId),
+      clientIdLooksLikeGoogleOAuthClient: Boolean(clientId?.endsWith(".apps.googleusercontent.com")),
+      redirectUri,
+      expectedRedirectUri: GOOGLE_CALENDAR_CALLBACK_URL,
+      expectedOrigin: GOOGLE_CALENDAR_ORIGIN,
+      scopes: getGoogleScopes().split(" "),
+      authorizationUrlOk,
+      authorizationUrlError,
+    };
   });
 
 export const getMyGoogleStatus = createServerFn({ method: "GET" })

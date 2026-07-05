@@ -197,7 +197,7 @@ function AccessPage() {
       <Card>
         <CardHeader><CardTitle className="font-display">Grant a role (without creating an account)</CardTitle><CardDescription>Use this when the person will sign in themselves — they'll get this role automatically on first sign-in with the matching email.</CardDescription></CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-6">
             <div className="md:col-span-2 space-y-1"><Label>Email</Label><Input placeholder="name@colladome.com" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             <div className="space-y-1"><Label>Role</Label>
               <Select value={role} onValueChange={(v) => setRole(v as GrantRole)}>
@@ -208,6 +208,9 @@ function AccessPage() {
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="md:col-span-2 space-y-1"><Label>Department</Label>
+              <Input list="dept-options" placeholder="Marketing, HR, …" value={gDept} onChange={(e) => setGDept(e.target.value)} />
             </div>
             <div className="space-y-1"><Label>Super admin</Label>
               <Select value={isSuper ? "yes" : "no"} onValueChange={(v) => setIsSuper(v === "yes")}>
@@ -227,12 +230,16 @@ function AccessPage() {
         <CardHeader><CardTitle className="font-display">Current grants</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {(grants?.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">No grants yet.</p>}
-          {grants?.map((g: { email: string; role: string; is_super_admin: boolean }) => (
+          {(grants ?? [])
+            .slice()
+            .sort((a: { department: string | null; email: string }, b) => (a.department ?? "zzz").localeCompare(b.department ?? "zzz") || a.email.localeCompare(b.email))
+            .map((g: { email: string; role: string; is_super_admin: boolean; department: string | null }) => (
             <div key={g.email} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
               <div>
                 <div className="text-sm font-medium">{g.email}</div>
-                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
                   <Badge variant="outline" className="capitalize">{g.role.replace("_", " ")}</Badge>
+                  {g.department && <Badge variant="secondary">{g.department}</Badge>}
                   {g.is_super_admin && <Badge className="gradient-primary"><Shield className="h-3 w-3 mr-1" /> Super admin</Badge>}
                 </div>
               </div>

@@ -30,9 +30,11 @@ type Profile = {
   employment_type: string | null;
   phone: string | null;
   joined_on: string | null;
+  is_active: boolean | null;
 };
 
 const EMPLOYMENT_TYPES = ["full_time", "intern", "contract", "consultant"] as const;
+
 const UNSET = "__unset__";
 
 function DirectoryPage() {

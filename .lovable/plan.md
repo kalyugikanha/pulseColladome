@@ -1,71 +1,37 @@
-## Overview
+## Two fixes
 
-Retire the monthly "Hours Editor" and rebuild timesheet flows Clockify-style:
-per-day editing everywhere, a manager Timesheet with Month/Range/Day views,
-a new "My Timesheet" for employees, and a per-day Approve/Lock workflow.
+### 1. Timesheet visibility for reporting managers
 
-## 1. Database migration
+Right now the Timesheet page grants access to anyone who is a reporting manager (correct), but does not scope the profile list to their direct reports. Kanishka (plain employee, but reporting manager for 6 people) therefore sees the full employee list. RLS blocks other people's logs, but her own entries still leak into her view and the UI shows unrelated names.
 
-Add approval + edit-tracking columns to `public.attendance_logs`:
+Fix in `src/routes/_authenticated/timesheet.tsx`:
+- Build `allowedUserIds` based on role:
+  - Admin / project manager → all users.
+  - Department head → users in `headOfDepartments`.
+  - Reporting manager (only) → `directReportIds` **plus** herself.
+- Apply that filter to:
+  - the `profiles` query (`.in("id", allowedUserIds)`),
+  - the `attendance_logs` query (`.in("user_id", allowedUserIds)`),
+  - the derived `users` / `filteredUsers` lists.
+- Same scoping applied to the Day-view rows and CSV export so a reporting manager only ever sees her own + reportee data.
 
-- `approved_at timestamptz null`
-- `approved_by uuid null` (references `auth.users` via FK, on delete set null)
-- `last_edited_by uuid null`
+No change to `my-timesheet.tsx` (already self-scoped) and no change to RLS.
 
-Ship a small helper function:
-- `public.is_day_approved(_user uuid, _date date) returns boolean` (SECURITY DEFINER, checks `approved_at is not null`)
+### 2. Consolidate old bulk-uploaded June hours
 
-RLS updates on `attendance_logs`:
-- **Own update** policy: replace with `auth.uid() = user_id AND approved_at IS NULL` (employees can't edit approved days).
-- Keep existing dept-head / reporting-manager / super admin / project-manager policies (they already bypass the approval lock and can unapprove).
-- **Own read** policy stays; employees always see their own history.
+The June-1 rows in `attendance_logs` are the leftover lumps from the retired monthly editor (12 rows totalling 2195 hrs). Real per-day entries also exist for June 2–17. Project Burn now sums both, so June is double-counted with a huge day-1 spike.
 
-No change to grants (table already granted).
+Data-only change via the insert tool (single SQL migration of data, not schema):
+- For every `attendance_logs` row where `date = '2026-06-01'`:
+  - Update `date` to `'2026-06-30'`.
+  - Set `approved_at = now()`, `approved_by = user_id` (self-approval marker; column is nullable and we just need a non-null value to lock it), `last_edited_by = user_id`.
+- If a user already has a June 30 row, merge: concatenate the `tasks` JSON arrays into the existing row and delete the June 1 row (handled with an upsert/merge CTE).
+- Leave June 2–17 rows and the sparse July rows untouched.
 
-## 2. Retire the Hours Editor
+Result: the day-1 spike disappears, the bulk totals live as a single approved rollup on June 30, and Project Burn stops double-counting.
 
-- Delete `src/routes/_authenticated/hours-editor.tsx`.
-- Remove the "Hours Editor" sidebar entry from `src/routes/_authenticated/route.tsx`.
+### Files touched
+- `src/routes/_authenticated/timesheet.tsx` — scope by reportees.
+- Data migration via `supabase--insert` — move/merge June-1 rows to June 30 and mark approved.
 
-## 3. Timesheet (manager view) — `/timesheet`
-
-Extend `src/routes/_authenticated/timesheet.tsx`:
-
-**View toggle** in the header: `Month` (existing pivot) · `Range` (from/to date range, same pivot but bounded by chosen dates) · `Day` (single-day list of every employee's entries).
-
-**Date controls** react to view:
-- Month view: current month/year selects.
-- Range view: `from` and `to` shadcn date pickers (defaults to current week).
-- Day view: single date picker (defaults to today).
-
-**Manager editing** (super admin / project manager / dept head / reporting manager):
-- Existing drill-down `Sheet` becomes an **editable table**: for each entry row, editable `date` (date picker), `project` (Select of project codes), `hours` (numeric), `comments` (text), and a delete (trash) button. "Add row" button at the bottom.
-- Save writes back to `attendance_logs.tasks` for the entry's date (upsert row per (user_id, date), rewrite the `tasks` array, recompute `total_hours`). If the date field is changed, remove the task from the old day's row and append to the new day's row.
-- Approve controls in the sheet header: `Approve day` / `Unapprove day` toggle (per-day approval scoped to the currently-viewed user; in the day-view list, each row has its own Approve toggle). Approved rows show a green "Approved" badge and disable inline edits until unapproved.
-
-**Day view** table: `Employee | Project | Hours | Comments | Approved | Actions`. Same edit affordances inline.
-
-## 4. My Timesheet (employee view) — `/my-timesheet`
-
-New route `src/routes/_authenticated/my-timesheet.tsx`:
-
-- Same Month/Range/Day view toggle.
-- Read-only pivot / list showing only the current user's entries.
-- Employee **can edit** entries on days where `approved_at IS NULL` (same editable drill-down as managers, restricted to self; RLS enforces this).
-- Approved days render a lock icon + "Approved" badge and are read-only.
-- Sidebar entry "My Timesheet" (visible to everyone, under Workspace).
-
-## 5. Project Burn fix
-
-Because per-day editing replaces the monthly-lump write, existing project-burn calculations already work day-by-day and will now stay in sync. No functional change needed to `project-burn.tsx` beyond what already exists — the source of the desync (Hours Editor lumping) is removed.
-
-## Files touched
-
-- `supabase/migrations/<timestamp>_timesheet_approval.sql` (new)
-- `src/routes/_authenticated/route.tsx` (sidebar: drop Hours Editor, add My Timesheet)
-- `src/routes/_authenticated/hours-editor.tsx` (delete)
-- `src/routes/_authenticated/timesheet.tsx` (add view toggle, date range, editable drill-down, approval)
-- `src/routes/_authenticated/my-timesheet.tsx` (new)
-- `src/integrations/supabase/types.ts` (regenerated after migration)
-
-No new server functions — all reads/writes go through `supabase` client with RLS enforcing the approval rules.
+No schema changes, no other route changes.

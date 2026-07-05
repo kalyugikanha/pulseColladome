@@ -115,6 +115,16 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                         <Link to="/timesheet"><TableProperties /><span>Timesheet</span></Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/tasks-overview")}>
+                        <Link to="/tasks-overview"><ListChecks /><span>Task Overview</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/task-templates")}>
+                        <Link to="/task-templates"><Repeat /><span>Task Templates</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   </>
                 )}
 

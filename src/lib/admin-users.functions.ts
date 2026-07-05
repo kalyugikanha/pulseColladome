@@ -168,3 +168,115 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
 
     return { created, skipped, errors };
   });
+
+type TeamEntry = {
+  email: string;
+  full_name: string;
+  role: Role;
+  is_super_admin: boolean;
+  monthly_salary: number;
+  department: string;
+};
+
+const TEAM_ROSTER: TeamEntry[] = [
+  { email: "arti@colladome.com",              full_name: "Arti Kumawat",           role: "admin",           is_super_admin: true,  monthly_salary: 60000, department: "Operations" },
+  { email: "shraddha.saxena@colladome.in",    full_name: "Shraddha Saxena",        role: "hr_admin",        is_super_admin: false, monthly_salary: 15000, department: "HR" },
+  { email: "sweksha@colladome.in",            full_name: "Sweksha Jadon",          role: "hr_admin",        is_super_admin: false, monthly_salary: 5000,  department: "HR" },
+  { email: "akash@colladome.in",              full_name: "Akash Jangid",           role: "project_manager", is_super_admin: false, monthly_salary: 40000, department: "Project Management" },
+  { email: "kanishka@colladome.in",           full_name: "Kanishka Khunteta",      role: "employee",        is_super_admin: false, monthly_salary: 35000, department: "Marketing" },
+  { email: "deepak@colladome.in",             full_name: "Deepak Patel",           role: "employee",        is_super_admin: false, monthly_salary: 20000, department: "Marketing" },
+  { email: "sandeep@colladome.in",            full_name: "Sandeep Kumar Mandal",   role: "employee",        is_super_admin: false, monthly_salary: 13000, department: "Marketing" },
+  { email: "anjali@colladome.in",             full_name: "Anjali",                 role: "employee",        is_super_admin: false, monthly_salary: 6000,  department: "Marketing" },
+  { email: "hemanth@colladome.in",            full_name: "Addala Hemanth Sridhar", role: "employee",        is_super_admin: false, monthly_salary: 10000, department: "Marketing" },
+  { email: "manvi@colladome.in",              full_name: "Manvi",                  role: "employee",        is_super_admin: false, monthly_salary: 5000,  department: "Marketing" },
+  { email: "trisha@colladome.in",             full_name: "Trisha",                 role: "employee",        is_super_admin: false, monthly_salary: 5000,  department: "Marketing" },
+  { email: "jagjeet@colladome.in",            full_name: "Jagjeet Singh Jassal",   role: "employee",        is_super_admin: false, monthly_salary: 28000, department: "Business Development" },
+  { email: "chirag@colladome.com",            full_name: "Chirag Bansal",          role: "employee",        is_super_admin: false, monthly_salary: 30000, department: "Business Development" },
+  { email: "juhi@colladome.com",              full_name: "Juhi",                   role: "employee",        is_super_admin: false, monthly_salary: 20000, department: "Business Development" },
+  { email: "neetu@colladome.in",              full_name: "Neetu Rauniyar",         role: "employee",        is_super_admin: false, monthly_salary: 2000,  department: "Business Development" },
+  { email: "sarita@colladome.in",             full_name: "Sarita Kumari",          role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Business Development" },
+  { email: "riyanshi@colladome.in",           full_name: "Riyanshi Sharma",        role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Business Development" },
+  { email: "arpit@colladome.in",              full_name: "Arpit Kast",             role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Development" },
+];
+
+export const bulkProvisionTeam = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: superRow } = await context.supabase
+      .from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle();
+    if (!superRow) throw new Error("Forbidden");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const created: string[] = [];
+    const updated: string[] = [];
+    const errors: { email: string; message: string }[] = [];
+
+    for (const entry of TEAM_ROSTER) {
+      const em = entry.email.toLowerCase();
+      try {
+        const { error: grantErr } = await supabaseAdmin.from("role_grants").upsert({
+          email: em,
+          role: entry.role,
+          is_super_admin: entry.is_super_admin,
+          default_monthly_salary: entry.monthly_salary,
+          department: entry.department,
+        }, { onConflict: "email" });
+        if (grantErr) throw new Error(`role_grants: ${grantErr.message}`);
+
+        const { data: existing } = await supabaseAdmin
+          .from("profiles").select("id, full_name, department").eq("email", em).maybeSingle();
+
+        if (existing) {
+          const patch: Record<string, unknown> = { department: entry.department };
+          const currentName = (existing.full_name ?? "").trim().toLowerCase();
+          const emailLocal = em.split("@")[0].toLowerCase();
+          if (!currentName || currentName === emailLocal) {
+            patch.full_name = entry.full_name;
+          }
+          const { error: pErr } = await supabaseAdmin.from("profiles").update(patch).eq("id", existing.id);
+          if (pErr) throw new Error(`profiles: ${pErr.message}`);
+
+          const { error: rErr } = await supabaseAdmin.from("user_roles")
+            .upsert({ user_id: existing.id, role: entry.role }, { onConflict: "user_id,role" });
+          if (rErr) throw new Error(`user_roles: ${rErr.message}`);
+          if (entry.is_super_admin) {
+            await supabaseAdmin.from("super_admins").upsert({ user_id: existing.id }, { onConflict: "user_id" });
+            await supabaseAdmin.from("user_roles")
+              .upsert({ user_id: existing.id, role: "admin" }, { onConflict: "user_id,role" });
+          }
+
+          const { error: sErr } = await supabaseAdmin.from("salaries").upsert({
+            user_id: existing.id,
+            monthly_salary: entry.monthly_salary,
+            effective_from: new Date().toISOString().slice(0, 10),
+            currency: "INR",
+          }, { onConflict: "user_id,effective_from" });
+          if (sErr) throw new Error(`salaries: ${sErr.message}`);
+
+          updated.push(em);
+        } else {
+          const { error: cErr } = await supabaseAdmin.auth.admin.createUser({
+            email: em,
+            password: "Test@123",
+            email_confirm: true,
+            user_metadata: { full_name: entry.full_name },
+          });
+          if (cErr) {
+            if (/already registered|already exists|duplicate/i.test(cErr.message)) {
+              updated.push(em);
+            } else {
+              throw new Error(cErr.message);
+            }
+          } else {
+            created.push(em);
+          }
+        }
+      } catch (e: unknown) {
+        errors.push({ email: em, message: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
+    return { created, updated, errors };
+  });
+

@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as GoogleCalendarOauthLaunchRouteImport } from './routes/google-calendar-oauth-launch'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -39,12 +38,6 @@ import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/cha
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
 
-const GoogleCalendarOauthLaunchRoute =
-  GoogleCalendarOauthLaunchRouteImport.update({
-    id: '/google-calendar-oauth-launch',
-    path: '/google-calendar-oauth-launch',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
   id: '/change-password',
   path: '/change-password',
@@ -195,7 +188,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
-  '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/access': typeof AuthenticatedAccessRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -225,7 +217,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
-  '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/access': typeof AuthenticatedAccessRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -257,7 +248,6 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
-  '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
@@ -289,7 +279,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
-    | '/google-calendar-oauth-launch'
     | '/access'
     | '/attendance'
     | '/calendar'
@@ -319,7 +308,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
-    | '/google-calendar-oauth-launch'
     | '/access'
     | '/attendance'
     | '/calendar'
@@ -350,7 +338,6 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/change-password'
-    | '/google-calendar-oauth-launch'
     | '/_authenticated/access'
     | '/_authenticated/attendance'
     | '/_authenticated/calendar'
@@ -382,7 +369,6 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
-  GoogleCalendarOauthLaunchRoute: typeof GoogleCalendarOauthLaunchRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiAssistantTranscribeRoute: typeof ApiAssistantTranscribeRoute
   ApiPublicGoogleCallbackRoute: typeof ApiPublicGoogleCallbackRoute
@@ -390,13 +376,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/google-calendar-oauth-launch': {
-      id: '/google-calendar-oauth-launch'
-      path: '/google-calendar-oauth-launch'
-      fullPath: '/google-calendar-oauth-launch'
-      preLoaderRoute: typeof GoogleCalendarOauthLaunchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/change-password': {
       id: '/change-password'
       path: '/change-password'
@@ -652,7 +631,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ChangePasswordRoute: ChangePasswordRoute,
-  GoogleCalendarOauthLaunchRoute: GoogleCalendarOauthLaunchRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiAssistantTranscribeRoute: ApiAssistantTranscribeRoute,
   ApiPublicGoogleCallbackRoute: ApiPublicGoogleCallbackRoute,

@@ -317,7 +317,7 @@ function ProjectBurnPage() {
       <Card>
         <CardHeader>
           <CardTitle>Daily log</CardTitle>
-          <CardDescription>Every entry contributing to burn this month.</CardDescription>
+          <CardDescription>{showCosts ? "Every entry contributing to burn this month." : "Every entry logged this month."}</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredDaily.length === 0 ? (

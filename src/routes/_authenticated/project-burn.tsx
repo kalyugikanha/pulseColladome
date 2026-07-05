@@ -155,7 +155,7 @@ function ProjectBurnPage() {
     return Array.from(map.entries()).map(([code, name]) => ({ code, name }));
   }, [dailyRows]);
 
-  const deptFilteredDaily = useMemo(() => dailyRows.filter((r) => passesDept(r.user_id)), [dailyRows, deptSel, deptById]);
+  const deptFilteredDaily = useMemo(() => dailyRows.filter((r) => passesDept(r.user_id) && (empSel.size === 0 || empSel.has(r.user_id))), [dailyRows, deptSel, deptById, empSel]);
   const filteredDaily = useMemo(() => projectFilter === "all" ? deptFilteredDaily : deptFilteredDaily.filter((r) => r.code === projectFilter), [deptFilteredDaily, projectFilter]);
 
 

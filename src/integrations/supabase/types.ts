@@ -480,6 +480,7 @@ export type Database = {
         Row: {
           created_at: string
           default_monthly_salary: number | null
+          department: string | null
           email: string
           is_super_admin: boolean
           role: Database["public"]["Enums"]["app_role"]
@@ -487,6 +488,7 @@ export type Database = {
         Insert: {
           created_at?: string
           default_monthly_salary?: number | null
+          department?: string | null
           email: string
           is_super_admin?: boolean
           role?: Database["public"]["Enums"]["app_role"]
@@ -494,6 +496,7 @@ export type Database = {
         Update: {
           created_at?: string
           default_monthly_salary?: number | null
+          department?: string | null
           email?: string
           is_super_admin?: boolean
           role?: Database["public"]["Enums"]["app_role"]

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { createTeamUser } from "@/lib/admin-users.functions";
+import { createTeamUser, bulkProvisionTeam } from "@/lib/admin-users.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Shield, Trash2, UserPlus } from "lucide-react";
+import { Shield, Trash2, UserPlus, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/access")({
   component: AccessPage,
@@ -24,6 +24,9 @@ function AccessPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const createUserFn = useServerFn(createTeamUser);
+  const bulkProvisionFn = useServerFn(bulkProvisionTeam);
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionResult, setProvisionResult] = useState<{ created: string[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
 
   // Grant-only form (existing)
   const [email, setEmail] = useState("");
@@ -85,12 +88,51 @@ function AccessPage() {
     }
   }
 
+  async function runProvisioning() {
+    setProvisioning(true);
+    setProvisionResult(null);
+    try {
+      const res = await bulkProvisionFn();
+      setProvisionResult(res);
+      toast.success(`Provisioning done — ${res.created.length} created, ${res.updated.length} updated, ${res.errors.length} errors`);
+      qc.invalidateQueries({ queryKey: ["role-grants"] });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Provisioning failed");
+    } finally {
+      setProvisioning(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-3xl font-bold flex items-center gap-2"><Shield className="h-6 w-6 text-primary" /> Access & Roles</h1>
         <p className="text-muted-foreground text-sm mt-1">Super admin only — create team accounts or pre-assign roles by email.</p>
       </header>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Provision team from list</CardTitle>
+          <CardDescription>Creates accounts for the full Colladome roster (temp password <code className="px-1 rounded bg-muted">Test@123</code>) and syncs roles, monthly salaries, and departments. Safe to re-run — existing users are updated, not duplicated.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Button className="gradient-primary" onClick={runProvisioning} disabled={provisioning}>{provisioning ? "Provisioning…" : "Run provisioning"}</Button>
+          {provisionResult && (
+            <div className="text-sm space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">Created: {provisionResult.created.length}</Badge>
+                <Badge variant="outline">Updated: {provisionResult.updated.length}</Badge>
+                <Badge variant={provisionResult.errors.length ? "destructive" : "outline"}>Errors: {provisionResult.errors.length}</Badge>
+              </div>
+              {provisionResult.created.length > 0 && <details><summary className="cursor-pointer text-muted-foreground">Created ({provisionResult.created.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.created.map((e) => <li key={e}>{e}</li>)}</ul></details>}
+              {provisionResult.updated.length > 0 && <details><summary className="cursor-pointer text-muted-foreground">Updated ({provisionResult.updated.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.updated.map((e) => <li key={e}>{e}</li>)}</ul></details>}
+              {provisionResult.errors.length > 0 && <details open><summary className="cursor-pointer text-destructive">Errors</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.errors.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span>: {e.message}</li>)}</ul></details>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
 
       <Card>
         <CardHeader>

@@ -98,23 +98,49 @@ function TimesheetPage() {
       .sort((a, b) => (a.profile?.full_name ?? a.profile?.email ?? "").localeCompare(b.profile?.full_name ?? b.profile?.email ?? ""));
   }, [pivot.userSet, profileById]);
 
+  const allDepts = useMemo(() => {
+    const s = new Set<string>();
+    for (const u of users) if (u.profile?.department) s.add(u.profile.department);
+    return Array.from(s).sort();
+  }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    if (deptSel.size === 0) return users;
+    return users.filter((u) => {
+      const d = u.profile?.department;
+      return d ? deptSel.has(d) : deptSel.has(UNASSIGNED);
+    });
+  }, [users, deptSel]);
+
+  const filteredProjects = useMemo(() => {
+    if (projSel.size === 0) return projects;
+    return projects.filter((p) => projSel.has(p.code));
+  }, [projects, projSel]);
+
+  const filteredUserIds = useMemo(() => new Set(filteredUsers.map((u) => u.id)), [filteredUsers]);
+  const filteredProjCodes = useMemo(() => new Set(filteredProjects.map((p) => p.code)), [filteredProjects]);
+
   const rowTotals = useMemo(() => {
     const m = new Map<string, number>();
-    for (const [uid, uMap] of pivot.cells) {
+    for (const u of filteredUsers) {
+      const uMap = pivot.cells.get(u.id);
+      if (!uMap) { m.set(u.id, 0); continue; }
       let s = 0;
-      for (const v of uMap.values()) s += v;
-      m.set(uid, s);
+      for (const [code, v] of uMap) if (filteredProjCodes.has(code)) s += v;
+      m.set(u.id, s);
     }
     return m;
-  }, [pivot.cells]);
+  }, [pivot.cells, filteredUsers, filteredProjCodes]);
 
   const colTotals = useMemo(() => {
     const m = new Map<string, number>();
-    for (const uMap of pivot.cells.values()) {
-      for (const [code, v] of uMap) m.set(code, (m.get(code) ?? 0) + v);
+    for (const uid of filteredUserIds) {
+      const uMap = pivot.cells.get(uid);
+      if (!uMap) continue;
+      for (const [code, v] of uMap) if (filteredProjCodes.has(code)) m.set(code, (m.get(code) ?? 0) + v);
     }
     return m;
-  }, [pivot.cells]);
+  }, [pivot.cells, filteredUserIds, filteredProjCodes]);
 
   const grandTotal = useMemo(() => {
     let s = 0;

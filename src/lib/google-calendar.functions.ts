@@ -1,22 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-function callbackRedirectUri(originHeader: string | null | undefined) {
-  const origin = originHeader ?? "";
-  if (!origin) throw new Error("Missing origin header");
-  return `${origin}/api/public/google/callback`;
-}
+const GOOGLE_CALENDAR_CALLBACK_URL = "https://colladome-pulse.lovable.app/api/public/google/callback";
 
 export const getGoogleAuthUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { signState, buildGoogleAuthUrl } = await import("./google-calendar.server");
-    const req = getRequest();
-    const origin = req.headers.get("origin") ?? new URL(req.url).origin;
-    const redirectUri = callbackRedirectUri(origin);
     const state = signState(context.userId);
-    const url = buildGoogleAuthUrl({ redirectUri, state });
+    const url = buildGoogleAuthUrl({ redirectUri: GOOGLE_CALENDAR_CALLBACK_URL, state });
     return { url };
   });
 

@@ -69,11 +69,12 @@ function AccessPage() {
   async function addGrant() {
     const em = email.trim().toLowerCase();
     if (!em || !em.includes("@")) return toast.error("Valid email required");
-    const { error } = await supabase.from("role_grants").upsert({ email: em, role, is_super_admin: isSuper });
+    const { error } = await supabase.from("role_grants").upsert({ email: em, role, is_super_admin: isSuper, department: gDept.trim() || null });
     if (error) return toast.error(error.message);
     toast.success(`${em} will become ${isSuper ? "super admin" : role} on sign-in`);
-    setEmail(""); setIsSuper(false); setRole("employee");
+    setEmail(""); setIsSuper(false); setRole("employee"); setGDept("");
     qc.invalidateQueries({ queryKey: ["role-grants"] });
+    qc.invalidateQueries({ queryKey: ["access-departments"] });
   }
 
   async function removeGrant(em: string) {
@@ -94,10 +95,12 @@ function AccessPage() {
         role: cRole,
         is_super_admin: cIsSuper,
         default_monthly_salary: salary,
+        department: cDept.trim() || null,
       } });
       toast.success(`Account created for ${em}. Temporary password: Test@123 — they'll be asked to reset it on first sign-in.`);
-      setCFullName(""); setCEmail(""); setCRole("employee"); setCIsSuper(false); setCSalary("");
+      setCFullName(""); setCEmail(""); setCRole("employee"); setCIsSuper(false); setCSalary(""); setCDept("");
       qc.invalidateQueries({ queryKey: ["role-grants"] });
+      qc.invalidateQueries({ queryKey: ["access-departments"] });
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to create account");
     } finally {

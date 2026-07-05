@@ -166,7 +166,7 @@ function TeamPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {isAdmin && <Badge className="gradient-primary"><Shield className="h-3 w-3 mr-1" /> Admin</Badge>}
-                      {!isSelf && (
+                      {!isSelf && me?.isAdmin && (
                         <Button size="sm" variant="outline" onClick={() => toggleAdmin(p.id, !isAdmin)}>{isAdmin ? "Revoke admin" : "Make admin"}</Button>
                       )}
                     </div>

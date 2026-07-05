@@ -156,19 +156,16 @@ function ProjectBurnPage() {
   const filteredDaily = useMemo(() => projectFilter === "all" ? deptFilteredDaily : deptFilteredDaily.filter((r) => r.code === projectFilter), [deptFilteredDaily, projectFilter]);
 
 
-  // Aggregated by project
-  const byProject = useMemo(() => {
-    const m = new Map<string, { code: string; name: string; hours: number; burn: number; daysActive: Set<string> }>();
-    for (const r of deptFilteredDaily) {
-      const cur = m.get(r.code) ?? { code: r.code, name: r.name, hours: 0, burn: 0, daysActive: new Set<string>() };
-      cur.hours += r.hours; cur.burn += r.burn; cur.daysActive.add(r.date);
-      m.set(r.code, cur);
+  // Reset project filter if the chosen project no longer exists in the visible month.
+  useEffect(() => {
+    if (projectFilter !== "all" && !dailyRows.some((r) => r.code === projectFilter)) {
+      setProjectFilter("all");
     }
-    return Array.from(m.values()).sort((a, b) => b.burn - a.burn);
-  }, [deptFilteredDaily]);
+  }, [projectFilter, dailyRows]);
 
-  const totalBurn = byProject.reduce((s, p) => s + p.burn, 0);
-  const totalHours = byProject.reduce((s, p) => s + p.hours, 0);
+  const totalBurn = useMemo(() => deptFilteredDaily.reduce((s, r) => s + r.burn, 0), [deptFilteredDaily]);
+  const totalHours = useMemo(() => deptFilteredDaily.reduce((s, r) => s + r.hours, 0), [deptFilteredDaily]);
+  const activeProjectCount = useMemo(() => new Set(deptFilteredDaily.map((r) => r.code)).size, [deptFilteredDaily]);
   // Pool includes signed-up salaries + pending grants (people who will get that salary once they sign up)
   const totalSalaryPool = useMemo(() => {
     const signedUp = Array.from(salaryByUser.values()).reduce((s, v) => s + v, 0);

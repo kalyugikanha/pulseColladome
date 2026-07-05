@@ -214,7 +214,10 @@ function FinancesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(profiles ?? []).map((p) => {
+              {(profiles ?? []).filter((p) => {
+                if (deptSel.size === 0) return true;
+                return p.department ? deptSel.has(p.department) : deptSel.has(UNASSIGNED);
+              }).map((p) => {
                 const s = currentSalaryByUser.get(p.id);
                 const grant = p.email ? grantByEmail.get(p.email.toLowerCase()) : undefined;
                 const grantSalary = grant?.default_monthly_salary != null ? Number(grant.default_monthly_salary) : null;

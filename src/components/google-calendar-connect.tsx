@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getGoogleAuthUrl, getMyGoogleStatus, disconnectGoogleCalendar } from "@/lib/google-calendar.functions";
@@ -19,13 +19,7 @@ import { toast } from "sonner";
 
 const PUBLISHED_DASHBOARD_URL = "https://colladome-pulse.lovable.app/dashboard";
 const TROUBLESHOOTING_DOCS_URL = "https://docs.lovable.dev/tips-tricks/troubleshooting";
-const GOOGLE_OAUTH_LAUNCH_PATH = "/google-calendar-oauth-launch";
-
-function googleOAuthLaunchUrl(authUrl: string, baseOrigin: string) {
-  const launchUrl = new URL(GOOGLE_OAUTH_LAUNCH_PATH, baseOrigin || window.location.origin);
-  launchUrl.searchParams.set("to", authUrl);
-  return launchUrl.toString();
-}
+const RETURNING_KEY = "gcal:returning";
 
 type PanelProps = {
   lastError: string | null;
@@ -50,11 +44,11 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
 
   const items: Array<{ title: string; body: React.ReactNode }> = [
     {
-      title: "The new tab never opened",
-      body: <>Your browser blocked the popup. Click <strong>Reconnect</strong> again, and if prompted, allow popups for this site.</>,
+      title: "Nothing happened when I clicked Connect",
+      body: <>Your browser may have blocked the navigation to accounts.google.com. Click <strong>Connect</strong> again, and allow the redirect if prompted.</>,
     },
     {
-      title: 'Chrome shows "accounts.google.com is blocked"',
+      title: 'Chrome shows "accounts.google.com is blocked" (ERR_BLOCKED_BY_RESPONSE)',
       body: (
         <>
           Google refuses to load inside embedded app previews. Open the published dashboard in a new tab, then connect Google Calendar from there.
@@ -97,10 +91,6 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
           </div>
         </>
       ),
-    },
-    {
-      title: 'Stuck on "Waiting for Google authorization…"',
-      body: <>The Google tab was closed before finishing, or the callback didn&apos;t reach the app. Click <strong>Reconnect</strong> to try again.</>,
     },
     {
       title: "Signed in with the wrong Google account",
@@ -191,15 +181,11 @@ export function GoogleCalendarConnectCard() {
   const getStatus = useServerFn(getMyGoogleStatus);
   const disconnect = useServerFn(disconnectGoogleCalendar);
 
-  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
-  const [popupBlocked, setPopupBlocked] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const [isLovablePreview, setIsLovablePreview] = useState(false);
   const [isOAuthBlockedContext, setIsOAuthBlockedContext] = useState(false);
   const [origin, setOrigin] = useState("");
   const [lastError, setLastError] = useState<string | null>(null);
-  const pollRef = useRef<number | null>(null);
-  const pollStopAtRef = useRef<number>(0);
 
   const { data: status, isLoading } = useQuery({
     queryKey: ["my-google-status"],
@@ -216,67 +202,36 @@ export function GoogleCalendarConnectCard() {
     setOrigin(window.location.origin);
     setIsLovablePreview(lovablePreview);
     setIsOAuthBlockedContext(embedded && lovablePreview);
-  }, []);
+
+    // If we're returning from Google, refresh status.
+    try {
+      if (sessionStorage.getItem(RETURNING_KEY)) {
+        sessionStorage.removeItem(RETURNING_KEY);
+        qc.invalidateQueries({ queryKey: ["my-google-status"] });
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [qc]);
 
   const callbackUrl = origin ? `${origin}/api/public/google/callback` : "/api/public/google/callback";
-  const pendingLaunchUrl = pendingUrl && origin ? googleOAuthLaunchUrl(pendingUrl, origin) : null;
-
-  const stopPolling = () => {
-    if (pollRef.current) {
-      window.clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  };
-
-  const startPolling = () => {
-    stopPolling();
-    pollStopAtRef.current = Date.now() + 2 * 60 * 1000; // 2 minutes
-    pollRef.current = window.setInterval(async () => {
-      if (Date.now() > pollStopAtRef.current) {
-        stopPolling();
-        return;
-      }
-      await qc.invalidateQueries({ queryKey: ["my-google-status"] });
-    }, 3000);
-  };
-
-  useEffect(() => {
-    if (status?.connected) {
-      stopPolling();
-      setPendingUrl(null);
-      setPopupBlocked(false);
-      setLastError(null);
-    }
-  }, [status?.connected]);
-
-  useEffect(() => () => stopPolling(), []);
 
   const openOAuth = async (opts: { disconnectFirst: boolean }) => {
     if (isOpening) return;
-
     setIsOpening(true);
-    setPopupBlocked(false);
-    setPendingUrl(null);
     setLastError(null);
-    stopPolling();
 
+    // Embedded Lovable preview: Google will refuse to load in the iframe.
+    // Send the user to the published dashboard to complete the flow there.
     if (isOAuthBlockedContext) {
       const publishedTab = window.open(PUBLISHED_DASHBOARD_URL, "_blank", "noopener,noreferrer");
       if (!publishedTab) {
-        setPopupBlocked(true);
         setLastError("Open the published dashboard in a new tab to connect Google Calendar. Google blocks OAuth inside the embedded preview.");
       } else {
         toast.info("Continue Google Calendar connection from the published dashboard tab.");
       }
       setIsOpening(false);
       return;
-    }
-
-    const authTab = window.open("about:blank", "_blank");
-    if (authTab) {
-      authTab.document.write(
-        "<!doctype html><title>Opening Google</title><body style='font-family:system-ui,sans-serif;padding:24px'>Opening Google sign-in…</body>",
-      );
     }
 
     try {
@@ -290,24 +245,28 @@ export function GoogleCalendarConnectCard() {
       }
 
       const { url } = await getUrl();
-      const launchUrl = googleOAuthLaunchUrl(url, window.location.origin);
-      setPendingUrl(url);
 
-      if (authTab && !authTab.closed) {
-        authTab.location.replace(launchUrl);
-        setPopupBlocked(false);
-        startPolling();
-      } else {
-        setPopupBlocked(true);
-        setLastError("Browser blocked the new tab for Google sign-in.");
+      try {
+        sessionStorage.setItem(RETURNING_KEY, "1");
+      } catch {
+        // ignore storage errors
       }
+
+      // Top-level navigation. Break out of any iframe so Google is loaded
+      // as a top-level document (X-Frame-Options: DENY only blocks framed loads).
+      try {
+        if (window.top && window.top !== window.self) {
+          window.top.location.href = url;
+          return;
+        }
+      } catch {
+        // Cross-origin top — fall through to same-window navigation.
+      }
+      window.location.href = url;
     } catch (e: unknown) {
-      if (authTab && !authTab.closed) authTab.close();
       const message = e instanceof Error ? e.message : "Could not start Google sign-in";
       toast.error(message);
       setLastError(message);
-      await qc.invalidateQueries({ queryKey: ["my-google-status"] });
-    } finally {
       setIsOpening(false);
     }
   };
@@ -365,41 +324,6 @@ export function GoogleCalendarConnectCard() {
               Disconnect
             </Button>
           </div>
-          {popupBlocked && pendingLaunchUrl && (
-            <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-                <div>
-                  Your browser blocked the new tab.{" "}
-                  <a
-                    className="font-medium text-primary hover:underline"
-                    href={pendingLaunchUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => {
-                      setPopupBlocked(false);
-                      startPolling();
-                    }}
-                  >
-                    Open Google sign-in in a new tab
-                  </a>.
-                </div>
-              </div>
-            </div>
-          )}
-          {popupBlocked && isOAuthBlockedContext && !pendingLaunchUrl && (
-            <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-                <div>
-                  Your browser blocked the published dashboard tab.{" "}
-                  <a className="font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
-                    Open published dashboard
-                  </a>.
-                </div>
-              </div>
-            </div>
-          )}
           {panel}
         </CardContent>
       </Card>
@@ -424,49 +348,6 @@ export function GoogleCalendarConnectCard() {
           )}
         </Button>
 
-        {pendingLaunchUrl && !popupBlocked && (
-          <div className="basis-full rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-              <span>Waiting for Google authorization in the new tab… this card will update automatically.</span>
-            </div>
-            <a className="mt-1 inline-block font-medium text-primary hover:underline" href={pendingLaunchUrl} target="_blank" rel="noopener noreferrer">
-              Reopen Google sign-in
-            </a>
-          </div>
-        )}
-
-        {popupBlocked && pendingLaunchUrl && (
-          <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-              <div>
-                Your browser blocked the new tab.{" "}
-                <a className="font-medium text-primary hover:underline" href={pendingLaunchUrl} target="_blank" rel="noopener noreferrer" onClick={() => {
-                  setPopupBlocked(false);
-                  startPolling();
-                }}>
-                  Open Google sign-in in a new tab
-                </a>.
-              </div>
-            </div>
-          </div>
-        )}
-
-        {popupBlocked && isOAuthBlockedContext && !pendingLaunchUrl && (
-          <div className="basis-full rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-              <div>
-                Your browser blocked the published dashboard tab.{" "}
-                <a className="font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
-                  Open published dashboard
-                </a>.
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="basis-full rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-muted-foreground">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
@@ -475,7 +356,7 @@ export function GoogleCalendarConnectCard() {
                 ? "Google Calendar connection must be completed from the published app. Google blocks accounts.google.com inside the embedded preview."
                 : isLovablePreview
                 ? "If Google shows 403 in preview, connect from the published app instead. Google may reject OAuth started from the editor preview."
-                : "If Google shows 403, publish the OAuth consent screen or add this account as a test user in Google Cloud."}
+                : "Clicking Connect will send you to Google to sign in, then return here. If Google shows 403, publish the OAuth consent screen or add this account as a test user in Google Cloud."}
               <a className="ml-1 font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noreferrer">
                 Open published dashboard
               </a>

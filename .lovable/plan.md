@@ -1,90 +1,42 @@
+## Fix: Google Calendar "accounts.google.com refused to connect" (ERR_BLOCKED_BY_RESPONSE)
 
-# Pulse Assistant — Natural-language copilot
+### Root cause
 
-A right-side dock that lets any user say or type (in any language) things like *"Log 3h on CLDM123 yesterday, testing work"*, *"Punch me in"*, *"Mark task X done"*, or *"Apply casual leave next Mon–Tue for a family function"*. The assistant translates that into a structured action, **shows a confirmation card**, and then writes to the exact same tables your existing UI writes to — no separate flow, no separate approvals model.
+`ERR_BLOCKED_BY_RESPONSE` from `accounts.google.com` means Google is being loaded inside an iframe — Google sends `X-Frame-Options: DENY`, so any framed load is refused. Our current flow makes this easy to trigger:
 
-## Behavior
+1. Click Connect → we `window.open("about:blank", "_blank")` → then `authTab.location.replace(launchUrl)` → the launch page does `window.location.replace(authUrl)`.
+2. On some browsers / when clicked from certain contexts (or when the "popup" ends up rendered inside the editor iframe rather than as a real tab), Google's URL is loaded framed and the browser blocks it.
+3. The intermediate `/google-calendar-oauth-launch` page adds an extra navigation hop that can inherit the framed context.
 
-- **Placement:** Persistent collapsible dock on the right (icon rail when collapsed, ~380px panel when open). Available on every authenticated page.
-- **Input:** Text box + mic button. Mic uses Lovable AI STT (`openai/gpt-4o-mini-transcribe`) — records WAV, uploads to a server route, streams transcript back into the composer. User hits send.
-- **Language:** Prompt the LLM to understand any language the user types/speaks and reply in the same language. Actions/dates get normalized to app-native values server-side.
-- **Confirmation-first:** Assistant never writes silently. It renders a **structured confirmation card** ("Log 3.0 h · CLDM123 · Sat 4 Jul · 'testing work' — Confirm / Edit / Cancel"). Only on Confirm does it call the write path.
-- **Attribution:** Writes go through the same server functions the UI uses, so RLS + audit fields (last_edited_by, created_by) work identically. "View as" impersonation is honored — while impersonating Kanishka, the assistant acts as Kanishka.
-- **Transparency:** Every tool call renders as a small collapsible activity strip in the message ("Looked up projects", "Saved timesheet") so it never feels like a black box.
-- **History:** One rolling conversation per user, stored in `assistant_messages` (last ~50 turns kept in context). No thread list in v1.
+Google Sign-In works because it goes through Lovable's managed OAuth broker (`lovable.auth.signInWithOAuth`), which is iframe-safe. Our custom Calendar OAuth doesn't use that broker, so we need an iframe-safe flow of our own.
 
-## Actions covered in v1
+### Fix (frontend only, backend already correct)
 
-| Intent | Backing table / server fn | Confirmation card fields |
-|---|---|---|
-| Log timesheet hours / edit a day's tasks | `attendance_logs` (same as Day Editor) | user, date, project code+name, hours, comments |
-| Punch in / punch out | `punch_sessions` | action, timestamp, note |
-| Create / update / complete a task | `tasks` | project, title, assignee, due, status |
-| Apply for leave | `leave_requests` | leave_type, from-to, days, reason |
+Replace the popup/launch-page dance with a **top-level navigation** to Google's OAuth URL, done from the published site.
 
-Out of scope for v1 (added later): approvals, project/vendor CRUD, finance, taxonomy edits.
+1. **`src/components/google-calendar-connect.tsx`**
+   - Remove `window.open("about:blank", "_blank")` + launch-page indirection for the normal case.
+   - On click (published/custom domain, not embedded):
+     - If `disconnectFirst`, await disconnect.
+     - Call `getGoogleAuthUrl()` → get `url`.
+     - Persist a "returning from Google" marker (e.g. `sessionStorage.setItem("gcal:returning","1")`) so we can auto-refresh status on return.
+     - `window.top.location.href = url` (use `_top` to break out of any iframe; falls back to `window.location.href` if `window.top` is cross-origin).
+   - If `isOAuthBlockedContext` (embedded Lovable preview): keep current behavior — show button that opens the published dashboard in a new tab. Do **not** attempt OAuth from inside the preview iframe.
+   - On mount, if the `gcal:returning` marker is set, clear it and invalidate `["my-google-status"]` so the card flips to Connected without a manual refresh.
+   - Drop the popup-blocked branch and the pending-launch-URL fallback link (no longer needed).
 
-## UX flow
+2. **`src/routes/google-calendar-oauth-launch.tsx`** — delete. No longer used. (Removing it also eliminates the framed-navigation hop entirely.)
 
-```text
-User: "log 4 hours on colladome social media yesterday, made 3 reels"
-   ↓ (LLM + tools)
-[Assistant activity] resolved project → CLDM00000, date → 4 Jul 2026
-Assistant renders card:
-  ┌───────────────────────────────────────────┐
-  │ Log timesheet · Fri 4 Jul                 │
-  │ Project: CLDM00000 · Colladome Social Media│
-  │ Hours:   4.0                              │
-  │ Notes:   made 3 reels                     │
-  │ For:     Kanishka (you)                   │
-  │ [Cancel]  [Edit]  [Confirm & save]        │
-  └───────────────────────────────────────────┘
-   ↓ Confirm
-[Assistant activity] saved to attendance_logs
-Assistant: "Done — added 4h on CLDM00000 for 4 Jul. Your day now totals 6h."
-```
+3. **`src/components/google-calendar-connect.tsx` troubleshooting panel**
+   - Replace the "popup blocked" copy with "If nothing happened, allow this site to navigate to accounts.google.com" and keep the redirect_uri_mismatch / access-blocked / wrong-account items.
+   - Keep the "Open published dashboard" CTA for the embedded-preview case.
 
-Edit reopens the field values inline in the card so the user can tweak hours/date/notes before confirming.
+### What stays the same
 
-## Technical section
+- `src/lib/google-calendar.server.ts`, `src/lib/google-calendar.functions.ts`, `src/routes/api/public/google/callback.ts` — unchanged. Callback already redirects back to `/dashboard`.
+- Secrets `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` are already set.
+- The redirect URI `https://colladome-pulse.lovable.app/api/public/google/callback` must remain in the OAuth client's Authorized redirect URIs in Google Cloud Console (it already is, since sign-in works — but if a separate OAuth client is used for Calendar, that one needs it).
 
-**Stack:** AI SDK (`ai` + `@ai-sdk/openai-compatible`) via Lovable AI Gateway, following `ai-sdk-lovable-gateway` + `tanstack-ai-chat` + `chat-agent-ui-contract` + `chat-ui-composition`. Default model `google/gemini-3-flash-preview` (fast + multilingual + tool-calling).
+### Result
 
-**New files:**
-- `src/lib/ai-gateway.server.ts` — provider helper (canonical snippet from the knowledge file).
-- `src/routes/api/assistant/chat.ts` — streaming chat route; `streamText` + tools, persists messages via `onFinish`.
-- `src/routes/api/assistant/transcribe.ts` — multipart passthrough to `/v1/audio/transcriptions` (STT).
-- `src/lib/assistant/tools.server.ts` — AI SDK `tool()` definitions (see below). Each mutating tool has `needsApproval: true` and returns a *proposed action* payload; the actual write is a separate server fn called only after the user hits Confirm in the UI.
-- `src/lib/assistant/actions.functions.ts` — `createServerFn` wrappers for `applyTimesheetEdit`, `applyPunch`, `applyTaskChange`, `applyLeaveRequest`. Each uses `requireSupabaseAuth`, re-validates the payload with Zod, and writes to the same tables the existing pages use (so RLS / triggers / audit fields behave identically). Impersonation: read `viewAsUserId` from the request header the client sends (mirroring `use-view-as`) and treat writes as originating from that user_id when the caller is a super admin — audit columns still record `context.userId`.
-- `src/components/assistant/AssistantDock.tsx` — right-side collapsible dock, mounted once in `src/routes/_authenticated/route.tsx` next to `<ViewAsBanner />`.
-- `src/components/assistant/ConfirmationCard.tsx` — renders proposed action, Edit/Cancel/Confirm.
-- `src/components/assistant/VoiceButton.tsx` — mic recorder → WAV → POST to transcribe route → fill composer.
-- AI Elements installed: `conversation message prompt-input shimmer tool`.
-
-**Tools exposed to the model** (all read-only unless flagged):
-- `listProjects(query?)` — search projects by code/name.
-- `listMyRecentTasks()` — top 20 tasks assigned to current user.
-- `resolveDate(natural)` — normalize "yesterday", "last Mon", Hindi/Marathi date phrases → `yyyy-mm-dd`.
-- `getMyDay(date)` — read current attendance_logs row (for merge vs replace decisions).
-- `getMyPunchStatus()` — is user punched in? current session.
-- `getLeaveBalance()` — current balances.
-- `proposeTimesheetEdit`, `proposePunch`, `proposeTaskChange`, `proposeLeaveRequest` — **mutating**. Each returns a structured payload rendered as a ConfirmationCard; the model does not write. When the user clicks Confirm, the client calls the matching `apply*` server fn with that payload.
-
-**System prompt highlights:**
-- Role: "You are Pulse Assistant, an internal copilot for Colladome employees. You help them log time, punch, manage tasks, and apply for leave — nothing else."
-- Always reply in the user's language.
-- Always call a `propose*` tool before claiming an action is done — never fabricate confirmations.
-- Prefer resolving ambiguity by asking one short question rather than guessing (e.g. "Which project — CLDM123 (Social Media) or CLDM124 (Website)?").
-- Never touch approvals, salaries, or other users' data unless the caller is admin/HR.
-
-**Persistence:** New table `assistant_messages` (user_id, role, content jsonb, created_at) with RLS `user_id = auth.uid()`. Load last 50 turns on dock open; append user+assistant messages via `onFinish`.
-
-**Secrets:** `LOVABLE_API_KEY` (already present). No user-facing keys.
-
-**Client bearer:** already wired via existing `functionMiddleware` in `src/start.ts`.
-
-## Rollout
-
-Ship v1 with the four action families above, text + STT, confirmation-mandatory, English/Hindi/Marathi verified. Full realtime voice (TTS back), approvals, and finance actions come in a follow-up once the confirmation UX is proven.
-
-If you have reference apps/screens you'd like the dock UI to feel like, share them after you approve the plan and I'll fold the visual direction in before building.
+From the published dashboard, clicking Connect Google Calendar sends the current tab to Google's OAuth page (no iframe, no popup, no `ERR_BLOCKED_BY_RESPONSE`). Google returns to `/api/public/google/callback`, which redirects to `/dashboard` with tokens saved. From the Lovable editor preview, the button opens the published dashboard in a new tab — same as today.

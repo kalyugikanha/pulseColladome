@@ -32,6 +32,7 @@ function AccessPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<GrantRole>("employee");
   const [isSuper, setIsSuper] = useState(false);
+  const [gDept, setGDept] = useState("");
 
   // Create-account form (new)
   const [cFullName, setCFullName] = useState("");
@@ -39,6 +40,7 @@ function AccessPage() {
   const [cRole, setCRole] = useState<GrantRole>("employee");
   const [cIsSuper, setCIsSuper] = useState(false);
   const [cSalary, setCSalary] = useState("");
+  const [cDept, setCDept] = useState("");
   const [creating, setCreating] = useState(false);
 
   if (me && !me.isSuperAdmin) throw redirect({ to: "/dashboard" });
@@ -47,6 +49,21 @@ function AccessPage() {
     queryKey: ["role-grants"],
     enabled: !!me?.isSuperAdmin,
     queryFn: async () => (await supabase.from("role_grants").select("*").order("email")).data ?? [],
+  });
+
+  const { data: deptOptions } = useQuery({
+    queryKey: ["access-departments"],
+    enabled: !!me?.isSuperAdmin,
+    queryFn: async () => {
+      const [{ data: p }, { data: g }] = await Promise.all([
+        supabase.from("profiles").select("department"),
+        supabase.from("role_grants").select("department"),
+      ]);
+      const s = new Set<string>();
+      for (const r of (p ?? []) as { department: string | null }[]) if (r.department) s.add(r.department);
+      for (const r of (g ?? []) as { department: string | null }[]) if (r.department) s.add(r.department);
+      return Array.from(s).sort();
+    },
   });
 
   async function addGrant() {

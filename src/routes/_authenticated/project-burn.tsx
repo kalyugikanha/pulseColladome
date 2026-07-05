@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/project-burn")({
 
 type Salary = { user_id: string; monthly_salary: number; effective_from: string };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
-type Profile = { id: string; full_name: string | null; email: string | null };
+type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
 
 function monthKey(d: Date) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; }
 const inr = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);

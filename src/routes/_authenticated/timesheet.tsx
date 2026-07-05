@@ -269,6 +269,7 @@ function TimesheetPage() {
           {view === "day" && <DatePickerButton value={day} onChange={setDay} label="Day" />}
 
           <MultiSelectFilter label="Department" options={allDepts.map((d) => ({ value: d, label: d }))} selected={deptSel} onChange={setDeptSel} includeUnassigned />
+          <MultiSelectFilter label="Employee" options={users.map((u) => ({ value: u.id, label: u.profile?.full_name ?? u.profile?.email ?? "—", sub: u.profile?.email ?? undefined }))} selected={empSel} onChange={setEmpSel} />
           <MultiSelectFilter label="Projects" options={projects.map((p) => ({ value: p.code, label: p.name, sub: p.code }))} selected={projSel} onChange={setProjSel} />
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredUsers.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Export CSV

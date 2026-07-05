@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Clock, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 
 export const Route = createFileRoute("/_authenticated/hours-editor")({
   component: HoursEditorPage,
@@ -42,6 +43,7 @@ function HoursEditorPage() {
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const [month, setMonth] = useState(defaultMonth);
+  const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
   const [addFor, setAddFor] = useState<string | null>(null);
   const [addCode, setAddCode] = useState<string>("");
 
@@ -113,12 +115,19 @@ function HoursEditorPage() {
   if (meLoading || !me) return <div className="text-muted-foreground">Loading…</div>;
   if (!me.isSuperAdmin) return null;
 
-  const rows = (profiles ?? []).slice().sort((a, b) => {
-    const ad = a.department ?? "zzz";
-    const bd = b.department ?? "zzz";
-    if (ad !== bd) return ad.localeCompare(bd);
-    return (a.full_name ?? "").localeCompare(b.full_name ?? "");
-  });
+  const allDepts = Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort();
+  const rows = (profiles ?? [])
+    .slice()
+    .filter((p) => {
+      if (deptSel.size === 0) return true;
+      return p.department ? deptSel.has(p.department) : deptSel.has(UNASSIGNED);
+    })
+    .sort((a, b) => {
+      const ad = a.department ?? "zzz";
+      const bd = b.department ?? "zzz";
+      if (ad !== bd) return ad.localeCompare(bd);
+      return (a.full_name ?? "").localeCompare(b.full_name ?? "");
+    });
 
   // Columns = union of all project codes that have hours this month, sorted.
   const activeCodes = Array.from(new Set(Array.from(userMonthly.values()).flatMap((m) => Array.from(m.keys())))).sort();
@@ -131,6 +140,13 @@ function HoursEditorPage() {
           <p className="text-sm text-muted-foreground">Super admin only. Edit any teammate's monthly hours per project.</p>
         </div>
         <div className="flex items-center gap-2">
+          <MultiSelectFilter
+            label="Department"
+            options={allDepts.map((d) => ({ value: d, label: d }))}
+            selected={deptSel}
+            onChange={setDeptSel}
+            includeUnassigned
+          />
           <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
         </div>
       </div>

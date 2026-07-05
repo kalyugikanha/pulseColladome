@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TableProperties, Download } from "lucide-react";
+import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/timesheet")({
@@ -27,6 +28,8 @@ function TimesheetPage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const navigate = useNavigate();
   const [month, setMonth] = useState(() => monthKey(new Date()));
+  const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
+  const [projSel, setProjSel] = useState<Set<string>>(new Set());
   const [drill, setDrill] = useState<{ user: string; code: string; name: string; entries: Array<{ date: string; hours: number; comments?: string }> } | null>(null);
 
   useEffect(() => {
@@ -95,23 +98,49 @@ function TimesheetPage() {
       .sort((a, b) => (a.profile?.full_name ?? a.profile?.email ?? "").localeCompare(b.profile?.full_name ?? b.profile?.email ?? ""));
   }, [pivot.userSet, profileById]);
 
+  const allDepts = useMemo(() => {
+    const s = new Set<string>();
+    for (const u of users) if (u.profile?.department) s.add(u.profile.department);
+    return Array.from(s).sort();
+  }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    if (deptSel.size === 0) return users;
+    return users.filter((u) => {
+      const d = u.profile?.department;
+      return d ? deptSel.has(d) : deptSel.has(UNASSIGNED);
+    });
+  }, [users, deptSel]);
+
+  const filteredProjects = useMemo(() => {
+    if (projSel.size === 0) return projects;
+    return projects.filter((p) => projSel.has(p.code));
+  }, [projects, projSel]);
+
+  const filteredUserIds = useMemo(() => new Set(filteredUsers.map((u) => u.id)), [filteredUsers]);
+  const filteredProjCodes = useMemo(() => new Set(filteredProjects.map((p) => p.code)), [filteredProjects]);
+
   const rowTotals = useMemo(() => {
     const m = new Map<string, number>();
-    for (const [uid, uMap] of pivot.cells) {
+    for (const u of filteredUsers) {
+      const uMap = pivot.cells.get(u.id);
+      if (!uMap) { m.set(u.id, 0); continue; }
       let s = 0;
-      for (const v of uMap.values()) s += v;
-      m.set(uid, s);
+      for (const [code, v] of uMap) if (filteredProjCodes.has(code)) s += v;
+      m.set(u.id, s);
     }
     return m;
-  }, [pivot.cells]);
+  }, [pivot.cells, filteredUsers, filteredProjCodes]);
 
   const colTotals = useMemo(() => {
     const m = new Map<string, number>();
-    for (const uMap of pivot.cells.values()) {
-      for (const [code, v] of uMap) m.set(code, (m.get(code) ?? 0) + v);
+    for (const uid of filteredUserIds) {
+      const uMap = pivot.cells.get(uid);
+      if (!uMap) continue;
+      for (const [code, v] of uMap) if (filteredProjCodes.has(code)) m.set(code, (m.get(code) ?? 0) + v);
     }
     return m;
-  }, [pivot.cells]);
+  }, [pivot.cells, filteredUserIds, filteredProjCodes]);
 
   const grandTotal = useMemo(() => {
     let s = 0;
@@ -120,18 +149,18 @@ function TimesheetPage() {
   }, [rowTotals]);
 
   function exportCsv() {
-    const header = ["Employee", "Email", ...projects.map((p) => `${p.code} ${p.name}`), "Total"];
-    const rows = users.map((u) => {
+    const header = ["Employee", "Email", ...filteredProjects.map((p) => `${p.code} ${p.name}`), "Total"];
+    const rows = filteredUsers.map((u) => {
       const name = u.profile?.full_name ?? u.profile?.email ?? u.id;
       const email = u.profile?.email ?? "";
       const uMap = pivot.cells.get(u.id) ?? new Map();
-      const cells = projects.map((p) => {
+      const cells = filteredProjects.map((p) => {
         const v = uMap.get(p.code) ?? 0;
         return v > 0 ? String(v) : "";
       });
       return [name, email, ...cells, String(rowTotals.get(u.id) ?? 0)];
     });
-    const totalRow = ["Total", "", ...projects.map((p) => String(colTotals.get(p.code) ?? 0)), String(grandTotal)];
+    const totalRow = ["Total", "", ...filteredProjects.map((p) => String(colTotals.get(p.code) ?? 0)), String(grandTotal)];
     const csv = [header, ...rows, totalRow]
       .map((r) => r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))
       .join("\n");
@@ -183,7 +212,20 @@ function TimesheetPage() {
               </>
             );
           })()}
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={users.length === 0}>
+          <MultiSelectFilter
+            label="Department"
+            options={allDepts.map((d) => ({ value: d, label: d }))}
+            selected={deptSel}
+            onChange={setDeptSel}
+            includeUnassigned
+          />
+          <MultiSelectFilter
+            label="Projects"
+            options={projects.map((p) => ({ value: p.code, label: p.name, sub: p.code }))}
+            selected={projSel}
+            onChange={setProjSel}
+          />
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredUsers.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Export CSV
           </Button>
         </div>
@@ -193,20 +235,20 @@ function TimesheetPage() {
         <CardHeader>
           <CardTitle>Employee × Project — {month}</CardTitle>
           <CardDescription>
-            {users.length} employee{users.length === 1 ? "" : "s"} · {projects.length} project{projects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs
+            {filteredUsers.length} employee{filteredUsers.length === 1 ? "" : "s"} · {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs
             {" · "}Click a cell for the day-by-day breakdown.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {users.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-10 text-center">No hours logged in {month}.</div>
+          {filteredUsers.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-10 text-center">No hours logged in {month} for the selected filters.</div>
           ) : (
             <div className="overflow-auto max-h-[70vh] border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="sticky left-0 bg-card z-20 min-w-[200px]">Employee</TableHead>
-                    {projects.map((p) => (
+                    {filteredProjects.map((p) => (
                       <TableHead key={p.code} className="text-right whitespace-nowrap">
                         <div className="font-mono text-[10px] text-muted-foreground">{p.code}</div>
                         <div className="text-xs">{p.name}</div>
@@ -216,7 +258,7 @@ function TimesheetPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u) => {
+                  {filteredUsers.map((u) => {
                     const uMap = pivot.cells.get(u.id) ?? new Map<string, number>();
                     const name = u.profile?.full_name ?? u.profile?.email ?? "—";
                     return (
@@ -225,7 +267,7 @@ function TimesheetPage() {
                           <div className="font-medium">{name}</div>
                           {u.profile?.department && <div className="text-[10px] text-muted-foreground">{u.profile.department}</div>}
                         </TableCell>
-                        {projects.map((p) => {
+                        {filteredProjects.map((p) => {
                           const v = uMap.get(p.code) ?? 0;
                           return (
                             <TableCell key={p.code} className="text-right">
@@ -254,7 +296,7 @@ function TimesheetPage() {
                   })}
                   <TableRow className="border-t-2">
                     <TableCell className="sticky left-0 bg-card z-10 font-semibold">Total</TableCell>
-                    {projects.map((p) => (
+                    {filteredProjects.map((p) => (
                       <TableCell key={p.code} className="text-right font-semibold">{(colTotals.get(p.code) ?? 0).toFixed(1)}</TableCell>
                     ))}
                     <TableCell className="text-right sticky right-0 bg-card z-10 font-bold">{grandTotal.toFixed(1)}</TableCell>

@@ -8,6 +8,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Flame, IndianRupee, TrendingUp, CalendarDays } from "lucide-react";
 import { format, getDaysInMonth } from "date-fns";
+import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
   component: ProjectBurnPage,
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/project-burn")({
 
 type Salary = { user_id: string; monthly_salary: number; effective_from: string };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
-type Profile = { id: string; full_name: string | null; email: string | null };
+type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
 
 function monthKey(d: Date) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; }
 const inr = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
@@ -24,11 +25,12 @@ function ProjectBurnPage() {
   const { data: me, isLoading } = useCurrentUser();
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
 
   const { data: profiles } = useQuery({
     queryKey: ["pb-profiles"],
     enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data as Profile[] ?? [],
+    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department")).data as Profile[] ?? [],
   });
 
   const { data: grants } = useQuery({
@@ -79,6 +81,24 @@ function ProjectBurnPage() {
     return m;
   }, [profiles]);
 
+  const deptById = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const p of profiles ?? []) m.set(p.id, p.department);
+    return m;
+  }, [profiles]);
+
+  const allDepts = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of profiles ?? []) if (p.department) s.add(p.department);
+    return Array.from(s).sort();
+  }, [profiles]);
+
+  function passesDept(userId: string): boolean {
+    if (deptSel.size === 0) return true;
+    const d = deptById.get(userId) ?? null;
+    return d ? deptSel.has(d) : deptSel.has(UNASSIGNED);
+  }
+
   // Monthly totals: per-user, sum hours per project (for salary-share)
   const monthlyUserTotals = useMemo(() => {
     const totals = new Map<string, number>(); // user_id -> monthly total hours
@@ -116,18 +136,19 @@ function ProjectBurnPage() {
     return Array.from(map.entries()).map(([code, name]) => ({ code, name }));
   }, [dailyRows]);
 
-  const filteredDaily = useMemo(() => projectFilter === "all" ? dailyRows : dailyRows.filter((r) => r.code === projectFilter), [dailyRows, projectFilter]);
+  const deptFilteredDaily = useMemo(() => dailyRows.filter((r) => passesDept(r.user_id)), [dailyRows, deptSel, deptById]);
+  const filteredDaily = useMemo(() => projectFilter === "all" ? deptFilteredDaily : deptFilteredDaily.filter((r) => r.code === projectFilter), [deptFilteredDaily, projectFilter]);
 
   // Aggregated by project
   const byProject = useMemo(() => {
     const m = new Map<string, { code: string; name: string; hours: number; burn: number; daysActive: Set<string> }>();
-    for (const r of dailyRows) {
+    for (const r of deptFilteredDaily) {
       const cur = m.get(r.code) ?? { code: r.code, name: r.name, hours: 0, burn: 0, daysActive: new Set<string>() };
       cur.hours += r.hours; cur.burn += r.burn; cur.daysActive.add(r.date);
       m.set(r.code, cur);
     }
     return Array.from(m.values()).sort((a, b) => b.burn - a.burn);
-  }, [dailyRows]);
+  }, [deptFilteredDaily]);
 
   const totalBurn = byProject.reduce((s, p) => s + p.burn, 0);
   const totalHours = byProject.reduce((s, p) => s + p.hours, 0);
@@ -198,6 +219,13 @@ function ProjectBurnPage() {
               </>
             );
           })()}
+          <MultiSelectFilter
+            label="Department"
+            options={allDepts.map((d) => ({ value: d, label: d }))}
+            selected={deptSel}
+            onChange={setDeptSel}
+            includeUnassigned
+          />
           <Select value={projectFilter} onValueChange={setProjectFilter}>
             <SelectTrigger className="w-52 h-9 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>

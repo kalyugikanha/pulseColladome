@@ -32,6 +32,7 @@ function AccessPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<GrantRole>("employee");
   const [isSuper, setIsSuper] = useState(false);
+  const [gDept, setGDept] = useState("");
 
   // Create-account form (new)
   const [cFullName, setCFullName] = useState("");
@@ -39,6 +40,7 @@ function AccessPage() {
   const [cRole, setCRole] = useState<GrantRole>("employee");
   const [cIsSuper, setCIsSuper] = useState(false);
   const [cSalary, setCSalary] = useState("");
+  const [cDept, setCDept] = useState("");
   const [creating, setCreating] = useState(false);
 
   if (me && !me.isSuperAdmin) throw redirect({ to: "/dashboard" });
@@ -49,14 +51,30 @@ function AccessPage() {
     queryFn: async () => (await supabase.from("role_grants").select("*").order("email")).data ?? [],
   });
 
+  const { data: deptOptions } = useQuery({
+    queryKey: ["access-departments"],
+    enabled: !!me?.isSuperAdmin,
+    queryFn: async () => {
+      const [{ data: p }, { data: g }] = await Promise.all([
+        supabase.from("profiles").select("department"),
+        supabase.from("role_grants").select("department"),
+      ]);
+      const s = new Set<string>();
+      for (const r of (p ?? []) as { department: string | null }[]) if (r.department) s.add(r.department);
+      for (const r of (g ?? []) as { department: string | null }[]) if (r.department) s.add(r.department);
+      return Array.from(s).sort();
+    },
+  });
+
   async function addGrant() {
     const em = email.trim().toLowerCase();
     if (!em || !em.includes("@")) return toast.error("Valid email required");
-    const { error } = await supabase.from("role_grants").upsert({ email: em, role, is_super_admin: isSuper });
+    const { error } = await supabase.from("role_grants").upsert({ email: em, role, is_super_admin: isSuper, department: gDept.trim() || null });
     if (error) return toast.error(error.message);
     toast.success(`${em} will become ${isSuper ? "super admin" : role} on sign-in`);
-    setEmail(""); setIsSuper(false); setRole("employee");
+    setEmail(""); setIsSuper(false); setRole("employee"); setGDept("");
     qc.invalidateQueries({ queryKey: ["role-grants"] });
+    qc.invalidateQueries({ queryKey: ["access-departments"] });
   }
 
   async function removeGrant(em: string) {
@@ -77,10 +95,12 @@ function AccessPage() {
         role: cRole,
         is_super_admin: cIsSuper,
         default_monthly_salary: salary,
+        department: cDept.trim() || null,
       } });
       toast.success(`Account created for ${em}. Temporary password: Test@123 — they'll be asked to reset it on first sign-in.`);
-      setCFullName(""); setCEmail(""); setCRole("employee"); setCIsSuper(false); setCSalary("");
+      setCFullName(""); setCEmail(""); setCRole("employee"); setCIsSuper(false); setCSalary(""); setCDept("");
       qc.invalidateQueries({ queryKey: ["role-grants"] });
+      qc.invalidateQueries({ queryKey: ["access-departments"] });
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to create account");
     } finally {
@@ -154,6 +174,9 @@ function AccessPage() {
               </Select>
             </div>
             <div className="space-y-1"><Label>Monthly salary (INR)</Label><Input inputMode="numeric" placeholder="e.g. 40000" value={cSalary} onChange={(e) => setCSalary(e.target.value)} /></div>
+            <div className="md:col-span-2 space-y-1"><Label>Department</Label>
+              <Input list="dept-options" placeholder="Marketing, HR, …" value={cDept} onChange={(e) => setCDept(e.target.value)} />
+            </div>
             <div className="md:col-span-2 space-y-1"><Label>Super admin</Label>
               <Select value={cIsSuper ? "yes" : "no"} onValueChange={(v) => setCIsSuper(v === "yes")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -164,6 +187,9 @@ function AccessPage() {
               </Select>
             </div>
           </div>
+          <datalist id="dept-options">
+            {(deptOptions ?? []).map((d) => <option key={d} value={d} />)}
+          </datalist>
           <div className="mt-4"><Button className="gradient-primary" onClick={createAccount} disabled={creating}>{creating ? "Creating…" : "Create account"}</Button></div>
         </CardContent>
       </Card>
@@ -171,7 +197,7 @@ function AccessPage() {
       <Card>
         <CardHeader><CardTitle className="font-display">Grant a role (without creating an account)</CardTitle><CardDescription>Use this when the person will sign in themselves — they'll get this role automatically on first sign-in with the matching email.</CardDescription></CardHeader>
         <CardContent>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-6">
             <div className="md:col-span-2 space-y-1"><Label>Email</Label><Input placeholder="name@colladome.com" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             <div className="space-y-1"><Label>Role</Label>
               <Select value={role} onValueChange={(v) => setRole(v as GrantRole)}>
@@ -182,6 +208,9 @@ function AccessPage() {
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="md:col-span-2 space-y-1"><Label>Department</Label>
+              <Input list="dept-options" placeholder="Marketing, HR, …" value={gDept} onChange={(e) => setGDept(e.target.value)} />
             </div>
             <div className="space-y-1"><Label>Super admin</Label>
               <Select value={isSuper ? "yes" : "no"} onValueChange={(v) => setIsSuper(v === "yes")}>
@@ -201,12 +230,16 @@ function AccessPage() {
         <CardHeader><CardTitle className="font-display">Current grants</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {(grants?.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">No grants yet.</p>}
-          {grants?.map((g: { email: string; role: string; is_super_admin: boolean }) => (
+          {(grants ?? [])
+            .slice()
+            .sort((a: { department: string | null; email: string }, b) => (a.department ?? "zzz").localeCompare(b.department ?? "zzz") || a.email.localeCompare(b.email))
+            .map((g: { email: string; role: string; is_super_admin: boolean; department: string | null }) => (
             <div key={g.email} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
               <div>
                 <div className="text-sm font-medium">{g.email}</div>
-                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
                   <Badge variant="outline" className="capitalize">{g.role.replace("_", " ")}</Badge>
+                  {g.department && <Badge variant="secondary">{g.department}</Badge>}
                   {g.is_super_admin && <Badge className="gradient-primary"><Shield className="h-3 w-3 mr-1" /> Super admin</Badge>}
                 </div>
               </div>

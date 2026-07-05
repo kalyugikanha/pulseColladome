@@ -14,12 +14,13 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Wallet, IndianRupee, Users, UserPlus, Loader2 } from "lucide-react";
 import { provisionPendingUsers } from "@/lib/admin-users.functions";
+import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
 });
 
-type Profile = { id: string; full_name: string | null; email: string | null };
+type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
 type Salary = { id: string; user_id: string; monthly_salary: number; currency: string; effective_from: string };
 type Grant = { email: string; role: string; default_monthly_salary: number | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
@@ -33,12 +34,13 @@ function FinancesPage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const qc = useQueryClient();
   const [month, setMonth] = useState(() => monthKey(new Date()));
+  const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
 
   const { data: profiles } = useQuery({
     queryKey: ["finances-profiles"],
     enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name, email").order("full_name");
+      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department").order("full_name");
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
@@ -173,6 +175,13 @@ function FinancesPage() {
         </div>
         <div className="flex items-center gap-2">
           {me?.realIsSuperAdmin && <ProvisionButton pendingCount={pendingGrants.length} />}
+          <MultiSelectFilter
+            label="Department"
+            options={Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort().map((d) => ({ value: d, label: d }))}
+            selected={deptSel}
+            onChange={setDeptSel}
+            includeUnassigned
+          />
           <Label htmlFor="month" className="text-xs text-muted-foreground">Month</Label>
           <Input id="month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
         </div>
@@ -205,7 +214,10 @@ function FinancesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(profiles ?? []).map((p) => {
+              {(profiles ?? []).filter((p) => {
+                if (deptSel.size === 0) return true;
+                return p.department ? deptSel.has(p.department) : deptSel.has(UNASSIGNED);
+              }).map((p) => {
                 const s = currentSalaryByUser.get(p.id);
                 const grant = p.email ? grantByEmail.get(p.email.toLowerCase()) : undefined;
                 const grantSalary = grant?.default_monthly_salary != null ? Number(grant.default_monthly_salary) : null;

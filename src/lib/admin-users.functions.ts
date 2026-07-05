@@ -62,6 +62,7 @@ export const createTeamUser = createServerFn({ method: "POST" })
       role,
       is_super_admin: isSuperAdmin,
       default_monthly_salary: defaultSalary,
+      department: data.department ?? null,
     }, { onConflict: "email" });
     if (grantErr) throw new Error(grantErr.message);
 

@@ -175,7 +175,7 @@ function AuthenticatedLayout() {
       router.navigate({ to: "/change-password", replace: true });
       return;
     }
-    if (!user.mustChangePassword && !user.onboardingCompleted && pathname !== "/complete-onboarding" && pathname !== "/change-password") {
+    if (!user.mustChangePassword && !user.isSuperAdmin && !user.onboardingCompleted && pathname !== "/complete-onboarding" && pathname !== "/change-password") {
       router.navigate({ to: "/complete-onboarding", replace: true });
     }
   }, [user, pathname, router]);

@@ -149,7 +149,17 @@ export const updateTaskFull = createServerFn({ method: "POST" })
   .inputValidator((d: Partial<TaskInput> & { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const patch: Record<string, unknown> = {};
+    const patch: Partial<{
+      title: string;
+      description: string | null;
+      due_date: string | null;
+      priority: "low" | "medium" | "high";
+      assignee_id: string;
+      project_id: string;
+      asset_links: AssetLink[];
+      domain_id: string | null;
+      department_id: string | null;
+    }> = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.description !== undefined) patch.description = data.description || null;
     if (data.dueDate !== undefined) patch.due_date = data.dueDate || null;

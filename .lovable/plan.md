@@ -1,11 +1,18 @@
-## Hours editor blank for Kanishka
+## Project Burn for department heads — hours-only view
 
-Line 121 of `src/routes/_authenticated/hours-editor.tsx` still has `if (!me.isSuperAdmin) return null;` — an early return that fires before the grid renders. The earlier fix updated the redirect guard and query scope, but missed this second gate, so department heads land on an empty page.
+Kanishka can see the sidebar link but the page early-returns because she isn't a finance admin, and every query is gated on `me.isFinanceAdmin`. Plan: let department heads render the page with cost columns hidden and data scoped to their department members.
 
-### Fix
+### Changes (single file: `src/routes/_authenticated/project-burn.tsx`)
 
-Replace with `if (!(me.canManageProjects || me.isDepartmentHead)) return null;` to match the redirect guard and query `enabled` flag. Also swap the "Super admin only." helper caption to something accurate ("Edit teammates' monthly hours per project.").
+1. **Remove the finance-only redirect**. Allow either `me.isFinanceAdmin` or `me.isDepartmentHead`. Redirect only when neither is true.
+2. **Enable queries** for both roles (change every `enabled: !!me?.isFinanceAdmin` to `!!me && (me.isFinanceAdmin || me.isDepartmentHead)`). Skip the `salaries` and `role_grants` queries entirely for non-finance viewers.
+3. **Scope profiles / logs** to `me.headOfDepartments` when the viewer is a department head (not finance). Finance keeps the full org view.
+4. **Hide cost columns and totals** for non-finance viewers: hide any column showing INR, hourly rate, salary, cost-per-project, cost totals, and the "monthly burn (₹)" summary card. Keep hours per project, hours totals, project selector, and department filter.
+5. **Header copy** switches to something like "Project hours by teammate — <Department>" when finance is hidden, so it's obvious what she's looking at.
+
+No RLS or backend changes — cost tables stay finance-only, so even a hand-crafted request from her session returns nothing.
 
 ### Verify
 
-View as Kanishka → /hours-editor loads the grid populated with the 5 Marketing teammates.
+- View as Kanishka → /project-burn loads, shows 5 Marketing teammates, per-project hours grid, no INR anywhere.
+- View as Shubham (super/finance admin) → same page still shows salaries and INR burn totals as before.

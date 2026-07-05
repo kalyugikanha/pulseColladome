@@ -304,7 +304,7 @@ function ProjectBurnPage() {
                     <TableCell className="font-mono text-xs">{p.code}</TableCell>
                     <TableCell className="text-right">{p.daysActive.size}</TableCell>
                     <TableCell className="text-right">{p.hours.toFixed(1)}</TableCell>
-                    <TableCell className="text-right font-semibold">{inr(p.burn)}</TableCell>
+                    {showCosts && <TableCell className="text-right font-semibold">{inr(p.burn)}</TableCell>}
                     <TableCell className="text-right text-muted-foreground">{totalBurn > 0 ? ((p.burn / totalBurn) * 100).toFixed(1) : "0"}%</TableCell>
                   </TableRow>
                 ))}

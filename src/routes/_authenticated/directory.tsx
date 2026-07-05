@@ -63,7 +63,7 @@ function DirectoryPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on")
+        .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on, is_active")
         .order("full_name");
       if (error) throw error;
       return (data ?? []) as Profile[];

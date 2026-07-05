@@ -329,7 +329,7 @@ function ProjectBurnPage() {
                   <TableHead>Date</TableHead><TableHead>Employee</TableHead>
                   <TableHead>Project</TableHead>
                   <TableHead className="text-right">Hours</TableHead>
-                  <TableHead className="text-right">Burn</TableHead>
+                  {showCosts && <TableHead className="text-right">Burn</TableHead>}
                 </TableRow></TableHeader>
                 <TableBody>
                   {filteredDaily.map((r, i) => (

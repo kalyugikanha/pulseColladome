@@ -1,18 +1,21 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { setUserActive, deleteUserPermanently } from "@/lib/admin-users.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Pencil, Users, Search } from "lucide-react";
+import { Pencil, Users, Search, UserX, UserCheck, Trash2 } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/directory")({
   component: DirectoryPage,
@@ -27,9 +30,11 @@ type Profile = {
   employment_type: string | null;
   phone: string | null;
   joined_on: string | null;
+  is_active: boolean | null;
 };
 
 const EMPLOYMENT_TYPES = ["full_time", "intern", "contract", "consultant"] as const;
+
 const UNSET = "__unset__";
 
 function DirectoryPage() {
@@ -37,10 +42,19 @@ function DirectoryPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<"active" | "inactive" | "all">("active");
   const [editing, setEditing] = useState<Profile | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Profile | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const setActiveFn = useServerFn(setUserActive);
+  const deleteFn = useServerFn(deleteUserPermanently);
 
   const canView = !!me && (me.isSuperAdmin || me.isAdmin || me.isHrAdmin || me.isDepartmentHead || me.isReportingManager);
   const canEdit = !!me && (me.isSuperAdmin || me.isHrAdmin);
+  const canHardDelete = !!me && me.isSuperAdmin;
+
 
   const { data: profiles } = useQuery({
     queryKey: ["directory-profiles"],
@@ -49,7 +63,7 @@ function DirectoryPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("profiles")
-        .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on")
+        .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on, is_active")
         .order("full_name");
       if (error) throw error;
       return (data ?? []) as Profile[];
@@ -97,6 +111,8 @@ function DirectoryPage() {
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (profiles ?? []).filter((p) => {
+      if (activeFilter === "active" && p.is_active === false) return false;
+      if (activeFilter === "inactive" && p.is_active !== false) return false;
       if (deptFilter !== "all" && (p.department ?? "") !== deptFilter) return false;
       if (!q) return true;
       return (
@@ -105,7 +121,8 @@ function DirectoryPage() {
         (p.department ?? "").toLowerCase().includes(q)
       );
     });
-  }, [profiles, search, deptFilter]);
+  }, [profiles, search, deptFilter, activeFilter]);
+
 
   if (me && !canView) throw redirect({ to: "/dashboard" });
 
@@ -125,6 +142,43 @@ function DirectoryPage() {
     setEditing(null);
     qc.invalidateQueries({ queryKey: ["directory-profiles"] });
   }
+
+  async function toggleActive(p: Profile, active: boolean) {
+    if (!canEdit) return;
+    setBusy(true);
+    try {
+      await setActiveFn({ data: { user_id: p.id, active } });
+      toast.success(active ? "Reactivated" : "Deactivated");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["directory-profiles"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function hardDelete() {
+    if (!confirmDelete || !canHardDelete) return;
+    if (deleteConfirmText.trim().toLowerCase() !== (confirmDelete.email ?? "").toLowerCase()) {
+      toast.error("Email does not match");
+      return;
+    }
+    setBusy(true);
+    try {
+      await deleteFn({ data: { user_id: confirmDelete.id } });
+      toast.success("User permanently deleted");
+      setConfirmDelete(null);
+      setDeleteConfirmText("");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["directory-profiles"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
 
   return (
     <div className="space-y-6">
@@ -147,6 +201,14 @@ function DirectoryPage() {
               className="h-9 pl-8 w-64"
             />
           </div>
+          <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as "active" | "inactive" | "all")}>
+            <SelectTrigger className="h-9 w-36 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={deptFilter} onValueChange={setDeptFilter}>
             <SelectTrigger className="h-9 w-44 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -156,6 +218,7 @@ function DirectoryPage() {
               ))}
             </SelectContent>
           </Select>
+
         </div>
       </header>
 
@@ -180,7 +243,7 @@ function DirectoryPage() {
             </TableHeader>
             <TableBody>
               {rows.map((p) => (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} className={p.is_active === false ? "opacity-60" : ""}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-8 w-8">
@@ -189,11 +252,17 @@ function DirectoryPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="text-sm font-medium">{p.full_name ?? "—"}</div>
+                        <div className="text-sm font-medium flex items-center gap-2">
+                          {p.full_name ?? "—"}
+                          {p.is_active === false && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">{p.email ?? "—"}</div>
                       </div>
                     </div>
                   </TableCell>
+
                   <TableCell className="text-sm">
                     {p.department ?? <span className="text-muted-foreground">—</span>}
                   </TableCell>
@@ -304,15 +373,74 @@ function DirectoryPage() {
               </Field>
             </div>
           )}
+          <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {editing && editing.id !== me?.id && (
+                editing.is_active === false ? (
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => toggleActive(editing, true)}>
+                    <UserCheck className="h-3.5 w-3.5 mr-1" /> Reactivate
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => toggleActive(editing, false)}>
+                    <UserX className="h-3.5 w-3.5 mr-1" /> Deactivate
+                  </Button>
+                )
+              )}
+              {canHardDelete && editing && editing.id !== me?.id && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => { setConfirmDelete(editing); setDeleteConfirmText(""); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete permanently
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+              <Button className="gradient-primary" onClick={save} disabled={busy}>Save</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!confirmDelete} onOpenChange={(o) => { if (!o) { setConfirmDelete(null); setDeleteConfirmText(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Permanently delete user
+            </DialogTitle>
+            <DialogDescription>
+              This wipes the user's auth login, profile, attendance, leave, salary, and all related records.
+              This action <strong>cannot be undone</strong>. Consider Deactivate instead.
+            </DialogDescription>
+          </DialogHeader>
+          {confirmDelete && (
+            <div className="space-y-2">
+              <p className="text-sm">
+                Type <span className="font-mono font-semibold">{confirmDelete.email}</span> to confirm:
+              </p>
+              <Input
+                autoFocus
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder={confirmDelete.email ?? ""}
+              />
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button className="gradient-primary" onClick={save}>Save</Button>
+            <Button variant="outline" onClick={() => { setConfirmDelete(null); setDeleteConfirmText(""); }}>Cancel</Button>
+            <Button variant="destructive" onClick={hardDelete} disabled={busy}>
+              Delete permanently
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

@@ -1,33 +1,35 @@
 ## Plan
 
-### 1. Make the new landing page actually visible
-- Update `/` so it always shows the founder-vision landing page, even if a user is already signed in.
-- Keep clear calls to action:
-  - Signed out: `Sign in` / `Enter Pulse`
-  - Signed in: `Go to dashboard`
-- This removes the current behavior where signed-in users are immediately redirected to `/dashboard`, which makes it look like the landing page never changed.
-
-### 2. Publish-ready landing verification
-- Verify the published home page route is `/` and the content is the new AI/founder vision page.
-- Keep dashboard access separate from the landing page instead of using the landing page as an auth redirect.
-
-### 3. Fix Google sign-in OAuth first
-- Reconfigure Lovable Cloud Google sign-in using the managed Google provider.
-- Keep the app code using the supported `lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin })` flow.
-- Do not add custom popup/iframe workarounds or manual Google credentials for normal app sign-in.
-
-### 4. Separate Google Calendar OAuth from app sign-in
-- Audit the calendar connection flow so it is clearly separate from normal Google login.
-- Keep the Calendar flow using the exact published callback:
+### 1. Confirm the Calendar OAuth URL is using your Google Cloud credentials
+- Keep Calendar sync separate from normal Pulse Google sign-in.
+- Verify the Calendar flow uses `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`, which are the Google Cloud Console credentials you provided.
+- Confirm the generated Google URL sends this exact callback:
   `https://colladome-pulse.lovable.app/api/public/google/callback`
-- Add clearer in-app error text so if Calendar OAuth still fails, it tells us whether the failure is from:
-  - normal app Google sign-in, or
-  - Google Calendar sync permissions / redirect URI setup.
 
-### 5. Validate after changes
-- Check `/` while signed out and signed in.
-- Check `/auth` Google sign-in starts without `redirect_uri_mismatch`.
-- Check the Calendar connect page still shows the exact callback URL needed for Google Calendar sync.
+### 2. Fix the actual redirect mismatch cause
+- The screenshot shows Google Calendar OAuth is reaching Google, but Google rejects the `redirect_uri`.
+- This means the OAuth client in Google Cloud must contain the exact callback URL above under **Authorized redirect URIs**.
+- If your Google Cloud OAuth client has a different callback, preview URL, dashboard URL, trailing slash, or `/auth` URL, Google will keep showing `redirect_uri_mismatch`.
+
+### 3. Add an in-app credential sanity check for Calendar OAuth
+- Add a backend check that builds the Calendar OAuth URL and returns:
+  - the exact `redirect_uri` being sent to Google,
+  - whether Calendar OAuth client ID/secret are present,
+  - the expected published callback URL,
+  - clear setup instructions.
+- Do not expose the secret value.
+
+### 4. Improve the Calendar connect screen
+- Show a “Google Cloud setup check” panel before redirecting, so you can copy the exact callback URL.
+- Make the error text explicit: this is **Calendar OAuth**, not Pulse sign-in.
+- Add a direct “Copy callback URL” affordance for:
+  - Authorized redirect URI: `https://colladome-pulse.lovable.app/api/public/google/callback`
+  - Authorized JavaScript origin: `https://colladome-pulse.lovable.app`
+
+### 5. Validate the flow
+- Test the generated Calendar OAuth URL and confirm it contains the expected `client_id` and `redirect_uri`.
+- Re-check `/auth` stays on managed Pulse Google sign-in.
+- Re-check `/google-calendar-connect` starts only the Calendar OAuth flow.
 
 ### Important note
-If the screenshot came from the **Calendar Connect** button, Google still requires that exact callback URL to be added in the Google Cloud OAuth client used for Calendar access. If it came from **Continue with Google** on `/auth`, the managed Google sign-in reconfiguration should fix it.
+No code change can bypass Google’s `redirect_uri_mismatch`. The app can only make sure it sends the correct callback and shows it clearly. The final fix requires the same callback URL to be added to the Google Cloud OAuth client that owns the Calendar Client ID/Secret.

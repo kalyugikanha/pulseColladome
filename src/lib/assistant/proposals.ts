@@ -27,7 +27,7 @@ export const TaskProposalSchema = z.object({
   title: z.string().optional().nullable(),
   assignee_email: z.string().email().optional().nullable(),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  status: z.enum(["todo", "in_progress", "done", "blocked"]).optional().nullable(),
+  status: z.enum(["todo", "in_progress", "done"]).optional().nullable(),
   priority: z.enum(["low", "medium", "high"]).optional().nullable(),
 });
 

@@ -123,7 +123,10 @@ export const applyProposal = createServerFn({ method: "POST" })
       }
       if (proposal.operation === "update") {
         if (!proposal.task_id) throw new Error("task_id required");
-        const patch: Record<string, unknown> = {};
+        const patch: {
+          title?: string; status?: "todo" | "in_progress" | "done";
+          priority?: "low" | "medium" | "high"; due_date?: string;
+        } = {};
         if (proposal.title) patch.title = proposal.title;
         if (proposal.status) patch.status = proposal.status;
         if (proposal.priority) patch.priority = proposal.priority;

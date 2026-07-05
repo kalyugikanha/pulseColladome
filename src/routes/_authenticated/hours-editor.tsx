@@ -140,6 +140,13 @@ function HoursEditorPage() {
           <p className="text-sm text-muted-foreground">Super admin only. Edit any teammate's monthly hours per project.</p>
         </div>
         <div className="flex items-center gap-2">
+          <MultiSelectFilter
+            label="Department"
+            options={allDepts.map((d) => ({ value: d, label: d }))}
+            selected={deptSel}
+            onChange={setDeptSel}
+            includeUnassigned
+          />
           <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
         </div>
       </div>

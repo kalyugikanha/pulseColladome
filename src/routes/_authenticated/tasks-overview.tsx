@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/tasks-overview")({ compone
 
 function Page() {
   const { data: me } = useCurrentUser();
-  const canView = me?.canManageProjects || me?.isDepartmentHead || me?.isAdmin;
+  const canView = me?.canManageProjects || me?.isDepartmentHead || me?.isReportingManager || me?.isAdmin;
 
   const [employees, setEmployees] = useState<string[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
@@ -27,10 +27,14 @@ function Page() {
   const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
-    if (me?.isDepartmentHead && !me.isAdmin && departments.length === 0) {
+    if (me?.isDepartmentHead && !me.isAdmin && !me.isReportingManager && departments.length === 0) {
       setDepartments(me.headOfDepartments);
     }
-  }, [me, departments.length]);
+    if (me?.isReportingManager && !me.isAdmin && employees.length === 0) {
+      setEmployees(me.directReportIds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
 
   const { data: profileList } = useQuery({
     queryKey: ["profiles-mini"],

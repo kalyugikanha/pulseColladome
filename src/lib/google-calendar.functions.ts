@@ -9,6 +9,10 @@ export const getGoogleAuthUrl = createServerFn({ method: "POST" })
     const { signState, buildGoogleAuthUrl } = await import("./google-calendar.server");
     const state = signState(context.userId);
     const url = buildGoogleAuthUrl({ redirectUri: GOOGLE_CALENDAR_CALLBACK_URL, state });
+    const parsedUrl = new URL(url);
+    if (parsedUrl.searchParams.get("redirect_uri") !== GOOGLE_CALENDAR_CALLBACK_URL) {
+      throw new Error("Google Calendar OAuth redirect URI sanity check failed.");
+    }
     return { url };
   });
 

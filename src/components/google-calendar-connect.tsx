@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 
 const PUBLISHED_DASHBOARD_URL = "https://colladome-pulse.lovable.app/dashboard";
+const GOOGLE_CALENDAR_ORIGIN = "https://colladome-pulse.lovable.app";
 const GOOGLE_CALENDAR_CALLBACK_URL = "https://colladome-pulse.lovable.app/api/public/google/callback";
 const TROUBLESHOOTING_DOCS_URL = "https://docs.lovable.dev/tips-tricks/troubleshooting";
 const RETURNING_KEY = "gcal:returning";
@@ -52,7 +53,7 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
       title: 'Chrome shows "accounts.google.com is blocked" (ERR_BLOCKED_BY_RESPONSE)',
       body: (
         <>
-          Google may show this page when the OAuth request is started from an embedded preview or with an unauthorized callback URL.
+          In this Calendar flow, that page can hide Google&apos;s <strong>redirect_uri_mismatch</strong> error. Add the exact callback URL below in Google Cloud.
           {isOAuthBlockedContext && " This preview is embedded, so starting OAuth here will keep hitting the blocked page."}
           <a className="ml-1 font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noreferrer">
             Open published dashboard
@@ -86,6 +87,20 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
               className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
               onClick={() => copy(callbackUrl, "Callback URL")}
               aria-label="Copy callback URL"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="mt-2">
+            Also add this under <em>Authorized JavaScript origins</em>:
+          </div>
+          <div className="mt-1 flex items-center gap-2 rounded border border-border/60 bg-background/60 p-2 font-mono text-[11px] break-all">
+            <span className="flex-1">{GOOGLE_CALENDAR_ORIGIN}</span>
+            <button
+              type="button"
+              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={() => copy(GOOGLE_CALENDAR_ORIGIN, "JavaScript origin")}
+              aria-label="Copy JavaScript origin"
             >
               <Copy className="h-3.5 w-3.5" />
             </button>
@@ -358,7 +373,7 @@ export function GoogleCalendarConnectCard() {
                 ? "Google Calendar connection must be completed from the published app. Google blocks accounts.google.com inside the embedded preview."
                 : isLovablePreview
                 ? "If Google shows 403 in preview, connect from the published app instead. Google may reject OAuth started from the editor preview."
-                : "Clicking Connect will send you to Google to sign in, then return here. If Google shows 403, publish the OAuth consent screen or add this account as a test user in Google Cloud."}
+                : "Clicking Connect will send you to Google to sign in, then return here. If Google still shows the blocked page, add the exact callback URL in Google Cloud's Authorized redirect URIs."}
               <a className="ml-1 font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noreferrer">
                 Open published dashboard
               </a>

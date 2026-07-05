@@ -43,6 +43,7 @@ function HoursEditorPage() {
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const [month, setMonth] = useState(defaultMonth);
+  const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
   const [addFor, setAddFor] = useState<string | null>(null);
   const [addCode, setAddCode] = useState<string>("");
 

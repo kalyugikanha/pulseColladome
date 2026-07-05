@@ -27,21 +27,29 @@ function ProjectBurnPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
 
+  const canView = !!me && (me.isFinanceAdmin || me.isDepartmentHead);
+  const showCosts = !!me?.isFinanceAdmin;
+  const deptScope = !!me && !me.isFinanceAdmin && me.isDepartmentHead ? me.headOfDepartments : null;
+
   const { data: profiles } = useQuery({
-    queryKey: ["pb-profiles"],
-    enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department")).data as Profile[] ?? [],
+    queryKey: ["pb-profiles", deptScope?.join(",") ?? "all"],
+    enabled: canView,
+    queryFn: async () => {
+      let q = supabase.from("profiles").select("id, full_name, email, department");
+      if (deptScope && deptScope.length) q = q.in("department", deptScope);
+      return (await q).data as Profile[] ?? [];
+    },
   });
 
   const { data: grants } = useQuery({
     queryKey: ["pb-grants"],
-    enabled: !!me?.isFinanceAdmin,
+    enabled: canView && showCosts,
     queryFn: async () => (await supabase.from("role_grants").select("email, default_monthly_salary")).data as Array<{ email: string; default_monthly_salary: number | null }> ?? [],
   });
 
   const { data: salaries } = useQuery({
     queryKey: ["pb-salaries"],
-    enabled: !!me?.isFinanceAdmin,
+    enabled: canView && showCosts,
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any).from("salaries").select("user_id, monthly_salary, effective_from").order("effective_from", { ascending: false });
@@ -51,17 +59,19 @@ function ProjectBurnPage() {
   });
 
   const { data: logs } = useQuery({
-    queryKey: ["pb-logs", month],
-    enabled: !!me?.isFinanceAdmin,
+    queryKey: ["pb-logs", month, deptScope?.join(",") ?? "all"],
+    enabled: canView,
     queryFn: async () => {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-      const { data, error } = await supabase.from("attendance_logs").select("user_id, date, tasks").gte("date", start).lt("date", end).order("date");
-      if (error) throw error;
-      return (data ?? []) as LogRow[];
+      let q = supabase.from("attendance_logs").select("user_id, date, tasks").gte("date", start).lt("date", end).order("date");
+      // Scope logs to department members when viewer is a dept head only.
+      // (RLS already limits what they can read, but this trims payload.)
+      return (await q).data as LogRow[] ?? [];
     },
   });
+
 
   const salaryByUser = useMemo(() => {
     const map = new Map<string, number>();
@@ -112,11 +122,15 @@ function ProjectBurnPage() {
     return totals;
   }, [logs]);
 
+  // Restrict logs to profiles in scope (dept-head only sees her team).
+  const profileIdSet = useMemo(() => new Set((profiles ?? []).map((p) => p.id)), [profiles]);
+  const scopedLogs = useMemo(() => (logs ?? []).filter((r) => profileIdSet.size === 0 || profileIdSet.has(r.user_id)), [logs, profileIdSet]);
+
   // Daily rows: [date, project_code, user_id, hours, burn]
   type DailyRow = { date: string; code: string; name: string; user_id: string; hours: number; burn: number };
   const dailyRows: DailyRow[] = useMemo(() => {
     const out: DailyRow[] = [];
-    for (const row of logs ?? []) {
+    for (const row of scopedLogs) {
       const monthlyHrs = monthlyUserTotals.get(row.user_id) ?? 0;
       const salary = salaryByUser.get(row.user_id) ?? 0;
       for (const t of row.tasks ?? []) {
@@ -128,7 +142,7 @@ function ProjectBurnPage() {
       }
     }
     return out.sort((a, b) => b.date.localeCompare(a.date));
-  }, [logs, monthlyUserTotals, salaryByUser]);
+  }, [scopedLogs, monthlyUserTotals, salaryByUser]);
 
   const projects = useMemo(() => {
     const map = new Map<string, string>();
@@ -138,6 +152,7 @@ function ProjectBurnPage() {
 
   const deptFilteredDaily = useMemo(() => dailyRows.filter((r) => passesDept(r.user_id)), [dailyRows, deptSel, deptById]);
   const filteredDaily = useMemo(() => projectFilter === "all" ? deptFilteredDaily : deptFilteredDaily.filter((r) => r.code === projectFilter), [deptFilteredDaily, projectFilter]);
+
 
   // Aggregated by project
   const byProject = useMemo(() => {
@@ -184,14 +199,15 @@ function ProjectBurnPage() {
   const trendMax = Math.max(1, ...dailyTrend.map((d) => d.burn));
 
   if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
-  if (!me?.isFinanceAdmin) throw redirect({ to: "/dashboard" });
+  if (!canView) throw redirect({ to: "/dashboard" });
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold flex items-center gap-2"><Flame className="h-6 w-6 text-primary" /> Project Burn</h1>
-          <p className="text-sm text-muted-foreground">Daily burn allocated from salaries as team logs hours. Salary-share allocation.</p>
+          <p className="text-sm text-muted-foreground">{showCosts ? "Daily burn allocated from salaries as team logs hours. Salary-share allocation." : `Project hours by teammate — ${(me?.headOfDepartments ?? []).join(", ") || "your team"}.`}</p>
+
         </div>
         <div className="flex items-center gap-2">
           {(() => {
@@ -237,41 +253,48 @@ function ProjectBurnPage() {
       </header>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Stat icon={<IndianRupee className="h-4 w-4" />} label="Burned this month" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs`} />
-        <Stat icon={<TrendingUp className="h-4 w-4" />} label="Salary pool" value={inr(totalSalaryPool)} sub={`${salaryByUser.size} active${pendingCount ? ` · ${pendingCount} pending` : ""}`} />
-        <Stat icon={<Flame className="h-4 w-4" />} label="Coverage" value={totalSalaryPool > 0 ? `${((totalBurn / totalSalaryPool) * 100).toFixed(0)}%` : "—"} sub="of salary pool allocated" />
+        {showCosts && <Stat icon={<IndianRupee className="h-4 w-4" />} label="Burned this month" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs`} />}
+        {showCosts && <Stat icon={<TrendingUp className="h-4 w-4" />} label="Salary pool" value={inr(totalSalaryPool)} sub={`${salaryByUser.size} active${pendingCount ? ` · ${pendingCount} pending` : ""}`} />}
+        {showCosts && <Stat icon={<Flame className="h-4 w-4" />} label="Coverage" value={totalSalaryPool > 0 ? `${((totalBurn / totalSalaryPool) * 100).toFixed(0)}%` : "—"} sub="of salary pool allocated" />}
+        {!showCosts && <Stat icon={<CalendarDays className="h-4 w-4" />} label="Hours this month" value={totalHours.toFixed(1)} sub={`${(profiles ?? []).length} teammates`} />}
         <Stat icon={<CalendarDays className="h-4 w-4" />} label="Active projects" value={String(byProject.length)} sub="with logged hours" />
       </div>
 
+
       <Card>
         <CardHeader>
-          <CardTitle>Daily burn — {month}</CardTitle>
+          <CardTitle>{showCosts ? `Daily burn — ${month}` : `Daily hours — ${month}`}</CardTitle>
           <CardDescription>{projectFilter === "all" ? "All projects" : projects.find((p) => p.code === projectFilter)?.name}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-end gap-1 h-32">
-            {dailyTrend.map((d) => (
-              <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" title={`${d.date}: ${inr(d.burn)} · ${d.hours.toFixed(1)}h`}>
-                <div className="w-full rounded-t bg-primary/70" style={{ height: `${(d.burn / trendMax) * 100}%`, minHeight: d.burn > 0 ? 2 : 0 }} />
-                <span className="text-[9px] text-muted-foreground">{Number(d.date.slice(8, 10))}</span>
-              </div>
-            ))}
+            {dailyTrend.map((d) => {
+              const metric = showCosts ? d.burn : d.hours;
+              const max = showCosts ? trendMax : Math.max(1, ...dailyTrend.map((x) => x.hours));
+              return (
+                <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" title={`${d.date}: ${showCosts ? inr(d.burn) + " · " : ""}${d.hours.toFixed(1)}h`}>
+                  <div className="w-full rounded-t bg-primary/70" style={{ height: `${(metric / max) * 100}%`, minHeight: metric > 0 ? 2 : 0 }} />
+                  <span className="text-[9px] text-muted-foreground">{Number(d.date.slice(8, 10))}</span>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
+
 
       <Card>
         <CardHeader><CardTitle>Burn by project</CardTitle></CardHeader>
         <CardContent>
           {byProject.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-8 text-center">No time logged this month for users with salaries set.</div>
+            <div className="text-sm text-muted-foreground py-8 text-center">{showCosts ? "No time logged this month for users with salaries set." : "No time logged this month."}</div>
           ) : (
             <Table>
               <TableHeader><TableRow>
                 <TableHead>Project</TableHead><TableHead>Code</TableHead>
                 <TableHead className="text-right">Active days</TableHead>
                 <TableHead className="text-right">Hours</TableHead>
-                <TableHead className="text-right">Burned so far</TableHead>
+                {showCosts && <TableHead className="text-right">Burned so far</TableHead>}
                 <TableHead className="text-right">% of total</TableHead>
               </TableRow></TableHeader>
               <TableBody>
@@ -281,8 +304,8 @@ function ProjectBurnPage() {
                     <TableCell className="font-mono text-xs">{p.code}</TableCell>
                     <TableCell className="text-right">{p.daysActive.size}</TableCell>
                     <TableCell className="text-right">{p.hours.toFixed(1)}</TableCell>
-                    <TableCell className="text-right font-semibold">{inr(p.burn)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{totalBurn > 0 ? ((p.burn / totalBurn) * 100).toFixed(1) : "0"}%</TableCell>
+                    {showCosts && <TableCell className="text-right font-semibold">{inr(p.burn)}</TableCell>}
+                    <TableCell className="text-right text-muted-foreground">{showCosts ? (totalBurn > 0 ? ((p.burn / totalBurn) * 100).toFixed(1) : "0") : (totalHours > 0 ? ((p.hours / totalHours) * 100).toFixed(1) : "0")}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -294,7 +317,7 @@ function ProjectBurnPage() {
       <Card>
         <CardHeader>
           <CardTitle>Daily log</CardTitle>
-          <CardDescription>Every entry contributing to burn this month.</CardDescription>
+          <CardDescription>{showCosts ? "Every entry contributing to burn this month." : "Every entry logged this month."}</CardDescription>
         </CardHeader>
         <CardContent>
           {filteredDaily.length === 0 ? (
@@ -306,7 +329,7 @@ function ProjectBurnPage() {
                   <TableHead>Date</TableHead><TableHead>Employee</TableHead>
                   <TableHead>Project</TableHead>
                   <TableHead className="text-right">Hours</TableHead>
-                  <TableHead className="text-right">Burn</TableHead>
+                  {showCosts && <TableHead className="text-right">Burn</TableHead>}
                 </TableRow></TableHeader>
                 <TableBody>
                   {filteredDaily.map((r, i) => (
@@ -315,7 +338,7 @@ function ProjectBurnPage() {
                       <TableCell>{nameById.get(r.user_id) ?? "—"}</TableCell>
                       <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>
                       <TableCell className="text-right">{r.hours.toFixed(1)}</TableCell>
-                      <TableCell className="text-right">{inr(r.burn)}</TableCell>
+                      {showCosts && <TableCell className="text-right">{inr(r.burn)}</TableCell>}
                     </TableRow>
                   ))}
                 </TableBody>

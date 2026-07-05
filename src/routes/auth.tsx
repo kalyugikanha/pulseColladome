@@ -12,7 +12,6 @@ import { Activity } from "lucide-react";
 import logo from "@/assets/colladome-logo.png.asset.json";
 
 export const Route = createFileRoute("/auth")({
-  ssr: false,
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
     if (data.user) throw redirect({ to: "/dashboard" });

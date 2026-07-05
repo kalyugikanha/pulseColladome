@@ -5,12 +5,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useHolidays, weeklyOffLabel } from "@/hooks/use-holidays";
-import { listMyMonthEvents } from "@/lib/google-calendar.functions";
+import { createTeamCalendarBooking, listTeamCalendarEvents, syncMyGoogleCalendar } from "@/lib/google-calendar.functions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -21,7 +22,7 @@ import {
 } from "date-fns";
 import {
   ChevronLeft, ChevronRight, PartyPopper, Search, Cake, Trophy,
-  CalendarClock, Filter, Settings2, X,
+  CalendarClock, Filter, Settings2, X, RefreshCw, Plus, Link as LinkIcon, AlertCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
@@ -81,6 +82,8 @@ type Filters = {
 function CalendarPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
+  const fetchTeamCalendar = useServerFn(listTeamCalendarEvents);
+  const syncGoogleCalendar = useServerFn(syncMyGoogleCalendar);
   const [cursor, setCursor] = useState(new Date());
   const [openDay, setOpenDay] = useState<Date | null>(null);
   const [filters, setFilters] = useState<Filters>({
@@ -123,14 +126,26 @@ function CalendarPage() {
 
   const { data: holidays } = useHolidays();
 
-  const fetchMyEvents = useServerFn(listMyMonthEvents);
-  const { data: myEvents } = useQuery({
-    queryKey: ["my-google-events", format(gridStart, "yyyy-MM-dd"), format(gridEnd, "yyyy-MM-dd")],
-    queryFn: () => fetchMyEvents({
+  const { data: teamCalendar, isFetching: calendarFetching } = useQuery({
+    queryKey: ["team-google-calendar", format(gridStart, "yyyy-MM-dd"), format(gridEnd, "yyyy-MM-dd")],
+    queryFn: () => fetchTeamCalendar({
       data: { startISO: gridStart.toISOString(), endISO: addDays(gridEnd, 1).toISOString() },
     }),
     staleTime: 60_000,
   });
+
+  const myCalendarStatus = (teamCalendar?.statuses ?? []).find((s: any) => s.user_id === me?.id);
+  const connectedCount = teamCalendar?.statuses?.length ?? 0;
+  const visibleProfiles = teamCalendar?.profiles ?? profiles ?? [];
+
+  async function syncCalendar() {
+    const result = await syncGoogleCalendar({ data: { startISO: gridStart.toISOString(), endISO: addDays(gridEnd, 1).toISOString() } });
+    if (!result.connected) return toast.error(result.error ?? "Connect Google Calendar first.");
+    if (result.error) return toast.error(result.error);
+    toast.success(`Synced ${result.synced} calendar block${result.synced === 1 ? "" : "s"}`);
+    await qc.invalidateQueries({ queryKey: ["team-google-calendar"] });
+    await qc.invalidateQueries({ queryKey: ["my-google-status"] });
+  }
 
   const deptColorMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -142,16 +157,16 @@ function CalendarPage() {
     (name && deptColorMap.get(name)) || defaultDeptColor(name);
 
   const profileById = useMemo(() => {
-    const m = new Map<string, NonNullable<typeof profiles>[number]>();
-    (profiles ?? []).forEach((p) => m.set(p.id, p));
+    const m = new Map<string, (typeof visibleProfiles)[number]>();
+    visibleProfiles.forEach((p) => m.set(p.id, p));
     return m;
-  }, [profiles]);
+  }, [visibleProfiles]);
 
   const allDepts = useMemo(() => {
     const s = new Set<string>();
-    (profiles ?? []).forEach((p) => p.department && s.add(p.department));
+    visibleProfiles.forEach((p) => p.department && s.add(p.department));
     return Array.from(s).sort();
-  }, [profiles]);
+  }, [visibleProfiles]);
 
   const days: Date[] = [];
   for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) days.push(d);
@@ -171,24 +186,43 @@ function CalendarPage() {
   };
 
   const eventsForDay = (d: Date) => {
-    const list: { title: string; kind: "internal" | "client"; time?: string }[] = [];
-    if (!myEvents?.connected) return list;
-    for (const ev of myEvents.events) {
-      const start = new Date(ev.start);
-      const end = new Date(ev.end);
-      if (isWithinInterval(d, { start: startOfWeek(start), end: endOfWeek(end) }) === false) {
-        // cheap prefilter — actually match by date
-      }
+    const list: { title: string; owner?: string | null; dept?: string | null; kind: "internal" | "client" | "booking" | "private"; time?: string; userId?: string; details?: string | null }[] = [];
+    for (const ev of teamCalendar?.events ?? []) {
+      const start = new Date(ev.start_at);
+      const end = new Date(ev.end_at);
       const sameDay = isSameDay(d, start) ||
         (start < d && end > d) ||
         isSameDay(d, end);
       if (!sameDay) continue;
-      const summary = ev.summary || "(no title)";
-      const isClient = /client|external|customer/i.test(summary + " " + (ev.description ?? ""));
+      if (!matchesFilters(ev.user_id)) continue;
+      const p = profileById.get(ev.user_id);
+      const summary = ev.summary || "Busy";
+      const isPrivate = !!ev.is_private;
+      const isClient = !isPrivate && /client|external|customer/i.test(summary + " " + (ev.description_snippet ?? ""));
       list.push({
-        title: summary,
-        kind: isClient ? "client" : "internal",
+        title: isPrivate ? "Busy" : summary,
+        owner: p?.full_name ?? p?.email ?? "Team member",
+        dept: p?.department ?? null,
+        kind: isPrivate ? "private" : isClient ? "client" : "internal",
         time: ev.all_day ? undefined : format(start, "HH:mm"),
+        userId: ev.user_id,
+        details: isPrivate ? null : ev.description_snippet,
+      });
+    }
+    for (const booking of teamCalendar?.bookings ?? []) {
+      const start = new Date(booking.start_at);
+      const end = new Date(booking.end_at);
+      const sameDay = isSameDay(d, start) || (start < d && end > d) || isSameDay(d, end);
+      if (!sameDay) continue;
+      const creator = profileById.get(booking.created_by);
+      list.push({
+        title: booking.title,
+        owner: creator?.full_name ?? creator?.email ?? "Team booking",
+        dept: creator?.department ?? null,
+        kind: "booking",
+        time: format(start, "HH:mm"),
+        userId: booking.created_by,
+        details: booking.description,
       });
     }
     return list;
@@ -197,14 +231,14 @@ function CalendarPage() {
   const birthdaysForDay = (d: Date) => {
     if (!filters.showBirthdays) return [];
     const key = mmdd(d);
-    return (profiles ?? []).filter((p) =>
+    return visibleProfiles.filter((p) =>
       p.date_of_birth && mmdd(p.date_of_birth) === key && matchesFilters(p.id));
   };
 
   const anniversariesForDay = (d: Date) => {
     if (!filters.showAnniversaries) return [];
     const key = mmdd(d);
-    return (profiles ?? [])
+    return visibleProfiles
       .filter((p) => p.joined_on && mmdd(p.joined_on) === key && matchesFilters(p.id))
       .map((p) => ({ ...p, years: yearsBetween(p.joined_on!, d) }))
       .filter((p) => p.years > 0);
@@ -238,6 +272,7 @@ function CalendarPage() {
           <p className="text-muted-foreground text-sm mt-1">Leave, meetings, birthdays & anniversaries at a glance.</p>
         </div>
         <div className="flex items-center gap-2">
+          <BookingDialog profiles={visibleProfiles} onSaved={() => qc.invalidateQueries({ queryKey: ["team-google-calendar"] })} />
           <MyDatesDialog />
           {me?.isAdmin && <DeptColorsDialog depts={allDepts} colorFor={colorForDept} onSaved={() => qc.invalidateQueries({ queryKey: ["department-settings"] })} />}
           <Button variant="outline" size="icon" onClick={() => setCursor(addMonths(cursor, -1))}><ChevronLeft className="h-4 w-4" /></Button>
@@ -245,6 +280,35 @@ function CalendarPage() {
           <Button variant="outline" size="icon" onClick={() => setCursor(addMonths(cursor, 1))}><ChevronRight className="h-4 w-4" /></Button>
         </div>
       </header>
+
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <CalendarClock className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-medium">Team Google Calendar sync</div>
+              <div className="text-xs text-muted-foreground">
+                {myCalendarStatus
+                  ? `Connected${myCalendarStatus.last_synced_at ? ` · last sync ${format(new Date(myCalendarStatus.last_synced_at), "MMM d, HH:mm")}` : " · not synced yet"}`
+                  : "Connect your calendar so the team can see your blocked time."} {connectedCount} connected.
+              </div>
+              {myCalendarStatus?.sync_error && <div className="mt-1 text-xs text-destructive">{myCalendarStatus.sync_error}</div>}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!myCalendarStatus && (
+              <Button asChild size="sm" variant="outline">
+                <a href="/google-calendar-connect"><LinkIcon className="h-4 w-4" />Connect</a>
+              </Button>
+            )}
+            <Button size="sm" onClick={syncCalendar} disabled={!myCalendarStatus || calendarFetching}>
+              <RefreshCw className={`h-4 w-4 ${calendarFetching ? "animate-spin" : ""}`} /> Sync now
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filter bar */}
       <Card>
@@ -405,11 +469,12 @@ function CalendarPage() {
                         </div>
                       );
                     })}
-                    {evs.slice(0, 2).map((ev, i) => (
+                    {evs.slice(0, 3).map((ev, i) => (
                       <div key={"e" + i}
-                        className={`truncate rounded px-1.5 py-0.5 text-[10px] border ${ev.kind === "client" ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-500" : "border-indigo-400/40 bg-indigo-400/10 text-indigo-400"}`}
-                        title={ev.title}>
-                        📅 {ev.time ? `${ev.time} · ` : ""}{ev.title}
+                        className={`truncate rounded px-1.5 py-0.5 text-[10px] border ${ev.kind === "booking" ? "border-success/40 bg-success/10 text-success" : ev.kind === "client" ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-500" : ev.kind === "private" ? "border-border bg-muted/60 text-muted-foreground" : "border-indigo-400/40 bg-indigo-400/10 text-indigo-400"}`}
+                        style={{ borderLeft: ev.dept ? `3px solid ${colorForDept(ev.dept)}` : undefined }}
+                        title={`${ev.owner ?? ""} · ${ev.title}`}>
+                        📅 {ev.time ? `${ev.time} · ` : ""}{ev.owner ? `${ev.owner.split(" ")[0]}: ` : ""}{ev.title}
                       </div>
                     ))}
                     {(dl.length + evs.length + bdays.length + annivs.length) > 6 && (
@@ -426,7 +491,7 @@ function CalendarPage() {
       <DayDetailSheet
         day={openDay}
         onOpenChange={(v) => !v && setOpenDay(null)}
-        profiles={profiles ?? []}
+        profiles={visibleProfiles}
         leaves={(leaves ?? []).filter((l: any) => openDay && isWithinInterval(openDay, { start: new Date(l.start_date), end: new Date(l.end_date) }))}
         events={openDay ? eventsForDay(openDay) : []}
         birthdays={openDay ? birthdaysForDay(openDay) : []}
@@ -447,7 +512,7 @@ function DayDetailSheet({
   onOpenChange: (open: boolean) => void;
   profiles: Array<{ id: string; full_name: string | null; email: string | null; department: string | null }>;
   leaves: any[];
-  events: { title: string; kind: "internal" | "client"; time?: string }[];
+  events: { title: string; owner?: string | null; dept?: string | null; kind: "internal" | "client" | "booking" | "private"; time?: string; details?: string | null }[];
   birthdays: Array<{ id: string; full_name: string | null; department: string | null }>;
   anniversaries: Array<{ id: string; full_name: string | null; department: string | null; years: number }>;
   holiday?: string;
@@ -511,12 +576,14 @@ function DayDetailSheet({
           )}
 
           {events.length > 0 && (
-            <Section title={`My meetings (${events.length})`} icon={<CalendarClock className="h-4 w-4 text-cyan-500" />}>
+            <Section title={`Calendar blocks (${events.length})`} icon={<CalendarClock className="h-4 w-4 text-cyan-500" />}>
               {events.map((ev, i) => (
-                <div key={i} className="flex items-center justify-between rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-sm">
+                <div key={i} className="flex items-center justify-between rounded-md border border-border/60 bg-surface/40 px-3 py-2 text-sm"
+                  style={{ borderLeft: `3px solid ${ev.kind === "booking" ? "var(--success)" : colorForDept(ev.dept)}` }}>
                   <div className="truncate">
                     <div className="truncate font-medium">{ev.title}</div>
-                    <div className="text-[11px] text-muted-foreground">{ev.time ?? "All day"} · {ev.kind}</div>
+                    <div className="text-[11px] text-muted-foreground">{ev.time ?? "All day"} · {ev.owner ?? "Team"} · {ev.kind}</div>
+                    {ev.details && <div className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{ev.details}</div>}
                   </div>
                 </div>
               ))}
@@ -557,6 +624,77 @@ function DayDetailSheet({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function BookingDialog({ profiles, onSaved }: { profiles: Array<{ email: string | null; full_name: string | null }>; onSaved: () => void }) {
+  const createBooking = useServerFn(createTeamCalendarBooking);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [attendees, setAttendees] = useState("");
+  const [description, setDescription] = useState("");
+
+  async function save() {
+    setBusy(true);
+    try {
+      const result = await createBooking({ data: {
+        title,
+        startISO: new Date(start).toISOString(),
+        endISO: new Date(end).toISOString(),
+        attendeeEmails: attendees.split(/[\n,]/).map((v) => v.trim()).filter(Boolean),
+        description,
+      } });
+      if (!result.ok) {
+        toast.error(result.error ?? "Booking saved, but Google Calendar creation failed.");
+      } else {
+        toast.success("Team time booked");
+      }
+      setOpen(false);
+      setTitle("");
+      setStart("");
+      setEnd("");
+      setAttendees("");
+      setDescription("");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not book team time");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const teamEmails = profiles.map((p) => p.email).filter(Boolean) as string[];
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Book time</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Book team time</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Client review, sprint planning…" /></div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5"><Label>Starts</Label><Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Ends</Label><Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Attendees</Label>
+            <Textarea rows={3} value={attendees} onChange={(e) => setAttendees(e.target.value)} placeholder="name@colladome.com, teammate@colladome.com" />
+            {teamEmails.length > 0 && <div className="text-[11px] text-muted-foreground">Paste comma-separated work emails. {teamEmails.length} team emails are available in directory.</div>}
+          </div>
+          <div className="space-y-1.5"><Label>What is this time for?</Label><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+          <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-muted-foreground">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+            <span>If booking fails with permission error, reconnect Google Calendar once so it grants event booking permission.</span>
+          </div>
+        </div>
+        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button><Button onClick={save} disabled={busy}>{busy ? "Booking…" : "Book"}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -1,69 +1,68 @@
-## What this means
+## Goal
+Fix the Google Calendar connection error, then build a team calendar utility where employees can sync their calendars, view teammates’ blocked time/work context, and book time on a shared team calendar.
 
-This still does **not** look like a manual auth-token problem. You should not paste Google access tokens into the app. The app already has the two backend secrets it needs:
+## Immediate OAuth fix
+1. Update the Calendar OAuth callback to use the exact published callback URL Google is rejecting unless configured:
+   - `https://colladome-pulse.lovable.app/api/public/google/callback`
+2. Make the app surface a clear setup screen when Google returns `redirect_uri_mismatch`, including the exact values to add in Google Cloud:
+   - Authorized redirect URI: `https://colladome-pulse.lovable.app/api/public/google/callback`
+   - Authorized JavaScript origin: `https://colladome-pulse.lovable.app`
+3. Verify the app is consistently using the same callback URL for both:
+   - the initial Google auth URL
+   - the code-to-token exchange
+4. Fix the current `/auth` hydration mismatch quietly while touching auth-related routes.
 
-- `GOOGLE_OAUTH_CLIENT_ID`
-- `GOOGLE_OAUTH_CLIENT_SECRET`
+## Google Cloud action you still need to do
+No personal auth token is needed and you should not paste Google access tokens into chat. The required Google-side setup is:
+1. In the same Google Cloud project as the saved Client ID/Secret, open the OAuth Client ID used by this app.
+2. Add this exact Authorized redirect URI:
+   `https://colladome-pulse.lovable.app/api/public/google/callback`
+3. Add this Authorized JavaScript origin:
+   `https://colladome-pulse.lovable.app`
+4. Enable Google Calendar API in that Google Cloud project.
+5. OAuth consent screen:
+   - If Testing: add every employee Google account as a test user.
+   - For org-wide usage: publish the consent screen or configure it as internal for your Google Workspace.
+6. Calendar scopes needed:
+   - `openid`
+   - `email`
+   - `https://www.googleapis.com/auth/calendar.readonly`
+   - for booking shared calendar events, also add `https://www.googleapis.com/auth/calendar.events`
 
-The recurring `accounts.google.com refused to connect / ERR_BLOCKED_BY_RESPONSE` usually happens when Google is being opened inside an embedded frame or when Google is showing an OAuth error page that cannot be framed. The app should make that impossible by forcing the Calendar OAuth start to happen as a top-level page on the published domain and by showing the exact Google Cloud configuration to check.
+## Team calendar sync utility
+1. Extend Google Calendar OAuth scopes from read-only to event booking:
+   - keep read access for availability/work visibility
+   - add event write access for creating bookings on the shared team calendar
+2. Add secure backend tables for:
+   - each employee’s synced calendar connection
+   - cached/sanitized calendar events
+   - shared team calendar bookings
+   - sync status/errors per employee
+3. Add server functions to:
+   - sync the signed-in employee’s calendar events
+   - refresh expired Google access tokens safely
+   - list visible team availability across departments
+   - create a booking on the shared team calendar
+4. Add UI to the dashboard/calendar area:
+   - “Sync my calendar” status card
+   - team availability timeline/day view
+   - teammate filters by department/person
+   - booking form for team shared calendar slots
+   - clear connected/error states
+5. Privacy behavior:
+   - show time blocks and work context where available
+   - avoid exposing private event descriptions by default
+   - show enough information for team planning without leaking sensitive personal details
 
-## What I will change in the app
+## Technical notes
+- Tokens stay server-side only in the backend.
+- Employees never enter or share Google auth tokens manually.
+- Existing saved `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` remain the only app secrets needed unless they belong to the wrong OAuth client.
+- If the OAuth client was edited, connected users may need to reconnect once so Google grants the new calendar event scope.
 
-1. **Add a dedicated top-level OAuth launch route**
-   - Create a public route such as `/google-calendar-connect`.
-   - The dashboard button will navigate to that route first.
-   - That route will immediately request the Google auth URL and redirect the full browser tab to Google.
-   - This avoids starting `accounts.google.com` from an embedded/preview context.
-
-2. **Change the dashboard Calendar button behavior**
-   - On the published app, clicking Connect/Open Calendar will use full-page navigation, not iframe/popup-style behavior.
-   - In Lovable preview, it will clearly send the user to the published dashboard/launch route.
-
-3. **Keep the stable Google callback URL**
-   - Continue using exactly:
-     ```text
-     https://colladome-pulse.lovable.app/api/public/google/callback
-     ```
-   - Continue exchanging tokens only on the server.
-   - Continue storing tokens securely in the backend, never in the browser.
-
-4. **Improve error messages for the two likely cases**
-   - If Google returns `redirect_uri_mismatch`, show the exact callback URL to add in Google Cloud.
-   - If Google returns access/permission issues, show the exact Google Cloud checks:
-     - Google Calendar API enabled
-     - OAuth consent screen published, or your Google account added as a test user
-     - Scopes include calendar read access
-
-## What you should check in Google Cloud
-
-Use the same OAuth Client whose Client ID/Secret are saved in Lovable.
-
-1. **Authorized redirect URI** must include exactly:
-   ```text
-   https://colladome-pulse.lovable.app/api/public/google/callback
-   ```
-
-2. **Authorized JavaScript origin** should include:
-   ```text
-   https://colladome-pulse.lovable.app
-   ```
-
-3. **Google Calendar API** must be enabled in that same Google Cloud project.
-
-4. **OAuth consent screen**:
-   - If status is Testing, add the Google account you are signing in with as a test user.
-   - If your app is for broader users, publish/verify the consent screen as needed.
-
-5. **Scopes** should allow calendar read access:
-   ```text
-   openid
-   email
-   https://www.googleapis.com/auth/calendar.readonly
-   ```
-
-## What I do not need
-
-- I do **not** need a Google access token.
-- I do **not** need your personal Google password.
-- I do **not** need any browser-copied auth token.
-- If the Client ID/Secret values are wrong or from a different OAuth Client, they should be replaced securely through the app secrets form, not pasted in chat.
+## Validation
+1. Open published `/google-calendar-connect`.
+2. Confirm Google no longer shows `redirect_uri_mismatch` after the Google Cloud redirect URI is added.
+3. Connect one employee account.
+4. Sync events and confirm they appear in the team calendar view.
+5. Create a test booking on the shared calendar and confirm it appears in Google Calendar.

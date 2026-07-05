@@ -4,6 +4,7 @@ const GOOGLE_SCOPES = [
   "openid",
   "email",
   "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.events",
 ];
 
 export function getGoogleScopes() {
@@ -138,7 +139,28 @@ export type CalendarEvent = {
   organizer?: string;
   status?: string;
   html_link?: string;
+  visibility?: string;
 };
+
+function mapGoogleEvent(e: any): CalendarEvent {
+  const start = e.start?.dateTime ?? e.start?.date ?? "";
+  const end = e.end?.dateTime ?? e.end?.date ?? "";
+  return {
+    id: e.id,
+    summary: e.summary ?? "(no title)",
+    description: e.description,
+    start,
+    end,
+    all_day: !e.start?.dateTime,
+    location: e.location,
+    meeting_link: e.hangoutLink ?? e.conferenceData?.entryPoints?.find((p: any) => p.entryPointType === "video")?.uri,
+    attendees_count: Array.isArray(e.attendees) ? e.attendees.length : 0,
+    organizer: e.organizer?.email,
+    status: e.status,
+    html_link: e.htmlLink,
+    visibility: e.visibility,
+  };
+}
 
 export async function fetchUpcomingEvents(accessToken: string, days: number): Promise<CalendarEvent[]> {
   const now = new Date();
@@ -156,24 +178,7 @@ export async function fetchUpcomingEvents(accessToken: string, days: number): Pr
   );
   if (!res.ok) throw new Error(`Google Calendar list failed (${res.status}): ${await res.text()}`);
   const json = await res.json();
-  return (json.items ?? []).map((e: any): CalendarEvent => {
-    const start = e.start?.dateTime ?? e.start?.date ?? "";
-    const end = e.end?.dateTime ?? e.end?.date ?? "";
-    return {
-      id: e.id,
-      summary: e.summary ?? "(no title)",
-      description: e.description,
-      start,
-      end,
-      all_day: !e.start?.dateTime,
-      location: e.location,
-      meeting_link: e.hangoutLink ?? e.conferenceData?.entryPoints?.find((p: any) => p.entryPointType === "video")?.uri,
-      attendees_count: Array.isArray(e.attendees) ? e.attendees.length : 0,
-      organizer: e.organizer?.email,
-      status: e.status,
-      html_link: e.htmlLink,
-    };
-  });
+  return (json.items ?? []).map(mapGoogleEvent);
 }
 
 export async function fetchEventsInRange(accessToken: string, timeMinISO: string, timeMaxISO: string): Promise<CalendarEvent[]> {
@@ -190,23 +195,42 @@ export async function fetchEventsInRange(accessToken: string, timeMinISO: string
   );
   if (!res.ok) throw new Error(`Google Calendar list failed (${res.status}): ${await res.text()}`);
   const json = await res.json();
-  return (json.items ?? []).map((e: any): CalendarEvent => {
-    const start = e.start?.dateTime ?? e.start?.date ?? "";
-    const end = e.end?.dateTime ?? e.end?.date ?? "";
-    return {
-      id: e.id,
-      summary: e.summary ?? "(no title)",
-      description: e.description,
-      start,
-      end,
-      all_day: !e.start?.dateTime,
-      location: e.location,
-      meeting_link: e.hangoutLink ?? e.conferenceData?.entryPoints?.find((p: any) => p.entryPointType === "video")?.uri,
-      attendees_count: Array.isArray(e.attendees) ? e.attendees.length : 0,
-      organizer: e.organizer?.email,
-      status: e.status,
-      html_link: e.htmlLink,
-    };
+  return (json.items ?? []).map(mapGoogleEvent);
+}
+
+export async function createGoogleCalendarEvent(accessToken: string, input: {
+  calendarId: string;
+  title: string;
+  description?: string;
+  startISO: string;
+  endISO: string;
+  attendeeEmails?: string[];
+  location?: string;
+}) {
+  const calendarId = encodeURIComponent(input.calendarId || "primary");
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?conferenceDataVersion=1&sendUpdates=all`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      summary: input.title,
+      description: input.description || undefined,
+      location: input.location || undefined,
+      start: { dateTime: input.startISO },
+      end: { dateTime: input.endISO },
+      attendees: (input.attendeeEmails ?? []).map((email) => ({ email })),
+      conferenceData: {
+        createRequest: {
+          requestId: `pulse-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          conferenceSolutionKey: { type: "hangoutsMeet" },
+        },
+      },
+    }),
   });
+  const body = await res.json().catch(async () => ({ error: await res.text() }));
+  if (!res.ok) throw new Error(`Google Calendar booking failed (${res.status}): ${JSON.stringify(body)}`);
+  return mapGoogleEvent(body);
 }
 

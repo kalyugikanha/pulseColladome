@@ -354,7 +354,7 @@ export function GoogleCalendarConnectCard() {
           <CalendarDays className="h-4 w-4 text-primary" />
           <div>
             <div className="font-medium">Connect your Google Calendar</div>
-            <div className="text-xs text-muted-foreground">Let super admins see your upcoming meetings.</div>
+              <div className="text-xs text-muted-foreground">Sync your blocked time into the team calendar.</div>
           </div>
         </div>
         <Button size="sm" onClick={handleConnect} disabled={isOpening}>

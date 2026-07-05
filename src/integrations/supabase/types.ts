@@ -196,14 +196,87 @@ export type Database = {
         }
         Relationships: []
       }
+      google_calendar_events: {
+        Row: {
+          all_day: boolean
+          attendees_count: number
+          calendar_id: string
+          description_snippet: string | null
+          end_at: string
+          google_event_id: string
+          html_link: string | null
+          id: string
+          is_private: boolean
+          location: string | null
+          meeting_link: string | null
+          organizer_email: string | null
+          start_at: string
+          status: string | null
+          summary: string
+          synced_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean
+          attendees_count?: number
+          calendar_id?: string
+          description_snippet?: string | null
+          end_at: string
+          google_event_id: string
+          html_link?: string | null
+          id?: string
+          is_private?: boolean
+          location?: string | null
+          meeting_link?: string | null
+          organizer_email?: string | null
+          start_at: string
+          status?: string | null
+          summary: string
+          synced_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean
+          attendees_count?: number
+          calendar_id?: string
+          description_snippet?: string | null
+          end_at?: string
+          google_event_id?: string
+          html_link?: string | null
+          id?: string
+          is_private?: boolean
+          location?: string | null
+          meeting_link?: string | null
+          organizer_email?: string | null
+          start_at?: string
+          status?: string | null
+          summary?: string
+          synced_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_calendar_tokens: {
         Row: {
           access_token: string
           connected_at: string
           expires_at: string
           google_email: string | null
+          last_synced_at: string | null
           refresh_token: string | null
           scope: string | null
+          sync_error: string | null
           updated_at: string
           user_id: string
         }
@@ -212,8 +285,10 @@ export type Database = {
           connected_at?: string
           expires_at: string
           google_email?: string | null
+          last_synced_at?: string | null
           refresh_token?: string | null
           scope?: string | null
+          sync_error?: string | null
           updated_at?: string
           user_id: string
         }
@@ -222,8 +297,10 @@ export type Database = {
           connected_at?: string
           expires_at?: string
           google_email?: string | null
+          last_synced_at?: string | null
           refresh_token?: string | null
           scope?: string | null
+          sync_error?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -999,6 +1076,68 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "taxonomy_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_calendar_bookings: {
+        Row: {
+          attendee_emails: Json
+          calendar_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          end_at: string
+          error: string | null
+          google_event_id: string | null
+          id: string
+          location: string | null
+          meeting_link: string | null
+          start_at: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          attendee_emails?: Json
+          calendar_id?: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          end_at: string
+          error?: string | null
+          google_event_id?: string | null
+          id?: string
+          location?: string | null
+          meeting_link?: string | null
+          start_at: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          attendee_emails?: Json
+          calendar_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          end_at?: string
+          error?: string | null
+          google_event_id?: string | null
+          id?: string
+          location?: string | null
+          meeting_link?: string | null
+          start_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_calendar_bookings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

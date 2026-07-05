@@ -49,12 +49,20 @@ function AttendancePage() {
         : await supabase.from("leave_requests").select("*").eq("status", "pending");
       const pendingWithUser = (pendingReq.data ?? [])
         .filter((r: { user_id: string }) => nameById.has(r.user_id) || me?.isAdmin)
-        .map((r: { user_id: string; [key: string]: unknown }) => ({
+        .map((r: Record<string, unknown> & { user_id: string }) => ({
           ...r,
           user: nameById.get(r.user_id)
             ? { full_name: nameById.get(r.user_id)!.full_name, email: nameById.get(r.user_id)!.email }
             : null,
-        }));
+        })) as Array<{
+          id: string;
+          leave_type: string;
+          days: number;
+          start_date: string;
+          end_date: string;
+          reason?: string | null;
+          user: { full_name: string | null; email: string | null } | null;
+        }>;
       return { people: peopleList, todayAtt: todayAtt.data ?? [], pending: pendingWithUser };
     },
   });

@@ -28,9 +28,11 @@ import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
 import { Route as AuthenticatedHoursEditorRouteImport } from './routes/_authenticated/hours-editor'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
+import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_authenticated/complete-onboarding'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
@@ -134,6 +136,11 @@ const AuthenticatedFinancesRoute = AuthenticatedFinancesRouteImport.update({
   path: '/finances',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDirectoryRoute = AuthenticatedDirectoryRouteImport.update({
+  id: '/directory',
+  path: '/directory',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -148,6 +155,11 @@ const AuthenticatedCompleteOnboardingRoute =
 const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
@@ -173,9 +185,11 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/access': typeof AuthenticatedAccessRoute
+  '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/leave': typeof AuthenticatedLeaveRoute
@@ -199,9 +213,11 @@ export interface FileRoutesByTo {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/access': typeof AuthenticatedAccessRoute
+  '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/leave': typeof AuthenticatedLeaveRoute
@@ -227,9 +243,11 @@ export interface FileRoutesById {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
+  '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
@@ -255,9 +273,11 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-oauth-launch'
     | '/access'
+    | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
     | '/dashboard'
+    | '/directory'
     | '/finances'
     | '/hours-editor'
     | '/leave'
@@ -281,9 +301,11 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-oauth-launch'
     | '/access'
+    | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
     | '/dashboard'
+    | '/directory'
     | '/finances'
     | '/hours-editor'
     | '/leave'
@@ -308,9 +330,11 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-oauth-launch'
     | '/_authenticated/access'
+    | '/_authenticated/attendance'
     | '/_authenticated/calendar'
     | '/_authenticated/complete-onboarding'
     | '/_authenticated/dashboard'
+    | '/_authenticated/directory'
     | '/_authenticated/finances'
     | '/_authenticated/hours-editor'
     | '/_authenticated/leave'
@@ -473,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFinancesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/directory': {
+      id: '/_authenticated/directory'
+      path: '/directory'
+      fullPath: '/directory'
+      preLoaderRoute: typeof AuthenticatedDirectoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -492,6 +523,13 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/calendar'
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/attendance': {
+      id: '/_authenticated/attendance'
+      path: '/attendance'
+      fullPath: '/attendance'
+      preLoaderRoute: typeof AuthenticatedAttendanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/access': {
@@ -520,9 +558,11 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccessRoute: typeof AuthenticatedAccessRoute
+  AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedCompleteOnboardingRoute: typeof AuthenticatedCompleteOnboardingRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedHoursEditorRoute: typeof AuthenticatedHoursEditorRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
@@ -542,9 +582,11 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccessRoute: AuthenticatedAccessRoute,
+  AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedCompleteOnboardingRoute: AuthenticatedCompleteOnboardingRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedHoursEditorRoute: AuthenticatedHoursEditorRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,

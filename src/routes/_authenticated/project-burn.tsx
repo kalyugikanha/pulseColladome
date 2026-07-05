@@ -81,6 +81,24 @@ function ProjectBurnPage() {
     return m;
   }, [profiles]);
 
+  const deptById = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const p of profiles ?? []) m.set(p.id, p.department);
+    return m;
+  }, [profiles]);
+
+  const allDepts = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of profiles ?? []) if (p.department) s.add(p.department);
+    return Array.from(s).sort();
+  }, [profiles]);
+
+  function passesDept(userId: string): boolean {
+    if (deptSel.size === 0) return true;
+    const d = deptById.get(userId) ?? null;
+    return d ? deptSel.has(d) : deptSel.has(UNASSIGNED);
+  }
+
   // Monthly totals: per-user, sum hours per project (for salary-share)
   const monthlyUserTotals = useMemo(() => {
     const totals = new Map<string, number>(); // user_id -> monthly total hours

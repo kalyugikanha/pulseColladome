@@ -35,6 +35,7 @@ function GoogleCalendarLaunchPage() {
       `Authorized redirect URI: ${CALLBACK_URL}`,
       `Authorized JavaScript origin: ${ORIGIN_URL}`,
       "Google Calendar API enabled in the same Google Cloud project",
+      "Calendar OAuth scopes include calendar.readonly and calendar.events",
       "OAuth consent screen published, or this Google account added as a test user",
     ],
     [],
@@ -87,7 +88,7 @@ function GoogleCalendarLaunchPage() {
             <CalendarDays className="h-5 w-5" />
           </div>
           <CardTitle className="font-display">Opening Google Calendar access</CardTitle>
-          <CardDescription>This page starts Google in the full browser tab so the sign-in screen is not embedded.</CardDescription>
+          <CardDescription>This is only for Calendar sync and booking permissions. Pulse sign-in uses the separate Google button on the sign-in page.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!error ? (
@@ -103,6 +104,9 @@ function GoogleCalendarLaunchPage() {
                   <div>
                     <div className="font-medium">Could not open Google Calendar access</div>
                     <div className="mt-1 break-words font-mono text-xs">{error}</div>
+                    <div className="mt-2 text-xs text-destructive/80">
+                      If Google says redirect_uri_mismatch, fix the Calendar OAuth callback below. This is different from Pulse Google sign-in.
+                    </div>
                   </div>
                 </div>
               </div>

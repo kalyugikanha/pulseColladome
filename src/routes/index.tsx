@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -49,20 +49,17 @@ function useDailyQuote() {
 }
 
 function LandingPage() {
-  const navigate = useNavigate();
-  const [checked, setChecked] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
   const quote = useDailyQuote();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard" });
-      else setChecked(true);
+      setIsSignedIn(!!data.session);
     });
-  }, [navigate]);
+  }, []);
 
-  if (!checked) {
-    return <div className="min-h-screen bg-background" />;
-  }
+  const pulsePath = isSignedIn ? "/dashboard" : "/auth";
+  const pulseLabel = isSignedIn ? "Go to dashboard" : "Enter Pulse →";
 
   return (
     <main className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -78,8 +75,8 @@ function LandingPage() {
         <nav className="relative z-10 flex items-center justify-between mb-16">
           <div className="font-semibold tracking-tight text-lg">Colladome<span className="text-primary">.</span>Pulse</div>
           <div className="flex gap-3">
-            <Link to="/auth">
-              <Button variant="ghost" size="sm">Sign in</Button>
+            <Link to={pulsePath}>
+              <Button variant="ghost" size="sm">{isSignedIn ? "Dashboard" : "Sign in"}</Button>
             </Link>
           </div>
         </nav>
@@ -102,8 +99,8 @@ function LandingPage() {
           </p>
 
           <div className="mt-12 flex flex-wrap gap-4">
-            <Link to="/auth">
-              <Button size="lg" className="text-base px-8 py-6">Enter Pulse →</Button>
+            <Link to={pulsePath}>
+              <Button size="lg" className="text-base px-8 py-6">{pulseLabel}</Button>
             </Link>
             <a href="#manifesto">
               <Button size="lg" variant="outline" className="text-base px-8 py-6">Read the vision</Button>
@@ -167,8 +164,8 @@ function LandingPage() {
           Build the future <em className="text-primary">with us</em>.
         </h2>
         <div className="mt-10">
-          <Link to="/auth">
-            <Button size="lg" className="text-base px-10 py-6">Enter Pulse</Button>
+          <Link to={pulsePath}>
+            <Button size="lg" className="text-base px-10 py-6">{isSignedIn ? "Open dashboard" : "Enter Pulse"}</Button>
           </Link>
         </div>
         <p className="mt-16 text-xs uppercase tracking-[0.3em] text-muted-foreground">

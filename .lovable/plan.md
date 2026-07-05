@@ -1,64 +1,69 @@
-## Diagnosis
+## What this means
 
-This is **not an auth token issue**.
+This still does **not** look like a manual auth-token problem. You should not paste Google access tokens into the app. The app already has the two backend secrets it needs:
 
-Your screenshot URL contains Google’s encoded error:
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_SECRET`
 
-```text
-redirect_uri_mismatch
-```
+The recurring `accounts.google.com refused to connect / ERR_BLOCKED_BY_RESPONSE` usually happens when Google is being opened inside an embedded frame or when Google is showing an OAuth error page that cannot be framed. The app should make that impossible by forcing the Calendar OAuth start to happen as a top-level page on the published domain and by showing the exact Google Cloud configuration to check.
 
-That means Google is rejecting the Calendar OAuth request because the **redirect/callback URL in the app does not exactly match what is configured in your Google Cloud OAuth Client**.
+## What I will change in the app
 
-Do **not** paste or rotate access tokens for this. The app should never use a manually copied Google auth token for user Calendar access.
+1. **Add a dedicated top-level OAuth launch route**
+   - Create a public route such as `/google-calendar-connect`.
+   - The dashboard button will navigate to that route first.
+   - That route will immediately request the Google auth URL and redirect the full browser tab to Google.
+   - This avoids starting `accounts.google.com` from an embedded/preview context.
 
-## What you need to do in Google Cloud
+2. **Change the dashboard Calendar button behavior**
+   - On the published app, clicking Connect/Open Calendar will use full-page navigation, not iframe/popup-style behavior.
+   - In Lovable preview, it will clearly send the user to the published dashboard/launch route.
 
-In the same Google Cloud project where your Calendar OAuth Client ID/Secret were created:
-
-1. Go to **APIs & Services → Credentials**.
-2. Open the **OAuth 2.0 Client ID** used by this app for Calendar.
-3. Under **Authorized redirect URIs**, add this exact URL:
-
-```text
-https://colladome-pulse.lovable.app/api/public/google/callback
-```
-
-4. Under **Authorized JavaScript origins**, add:
-
-```text
-https://colladome-pulse.lovable.app
-```
-
-5. Make sure **Google Calendar API** is enabled in that Google Cloud project.
-6. If the OAuth consent screen is in **Testing**, add the Google account you are using as a **Test user**.
-7. Save changes, wait 1–2 minutes, then try the Calendar connect again from:
-
-```text
-https://colladome-pulse.lovable.app/dashboard
-```
-
-## What I will adjust in the app after approval
-
-1. **Add a clearer Calendar OAuth diagnostic panel**
-   - Show the exact required callback URL.
-   - Show the exact required JavaScript origin.
-   - Add copy buttons for both values.
-   - Replace the generic “403” wording with a specific `redirect_uri_mismatch` explanation.
-
-2. **Add a small server-side OAuth sanity check**
-   - Confirm the generated Google auth URL includes:
+3. **Keep the stable Google callback URL**
+   - Continue using exactly:
      ```text
-     redirect_uri=https://colladome-pulse.lovable.app/api/public/google/callback
+     https://colladome-pulse.lovable.app/api/public/google/callback
      ```
-   - Surface a readable app error if Calendar OAuth env config is missing.
+   - Continue exchanging tokens only on the server.
+   - Continue storing tokens securely in the backend, never in the browser.
 
-3. **Keep the secure OAuth flow**
-   - No manual Google access tokens.
-   - No tokens in the browser.
-   - No iframe/popup workaround for `accounts.google.com`.
-   - Full-page redirect only from the published dashboard.
+4. **Improve error messages for the two likely cases**
+   - If Google returns `redirect_uri_mismatch`, show the exact callback URL to add in Google Cloud.
+   - If Google returns access/permission issues, show the exact Google Cloud checks:
+     - Google Calendar API enabled
+     - OAuth consent screen published, or your Google account added as a test user
+     - Scopes include calendar read access
 
-## Key point
+## What you should check in Google Cloud
 
-The only “auth/token” values needed in the app are the saved Google OAuth **Client ID** and **Client Secret**. The error you shared is fixed by matching Google Cloud’s allowed redirect URI to the app’s callback URL exactly.
+Use the same OAuth Client whose Client ID/Secret are saved in Lovable.
+
+1. **Authorized redirect URI** must include exactly:
+   ```text
+   https://colladome-pulse.lovable.app/api/public/google/callback
+   ```
+
+2. **Authorized JavaScript origin** should include:
+   ```text
+   https://colladome-pulse.lovable.app
+   ```
+
+3. **Google Calendar API** must be enabled in that same Google Cloud project.
+
+4. **OAuth consent screen**:
+   - If status is Testing, add the Google account you are signing in with as a test user.
+   - If your app is for broader users, publish/verify the consent screen as needed.
+
+5. **Scopes** should allow calendar read access:
+   ```text
+   openid
+   email
+   https://www.googleapis.com/auth/calendar.readonly
+   ```
+
+## What I do not need
+
+- I do **not** need a Google access token.
+- I do **not** need your personal Google password.
+- I do **not** need any browser-copied auth token.
+- If the Client ID/Secret values are wrong or from a different OAuth Client, they should be replaced securely through the app secrets form, not pasted in chat.

@@ -24,6 +24,9 @@ function AccessPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const createUserFn = useServerFn(createTeamUser);
+  const bulkProvisionFn = useServerFn(bulkProvisionTeam);
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionResult, setProvisionResult] = useState<{ created: string[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
 
   // Grant-only form (existing)
   const [email, setEmail] = useState("");

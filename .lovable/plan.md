@@ -1,42 +1,33 @@
-## Fix: Google Calendar "accounts.google.com refused to connect" (ERR_BLOCKED_BY_RESPONSE)
+## Plan
 
-### Root cause
+1. **Treat this as a redirect/callback mismatch, not a popup problem**
+   - The screenshot is on `accounts.google.com/signin/oauth/error?...`, which commonly hides a Google OAuth configuration error behind the “blocked” page.
+   - The current code builds the callback URL from the request origin, so it can generate different callback URLs depending on preview/published/domain context.
 
-`ERR_BLOCKED_BY_RESPONSE` from `accounts.google.com` means Google is being loaded inside an iframe — Google sends `X-Frame-Options: DENY`, so any framed load is refused. Our current flow makes this easy to trigger:
+2. **Make Google Calendar OAuth use one stable callback URL**
+   - Update the Calendar auth URL server function to always use the published app callback:
+     ```text
+     https://colladome-pulse.lovable.app/api/public/google/callback
+     ```
+   - Keep the callback handler exchanging the code with the same exact URL.
+   - This prevents Google from receiving preview/dev/cross-origin callback URLs that are not authorized.
 
-1. Click Connect → we `window.open("about:blank", "_blank")` → then `authTab.location.replace(launchUrl)` → the launch page does `window.location.replace(authUrl)`.
-2. On some browsers / when clicked from certain contexts (or when the "popup" ends up rendered inside the editor iframe rather than as a real tab), Google's URL is loaded framed and the browser blocks it.
-3. The intermediate `/google-calendar-oauth-launch` page adds an extra navigation hop that can inherit the framed context.
+3. **Block Calendar OAuth from preview/editor contexts**
+   - If the app is running in the Lovable preview/editor iframe, keep sending the user to the published dashboard instead of starting OAuth there.
+   - On the published dashboard, start OAuth with a full-page redirect only.
 
-Google Sign-In works because it goes through Lovable's managed OAuth broker (`lovable.auth.signInWithOAuth`), which is iframe-safe. Our custom Calendar OAuth doesn't use that broker, so we need an iframe-safe flow of our own.
+4. **Show the exact callback URL in the UI**
+   - Update the Calendar troubleshooting panel to display/copy the one exact callback URL Google must allow.
+   - Add clearer text: if Google still shows this error after the code fix, the Google OAuth Client must include that exact callback URL in Authorized redirect URIs.
 
-### Fix (frontend only, backend already correct)
+5. **Verify the flow**
+   - Confirm the generated Google OAuth URL contains the stable published `redirect_uri`.
+   - Confirm the callback route redirects back to `/dashboard` after a successful token save.
 
-Replace the popup/launch-page dance with a **top-level navigation** to Google's OAuth URL, done from the published site.
+## Important note
 
-1. **`src/components/google-calendar-connect.tsx`**
-   - Remove `window.open("about:blank", "_blank")` + launch-page indirection for the normal case.
-   - On click (published/custom domain, not embedded):
-     - If `disconnectFirst`, await disconnect.
-     - Call `getGoogleAuthUrl()` → get `url`.
-     - Persist a "returning from Google" marker (e.g. `sessionStorage.setItem("gcal:returning","1")`) so we can auto-refresh status on return.
-     - `window.top.location.href = url` (use `_top` to break out of any iframe; falls back to `window.location.href` if `window.top` is cross-origin).
-   - If `isOAuthBlockedContext` (embedded Lovable preview): keep current behavior — show button that opens the published dashboard in a new tab. Do **not** attempt OAuth from inside the preview iframe.
-   - On mount, if the `gcal:returning` marker is set, clear it and invalidate `["my-google-status"]` so the card flips to Connected without a manual refresh.
-   - Drop the popup-blocked branch and the pending-launch-URL fallback link (no longer needed).
+If the Google Cloud OAuth client does not already include this exact Authorized redirect URI, no code change can bypass Google’s restriction. The app can generate the correct URL, but Google must allow it:
 
-2. **`src/routes/google-calendar-oauth-launch.tsx`** — delete. No longer used. (Removing it also eliminates the framed-navigation hop entirely.)
-
-3. **`src/components/google-calendar-connect.tsx` troubleshooting panel**
-   - Replace the "popup blocked" copy with "If nothing happened, allow this site to navigate to accounts.google.com" and keep the redirect_uri_mismatch / access-blocked / wrong-account items.
-   - Keep the "Open published dashboard" CTA for the embedded-preview case.
-
-### What stays the same
-
-- `src/lib/google-calendar.server.ts`, `src/lib/google-calendar.functions.ts`, `src/routes/api/public/google/callback.ts` — unchanged. Callback already redirects back to `/dashboard`.
-- Secrets `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` are already set.
-- The redirect URI `https://colladome-pulse.lovable.app/api/public/google/callback` must remain in the OAuth client's Authorized redirect URIs in Google Cloud Console (it already is, since sign-in works — but if a separate OAuth client is used for Calendar, that one needs it).
-
-### Result
-
-From the published dashboard, clicking Connect Google Calendar sends the current tab to Google's OAuth page (no iframe, no popup, no `ERR_BLOCKED_BY_RESPONSE`). Google returns to `/api/public/google/callback`, which redirects to `/dashboard` with tokens saved. From the Lovable editor preview, the button opens the published dashboard in a new tab — same as today.
+```text
+https://colladome-pulse.lovable.app/api/public/google/callback
+```

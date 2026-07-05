@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 
 const PUBLISHED_DASHBOARD_URL = "https://colladome-pulse.lovable.app/dashboard";
+const GOOGLE_CALENDAR_CALLBACK_URL = "https://colladome-pulse.lovable.app/api/public/google/callback";
 const TROUBLESHOOTING_DOCS_URL = "https://docs.lovable.dev/tips-tricks/troubleshooting";
 const RETURNING_KEY = "gcal:returning";
 
@@ -51,7 +52,7 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
       title: 'Chrome shows "accounts.google.com is blocked" (ERR_BLOCKED_BY_RESPONSE)',
       body: (
         <>
-          Google refuses to load inside embedded app previews. Open the published dashboard in a new tab, then connect Google Calendar from there.
+          Google may show this page when the OAuth request is started from an embedded preview or with an unauthorized callback URL.
           {isOAuthBlockedContext && " This preview is embedded, so starting OAuth here will keep hitting the blocked page."}
           <a className="ml-1 font-medium text-primary hover:underline" href={PUBLISHED_DASHBOARD_URL} target="_blank" rel="noreferrer">
             Open published dashboard
@@ -77,7 +78,7 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
       title: '"redirect_uri_mismatch" error from Google',
       body: (
         <>
-          The callback URL below isn&apos;t listed under <em>Authorized redirect URIs</em> in your Google Cloud OAuth client. Add it exactly:
+          The callback URL below must be listed under <em>Authorized redirect URIs</em> in your Google Cloud OAuth client. Add it exactly:
           <div className="mt-1 flex items-center gap-2 rounded border border-border/60 bg-background/60 p-2 font-mono text-[11px] break-all">
             <span className="flex-1">{callbackUrl}</span>
             <button
@@ -195,9 +196,10 @@ export function GoogleCalendarConnectCard() {
 
   useEffect(() => {
     const embedded = window.top !== window.self;
+    const previewHost = window.location.hostname.includes("preview") || window.location.hostname.includes("lovableproject.com");
     const lovablePreview =
       /(^|\.)(lovable\.app|lovableproject\.com)$/.test(window.location.hostname) &&
-      (window.location.hostname.includes("preview") || document.referrer.includes("lovable.dev") || embedded);
+      (previewHost || embedded);
 
     setOrigin(window.location.origin);
     setIsLovablePreview(lovablePreview);
@@ -214,7 +216,7 @@ export function GoogleCalendarConnectCard() {
     }
   }, [qc]);
 
-  const callbackUrl = origin ? `${origin}/api/public/google/callback` : "/api/public/google/callback";
+  const callbackUrl = GOOGLE_CALENDAR_CALLBACK_URL;
 
   const openOAuth = async (opts: { disconnectFirst: boolean }) => {
     if (isOpening) return;
@@ -223,10 +225,10 @@ export function GoogleCalendarConnectCard() {
 
     // Embedded Lovable preview: Google will refuse to load in the iframe.
     // Send the user to the published dashboard to complete the flow there.
-    if (isOAuthBlockedContext) {
+    if (isLovablePreview) {
       const publishedTab = window.open(PUBLISHED_DASHBOARD_URL, "_blank", "noopener,noreferrer");
       if (!publishedTab) {
-        setLastError("Open the published dashboard in a new tab to connect Google Calendar. Google blocks OAuth inside the embedded preview.");
+        setLastError("Open the published dashboard in a new tab to connect Google Calendar. Google blocks OAuth inside embedded preview contexts.");
       } else {
         toast.info("Continue Google Calendar connection from the published dashboard tab.");
       }
@@ -317,7 +319,7 @@ export function GoogleCalendarConnectCard() {
               {isOpening ? (
                 <><Loader2 className="h-3.5 w-3.5 animate-spin" />Reconnecting…</>
               ) : (
-                <><ExternalLink className="h-3.5 w-3.5" />{isOAuthBlockedContext ? "Open published dashboard" : "Reconnect"}</>
+            <><ExternalLink className="h-3.5 w-3.5" />{isLovablePreview ? "Open published dashboard" : "Reconnect"}</>
               )}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => disconnectMut.mutate()} disabled={busy}>
@@ -344,7 +346,7 @@ export function GoogleCalendarConnectCard() {
           {isOpening ? (
             <><Loader2 className="h-3.5 w-3.5 animate-spin" />Opening…</>
           ) : (
-            <><ExternalLink className="h-3.5 w-3.5" />{isOAuthBlockedContext ? "Open published dashboard" : "Connect Google Calendar"}</>
+            <><ExternalLink className="h-3.5 w-3.5" />{isLovablePreview ? "Open published dashboard" : "Connect Google Calendar"}</>
           )}
         </Button>
 

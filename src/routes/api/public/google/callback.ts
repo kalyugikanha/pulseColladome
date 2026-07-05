@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+const GOOGLE_CALENDAR_CALLBACK_URL = "https://colladome-pulse.lovable.app/api/public/google/callback";
+
 function html(body: string, status = 200) {
   return new Response(
     `<!doctype html><html><head><meta charset="utf-8"><title>Google Calendar</title><style>body{font-family:system-ui,sans-serif;background:#0b0b10;color:#eee;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.card{background:#16161d;border:1px solid #2a2a35;border-radius:14px;padding:28px 32px;max-width:420px;text-align:center}.ok{color:#4ade80}.err{color:#f87171}a{color:#8ab4f8}</style></head><body><div class="card">${body}</div></body></html>`,
@@ -31,9 +33,8 @@ export const Route = createFileRoute("/api/public/google/callback")({
         const parsed = verifyState(state);
         if (!parsed) return html(`<h2 class="err">Invalid or expired state</h2>`, 400);
 
-        const redirectUri = `${url.origin}/api/public/google/callback`;
         try {
-          const tokens = await exchangeCodeForTokens(code, redirectUri);
+          const tokens = await exchangeCodeForTokens(code, GOOGLE_CALENDAR_CALLBACK_URL);
           const email = decodeIdTokenEmail(tokens.id_token);
           const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 

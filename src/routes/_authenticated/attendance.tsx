@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Check, X } from "lucide-react";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
   component: AttendancePage,
@@ -26,18 +27,15 @@ function AttendancePage() {
   const [comment, setComment] = useState("");
 
   const canView = !!me && (me.isAdmin || me.isDepartmentHead || me.isReportingManager);
-  // Only apply an explicit client-side filter when the viewer is purely a
-  // department head — reporting managers get scoped by RLS to their reports
-  // + themselves, and admins see everyone.
-  const pureHead =
-    !!me && !me.isAdmin && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
+  const { deptScope, userScope } = useVisibilityScope(me);
 
   const { data } = useQuery({
-    queryKey: ["attendance", me?.id, pureHead?.join(",") ?? "rls"],
+    queryKey: ["attendance", me?.id, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
-      if (pureHead && pureHead.length) peopleQ = peopleQ.in("department", pureHead);
+      if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
+      if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
       const [people, todayAtt] = await Promise.all([
         peopleQ,
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", today),

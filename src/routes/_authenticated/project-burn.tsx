@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Flame, IndianRupee, TrendingUp, CalendarDays } from "lucide-react";
 import { format, getDaysInMonth } from "date-fns";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
   component: ProjectBurnPage,
@@ -26,19 +27,19 @@ function ProjectBurnPage() {
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
+  const [empSel, setEmpSel] = useState<Set<string>>(new Set());
 
   const canView = !!me && (me.isFinanceAdmin || me.isDepartmentHead || me.isReportingManager);
   const showCosts = !!me?.isFinanceAdmin;
-  // Only add a client-side department filter when the viewer is purely a
-  // department head. Reporting managers are scoped by RLS to their reports.
-  const deptScope = !!me && !me.isFinanceAdmin && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
+  const { deptScope, userScope } = useVisibilityScope(me);
 
   const { data: profiles } = useQuery({
-    queryKey: ["pb-profiles", deptScope?.join(",") ?? "all"],
+    queryKey: ["pb-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let q = supabase.from("profiles").select("id, full_name, email, department");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
+      if (userScope && userScope.length) q = q.in("id", userScope);
       return (await q).data as Profile[] ?? [];
     },
   });
@@ -60,16 +61,18 @@ function ProjectBurnPage() {
     },
   });
 
+  const visibleUserIds = useMemo(() => (profiles ?? []).map((p) => p.id), [profiles]);
+  const hasScope = !!deptScope || !!userScope;
+
   const { data: logs } = useQuery({
-    queryKey: ["pb-logs", month, deptScope?.join(",") ?? "all"],
-    enabled: canView,
+    queryKey: ["pb-logs", month, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
     queryFn: async () => {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
       let q = supabase.from("attendance_logs").select("user_id, date, tasks").gte("date", start).lt("date", end).order("date");
-      // Scope logs to department members when viewer is a dept head only.
-      // (RLS already limits what they can read, but this trims payload.)
+      if (hasScope) q = q.in("user_id", visibleUserIds);
       return (await q).data as LogRow[] ?? [];
     },
   });
@@ -152,7 +155,7 @@ function ProjectBurnPage() {
     return Array.from(map.entries()).map(([code, name]) => ({ code, name }));
   }, [dailyRows]);
 
-  const deptFilteredDaily = useMemo(() => dailyRows.filter((r) => passesDept(r.user_id)), [dailyRows, deptSel, deptById]);
+  const deptFilteredDaily = useMemo(() => dailyRows.filter((r) => passesDept(r.user_id) && (empSel.size === 0 || empSel.has(r.user_id))), [dailyRows, deptSel, deptById, empSel]);
   const filteredDaily = useMemo(() => projectFilter === "all" ? deptFilteredDaily : deptFilteredDaily.filter((r) => r.code === projectFilter), [deptFilteredDaily, projectFilter]);
 
 
@@ -268,6 +271,12 @@ function ProjectBurnPage() {
             selected={deptSel}
             onChange={setDeptSel}
             includeUnassigned
+          />
+          <MultiSelectFilter
+            label="Employee"
+            options={(profiles ?? []).map((p) => ({ value: p.id, label: p.full_name ?? p.email ?? "—", sub: p.email ?? undefined }))}
+            selected={empSel}
+            onChange={setEmpSel}
           />
           <Select value={projectFilter} onValueChange={setProjectFilter}>
             <SelectTrigger className="w-52 h-9 text-sm"><SelectValue /></SelectTrigger>

@@ -16,6 +16,7 @@ import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter"
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DayEditorSheet } from "@/components/day-editor-sheet";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/timesheet")({
   component: TimesheetPage,
@@ -53,6 +54,7 @@ function TimesheetPage() {
 
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
   const [projSel, setProjSel] = useState<Set<string>>(new Set());
+  const [empSel, setEmpSel] = useState<Set<string>>(new Set());
   const [drill, setDrill] = useState<{ userId: string; user: string; code: string; name: string; entries: Array<{ date: string; hours: number; comments?: string; approved: boolean }> } | null>(null);
   const [editor, setEditor] = useState<{ userId: string; userName: string; date: string } | null>(null);
 
@@ -65,11 +67,7 @@ function TimesheetPage() {
   const canView = !!me && (me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
   const canEdit = !!me && (me.isSuperAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
   const canApprove = canEdit;
-  const deptScope = !!me && !me.isAdmin && !me.canManageProjects && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
-  // Reporting-manager-only users (not admin/PM/dept head) are scoped to their direct reports + themselves.
-  const reporteeScope = !!me && !me.isAdmin && !me.canManageProjects && !me.isDepartmentHead && me.isReportingManager
-    ? Array.from(new Set([...(me.directReportIds ?? []), me.id]))
-    : null;
+  const { deptScope, userScope } = useVisibilityScope(me);
 
   // Compute active date range based on view.
   const { startIso, endIso, label } = useMemo(() => {
@@ -89,25 +87,29 @@ function TimesheetPage() {
   }, [view, month, rangeFrom, rangeTo, day]);
 
   const { data: profiles } = useQuery({
-    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", reporteeScope?.join(",") ?? "all"],
+    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let q = supabase.from("profiles").select("id, full_name, email, department");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
-      if (reporteeScope && reporteeScope.length) q = q.in("id", reporteeScope);
+      if (userScope && userScope.length) q = q.in("id", userScope);
       return (await q).data as Profile[] ?? [];
     },
   });
 
+  const visibleUserIds = useMemo(() => (profiles ?? []).map((p) => p.id), [profiles]);
+  const visibleUserIdSet = useMemo(() => new Set(visibleUserIds), [visibleUserIds]);
+  const hasScope = !!deptScope || !!userScope;
+
   const { data: logs } = useQuery({
-    queryKey: ["ts-logs", startIso, endIso, reporteeScope?.join(",") ?? "all"],
-    enabled: canView,
+    queryKey: ["ts-logs", startIso, endIso, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
     queryFn: async () => {
       let q = supabase
         .from("attendance_logs")
         .select("id, user_id, date, tasks, approved_at")
         .gte("date", startIso).lt("date", endIso);
-      if (reporteeScope && reporteeScope.length) q = q.in("user_id", reporteeScope);
+      if (hasScope) q = q.in("user_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as LogRow[];
@@ -148,9 +150,20 @@ function TimesheetPage() {
   }, [logs]);
 
   const projects = useMemo(() => Array.from(pivot.projMap.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code)), [pivot.projMap]);
-  const users = useMemo(() => Array.from(pivot.userSet).map((id) => ({ id, profile: profileById.get(id) })).sort((a, b) => (a.profile?.full_name ?? a.profile?.email ?? "").localeCompare(b.profile?.full_name ?? b.profile?.email ?? "")), [pivot.userSet, profileById]);
+  const users = useMemo(() => Array.from(pivot.userSet)
+    .filter((id) => !hasScope || visibleUserIdSet.has(id))
+    .map((id) => ({ id, profile: profileById.get(id) }))
+    .sort((a, b) => (a.profile?.full_name ?? a.profile?.email ?? "").localeCompare(b.profile?.full_name ?? b.profile?.email ?? "")),
+    [pivot.userSet, profileById, hasScope, visibleUserIdSet]);
   const allDepts = useMemo(() => { const s = new Set<string>(); for (const u of users) if (u.profile?.department) s.add(u.profile.department); return Array.from(s).sort(); }, [users]);
-  const filteredUsers = useMemo(() => deptSel.size === 0 ? users : users.filter((u) => { const d = u.profile?.department; return d ? deptSel.has(d) : deptSel.has(UNASSIGNED); }), [users, deptSel]);
+  const filteredUsers = useMemo(() => users.filter((u) => {
+    if (deptSel.size > 0) {
+      const d = u.profile?.department;
+      if (!(d ? deptSel.has(d) : deptSel.has(UNASSIGNED))) return false;
+    }
+    if (empSel.size > 0 && !empSel.has(u.id)) return false;
+    return true;
+  }), [users, deptSel, empSel]);
   const filteredProjects = useMemo(() => projSel.size === 0 ? projects : projects.filter((p) => projSel.has(p.code)), [projects, projSel]);
   const filteredUserIds = useMemo(() => new Set(filteredUsers.map((u) => u.id)), [filteredUsers]);
   const filteredProjCodes = useMemo(() => new Set(filteredProjects.map((p) => p.code)), [filteredProjects]);
@@ -256,6 +269,7 @@ function TimesheetPage() {
           {view === "day" && <DatePickerButton value={day} onChange={setDay} label="Day" />}
 
           <MultiSelectFilter label="Department" options={allDepts.map((d) => ({ value: d, label: d }))} selected={deptSel} onChange={setDeptSel} includeUnassigned />
+          <MultiSelectFilter label="Employee" options={users.map((u) => ({ value: u.id, label: u.profile?.full_name ?? u.profile?.email ?? "—", sub: u.profile?.email ?? undefined }))} selected={empSel} onChange={setEmpSel} />
           <MultiSelectFilter label="Projects" options={projects.map((p) => ({ value: p.code, label: p.name, sub: p.code }))} selected={projSel} onChange={setProjSel} />
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredUsers.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Export CSV

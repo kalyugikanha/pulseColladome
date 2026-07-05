@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Pencil, Users, Search, UserX, UserCheck, Trash2 } from "lucide-react";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 
 export const Route = createFileRoute("/_authenticated/directory")({
@@ -56,15 +57,20 @@ function DirectoryPage() {
   const canHardDelete = !!me && me.isSuperAdmin;
 
 
+  const { deptScope, userScope } = useVisibilityScope(me);
+
   const { data: profiles } = useQuery({
-    queryKey: ["directory-profiles"],
+    queryKey: ["directory-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
+      let q = (supabase as any)
         .from("profiles")
         .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on, is_active")
         .order("full_name");
+      if (deptScope && deptScope.length) q = q.in("department", deptScope);
+      if (userScope && userScope.length) q = q.in("id", userScope);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Profile[];
     },

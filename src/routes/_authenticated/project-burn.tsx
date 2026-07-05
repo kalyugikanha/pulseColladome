@@ -8,6 +8,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Flame, IndianRupee, TrendingUp, CalendarDays } from "lucide-react";
 import { format, getDaysInMonth } from "date-fns";
+import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
   component: ProjectBurnPage,

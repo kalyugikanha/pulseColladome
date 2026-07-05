@@ -117,7 +117,7 @@ function TasksPage() {
         domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds,
       }});
       // bump preset
-      await bumpFn({ data: { domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds[0] ?? null } });
+      await bumpFn({ data: { domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeId: tax_.taskTypeIds[0] ?? null } });
       toast.success("Task created");
       resetForm();
       setOpen(false);

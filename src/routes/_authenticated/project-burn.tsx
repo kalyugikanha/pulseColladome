@@ -283,37 +283,6 @@ function ProjectBurnPage() {
 
 
       <Card>
-        <CardHeader><CardTitle>Burn by project</CardTitle></CardHeader>
-        <CardContent>
-          {byProject.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-8 text-center">{showCosts ? "No time logged this month for users with salaries set." : "No time logged this month."}</div>
-          ) : (
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>Project</TableHead><TableHead>Code</TableHead>
-                <TableHead className="text-right">Active days</TableHead>
-                <TableHead className="text-right">Hours</TableHead>
-                {showCosts && <TableHead className="text-right">Burned so far</TableHead>}
-                <TableHead className="text-right">% of total</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {byProject.map((p) => (
-                  <TableRow key={p.code}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{p.code}</TableCell>
-                    <TableCell className="text-right">{p.daysActive.size}</TableCell>
-                    <TableCell className="text-right">{p.hours.toFixed(1)}</TableCell>
-                    {showCosts && <TableCell className="text-right font-semibold">{inr(p.burn)}</TableCell>}
-                    <TableCell className="text-right text-muted-foreground">{showCosts ? (totalBurn > 0 ? ((p.burn / totalBurn) * 100).toFixed(1) : "0") : (totalHours > 0 ? ((p.hours / totalHours) * 100).toFixed(1) : "0")}%</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
         <CardHeader>
           <CardTitle>Daily log</CardTitle>
           <CardDescription>{showCosts ? "Every entry contributing to burn this month." : "Every entry logged this month."}</CardDescription>

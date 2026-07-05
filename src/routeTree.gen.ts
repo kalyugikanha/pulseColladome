@@ -24,6 +24,7 @@ import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProjectBurnRouteImport } from './routes/_authenticated/project-burn'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedMyTimesheetRouteImport } from './routes/_authenticated/my-timesheet'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
@@ -114,6 +115,12 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMyTimesheetRoute =
+  AuthenticatedMyTimesheetRouteImport.update({
+    id: '/my-timesheet',
+    path: '/my-timesheet',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
   id: '/meetings',
   path: '/meetings',
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
+  '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -213,6 +221,7 @@ export interface FileRoutesByTo {
   '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
+  '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -242,6 +251,7 @@ export interface FileRoutesById {
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
+  '/_authenticated/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/project-burn': typeof AuthenticatedProjectBurnRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
@@ -271,6 +281,7 @@ export interface FileRouteTypes {
     | '/finances'
     | '/leave'
     | '/meetings'
+    | '/my-timesheet'
     | '/onboarding'
     | '/project-burn'
     | '/projects'
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/finances'
     | '/leave'
     | '/meetings'
+    | '/my-timesheet'
     | '/onboarding'
     | '/project-burn'
     | '/projects'
@@ -326,6 +338,7 @@ export interface FileRouteTypes {
     | '/_authenticated/finances'
     | '/_authenticated/leave'
     | '/_authenticated/meetings'
+    | '/_authenticated/my-timesheet'
     | '/_authenticated/onboarding'
     | '/_authenticated/project-burn'
     | '/_authenticated/projects'
@@ -456,6 +469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/my-timesheet': {
+      id: '/_authenticated/my-timesheet'
+      path: '/my-timesheet'
+      fullPath: '/my-timesheet'
+      preLoaderRoute: typeof AuthenticatedMyTimesheetRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/meetings': {
       id: '/_authenticated/meetings'
       path: '/meetings'
@@ -546,6 +566,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
+  AuthenticatedMyTimesheetRoute: typeof AuthenticatedMyTimesheetRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedProjectBurnRoute: typeof AuthenticatedProjectBurnRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
@@ -569,6 +590,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
+  AuthenticatedMyTimesheetRoute: AuthenticatedMyTimesheetRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedProjectBurnRoute: AuthenticatedProjectBurnRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,

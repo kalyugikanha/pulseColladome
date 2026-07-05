@@ -54,6 +54,7 @@ function TimesheetPage() {
 
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
   const [projSel, setProjSel] = useState<Set<string>>(new Set());
+  const [empSel, setEmpSel] = useState<Set<string>>(new Set());
   const [drill, setDrill] = useState<{ userId: string; user: string; code: string; name: string; entries: Array<{ date: string; hours: number; comments?: string; approved: boolean }> } | null>(null);
   const [editor, setEditor] = useState<{ userId: string; userName: string; date: string } | null>(null);
 
@@ -66,11 +67,7 @@ function TimesheetPage() {
   const canView = !!me && (me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
   const canEdit = !!me && (me.isSuperAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
   const canApprove = canEdit;
-  const deptScope = !!me && !me.isAdmin && !me.canManageProjects && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
-  // Reporting-manager-only users (not admin/PM/dept head) are scoped to their direct reports + themselves.
-  const reporteeScope = !!me && !me.isAdmin && !me.canManageProjects && !me.isDepartmentHead && me.isReportingManager
-    ? Array.from(new Set([...(me.directReportIds ?? []), me.id]))
-    : null;
+  const { deptScope, userScope } = useVisibilityScope(me);
 
   // Compute active date range based on view.
   const { startIso, endIso, label } = useMemo(() => {

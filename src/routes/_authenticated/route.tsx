@@ -189,7 +189,11 @@ function AuthenticatedLayout() {
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  // Toggle to true when moving to production to re-enforce onboarding + password redirects.
+  const ENFORCE_ONBOARDING = false;
+
   useEffect(() => {
+    if (!ENFORCE_ONBOARDING) return;
     if (!user) return;
     if (user.mustChangePassword && pathname !== "/change-password") {
       router.navigate({ to: "/change-password", replace: true });
@@ -198,7 +202,7 @@ function AuthenticatedLayout() {
     if (!user.mustChangePassword && !user.isSuperAdmin && !user.onboardingCompleted && pathname !== "/complete-onboarding" && pathname !== "/change-password") {
       router.navigate({ to: "/complete-onboarding", replace: true });
     }
-  }, [user, pathname, router]);
+  }, [user, pathname, router, ENFORCE_ONBOARDING]);
 
   if (isLoading || !user) {
     return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading workspace…</div>;

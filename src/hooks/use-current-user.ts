@@ -56,6 +56,7 @@ export function useCurrentUser() {
       let vIsFinance = realFinance;
       let vIsHr = realIsHrAdmin;
       let vCanManageProjects = realAdmin || !!roles?.some((r) => r.role === "project_manager");
+      let vHeadOf = realHeadOf;
 
       if (isSuperAdmin && viewAsUserId && viewAsUserId !== user.id) {
         const { data: other } = await supabase.from("profiles").select("full_name, email").eq("id", viewAsUserId).maybeSingle();
@@ -63,15 +64,20 @@ export function useCurrentUser() {
           viewingAs = true;
           vName = other.full_name ?? null;
           vEmail = other.email ?? null;
-          const { data: otherRoles } = await supabase.from("user_roles").select("role").eq("user_id", viewAsUserId);
-          const { data: otherSa } = await supabase.from("super_admins").select("user_id").eq("user_id", viewAsUserId).maybeSingle();
+          const [{ data: otherRoles }, { data: otherSa }, { data: otherHeadRows }] = await Promise.all([
+            supabase.from("user_roles").select("role").eq("user_id", viewAsUserId),
+            supabase.from("super_admins").select("user_id").eq("user_id", viewAsUserId).maybeSingle(),
+            supabase.from("department_heads").select("department").eq("user_id", viewAsUserId),
+          ]);
           vIsSuper = !!otherSa;
           vIsAdmin = vIsSuper || !!otherRoles?.some((r) => r.role === "admin");
           vIsFinance = !!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase());
           vIsHr = !!otherRoles?.some((r) => r.role === "hr_admin");
           vCanManageProjects = vIsAdmin || !!otherRoles?.some((r) => r.role === "project_manager");
+          vHeadOf = (otherHeadRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
         }
       }
+
 
       return {
         id: user.id,
@@ -83,8 +89,9 @@ export function useCurrentUser() {
         isFinanceAdmin: vIsFinance,
         isHrAdmin: vIsHr,
         canManageProjects: vCanManageProjects,
-        isDepartmentHead: realHeadOf.length > 0,
-        headOfDepartments: realHeadOf,
+        isDepartmentHead: vHeadOf.length > 0,
+        headOfDepartments: vHeadOf,
+
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         onboardingCompleted: !!(profile as { onboarding_completed?: boolean } | null)?.onboarding_completed,
         viewingAs,

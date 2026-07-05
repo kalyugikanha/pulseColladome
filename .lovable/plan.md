@@ -1,17 +1,20 @@
-## Why Kanishka can't see team tasks / timesheets
+## View-as doesn't reflect Kanishka's Department Head status
 
-Kanishka's role is correctly set — `department_heads` row for Marketing exists, and RLS policies already grant department heads read access to `tasks`, `attendance_logs`, `punch_sessions`, and `leave_requests` for anyone in their department. The sidebar shows Team, Hours Editor, Timesheet, Task Overview, and Task Templates to her.
+You're signed in as Shubham (super admin) using "view as Kanishka". The sidebar's Admin section is hidden because `useCurrentUser` overrides admin/finance/HR/PM flags for the impersonated user, but **`isDepartmentHead` is always computed from the real signed-in user's `department_heads` rows** — Shubham has none, so it stays `false`, and the whole Admin group hides.
 
-The problem is **page-level gates that check only admin / project-manager and ignore department heads**. When she clicks the link, the page redirects her away before it queries data.
+### Fix
 
-### Fix (frontend gates only, no DB changes)
+In `src/hooks/use-current-user.ts`, inside the `viewingAs` branch:
 
-1. `src/routes/_authenticated/timesheet.tsx` — change both the redirect guard and `canView` from `isAdmin || canManageProjects` to `isAdmin || canManageProjects || isDepartmentHead`. When a dept head views it, scope the `attendance_logs` query to users whose `profiles.department` is in `me.headOfDepartments` (RLS enforces this anyway; the filter avoids empty rows).
-2. `src/routes/_authenticated/hours-editor.tsx` — same: allow `isDepartmentHead`, and filter the `attendance_logs` fetch by department.
-3. `src/routes/_authenticated/team.tsx` — allow `isDepartmentHead` to view; scope the profile list to her department(s); keep the "Make admin" action admin-only.
-4. `src/routes/_authenticated/tasks-overview.tsx` — already allows dept heads; no change needed.
-5. Taxonomy: `/admin/taxonomy` (master list edit) stays super-admin only. The taxonomy dropdown inside task creation already works for everyone via `listTaxonomy()`; no change.
+- Also fetch `department_heads` for the impersonated user.
+- Override `headOfDepartments` and `isDepartmentHead` from that result (falling back to the real user's rows when not impersonating).
+
+That's the only change needed. The rest of the sidebar/page gates already honor `isDepartmentHead`, so after the flag flips true you'll see Team, Hours Editor, Timesheet, Task Overview, and Task Templates as Kanishka.
+
+### Note on data queries (not fixed by this)
+
+"View as" only re-labels the UI; server queries still run under Shubham's RLS (super admin sees all). Personal widgets on the dashboard (my tasks, my leave balance) still filter by Shubham's `user.id`. Once we're moving to production you'll sign in as Kanishka directly to see her real filtered data — no further code change needed for that.
 
 ### Verification
 
-Sign in as Kanishka, open Team / Hours Editor / Timesheet / Task Overview — each page loads and shows only Marketing employees / their tasks / their attendance.
+Refresh with view-as Kanishka. Left sidebar shows the Admin group with Team / Hours Editor / Timesheet / Task Overview / Task Templates. Opening any of them loads without redirecting to /dashboard.

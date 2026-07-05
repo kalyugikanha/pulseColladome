@@ -281,3 +281,65 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
     return { created, updated, errors };
   });
 
+export const setUserActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { user_id: string; active: boolean }) => input)
+  .handler(async ({ data, context }) => {
+    const [{ data: superRow }, { data: roleRows }] = await Promise.all([
+      context.supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle(),
+      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    if (!superRow && !roleRows?.some((r) => r.role === "hr_admin")) throw new Error("Forbidden");
+    if (data.user_id === context.userId) throw new Error("You cannot deactivate your own account");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const patch = data.active
+      ? { is_active: true, deactivated_at: null, deactivated_by: null }
+      : { is_active: false, deactivated_at: new Date().toISOString(), deactivated_by: context.userId };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabaseAdmin as any).from("profiles").update(patch).eq("id", data.user_id);
+    if (error) throw new Error(error.message);
+
+    if (!data.active) {
+      try { await supabaseAdmin.auth.admin.signOut(data.user_id); } catch { /* noop */ }
+    }
+    return { ok: true };
+  });
+
+export const deleteUserPermanently = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { user_id: string }) => input)
+  .handler(async ({ data, context }) => {
+    const { data: superRow } = await context.supabase
+      .from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle();
+    if (!superRow) throw new Error("Only super admins can permanently delete users");
+    if (data.user_id === context.userId) throw new Error("You cannot delete your own account");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: prof } = await supabaseAdmin
+      .from("profiles").select("email").eq("id", data.user_id).maybeSingle();
+    const email = prof?.email?.toLowerCase() ?? null;
+
+    const userTables = [
+      "attendance_logs", "punch_sessions", "leave_balances", "leave_requests",
+      "salaries", "employee_bank_details", "employee_documents",
+      "google_calendar_tokens", "user_task_presets", "department_heads",
+      "super_admins", "user_roles",
+    ] as const;
+    for (const t of userTables) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabaseAdmin as any).from(t).delete().eq("user_id", data.user_id);
+    }
+    if (email) {
+      await supabaseAdmin.from("role_grants").delete().eq("email", email);
+    }
+    await supabaseAdmin.from("profiles").delete().eq("id", data.user_id);
+
+    const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (authErr && !/not.?found/i.test(authErr.message)) throw new Error(authErr.message);
+
+    return { ok: true };
+  });
+
+

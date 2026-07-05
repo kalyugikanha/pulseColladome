@@ -80,7 +80,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {isAdmin && (
+                {(isAdmin || isDepartmentHead) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/team")}>
                       <Link to="/team"><Users /><span>Team</span></Link>
@@ -94,14 +94,16 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                         <Link to="/finances"><Wallet /><span>Finances</span></Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/project-burn")}>
-                        <Link to="/project-burn"><Flame /><span>Project Burn</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                   </>
                 )}
-                {canManageProjects && (
+                {(isFinanceAdmin || isDepartmentHead) && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/project-burn")}>
+                      <Link to="/project-burn"><Flame /><span>Project Burn</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {(canManageProjects || isDepartmentHead) && (
                   <>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
@@ -115,6 +117,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuItem>
                   </>
                 )}
+
                 {(isSuperAdmin || isHrAdmin) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/onboarding")}>

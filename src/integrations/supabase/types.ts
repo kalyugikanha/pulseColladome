@@ -524,6 +524,38 @@ export type Database = {
         }
         Relationships: []
       }
+      role_task_type_presets: {
+        Row: {
+          created_at: string
+          id: string
+          role_key: string
+          sort: number
+          task_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role_key: string
+          sort?: number
+          task_type_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role_key?: string
+          sort?: number
+          task_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_task_type_presets_task_type_id_fkey"
+            columns: ["task_type_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_task_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salaries: {
         Row: {
           created_at: string
@@ -580,43 +612,194 @@ export type Database = {
         }
         Relationships: []
       }
+      task_task_types: {
+        Row: {
+          task_id: string
+          task_type_id: string
+        }
+        Insert: {
+          task_id: string
+          task_type_id: string
+        }
+        Update: {
+          task_id?: string
+          task_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_task_types_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_task_types_task_type_id_fkey"
+            columns: ["task_type_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_task_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_template_task_types: {
+        Row: {
+          task_type_id: string
+          template_id: string
+        }
+        Insert: {
+          task_type_id: string
+          template_id: string
+        }
+        Update: {
+          task_type_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_template_task_types_task_type_id_fkey"
+            columns: ["task_type_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_task_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_template_task_types_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_templates: {
+        Row: {
+          active: boolean
+          asset_links: Json
+          created_at: string
+          created_by: string | null
+          day_of_month: number | null
+          default_assignee_id: string | null
+          department_id: string | null
+          description: string | null
+          domain_id: string | null
+          id: string
+          priority: Database["public"]["Enums"]["task_priority"]
+          project_id: string | null
+          recurrence: Database["public"]["Enums"]["task_recurrence"]
+          title: string
+          updated_at: string
+          weekday: number | null
+        }
+        Insert: {
+          active?: boolean
+          asset_links?: Json
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number | null
+          default_assignee_id?: string | null
+          department_id?: string | null
+          description?: string | null
+          domain_id?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          project_id?: string | null
+          recurrence?: Database["public"]["Enums"]["task_recurrence"]
+          title: string
+          updated_at?: string
+          weekday?: number | null
+        }
+        Update: {
+          active?: boolean
+          asset_links?: Json
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number | null
+          default_assignee_id?: string | null
+          department_id?: string | null
+          description?: string | null
+          domain_id?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          project_id?: string | null
+          recurrence?: Database["public"]["Enums"]["task_recurrence"]
+          title?: string
+          updated_at?: string
+          weekday?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_templates_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
+          asset_links: Json
           assignee_id: string | null
           created_at: string
           created_by: string | null
+          department_id: string | null
           description: string | null
+          domain_id: string | null
           due_date: string | null
           id: string
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string
           status: Database["public"]["Enums"]["task_status"]
+          template_id: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          asset_links?: Json
           assignee_id?: string | null
           created_at?: string
           created_by?: string | null
+          department_id?: string | null
           description?: string | null
+          domain_id?: string | null
           due_date?: string | null
           id?: string
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id: string
           status?: Database["public"]["Enums"]["task_status"]
+          template_id?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          asset_links?: Json
           assignee_id?: string | null
           created_at?: string
           created_by?: string | null
+          department_id?: string | null
           description?: string | null
+          domain_id?: string | null
           due_date?: string | null
           id?: string
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string
           status?: Database["public"]["Enums"]["task_status"]
+          template_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -629,10 +812,137 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_domains"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      taxonomy_departments: {
+        Row: {
+          active: boolean
+          created_at: string
+          domain_id: string
+          id: string
+          name: string
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          domain_id: string
+          id?: string
+          name: string
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          domain_id?: string
+          id?: string
+          name?: string
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taxonomy_departments_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_domains"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      taxonomy_domains: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          sort: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          sort?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          sort?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      taxonomy_task_types: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          id: string
+          is_custom: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          id?: string
+          is_custom?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          id?: string
+          is_custom?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taxonomy_task_types_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_departments"
             referencedColumns: ["id"]
           },
         ]
@@ -657,6 +967,61 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_task_presets: {
+        Row: {
+          department_id: string | null
+          domain_id: string | null
+          id: string
+          label: string | null
+          task_type_id: string | null
+          updated_at: string
+          use_count: number
+          user_id: string
+        }
+        Insert: {
+          department_id?: string | null
+          domain_id?: string | null
+          id?: string
+          label?: string | null
+          task_type_id?: string | null
+          updated_at?: string
+          use_count?: number
+          user_id: string
+        }
+        Update: {
+          department_id?: string | null
+          domain_id?: string | null
+          id?: string
+          label?: string | null
+          task_type_id?: string | null
+          updated_at?: string
+          use_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_task_presets_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_task_presets_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_domains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_task_presets_task_type_id_fkey"
+            columns: ["task_type_id"]
+            isOneToOne: false
+            referencedRelation: "taxonomy_task_types"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendor_payments: {
         Row: {
@@ -835,6 +1200,7 @@ export type Database = {
       leave_type: "casual" | "sick" | "earned" | "unpaid"
       project_status: "active" | "on_hold" | "completed"
       task_priority: "low" | "medium" | "high"
+      task_recurrence: "none" | "weekly" | "monthly"
       task_status: "todo" | "in_progress" | "done"
     }
     CompositeTypes: {
@@ -980,6 +1346,7 @@ export const Constants = {
       leave_type: ["casual", "sick", "earned", "unpaid"],
       project_status: ["active", "on_hold", "completed"],
       task_priority: ["low", "medium", "high"],
+      task_recurrence: ["none", "weekly", "monthly"],
       task_status: ["todo", "in_progress", "done"],
     },
   },

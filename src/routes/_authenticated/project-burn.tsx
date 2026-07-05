@@ -219,6 +219,13 @@ function ProjectBurnPage() {
               </>
             );
           })()}
+          <MultiSelectFilter
+            label="Department"
+            options={allDepts.map((d) => ({ value: d, label: d }))}
+            selected={deptSel}
+            onChange={setDeptSel}
+            includeUnassigned
+          />
           <Select value={projectFilter} onValueChange={setProjectFilter}>
             <SelectTrigger className="w-52 h-9 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>

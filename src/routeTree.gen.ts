@@ -34,6 +34,8 @@ import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_a
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
+import { Route as ApiAssistantTranscribeRouteImport } from './routes/api/assistant/transcribe'
+import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
 
@@ -167,6 +169,16 @@ const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
   path: '/access',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiAssistantTranscribeRoute = ApiAssistantTranscribeRouteImport.update({
+  id: '/api/assistant/transcribe',
+  path: '/api/assistant/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
+  id: '/api/assistant/chat',
+  path: '/api/assistant/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminTaxonomyRoute =
   AuthenticatedAdminTaxonomyRouteImport.update({
     id: '/admin/taxonomy',
@@ -205,6 +217,8 @@ export interface FileRoutesByFullPath {
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -233,6 +247,8 @@ export interface FileRoutesByTo {
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesById {
@@ -263,6 +279,8 @@ export interface FileRoutesById {
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
   '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRouteTypes {
@@ -293,6 +311,8 @@ export interface FileRouteTypes {
     | '/timesheet'
     | '/vendors'
     | '/admin/taxonomy'
+    | '/api/assistant/chat'
+    | '/api/assistant/transcribe'
     | '/api/public/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -321,6 +341,8 @@ export interface FileRouteTypes {
     | '/timesheet'
     | '/vendors'
     | '/admin/taxonomy'
+    | '/api/assistant/chat'
+    | '/api/assistant/transcribe'
     | '/api/public/google/callback'
   id:
     | '__root__'
@@ -350,6 +372,8 @@ export interface FileRouteTypes {
     | '/_authenticated/timesheet'
     | '/_authenticated/vendors'
     | '/_authenticated/admin/taxonomy'
+    | '/api/assistant/chat'
+    | '/api/assistant/transcribe'
     | '/api/public/google/callback'
   fileRoutesById: FileRoutesById
 }
@@ -359,6 +383,8 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
   GoogleCalendarOauthLaunchRoute: typeof GoogleCalendarOauthLaunchRoute
+  ApiAssistantChatRoute: typeof ApiAssistantChatRoute
+  ApiAssistantTranscribeRoute: typeof ApiAssistantTranscribeRoute
   ApiPublicGoogleCallbackRoute: typeof ApiPublicGoogleCallbackRoute
 }
 
@@ -539,6 +565,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccessRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/assistant/transcribe': {
+      id: '/api/assistant/transcribe'
+      path: '/api/assistant/transcribe'
+      fullPath: '/api/assistant/transcribe'
+      preLoaderRoute: typeof ApiAssistantTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/assistant/chat': {
+      id: '/api/assistant/chat'
+      path: '/api/assistant/chat'
+      fullPath: '/api/assistant/chat'
+      preLoaderRoute: typeof ApiAssistantChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/taxonomy': {
       id: '/_authenticated/admin/taxonomy'
       path: '/admin/taxonomy'
@@ -613,6 +653,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ChangePasswordRoute: ChangePasswordRoute,
   GoogleCalendarOauthLaunchRoute: GoogleCalendarOauthLaunchRoute,
+  ApiAssistantChatRoute: ApiAssistantChatRoute,
+  ApiAssistantTranscribeRoute: ApiAssistantTranscribeRoute,
   ApiPublicGoogleCallbackRoute: ApiPublicGoogleCallbackRoute,
 }
 export const routeTree = rootRouteImport

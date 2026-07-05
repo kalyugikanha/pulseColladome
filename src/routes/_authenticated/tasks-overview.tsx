@@ -96,12 +96,12 @@ function Page() {
       <Card>
         <CardHeader><CardTitle className="text-sm">Filters</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <MultiSelectFilter label="Employee" values={employees} onChange={setEmployees}
+          <MultiSelectFilter label="Employee" selected={new Set(employees)} onChange={(s) => setEmployees(Array.from(s))}
             options={(profileList ?? []).map((p) => ({ value: p.id, label: p.full_name ?? p.id }))} />
-          <MultiSelectFilter label="Department" values={departments} onChange={setDepartments} options={deptOptions} />
-          <MultiSelectFilter label="Project" values={projects} onChange={setProjects}
+          <MultiSelectFilter label="Department" selected={new Set(departments)} onChange={(s) => setDepartments(Array.from(s))} options={deptOptions} />
+          <MultiSelectFilter label="Project" selected={new Set(projects)} onChange={(s) => setProjects(Array.from(s))}
             options={(projectList ?? []).map((p) => ({ value: p.id, label: p.name }))} />
-          <MultiSelectFilter label="Status" values={statuses} onChange={setStatuses}
+          <MultiSelectFilter label="Status" selected={new Set(statuses)} onChange={(s) => setStatuses(Array.from(s))}
             options={[{value:"todo",label:"To Do"},{value:"in_progress",label:"In Progress"},{value:"done",label:"Done"}]} />
           <div>
             <label className="text-xs text-muted-foreground">From</label>

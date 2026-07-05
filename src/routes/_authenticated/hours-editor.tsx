@@ -115,12 +115,19 @@ function HoursEditorPage() {
   if (meLoading || !me) return <div className="text-muted-foreground">Loading…</div>;
   if (!me.isSuperAdmin) return null;
 
-  const rows = (profiles ?? []).slice().sort((a, b) => {
-    const ad = a.department ?? "zzz";
-    const bd = b.department ?? "zzz";
-    if (ad !== bd) return ad.localeCompare(bd);
-    return (a.full_name ?? "").localeCompare(b.full_name ?? "");
-  });
+  const allDepts = Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort();
+  const rows = (profiles ?? [])
+    .slice()
+    .filter((p) => {
+      if (deptSel.size === 0) return true;
+      return p.department ? deptSel.has(p.department) : deptSel.has(UNASSIGNED);
+    })
+    .sort((a, b) => {
+      const ad = a.department ?? "zzz";
+      const bd = b.department ?? "zzz";
+      if (ad !== bd) return ad.localeCompare(bd);
+      return (a.full_name ?? "").localeCompare(b.full_name ?? "");
+    });
 
   // Columns = union of all project codes that have hours this month, sorted.
   const activeCodes = Array.from(new Set(Array.from(userMonthly.values()).flatMap((m) => Array.from(m.keys())))).sort();

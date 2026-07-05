@@ -89,8 +89,9 @@ export function useCurrentUser() {
         isFinanceAdmin: vIsFinance,
         isHrAdmin: vIsHr,
         canManageProjects: vCanManageProjects,
-        isDepartmentHead: realHeadOf.length > 0,
-        headOfDepartments: realHeadOf,
+        isDepartmentHead: vHeadOf.length > 0,
+        headOfDepartments: vHeadOf,
+
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         onboardingCompleted: !!(profile as { onboarding_completed?: boolean } | null)?.onboarding_completed,
         viewingAs,

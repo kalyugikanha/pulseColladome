@@ -1,49 +1,33 @@
-## Goal
+## Plan
 
-Replace the current `/` redirect-to-dashboard behavior with a bold, founder-voice landing page for Colladome Pulse. The page centers on a motivational vision — "we adapt first, we build the future with AI" — instead of listing product modules. A large inspirational quote rotates every day.
+### 1. Make the new landing page actually visible
+- Update `/` so it always shows the founder-vision landing page, even if a user is already signed in.
+- Keep clear calls to action:
+  - Signed out: `Sign in` / `Enter Pulse`
+  - Signed in: `Go to dashboard`
+- This removes the current behavior where signed-in users are immediately redirected to `/dashboard`, which makes it look like the landing page never changed.
 
-## Behavior
+### 2. Publish-ready landing verification
+- Verify the published home page route is `/` and the content is the new AI/founder vision page.
+- Keep dashboard access separate from the landing page instead of using the landing page as an auth redirect.
 
-- Signed-out visitors land on the new hero-first landing page.
-- Signed-in users still go straight to `/dashboard` (existing behavior preserved via a client-side check, not a hard redirect).
-- The daily quote is deterministic per calendar day (same quote for everyone on a given day), rotating automatically at local midnight. No backend needed — a fixed curated list indexed by day-of-year.
+### 3. Fix Google sign-in OAuth first
+- Reconfigure Lovable Cloud Google sign-in using the managed Google provider.
+- Keep the app code using the supported `lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin })` flow.
+- Do not add custom popup/iframe workarounds or manual Google credentials for normal app sign-in.
 
-## Page structure (`src/routes/index.tsx`)
+### 4. Separate Google Calendar OAuth from app sign-in
+- Audit the calendar connection flow so it is clearly separate from normal Google login.
+- Keep the Calendar flow using the exact published callback:
+  `https://colladome-pulse.lovable.app/api/public/google/callback`
+- Add clearer in-app error text so if Calendar OAuth still fails, it tells us whether the failure is from:
+  - normal app Google sign-in, or
+  - Google Calendar sync permissions / redirect URI setup.
 
-1. **Hero (full viewport)**
-   - Small eyebrow: "A note from the founder"
-   - Massive headline in the founder's voice, e.g.:
-     *"The world is being rewritten by AI. We're not watching — we're the ones holding the pen."*
-   - 2–3 supporting motivational lines about adapting first and advocating the shift.
-   - Primary CTA: "Enter Pulse" → `/auth` (or `/dashboard` if signed in). Secondary: "Read the vision" scroll anchor.
+### 5. Validate after changes
+- Check `/` while signed out and signed in.
+- Check `/auth` Google sign-in starts without `redirect_uri_mismatch`.
+- Check the Calendar connect page still shows the exact callback URL needed for Google Calendar sync.
 
-2. **Daily Quote block**
-   - Large serif quote, attribution, and a subtle "Quote of the day · {date}" label.
-   - Rotates daily from a curated array (~30+ quotes on adaptation, building, future, AI, courage).
-
-3. **Founder manifesto section**
-   - 3–4 short inspirational statements (not feature bullets), each one line, staggered layout.
-   - Signed "— Founder, Colladome".
-
-4. **Footer CTA**
-   - One line: "Build the future with us." + button to sign in.
-
-## Visual direction
-
-- Dark, cinematic background with a subtle animated gradient / grain.
-- Distinctive typography: a display serif (e.g. Instrument Serif) for the headline + quote, paired with a clean sans (Work Sans / Inter fallback already loaded) for body.
-- Use existing semantic tokens in `src/styles.css`; add a new `--gradient-hero` and `--shadow-glow` if needed. No hardcoded colors.
-- Framer-motion fade/slide-in on hero and quote.
-
-## Technical details
-
-- Convert `src/routes/index.tsx` from a `beforeLoad` redirect to a real `component`. Keep it a public route (no server function calls in loader).
-- Client-side effect: if `supabase.auth.getSession()` returns a session, `navigate({ to: '/dashboard' })`. Otherwise render the landing page.
-- Daily quote selection: `const idx = Math.floor((Date.now() - Date.UTC(new Date().getFullYear(),0,0)) / 86400000) % QUOTES.length`. Pure client, no state, SSR-safe (compute in component using `new Date()` inside `useMemo`).
-- Set proper `head()` metadata: title "Colladome Pulse — Build the future with AI", matching description, og tags.
-- Keep changes UI-only; no DB, no server functions, no new dependencies (framer-motion already in project).
-
-## Out of scope
-
-- No changes to auth, dashboard, punch, or calendar flows.
-- No CMS/admin for quotes — curated in-code list is intentional for v1.
+### Important note
+If the screenshot came from the **Calendar Connect** button, Google still requires that exact callback URL to be added in the Google Cloud OAuth client used for Calendar access. If it came from **Continue with Google** on `/auth`, the managed Google sign-in reconfiguration should fix it.

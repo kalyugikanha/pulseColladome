@@ -175,6 +175,13 @@ function FinancesPage() {
         </div>
         <div className="flex items-center gap-2">
           {me?.realIsSuperAdmin && <ProvisionButton pendingCount={pendingGrants.length} />}
+          <MultiSelectFilter
+            label="Department"
+            options={Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort().map((d) => ({ value: d, label: d }))}
+            selected={deptSel}
+            onChange={setDeptSel}
+            includeUnassigned
+          />
           <Label htmlFor="month" className="text-xs text-muted-foreground">Month</Label>
           <Input id="month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
         </div>

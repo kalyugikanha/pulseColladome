@@ -17,7 +17,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedVendorsRouteImport } from './routes/_authenticated/vendors'
 import { Route as AuthenticatedTimesheetRouteImport } from './routes/_authenticated/timesheet'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
+import { Route as AuthenticatedTasksOverviewRouteImport } from './routes/_authenticated/tasks-overview'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
+import { Route as AuthenticatedTaskTemplatesRouteImport } from './routes/_authenticated/task-templates'
 import { Route as AuthenticatedResourcesRouteImport } from './routes/_authenticated/resources'
 import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/punch'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
@@ -31,6 +33,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_authenticated/complete-onboarding'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
+import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
 
 const GoogleCalendarOauthLaunchRoute =
@@ -73,11 +76,23 @@ const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
   path: '/team',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTasksOverviewRoute =
+  AuthenticatedTasksOverviewRouteImport.update({
+    id: '/tasks-overview',
+    path: '/tasks-overview',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTaskTemplatesRoute =
+  AuthenticatedTaskTemplatesRouteImport.update({
+    id: '/task-templates',
+    path: '/task-templates',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedResourcesRoute = AuthenticatedResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
@@ -146,6 +161,12 @@ const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
   path: '/access',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminTaxonomyRoute =
+  AuthenticatedAdminTaxonomyRouteImport.update({
+    id: '/admin/taxonomy',
+    path: '/admin/taxonomy',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const ApiPublicGoogleCallbackRoute = ApiPublicGoogleCallbackRouteImport.update({
   id: '/api/public/google/callback',
   path: '/api/public/google/callback',
@@ -170,10 +191,13 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
+  '/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
+  '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -194,10 +218,13 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
+  '/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
+  '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesById {
@@ -220,10 +247,13 @@ export interface FileRoutesById {
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/punch': typeof AuthenticatedPunchRoute
   '/_authenticated/resources': typeof AuthenticatedResourcesRoute
+  '/_authenticated/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
+  '/_authenticated/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
+  '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRouteTypes {
@@ -246,10 +276,13 @@ export interface FileRouteTypes {
     | '/projects'
     | '/punch'
     | '/resources'
+    | '/task-templates'
     | '/tasks'
+    | '/tasks-overview'
     | '/team'
     | '/timesheet'
     | '/vendors'
+    | '/admin/taxonomy'
     | '/api/public/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -270,10 +303,13 @@ export interface FileRouteTypes {
     | '/projects'
     | '/punch'
     | '/resources'
+    | '/task-templates'
     | '/tasks'
+    | '/tasks-overview'
     | '/team'
     | '/timesheet'
     | '/vendors'
+    | '/admin/taxonomy'
     | '/api/public/google/callback'
   id:
     | '__root__'
@@ -295,10 +331,13 @@ export interface FileRouteTypes {
     | '/_authenticated/projects'
     | '/_authenticated/punch'
     | '/_authenticated/resources'
+    | '/_authenticated/task-templates'
     | '/_authenticated/tasks'
+    | '/_authenticated/tasks-overview'
     | '/_authenticated/team'
     | '/_authenticated/timesheet'
     | '/_authenticated/vendors'
+    | '/_authenticated/admin/taxonomy'
     | '/api/public/google/callback'
   fileRoutesById: FileRoutesById
 }
@@ -369,11 +408,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTeamRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/tasks-overview': {
+      id: '/_authenticated/tasks-overview'
+      path: '/tasks-overview'
+      fullPath: '/tasks-overview'
+      preLoaderRoute: typeof AuthenticatedTasksOverviewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/tasks': {
       id: '/_authenticated/tasks'
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof AuthenticatedTasksRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/task-templates': {
+      id: '/_authenticated/task-templates'
+      path: '/task-templates'
+      fullPath: '/task-templates'
+      preLoaderRoute: typeof AuthenticatedTaskTemplatesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/resources': {
@@ -467,6 +520,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccessRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/taxonomy': {
+      id: '/_authenticated/admin/taxonomy'
+      path: '/admin/taxonomy'
+      fullPath: '/admin/taxonomy'
+      preLoaderRoute: typeof AuthenticatedAdminTaxonomyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/public/google/callback': {
       id: '/api/public/google/callback'
       path: '/api/public/google/callback'
@@ -491,10 +551,13 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedPunchRoute: typeof AuthenticatedPunchRoute
   AuthenticatedResourcesRoute: typeof AuthenticatedResourcesRoute
+  AuthenticatedTaskTemplatesRoute: typeof AuthenticatedTaskTemplatesRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
+  AuthenticatedTasksOverviewRoute: typeof AuthenticatedTasksOverviewRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedTimesheetRoute: typeof AuthenticatedTimesheetRoute
   AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRoute
+  AuthenticatedAdminTaxonomyRoute: typeof AuthenticatedAdminTaxonomyRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -511,10 +574,13 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedPunchRoute: AuthenticatedPunchRoute,
   AuthenticatedResourcesRoute: AuthenticatedResourcesRoute,
+  AuthenticatedTaskTemplatesRoute: AuthenticatedTaskTemplatesRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
+  AuthenticatedTasksOverviewRoute: AuthenticatedTasksOverviewRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedTimesheetRoute: AuthenticatedTimesheetRoute,
   AuthenticatedVendorsRoute: AuthenticatedVendorsRoute,
+  AuthenticatedAdminTaxonomyRoute: AuthenticatedAdminTaxonomyRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

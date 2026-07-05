@@ -227,14 +227,18 @@ function CompleteOnboardingPage() {
     return <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading…</div>;
   }
 
+  const alreadyCompleted = !!(data?.profile as { onboarding_completed?: boolean } | null)?.onboarding_completed;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <header>
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-          <ClipboardCheck className="h-6 w-6 text-primary" /> Complete your onboarding
+          <ClipboardCheck className="h-6 w-6 text-primary" /> {alreadyCompleted ? "My profile" : "Complete your onboarding"}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Fill in your details, upload the required documents, then follow &amp; review Colladome. Access to the tool unlocks once everything is submitted.
+          {alreadyCompleted
+            ? "Update your details, documents, and social links anytime."
+            : "Fill in your details, upload the required documents, then follow & review Colladome. Access to the tool unlocks once everything is submitted."}
         </p>
       </header>
 

@@ -9,11 +9,41 @@ function html(body: string, status = 200) {
   );
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function redirectToDashboard(origin: string) {
   return new Response(null, {
     status: 302,
     headers: { Location: `${origin}/dashboard` },
   });
+}
+
+function googleErrorMessage(error: string, description: string | null) {
+  if (error === "redirect_uri_mismatch") {
+    return `
+      <h2 class="err">Google Calendar setup mismatch</h2>
+      <p>Google rejected the callback URL. Add this exact URL under <strong>Authorized redirect URIs</strong> in the Google Cloud OAuth client used by this app:</p>
+      <p><code>${GOOGLE_CALENDAR_CALLBACK_URL}</code></p>
+      <p>Also add <code>https://colladome-pulse.lovable.app</code> under <strong>Authorized JavaScript origins</strong>.</p>
+    `;
+  }
+
+  if (error === "access_denied") {
+    return `
+      <h2 class="err">Google Calendar permission denied</h2>
+      <p>Make sure the Google Calendar API is enabled and this Google account is allowed on the OAuth consent screen.</p>
+      <p>If the consent screen is in Testing, add this Google account as a test user.</p>
+    `;
+  }
+
+  return `<h2 class="err">Google sign-in cancelled</h2><p>${escapeHtml(description ?? error)}</p>`;
 }
 
 export const Route = createFileRoute("/api/public/google/callback")({
@@ -24,7 +54,8 @@ export const Route = createFileRoute("/api/public/google/callback")({
         const code = url.searchParams.get("code");
         const state = url.searchParams.get("state");
         const errParam = url.searchParams.get("error");
-        if (errParam) return html(`<h2 class="err">Google sign-in cancelled</h2><p>${errParam}</p>`, 400);
+        const errDescription = url.searchParams.get("error_description");
+        if (errParam) return html(googleErrorMessage(errParam, errDescription), 400);
         if (!code || !state) return html(`<h2 class="err">Missing code or state</h2>`, 400);
 
         const { verifyState, exchangeCodeForTokens, decodeIdTokenEmail } = await import(
@@ -57,7 +88,7 @@ export const Route = createFileRoute("/api/public/google/callback")({
           return redirectToDashboard(url.origin);
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : "Unknown error";
-          return html(`<h2 class="err">Connection failed</h2><p>${msg}</p>`, 500);
+          return html(`<h2 class="err">Connection failed</h2><p>${escapeHtml(msg)}</p>`, 500);
         }
       },
     },

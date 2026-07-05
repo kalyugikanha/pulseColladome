@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getGoogleAuthUrl, getMyGoogleStatus, disconnectGoogleCalendar } from "@/lib/google-calendar.functions";
+import { getMyGoogleStatus, disconnectGoogleCalendar } from "@/lib/google-calendar.functions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 
 const PUBLISHED_DASHBOARD_URL = "https://colladome-pulse.lovable.app/dashboard";
+const PUBLISHED_GOOGLE_CONNECT_URL = "https://colladome-pulse.lovable.app/google-calendar-connect";
 const GOOGLE_CALENDAR_ORIGIN = "https://colladome-pulse.lovable.app";
 const GOOGLE_CALENDAR_CALLBACK_URL = "https://colladome-pulse.lovable.app/api/public/google/callback";
 const TROUBLESHOOTING_DOCS_URL = "https://docs.lovable.dev/tips-tricks/troubleshooting";
@@ -193,7 +194,6 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
 
 export function GoogleCalendarConnectCard() {
   const qc = useQueryClient();
-  const getUrl = useServerFn(getGoogleAuthUrl);
   const getStatus = useServerFn(getMyGoogleStatus);
   const disconnect = useServerFn(disconnectGoogleCalendar);
 
@@ -241,9 +241,9 @@ export function GoogleCalendarConnectCard() {
     // Embedded Lovable preview: Google will refuse to load in the iframe.
     // Send the user to the published dashboard to complete the flow there.
     if (isLovablePreview) {
-      const publishedTab = window.open(PUBLISHED_DASHBOARD_URL, "_blank", "noopener,noreferrer");
+      const publishedTab = window.open(PUBLISHED_GOOGLE_CONNECT_URL, "_blank", "noopener,noreferrer");
       if (!publishedTab) {
-        setLastError("Open the published dashboard in a new tab to connect Google Calendar. Google blocks OAuth inside embedded preview contexts.");
+        setLastError("Open the published Google Calendar connection page in a new tab. Google blocks OAuth inside embedded preview contexts.");
       } else {
         toast.info("Continue Google Calendar connection from the published dashboard tab.");
       }
@@ -261,25 +261,25 @@ export function GoogleCalendarConnectCard() {
         await qc.invalidateQueries({ queryKey: ["my-google-status"] });
       }
 
-      const { url } = await getUrl();
-
       try {
         sessionStorage.setItem(RETURNING_KEY, "1");
       } catch {
         // ignore storage errors
       }
 
-      // Top-level navigation. Break out of any iframe so Google is loaded
-      // as a top-level document (X-Frame-Options: DENY only blocks framed loads).
+      const launchUrl = opts.disconnectFirst ? "/google-calendar-connect?reconnect=1" : "/google-calendar-connect";
+
+      // Top-level navigation to an app route first. That route starts Google
+      // from a full browser tab, avoiding embedded accounts.google.com loads.
       try {
         if (window.top && window.top !== window.self) {
-          window.top.location.href = url;
+          window.top.location.href = launchUrl;
           return;
         }
       } catch {
         // Cross-origin top — fall through to same-window navigation.
       }
-      window.location.href = url;
+      window.location.href = launchUrl;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Could not start Google sign-in";
       toast.error(message);

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as GoogleCalendarConnectRouteImport } from './routes/google-calendar-connect'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -38,6 +39,11 @@ import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/cha
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
 
+const GoogleCalendarConnectRoute = GoogleCalendarConnectRouteImport.update({
+  id: '/google-calendar-connect',
+  path: '/google-calendar-connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
   id: '/change-password',
   path: '/change-password',
@@ -188,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
+  '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/access': typeof AuthenticatedAccessRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
+  '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/access': typeof AuthenticatedAccessRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -248,6 +256,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
+  '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
@@ -279,6 +288,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
+    | '/google-calendar-connect'
     | '/access'
     | '/attendance'
     | '/calendar'
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
+    | '/google-calendar-connect'
     | '/access'
     | '/attendance'
     | '/calendar'
@@ -338,6 +349,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/change-password'
+    | '/google-calendar-connect'
     | '/_authenticated/access'
     | '/_authenticated/attendance'
     | '/_authenticated/calendar'
@@ -369,6 +381,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
+  GoogleCalendarConnectRoute: typeof GoogleCalendarConnectRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiAssistantTranscribeRoute: typeof ApiAssistantTranscribeRoute
   ApiPublicGoogleCallbackRoute: typeof ApiPublicGoogleCallbackRoute
@@ -376,6 +389,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/google-calendar-connect': {
+      id: '/google-calendar-connect'
+      path: '/google-calendar-connect'
+      fullPath: '/google-calendar-connect'
+      preLoaderRoute: typeof GoogleCalendarConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/change-password': {
       id: '/change-password'
       path: '/change-password'
@@ -631,6 +651,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ChangePasswordRoute: ChangePasswordRoute,
+  GoogleCalendarConnectRoute: GoogleCalendarConnectRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiAssistantTranscribeRoute: ApiAssistantTranscribeRoute,
   ApiPublicGoogleCallbackRoute: ApiPublicGoogleCallbackRoute,
@@ -638,13 +659,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

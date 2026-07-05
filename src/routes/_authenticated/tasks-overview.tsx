@@ -27,10 +27,11 @@ function Page() {
   const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
-    if (me?.isDepartmentHead && !me.isAdmin && !me.isReportingManager && departments.length === 0) {
+    if (!me || me.isAdmin || me.canManageProjects) return;
+    if (me.isDepartmentHead && departments.length === 0) {
       setDepartments(me.headOfDepartments);
     }
-    if (me?.isReportingManager && !me.isAdmin && employees.length === 0) {
+    if (me.isReportingManager && employees.length === 0) {
       setEmployees(me.directReportIds);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

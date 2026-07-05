@@ -136,18 +136,19 @@ function ProjectBurnPage() {
     return Array.from(map.entries()).map(([code, name]) => ({ code, name }));
   }, [dailyRows]);
 
-  const filteredDaily = useMemo(() => projectFilter === "all" ? dailyRows : dailyRows.filter((r) => r.code === projectFilter), [dailyRows, projectFilter]);
+  const deptFilteredDaily = useMemo(() => dailyRows.filter((r) => passesDept(r.user_id)), [dailyRows, deptSel, deptById]);
+  const filteredDaily = useMemo(() => projectFilter === "all" ? deptFilteredDaily : deptFilteredDaily.filter((r) => r.code === projectFilter), [deptFilteredDaily, projectFilter]);
 
   // Aggregated by project
   const byProject = useMemo(() => {
     const m = new Map<string, { code: string; name: string; hours: number; burn: number; daysActive: Set<string> }>();
-    for (const r of dailyRows) {
+    for (const r of deptFilteredDaily) {
       const cur = m.get(r.code) ?? { code: r.code, name: r.name, hours: 0, burn: 0, daysActive: new Set<string>() };
       cur.hours += r.hours; cur.burn += r.burn; cur.daysActive.add(r.date);
       m.set(r.code, cur);
     }
     return Array.from(m.values()).sort((a, b) => b.burn - a.burn);
-  }, [dailyRows]);
+  }, [deptFilteredDaily]);
 
   const totalBurn = byProject.reduce((s, p) => s + p.burn, 0);
   const totalHours = byProject.reduce((s, p) => s + p.hours, 0);

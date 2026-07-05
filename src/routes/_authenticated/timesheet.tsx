@@ -66,6 +66,10 @@ function TimesheetPage() {
   const canEdit = !!me && (me.isSuperAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
   const canApprove = canEdit;
   const deptScope = !!me && !me.isAdmin && !me.canManageProjects && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
+  // Reporting-manager-only users (not admin/PM/dept head) are scoped to their direct reports + themselves.
+  const reporteeScope = !!me && !me.isAdmin && !me.canManageProjects && !me.isDepartmentHead && me.isReportingManager
+    ? Array.from(new Set([...(me.directReportIds ?? []), me.id]))
+    : null;
 
   // Compute active date range based on view.
   const { startIso, endIso, label } = useMemo(() => {
@@ -85,27 +89,31 @@ function TimesheetPage() {
   }, [view, month, rangeFrom, rangeTo, day]);
 
   const { data: profiles } = useQuery({
-    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all"],
+    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", reporteeScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let q = supabase.from("profiles").select("id, full_name, email, department");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
+      if (reporteeScope && reporteeScope.length) q = q.in("id", reporteeScope);
       return (await q).data as Profile[] ?? [];
     },
   });
 
   const { data: logs } = useQuery({
-    queryKey: ["ts-logs", startIso, endIso],
+    queryKey: ["ts-logs", startIso, endIso, reporteeScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("attendance_logs")
         .select("id, user_id, date, tasks, approved_at")
         .gte("date", startIso).lt("date", endIso);
+      if (reporteeScope && reporteeScope.length) q = q.in("user_id", reporteeScope);
+      const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as LogRow[];
     },
   });
+
 
   const profileById = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p])), [profiles]);
   const approvedByDay = useMemo(() => {

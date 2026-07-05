@@ -174,6 +174,9 @@ function AccessPage() {
               </Select>
             </div>
             <div className="space-y-1"><Label>Monthly salary (INR)</Label><Input inputMode="numeric" placeholder="e.g. 40000" value={cSalary} onChange={(e) => setCSalary(e.target.value)} /></div>
+            <div className="md:col-span-2 space-y-1"><Label>Department</Label>
+              <Input list="dept-options" placeholder="Marketing, HR, …" value={cDept} onChange={(e) => setCDept(e.target.value)} />
+            </div>
             <div className="md:col-span-2 space-y-1"><Label>Super admin</Label>
               <Select value={cIsSuper ? "yes" : "no"} onValueChange={(v) => setCIsSuper(v === "yes")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -184,6 +187,9 @@ function AccessPage() {
               </Select>
             </div>
           </div>
+          <datalist id="dept-options">
+            {(deptOptions ?? []).map((d) => <option key={d} value={d} />)}
+          </datalist>
           <div className="mt-4"><Button className="gradient-primary" onClick={createAccount} disabled={creating}>{creating ? "Creating…" : "Create account"}</Button></div>
         </CardContent>
       </Card>

@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Pencil, Users, Search, UserX, UserCheck, Trash2 } from "lucide-react";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 
 export const Route = createFileRoute("/_authenticated/directory")({

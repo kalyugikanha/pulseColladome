@@ -1,20 +1,17 @@
-## View-as doesn't reflect Kanishka's Department Head status
+## Give department heads full taxonomy access
 
-You're signed in as Shubham (super admin) using "view as Kanishka". The sidebar's Admin section is hidden because `useCurrentUser` overrides admin/finance/HR/PM flags for the impersonated user, but **`isDepartmentHead` is always computed from the real signed-in user's `department_heads` rows** — Shubham has none, so it stays `false`, and the whole Admin group hides.
+Currently the Taxonomy page (Domains / Departments / Task Types) is gated to super admins in the UI, and RLS only allows `admin` role to write. Kanishka (Marketing Head) can't reach or edit it.
 
-### Fix
+### Changes
 
-In `src/hooks/use-current-user.ts`, inside the `viewingAs` branch:
+**1. Migration** — extend RLS write policies on `taxonomy_domains`, `taxonomy_departments`, `taxonomy_task_types` so department heads (anyone with a row in `public.department_heads`) can INSERT / UPDATE / DELETE, in addition to admins. Reads already allow all authenticated users.
 
-- Also fetch `department_heads` for the impersonated user.
-- Override `headOfDepartments` and `isDepartmentHead` from that result (falling back to the real user's rows when not impersonating).
+**2. Frontend gate** — in `src/routes/_authenticated/admin.taxonomy.tsx`, change the guard from `isSuperAdmin || isAdmin` to also allow `isDepartmentHead`.
 
-That's the only change needed. The rest of the sidebar/page gates already honor `isDepartmentHead`, so after the flag flips true you'll see Team, Hours Editor, Timesheet, Task Overview, and Task Templates as Kanishka.
+**3. Sidebar** — add Taxonomy to the admin group for department heads too (currently likely admin-only).
 
-### Note on data queries (not fixed by this)
-
-"View as" only re-labels the UI; server queries still run under Shubham's RLS (super admin sees all). Personal widgets on the dashboard (my tasks, my leave balance) still filter by Shubham's `user.id`. Once we're moving to production you'll sign in as Kanishka directly to see her real filtered data — no further code change needed for that.
+No changes to server functions — they run under the caller's Supabase session, so RLS handles authorization.
 
 ### Verification
 
-Refresh with view-as Kanishka. Left sidebar shows the Admin group with Team / Hours Editor / Timesheet / Task Overview / Task Templates. Opening any of them loads without redirecting to /dashboard.
+View as Kanishka → Admin sidebar shows Taxonomy → open it, add/rename/delete a domain, department, and task type without permission errors.

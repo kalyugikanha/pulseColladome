@@ -152,13 +152,17 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                         <Link to="/access"><Shield /><span>Access & Roles</span></Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/taxonomy")}>
-                        <Link to="/admin/taxonomy"><Layers /><span>Taxonomy</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                   </>
                 )}
+                {(isSuperAdmin || isDepartmentHead) && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/taxonomy")}>
+                      <Link to="/admin/taxonomy"><Layers /><span>Taxonomy</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+
+
 
               </SidebarMenu>
             </SidebarGroupContent>

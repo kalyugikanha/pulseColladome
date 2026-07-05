@@ -163,9 +163,9 @@ function ProjectBurnPage() {
     }
   }, [projectFilter, dailyRows]);
 
-  const totalBurn = useMemo(() => deptFilteredDaily.reduce((s, r) => s + r.burn, 0), [deptFilteredDaily]);
-  const totalHours = useMemo(() => deptFilteredDaily.reduce((s, r) => s + r.hours, 0), [deptFilteredDaily]);
-  const activeProjectCount = useMemo(() => new Set(deptFilteredDaily.map((r) => r.code)).size, [deptFilteredDaily]);
+  const totalBurn = useMemo(() => filteredDaily.reduce((s, r) => s + r.burn, 0), [filteredDaily]);
+  const totalHours = useMemo(() => filteredDaily.reduce((s, r) => s + r.hours, 0), [filteredDaily]);
+  const activeProjectCount = useMemo(() => new Set(filteredDaily.map((r) => r.code)).size, [filteredDaily]);
   // Pool includes signed-up salaries + pending grants (people who will get that salary once they sign up)
   const totalSalaryPool = useMemo(() => {
     const signedUp = Array.from(salaryByUser.values()).reduce((s, v) => s + v, 0);
@@ -178,24 +178,52 @@ function ProjectBurnPage() {
     return (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())).length;
   }, [profiles, grants]);
 
-  // Daily trend for selected project (or all)
   const daysInMonth = useMemo(() => {
     const [y, m] = month.split("-").map(Number);
     return getDaysInMonth(new Date(y, m - 1, 1));
   }, [month]);
+
+  // Employees present in the filtered view, sorted by total metric desc for stable colors + legend order.
+  const employeeSeries = useMemo(() => {
+    const map = new Map<string, { userId: string; name: string; hours: number; burn: number }>();
+    for (const r of filteredDaily) {
+      const cur = map.get(r.user_id) ?? { userId: r.user_id, name: nameById.get(r.user_id) ?? "—", hours: 0, burn: 0 };
+      cur.hours += r.hours; cur.burn += r.burn;
+      map.set(r.user_id, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => (showCosts ? b.burn - a.burn : b.hours - a.hours));
+  }, [filteredDaily, nameById, showCosts]);
+
+  const EMP_COLORS = [
+    "hsl(217 91% 60%)", "hsl(160 84% 39%)", "hsl(38 92% 50%)", "hsl(0 84% 60%)",
+    "hsl(280 87% 65%)", "hsl(190 90% 45%)", "hsl(340 82% 60%)", "hsl(120 60% 45%)",
+    "hsl(20 90% 55%)", "hsl(260 70% 60%)", "hsl(180 70% 40%)", "hsl(50 90% 50%)",
+  ];
+  const colorFor = (userId: string) => {
+    const idx = employeeSeries.findIndex((e) => e.userId === userId);
+    return EMP_COLORS[(idx < 0 ? 0 : idx) % EMP_COLORS.length];
+  };
+
+  // Daily stacked series: per-day per-user hours + burn.
   const dailyTrend = useMemo(() => {
     const [y, m] = month.split("-").map(Number);
     const arr = Array.from({ length: daysInMonth }, (_, i) => {
       const d = `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`;
-      return { date: d, burn: 0, hours: 0 };
+      return { date: d, total: 0, perUser: new Map<string, { hours: number; burn: number }>() };
     });
     for (const r of filteredDaily) {
       const idx = Number(r.date.slice(8, 10)) - 1;
-      if (arr[idx]) { arr[idx].burn += r.burn; arr[idx].hours += r.hours; }
+      if (!arr[idx]) continue;
+      const cell = arr[idx];
+      const cur = cell.perUser.get(r.user_id) ?? { hours: 0, burn: 0 };
+      cur.hours += r.hours; cur.burn += r.burn;
+      cell.perUser.set(r.user_id, cur);
+      cell.total += showCosts ? r.burn : r.hours;
     }
     return arr;
-  }, [filteredDaily, month, daysInMonth]);
-  const trendMax = Math.max(1, ...dailyTrend.map((d) => d.burn));
+  }, [filteredDaily, month, daysInMonth, showCosts]);
+  const trendMax = Math.max(1, ...dailyTrend.map((d) => d.total));
+
 
   if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!canView) throw redirect({ to: "/dashboard" });

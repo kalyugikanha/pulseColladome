@@ -1,12 +1,24 @@
 ## Changes to `src/routes/_authenticated/project-burn.tsx`
 
-1. **Remove the "Burn by project" card** entirely (the table between the daily trend chart and the daily log).
+### 1. Stacked daily chart by employee
+Replace the single-bar-per-day chart with a **stacked bar per day**, one colored segment per employee, plus a legend below.
 
-2. **Fix the "Daily burn / Daily hours" chart not reacting to month/project filters**:
-   - Ensure the chart's data source (`dailyTrend`) is derived from `filteredDaily` (already is) but also recomputes correctly when `projectFilter`, `deptSel`, and `month` change.
-   - Recompute `trendMax` from the currently displayed metric (burn vs hours) so bars rescale when switching filters/months, instead of using a stale burn-only max.
-   - Reset `projectFilter` to `"all"` when the selected project no longer exists in the new month's data (prevents an empty chart when the previously chosen project has no entries in the new month).
+- Build `dailyTrend` as `{ date, total, perUser: Record<userId, { hours, burn }> }[]` from `filteredDaily` (already reacts to month/project/department).
+- Assign each employee a stable color from a small palette (cycled by index of sorted userId list within the current view).
+- Render each day column as a vertical flex stack: iterate employees in a stable order, render a segment sized by `(userMetric / maxDailyTotal) * 100%`. Tooltip on each segment shows "Employee — Xh · ₹Y".
+- Below the chart, render a legend: small color swatch + employee name + their total hours (and burn if `showCosts`) for the current filter. Employees with 0 in the current view are hidden from the legend.
+- Metric: hours when `!showCosts`, burn when `showCosts` (matches existing behavior). Chart title and card description stay as-is.
 
-3. Keep the top stat cards and the Daily log table unchanged in behavior; just drop references to `byProject` where they were only used for the removed card. Keep "Active projects" stat by computing it from `deptFilteredDaily` directly.
+### 2. Stat cards react to project filter
+Currently `totalBurn` / `totalHours` / `activeProjectCount` derive from `deptFilteredDaily` (ignores project filter). Switch them to derive from `filteredDaily` (which already applies project + department + month).
 
-No DB or server changes.
+- "Burned this month" → burn on selected project(s).
+- "Salary pool" → unchanged (it's a company-wide pool independent of project).
+- "Coverage" → `totalBurn / totalSalaryPool` using the project-filtered burn.
+- "Hours this month" (non-cost viewers) → hours on selected project.
+- "Active projects" → count of distinct project codes in `filteredDaily` (which is 1 when a specific project is chosen, otherwise all).
+
+### 3. Daily log
+No changes.
+
+No DB, server function, or other file changes.

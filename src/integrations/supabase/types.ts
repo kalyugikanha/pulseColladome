@@ -327,6 +327,7 @@ export type Database = {
           phone: string | null
           pinterest_url: string | null
           profile_picture_url: string | null
+          reporting_manager_id: string | null
           reviews_confirmed_at: string | null
           social_follows_confirmed_at: string | null
           standup_time: string | null
@@ -360,6 +361,7 @@ export type Database = {
           phone?: string | null
           pinterest_url?: string | null
           profile_picture_url?: string | null
+          reporting_manager_id?: string | null
           reviews_confirmed_at?: string | null
           social_follows_confirmed_at?: string | null
           standup_time?: string | null
@@ -393,6 +395,7 @@ export type Database = {
           phone?: string | null
           pinterest_url?: string | null
           profile_picture_url?: string | null
+          reporting_manager_id?: string | null
           reviews_confirmed_at?: string | null
           social_follows_confirmed_at?: string | null
           standup_time?: string | null
@@ -400,7 +403,15 @@ export type Database = {
           updated_at?: string
           youtube_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_reporting_manager_id_fkey"
+            columns: ["reporting_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {

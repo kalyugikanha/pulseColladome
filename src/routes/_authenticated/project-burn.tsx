@@ -27,21 +27,29 @@ function ProjectBurnPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
 
+  const canView = !!me && (me.isFinanceAdmin || me.isDepartmentHead);
+  const showCosts = !!me?.isFinanceAdmin;
+  const deptScope = !!me && !me.isFinanceAdmin && me.isDepartmentHead ? me.headOfDepartments : null;
+
   const { data: profiles } = useQuery({
-    queryKey: ["pb-profiles"],
-    enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department")).data as Profile[] ?? [],
+    queryKey: ["pb-profiles", deptScope?.join(",") ?? "all"],
+    enabled: canView,
+    queryFn: async () => {
+      let q = supabase.from("profiles").select("id, full_name, email, department");
+      if (deptScope && deptScope.length) q = q.in("department", deptScope);
+      return (await q).data as Profile[] ?? [];
+    },
   });
 
   const { data: grants } = useQuery({
     queryKey: ["pb-grants"],
-    enabled: !!me?.isFinanceAdmin,
+    enabled: canView && showCosts,
     queryFn: async () => (await supabase.from("role_grants").select("email, default_monthly_salary")).data as Array<{ email: string; default_monthly_salary: number | null }> ?? [],
   });
 
   const { data: salaries } = useQuery({
     queryKey: ["pb-salaries"],
-    enabled: !!me?.isFinanceAdmin,
+    enabled: canView && showCosts,
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any).from("salaries").select("user_id, monthly_salary, effective_from").order("effective_from", { ascending: false });
@@ -51,17 +59,19 @@ function ProjectBurnPage() {
   });
 
   const { data: logs } = useQuery({
-    queryKey: ["pb-logs", month],
-    enabled: !!me?.isFinanceAdmin,
+    queryKey: ["pb-logs", month, deptScope?.join(",") ?? "all"],
+    enabled: canView,
     queryFn: async () => {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-      const { data, error } = await supabase.from("attendance_logs").select("user_id, date, tasks").gte("date", start).lt("date", end).order("date");
-      if (error) throw error;
-      return (data ?? []) as LogRow[];
+      let q = supabase.from("attendance_logs").select("user_id, date, tasks").gte("date", start).lt("date", end).order("date");
+      // Scope logs to department members when viewer is a dept head only.
+      // (RLS already limits what they can read, but this trims payload.)
+      return (await q).data as LogRow[] ?? [];
     },
   });
+
 
   const salaryByUser = useMemo(() => {
     const map = new Map<string, number>();

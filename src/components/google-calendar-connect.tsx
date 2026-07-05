@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getMyGoogleStatus, disconnectGoogleCalendar } from "@/lib/google-calendar.functions";
+import { getMyGoogleStatus, disconnectGoogleCalendar, getGoogleCalendarOAuthDiagnostics } from "@/lib/google-calendar.functions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -199,6 +199,7 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
 export function GoogleCalendarConnectCard() {
   const qc = useQueryClient();
   const getStatus = useServerFn(getMyGoogleStatus);
+  const getDiagnostics = useServerFn(getGoogleCalendarOAuthDiagnostics);
   const disconnect = useServerFn(disconnectGoogleCalendar);
 
   const [isOpening, setIsOpening] = useState(false);
@@ -211,6 +212,12 @@ export function GoogleCalendarConnectCard() {
     queryKey: ["my-google-status"],
     queryFn: () => getStatus(),
     staleTime: 30_000,
+  });
+
+  const { data: diagnostics } = useQuery({
+    queryKey: ["google-calendar-oauth-diagnostics"],
+    queryFn: () => getDiagnostics(),
+    staleTime: 60_000,
   });
 
   useEffect(() => {
@@ -236,6 +243,46 @@ export function GoogleCalendarConnectCard() {
   }, [qc]);
 
   const callbackUrl = GOOGLE_CALENDAR_CALLBACK_URL;
+
+  const setupCheck = (
+    <div className="basis-full rounded-md border border-border/60 bg-background/70 p-3 text-xs">
+      <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
+        <HelpCircle className="h-3.5 w-3.5 text-primary" />
+        Google Cloud Calendar OAuth check
+      </div>
+      <div className="grid gap-2 text-muted-foreground sm:grid-cols-2">
+        <div>
+          <div className="text-[11px] uppercase text-muted-foreground">Credential source</div>
+          <div className="font-medium text-foreground">
+            {diagnostics?.usesProvidedGoogleCloudCredentials ? "Using your Google Cloud Console client" : "Google Cloud client not fully available"}
+          </div>
+          {diagnostics?.clientIdPreview && <div className="mt-0.5 font-mono text-[11px] break-all">{diagnostics.clientIdPreview}</div>}
+        </div>
+        <div>
+          <div className="text-[11px] uppercase text-muted-foreground">Generated redirect URI</div>
+          <div className="font-mono text-[11px] break-all text-foreground">{diagnostics?.redirectUri ?? callbackUrl}</div>
+        </div>
+      </div>
+      <div className="mt-3 rounded border border-warning/30 bg-warning/10 p-2 text-muted-foreground">
+        Google is rejecting the request if this exact URI is missing from the same OAuth client in Google Cloud:
+        <div className="mt-1 flex items-center gap-2 rounded border border-border/60 bg-background/60 p-2 font-mono text-[11px] break-all text-foreground">
+          <span className="flex-1">{callbackUrl}</span>
+          <button
+            type="button"
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={() => navigator.clipboard.writeText(callbackUrl).then(() => toast.success("Callback URL copied"), () => toast.error("Could not copy callback URL"))}
+            aria-label="Copy exact Calendar callback URL"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {diagnostics?.authorizationUrlError && <div className="mt-2 text-destructive">{diagnostics.authorizationUrlError}</div>}
+        {diagnostics && !diagnostics.clientIdLooksLikeGoogleOAuthClient && diagnostics.hasClientId && (
+          <div className="mt-2 text-destructive">The saved Client ID does not look like a Google OAuth web client ID ending in .apps.googleusercontent.com.</div>
+        )}
+      </div>
+    </div>
+  );
 
   const openOAuth = async (opts: { disconnectFirst: boolean }) => {
     if (isOpening) return;
@@ -345,6 +392,7 @@ export function GoogleCalendarConnectCard() {
               Disconnect
             </Button>
           </div>
+          {setupCheck}
           {panel}
         </CardContent>
       </Card>
@@ -368,6 +416,8 @@ export function GoogleCalendarConnectCard() {
             <><ExternalLink className="h-3.5 w-3.5" />{isLovablePreview ? "Open published dashboard" : "Connect Google Calendar"}</>
           )}
         </Button>
+
+        {setupCheck}
 
         <div className="basis-full rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-muted-foreground">
           <div className="flex items-start gap-2">

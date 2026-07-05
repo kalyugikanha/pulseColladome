@@ -256,7 +256,7 @@ function ProjectBurnPage() {
         {showCosts && <Stat icon={<TrendingUp className="h-4 w-4" />} label="Salary pool" value={inr(totalSalaryPool)} sub={`${salaryByUser.size} active${pendingCount ? ` · ${pendingCount} pending` : ""}`} />}
         {showCosts && <Stat icon={<Flame className="h-4 w-4" />} label="Coverage" value={totalSalaryPool > 0 ? `${((totalBurn / totalSalaryPool) * 100).toFixed(0)}%` : "—"} sub="of salary pool allocated" />}
         {!showCosts && <Stat icon={<CalendarDays className="h-4 w-4" />} label="Hours this month" value={totalHours.toFixed(1)} sub={`${(profiles ?? []).length} teammates`} />}
-        <Stat icon={<CalendarDays className="h-4 w-4" />} label="Active projects" value={String(byProject.length)} sub="with logged hours" />
+        <Stat icon={<CalendarDays className="h-4 w-4" />} label="Active projects" value={String(activeProjectCount)} sub="with logged hours" />
       </div>
 
 

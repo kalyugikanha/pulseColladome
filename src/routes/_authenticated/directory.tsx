@@ -375,7 +375,7 @@ function DirectoryPage() {
           )}
           <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
             <div className="flex items-center gap-2">
-              {editing && editing.id !== me?.userId && (
+              {editing && editing.id !== me?.id && (
                 editing.is_active === false ? (
                   <Button variant="outline" size="sm" disabled={busy} onClick={() => toggleActive(editing, true)}>
                     <UserCheck className="h-3.5 w-3.5 mr-1" /> Reactivate
@@ -386,7 +386,7 @@ function DirectoryPage() {
                   </Button>
                 )
               )}
-              {canHardDelete && editing && editing.id !== me?.userId && (
+              {canHardDelete && editing && editing.id !== me?.id && (
                 <Button
                   variant="destructive"
                   size="sm"

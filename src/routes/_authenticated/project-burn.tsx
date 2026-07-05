@@ -30,7 +30,7 @@ function ProjectBurnPage() {
   const { data: profiles } = useQuery({
     queryKey: ["pb-profiles"],
     enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email")).data as Profile[] ?? [],
+    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department")).data as Profile[] ?? [],
   });
 
   const { data: grants } = useQuery({

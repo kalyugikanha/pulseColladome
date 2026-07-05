@@ -9,6 +9,15 @@ function html(body: string, status = 200) {
   );
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function redirectToDashboard(origin: string) {
   return new Response(null, {
     status: 302,
@@ -34,7 +43,7 @@ function googleErrorMessage(error: string, description: string | null) {
     `;
   }
 
-  return `<h2 class="err">Google sign-in cancelled</h2><p>${description ?? error}</p>`;
+  return `<h2 class="err">Google sign-in cancelled</h2><p>${escapeHtml(description ?? error)}</p>`;
 }
 
 export const Route = createFileRoute("/api/public/google/callback")({
@@ -79,7 +88,7 @@ export const Route = createFileRoute("/api/public/google/callback")({
           return redirectToDashboard(url.origin);
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : "Unknown error";
-          return html(`<h2 class="err">Connection failed</h2><p>${msg}</p>`, 500);
+          return html(`<h2 class="err">Connection failed</h2><p>${escapeHtml(msg)}</p>`, 500);
         }
       },
     },

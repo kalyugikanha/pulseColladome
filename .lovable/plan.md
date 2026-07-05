@@ -1,54 +1,44 @@
-## Summary
-Apply one consistent visibility rule across every management screen: **a viewer sees the intersection of their reporting-manager scope and their department-head scope**. Extend the same employee filter (from Project Burn) to Timesheet.
-
-## The shared scoping rule (helper)
-For a viewer who is **not** admin and **not** project manager, build:
+## Root cause
+The log row you created is saved with `user_id = Shubham` (not Kanishka). Confirmed from the DB:
 
 ```
-reporteeScope = isReportingManager ? [...directReportIds, self.id] : null
-deptScope     = isDepartmentHead   ? headOfDepartments             : null
+date: 2026-07-05, user_id: Shubham Saxena,
+last_edited_by: Shubham Saxena, tasks: [CLDM00000 · 4h · Test by Shubham]
 ```
 
-Then when fetching profiles:
-- If both scopes exist → `WHERE department IN deptScope AND id IN reporteeScope` (intersection).
-- If only one exists → apply just that one.
-- If neither → no client-side scope (admin/PM path).
+The culprit is the **"View as"** super-admin impersonation. In `src/hooks/use-current-user.ts`, when a super admin views as another user, the returned object swaps `fullName`, `email`, and role flags to the impersonated user — but `id` stays as the *real* signed-in user (Shubham). So:
 
-Attendance-log / task queries follow with `.in("user_id", visibleUserIds)` where `visibleUserIds` are the profile ids that passed the scope.
+- `/my-timesheet` renders with `userId={me.id}` → Shubham's timesheet, even though the header says "Kanishka".
+- The Day Editor saves with `user_id: userId` → Shubham.
+- `last_edited_by: myId` (from `auth.getUser()`) → Shubham (correct, but same person as user_id).
 
-To keep this consistent, add a small helper to `src/hooks/use-current-user.ts` (or a sibling util):
+Net effect: you thought you were creating an entry on Kanishka's day, but you were actually adding a row to Shubham's own timesheet — which is why it shows up under Shubham Saxena in the admin view.
 
-```ts
-export function useVisibilityScope(me) {
-  // returns { deptScope: string[] | null, userScope: string[] | null, isUnscoped: boolean }
-}
-```
+## Fix — two options, please pick one
 
-Every page below uses it instead of hand-rolling the branches.
+### Option A · Full impersonation (recommended if "view as" is meant for reproducing what a user sees *and* acting on their behalf)
+- `useCurrentUser` returns `id = viewAsUserId` while impersonating; keep the real auth id in `realId`.
+- Update every "who did it" write (`decided_by`, `last_edited_by`, `approved_by`, `created_by`) to use `realId` — so audit trails always name Shubham, not Kanishka.
+- Persistent yellow banner: **"Viewing as Kanishka Khunteta — actions are attributed to you"**, with an "Exit" button.
+- Behavior after fix: opening `/my-timesheet` while viewing as Kanishka shows Kanishka's timesheet; adding a row saves under Kanishka. RLS still requires Shubham (super admin) to have write privileges — he does.
 
-## Pages to update
-1. **`/timesheet`** (`src/routes/_authenticated/timesheet.tsx`)
-   - Replace the current `deptScope`/`reporteeScope` branches with the helper (intersection).
-   - Add an **Employee** `MultiSelectFilter` (options = visible users, value = user id) and apply it to `filteredUsers`, drill-downs, day view, totals, and CSV export.
+### Option B · Read-only impersonation (safer, standard "view as")
+- Keep `id` = real auth id (as today).
+- While `viewingAs === true`, **disable all write affordances** — hide/gray out Save, Delete, Add row, Approve, Punch, Apply leave, etc. Query reads stay real-user's; the "Kanishka" name in the header only tells you which lens the role flags are set to (for testing what she can see).
+- Fix `/my-timesheet` to also read from the impersonated id so the page shows Kanishka's data (read-only) rather than Shubham's.
+- Persistent banner: **"Viewing as Kanishka (read-only)"** with Exit.
 
-2. **`/attendance`** (`src/routes/_authenticated/attendance.tsx`)
-   - Currently only applies `pureHead` when the viewer is a dept head AND not a reporting manager, and leans on RLS for RMs. Switch to the helper so the intersection works for viewers who are both, and so the RM scope is always applied client-side too (RLS remains the source of truth).
+### Option C · Retire "view as" entirely
+- Remove the impersonation feature. Super admins already see everything; testing another user's view is done via a separate account.
+- Simplest, no attribution risk. Rollback of the buggy row is a one-time DB cleanup.
 
-3. **`/tasks-overview`** (`src/routes/_authenticated/tasks-overview.tsx`)
-   - Today, the initial-filter effect sets *either* departments (dept-head-only) *or* employees (reporting-manager). For someone who is both, that collapses to just their reports, ignoring department. Change it to seed **both** filters when both roles apply, so results are `reports ∩ marketing`.
+## Cleanup (either option)
+- Delete or reassign the misattributed 5 Jul row (`id = 1f1d4d0f-…`). If you want it moved to Kanishka, I'll update `user_id`; if you want it gone, I'll delete it.
 
-4. **`/project-burn`** (already in the earlier plan)
-   - Same helper; keep the employee filter addition.
+## Files touched
+- `src/hooks/use-current-user.ts` (both A and B)
+- Every write site listed above (Option A only): `attendance.tsx`, `punch.tsx`, `leave.tsx`, `projects.tsx`, `tasks.tsx`, `day-editor-sheet.tsx`, `my-timesheet.tsx`
+- A banner component + mount in `__root.tsx` or `_authenticated/route.tsx`
+- `src/hooks/use-visibility-scope.ts` self-inclusion uses `realId` (Option A) so managers still see themselves correctly.
 
-5. **`/directory`** (`src/routes/_authenticated/directory.tsx`)
-   - Currently fetches all profiles. Apply the helper's `deptScope`/`userScope` so a reporting manager sees only their reports, a dept head sees their department, and someone who is both sees the intersection. Admin/HR/PM/super-admin remain unscoped.
-
-## Not changing
-- RLS policies (still the security boundary).
-- `/my-timesheet` (personal view).
-- Admin-only pages (`admin.taxonomy`, `task-templates`) — viewer is already admin.
-
-## Behavior after the change
-- **Kanishka** (Marketing head + RM): Attendance, Timesheet, Tasks Overview, Project Burn, Directory all show only her direct reports who are in Marketing.
-- **Akash** (RM only): all screens show only Arpit (his direct report) + himself where relevant.
-- Pure department head, admin, and project manager: unchanged.
+Which option (A / B / C) do you want, and should I delete or reassign the 5 Jul test row?

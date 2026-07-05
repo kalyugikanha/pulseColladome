@@ -1,62 +1,56 @@
-## Why departments aren't showing in Current grants
-Every row in `role_grants` currently has `department = NULL` — the bulk provisioner writes it but hasn't been (re-)run since the column was added, and older grants pre-date the form field. The badge renders only when set, so the list looks empty. Fix = backfill from the canonical roster + from existing `profiles.department`, then keep future writes flowing (already wired).
+## Goal
+Rethemethe portal with the Colladome palette: Cream `#F6EFE4`, White `#FFFFFF`, Gold `#CFB755`, Deep gold `#B58F15`, Light gold `#E5D89A`, Black `#111111`.
 
-## Plan
+## What changes
+Only `src/styles.css`. All components already consume semantic tokens (`bg-background`, `text-foreground`, `bg-primary`, `gradient-primary`, `bg-sidebar`, etc.), so replacing the token values reskins the whole app — no per-file edits.
 
-### 1. Backfill departments on `role_grants`
-One-shot data update:
-- For every email in the hardcoded `TEAM_ROSTER` (`src/lib/admin-users.functions.ts`), copy `department` into `role_grants.department` where it's null.
-- For any other grant whose matching `profiles.email` has a non-null `department`, copy that value across.
-- Verify on `/access` → Current grants list now shows department badges.
+### Token mapping (in `:root`, expressed as oklch equivalents of the hex swatches)
+- `--background` → Cream `#F6EFE4`
+- `--foreground` → Black `#111111`
+- `--surface` → White `#FFFFFF`
+- `--surface-2` → Light gold `#E5D89A` at low weight (`#F1E6BF`-ish) for subtle panel banding
+- `--card`, `--popover` → White
+- `--card-foreground`, `--popover-foreground` → Black
+- `--primary` → Deep gold `#B58F15` (strong contrast on cream/white; passes AA for white text)
+- `--primary-foreground` → White
+- `--primary-glow` → Gold `#CFB755` (used by `gradient-primary`)
+- `--secondary` → Light gold `#E5D89A`
+- `--secondary-foreground` → Black
+- `--muted` → Cream `#F6EFE4`
+- `--muted-foreground` → Warm grey around `#6B5A2A` (readable on cream)
+- `--accent` → Light gold `#E5D89A`
+- `--accent-foreground` → Black
+- `--border`, `--input` → Warm beige `#E4D9B8` (light gold at ~65%)
+- `--ring` → Deep gold `#B58F15`
+- `--destructive` unchanged (red stays semantic); `--success`, `--warning` retuned to sit next to gold without clashing (olive-leaning success, amber-leaning warning)
+- Charts → Deep gold, Gold, Light gold, Black, warm neutral (five-step monochrome gold ramp with black as anchor)
 
-### 2. Reusable "Department Head" concept
-Data model (single migration):
-- New enum value `department_head` on `app_role` (piggybacks on the existing `user_roles` table + `has_role()` function — no new tables).
-- New table `public.department_heads (department text primary key, user_id uuid references auth.users on delete cascade, created_at, updated_at)` with GRANTs, RLS, and update trigger. This is the "who leads which department" mapping (one head per department, generalizable to any department).
-- RLS: `authenticated` can `SELECT`; only super admins / admins can `INSERT/UPDATE/DELETE`.
-- Security-definer helper `public.is_department_head_of(_user_id uuid, _department text) returns boolean` for policy reuse.
-- Security-definer helper `public.user_department(_user_id uuid) returns text` reading `profiles.department` (used inside policies so we don't recurse on `profiles`).
+### Sidebar — inverted for brand recall
+The sidebar becomes the "black + gold" surface so the logo and navigation read strongly against the cream body:
+- `--sidebar` → Black `#111111`
+- `--sidebar-foreground` → Cream `#F6EFE4`
+- `--sidebar-primary` → Gold `#CFB755`
+- `--sidebar-primary-foreground` → Black
+- `--sidebar-accent` → `#1C1A12` (very dark warm)
+- `--sidebar-accent-foreground` → Light gold `#E5D89A`
+- `--sidebar-border` → `#2A2416`
+- `--sidebar-ring` → Gold `#CFB755`
 
-Grant Kanishka the role in the same migration:
-- Insert `('Marketing', <kanishka_user_id>)` into `department_heads`.
-- Insert `department_head` role into `user_roles` for her.
-- Also ensure her `profiles.department = 'Marketing'` and `role_grants.department = 'Marketing'`.
+### Gradients & shadows
+- `--gradient-primary` → linear-gradient Deep gold → Gold (drives every `gradient-primary` badge/button, `Super admin` chip, `Marketing Head` chip, etc.)
+- `--gradient-surface` → cream → white for elevated panels
+- `--shadow-elevated` → soft warm shadow (black at low alpha) tuned for the cream base
+- `--shadow-glow` → warm gold halo instead of blue
 
-### 3. Permissions — "Full department manager" for the head's department
-Extend RLS policies (additive — existing admin/self policies stay):
+### `.light` class
+Same token block synced with the new palette (kept in case any component toggles `.light`, so it doesn't fall back to old blues).
 
-- **`profiles`**: dept head may `SELECT` and `UPDATE` rows where `user_department(profiles.id) = <their dept>`. Sensitive columns (salary-adjacent) stay off-limits — salary lives on `salaries`, which we do NOT expand.
-- **`leave_requests`**: dept head may `SELECT` all requests for their dept and `UPDATE` `status` / `admin_note` (approve/reject). Existing `handle_leave_status_change` trigger already updates balances.
-- **`attendance_logs` + `punch_sessions`**: dept head may `SELECT` and `UPDATE` (edit hours) rows belonging to users in their dept.
-- **`tasks`**: dept head may `SELECT / INSERT / UPDATE / DELETE` tasks whose `assignee_id` is in their dept (assign & manage tasks).
-- **`projects`**: dept head may `SELECT` all projects and `UPDATE` those where any member is in their dept — keeps project ownership with PMs/admins but lets her adjust team-scope details. (Confirm during implementation whether `projects.members` is an array column or via a join table; adjust predicate accordingly.)
-- **`salaries` / `employee_bank_details` / `vendor_payments` / `role_grants` / `super_admins`**: NO change — dept head cannot see or edit salary or access controls.
-
-### 4. Client-side surfacing
-Extend `useCurrentUser` (`src/hooks/use-current-user.ts`):
-- Fetch `department_heads` row where `user_id = auth uid` → expose `headOfDepartments: string[]` and `isDepartmentHead: boolean` on `CurrentUser`.
-- Preserve the same fields for the impersonated view when a super admin uses view-as.
-
-Route gating (`src/routes/_authenticated/route.tsx`): treat `isDepartmentHead` as a manager-tier permission for showing:
-- `/leave` admin tab, `/hours-editor`, `/tasks` assign UI, `/timesheet`, `/project-burn` — same items admins see, but scoped by the RLS above.
-
-Scope filtering in admin views (no new logic, just seed the filter):
-- On `/hours-editor`, `/timesheet`, `/project-burn`, `/finances`, when the current user is a dept head (and not admin), default the Department multi-select to their `headOfDepartments` and disable "Select all" (they can still narrow further).
-- `/leave` admin tab: filter list to their department(s).
-- `/access`: dept heads do NOT get access here (super admin / hr_admin only, unchanged).
-
-### 5. UI badges
-- `/access` → Current grants: show `Marketing Head` badge when the user has both `department_head` role and a matching `department_heads` row.
-- `/team` roster: small "Head" chip next to the head's name in their department.
-
-### Out of scope (per your note — you'll define more later)
-- No admin CRUD screen for assigning department heads yet (Kanishka seeded via migration; we'll add a "Manage department heads" card on `/access` in a follow-up once you list what else she'll be doing).
-- No changes to salary visibility, vendor payments, or access-control tables.
-- No changes to `/dashboard` personal widgets.
+### Dark mode
+Not in scope — the palette is intentionally warm/light. The current dark defaults are removed; existing components that used dark values render on cream automatically because they read tokens.
 
 ## Verification
-1. `/access` → Current grants shows department badges for the whole roster, incl. `Marketing` for Kanishka + a `Marketing Head` badge.
-2. Sign in as Kanishka → sidebar shows manager pages; `/hours-editor` and `/timesheet` open pre-filtered to Marketing; opening a non-Marketing employee returns empty by RLS.
-3. Kanishka approves a Marketing leave request → status flips, balance decrements via existing trigger. Approving a non-Marketing request fails (RLS).
-4. Kanishka cannot see `/finances` salary values (kept admin-only) and cannot open `/access`.
-5. Admin/super admin behavior unchanged.
+1. `/dashboard`, `/access`, `/timesheet`, `/calendar`, `/finances` all render on cream with gold accents; sidebar renders black with cream text and gold active state.
+2. `gradient-primary` badges (Super admin, Marketing Head) show gold gradient, not blue.
+3. Text contrast: black on cream (body), white on deep-gold (buttons), cream on black (sidebar) — all AA.
+4. Charts and status colors (destructive/success/warning) remain legible.
+5. No component file needs editing — everything flows from token changes in `src/styles.css`.

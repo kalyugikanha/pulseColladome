@@ -42,7 +42,7 @@ function Page() {
 
   async function refresh() { await qc.invalidateQueries({ queryKey: ["taxonomy"] }); }
 
-  if (!me?.isSuperAdmin && !me?.isAdmin) return <div className="p-8 text-muted-foreground">Super admin only.</div>;
+  if (!me?.isSuperAdmin && !me?.isAdmin && !me?.isDepartmentHead) return <div className="p-8 text-muted-foreground">Not authorized.</div>;
 
   return (
     <div className="space-y-6">

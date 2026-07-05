@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -156,19 +156,16 @@ function ProjectBurnPage() {
   const filteredDaily = useMemo(() => projectFilter === "all" ? deptFilteredDaily : deptFilteredDaily.filter((r) => r.code === projectFilter), [deptFilteredDaily, projectFilter]);
 
 
-  // Aggregated by project
-  const byProject = useMemo(() => {
-    const m = new Map<string, { code: string; name: string; hours: number; burn: number; daysActive: Set<string> }>();
-    for (const r of deptFilteredDaily) {
-      const cur = m.get(r.code) ?? { code: r.code, name: r.name, hours: 0, burn: 0, daysActive: new Set<string>() };
-      cur.hours += r.hours; cur.burn += r.burn; cur.daysActive.add(r.date);
-      m.set(r.code, cur);
+  // Reset project filter if the chosen project no longer exists in the visible month.
+  useEffect(() => {
+    if (projectFilter !== "all" && !dailyRows.some((r) => r.code === projectFilter)) {
+      setProjectFilter("all");
     }
-    return Array.from(m.values()).sort((a, b) => b.burn - a.burn);
-  }, [deptFilteredDaily]);
+  }, [projectFilter, dailyRows]);
 
-  const totalBurn = byProject.reduce((s, p) => s + p.burn, 0);
-  const totalHours = byProject.reduce((s, p) => s + p.hours, 0);
+  const totalBurn = useMemo(() => deptFilteredDaily.reduce((s, r) => s + r.burn, 0), [deptFilteredDaily]);
+  const totalHours = useMemo(() => deptFilteredDaily.reduce((s, r) => s + r.hours, 0), [deptFilteredDaily]);
+  const activeProjectCount = useMemo(() => new Set(deptFilteredDaily.map((r) => r.code)).size, [deptFilteredDaily]);
   // Pool includes signed-up salaries + pending grants (people who will get that salary once they sign up)
   const totalSalaryPool = useMemo(() => {
     const signedUp = Array.from(salaryByUser.values()).reduce((s, v) => s + v, 0);
@@ -259,7 +256,7 @@ function ProjectBurnPage() {
         {showCosts && <Stat icon={<TrendingUp className="h-4 w-4" />} label="Salary pool" value={inr(totalSalaryPool)} sub={`${salaryByUser.size} active${pendingCount ? ` · ${pendingCount} pending` : ""}`} />}
         {showCosts && <Stat icon={<Flame className="h-4 w-4" />} label="Coverage" value={totalSalaryPool > 0 ? `${((totalBurn / totalSalaryPool) * 100).toFixed(0)}%` : "—"} sub="of salary pool allocated" />}
         {!showCosts && <Stat icon={<CalendarDays className="h-4 w-4" />} label="Hours this month" value={totalHours.toFixed(1)} sub={`${(profiles ?? []).length} teammates`} />}
-        <Stat icon={<CalendarDays className="h-4 w-4" />} label="Active projects" value={String(byProject.length)} sub="with logged hours" />
+        <Stat icon={<CalendarDays className="h-4 w-4" />} label="Active projects" value={String(activeProjectCount)} sub="with logged hours" />
       </div>
 
 
@@ -284,37 +281,6 @@ function ProjectBurnPage() {
         </CardContent>
       </Card>
 
-
-      <Card>
-        <CardHeader><CardTitle>Burn by project</CardTitle></CardHeader>
-        <CardContent>
-          {byProject.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-8 text-center">{showCosts ? "No time logged this month for users with salaries set." : "No time logged this month."}</div>
-          ) : (
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>Project</TableHead><TableHead>Code</TableHead>
-                <TableHead className="text-right">Active days</TableHead>
-                <TableHead className="text-right">Hours</TableHead>
-                {showCosts && <TableHead className="text-right">Burned so far</TableHead>}
-                <TableHead className="text-right">% of total</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {byProject.map((p) => (
-                  <TableRow key={p.code}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{p.code}</TableCell>
-                    <TableCell className="text-right">{p.daysActive.size}</TableCell>
-                    <TableCell className="text-right">{p.hours.toFixed(1)}</TableCell>
-                    {showCosts && <TableCell className="text-right font-semibold">{inr(p.burn)}</TableCell>}
-                    <TableCell className="text-right text-muted-foreground">{showCosts ? (totalBurn > 0 ? ((p.burn / totalBurn) * 100).toFixed(1) : "0") : (totalHours > 0 ? ((p.hours / totalHours) * 100).toFixed(1) : "0")}%</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>

@@ -306,6 +306,8 @@ export type Database = {
           created_at: string
           date_of_birth: string | null
           day_start_time: string | null
+          deactivated_at: string | null
+          deactivated_by: string | null
           department: string | null
           email: string | null
           employment_type: string | null
@@ -314,6 +316,7 @@ export type Database = {
           github_url: string | null
           id: string
           instagram_url: string | null
+          is_active: boolean
           is_placeholder: boolean
           joined_on: string | null
           linkedin_url: string | null
@@ -340,6 +343,8 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           day_start_time?: string | null
+          deactivated_at?: string | null
+          deactivated_by?: string | null
           department?: string | null
           email?: string | null
           employment_type?: string | null
@@ -348,6 +353,7 @@ export type Database = {
           github_url?: string | null
           id: string
           instagram_url?: string | null
+          is_active?: boolean
           is_placeholder?: boolean
           joined_on?: string | null
           linkedin_url?: string | null
@@ -374,6 +380,8 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           day_start_time?: string | null
+          deactivated_at?: string | null
+          deactivated_by?: string | null
           department?: string | null
           email?: string | null
           employment_type?: string | null
@@ -382,6 +390,7 @@ export type Database = {
           github_url?: string | null
           id?: string
           instagram_url?: string | null
+          is_active?: boolean
           is_placeholder?: boolean
           joined_on?: string | null
           linkedin_url?: string | null

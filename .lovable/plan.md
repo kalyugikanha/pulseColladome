@@ -1,29 +1,54 @@
 ## Goal
-Make onboarding mandatory-on-first-sign-in for everyone **except super admins**, and let anyone (super admins included) open and update those onboarding details later from their profile at any time.
+1. Let super admins pick a **department** when they create an account or grant a role on `/access`, and show departments in the current-grants list.
+2. Add a **Department filter** on the admin analytics pages that list many people (Timesheet, Project Burn, Hours Editor, Finances), and add a **Project filter** on Timesheet (Project Burn already has one).
+
+## Where "departments" come from
+There's no fixed department table — `profiles.department` is free text seeded by `role_grants.department` on first sign-in and editable from onboarding/profile. Filters will populate their options from the distinct set of `department` values present in the loaded profiles for that page, plus an "Unassigned" bucket for rows with no department. No new tables.
 
 ## Changes
 
-### 1. Skip the forced redirect for super admins
-`src/routes/_authenticated/route.tsx` — the effect at lines 172–181 currently sends every user with `!onboardingCompleted` to `/complete-onboarding`. Add an early-return when `user.isSuperAdmin` so super admins are never pushed into the flow. Password-change gate stays as-is.
+### 1. `/access` — add Department to both forms and show it in the list
+`src/routes/_authenticated/access.tsx`
+- **Create account** card: add a "Department" input (free text, with a `<datalist>` of existing departments pulled from `profiles`). Pass it as `department` in `createTeamUser({ data: ... })`.
+- **Grant a role** card: add a "Department" input with the same datalist. Include `department` in the `role_grants` upsert (`department` column already exists).
+- **Current grants** list: show a department badge next to the role badge when set. Order the list by department, then email.
 
-Result:
-- Non-super-admin, first sign-in → still redirected to `/complete-onboarding`.
-- Super admin, first sign-in → lands on `/dashboard` normally.
+`src/lib/admin-users.functions.ts`
+- In `createTeamUser`, include `department: data.department ?? null` in the `role_grants` upsert (currently only writes to profiles after user creation). This makes department persist even for grants that never trigger user creation, and matches the `bulkProvisionTeam` behavior.
 
-### 2. Let anyone open the onboarding form later ("profile")
-`/complete-onboarding` already renders the full form and works for anyone signed in. We'll expose it as the user's profile entry point so it's reachable anytime:
+No new server functions and no migration — `role_grants.department` and `profiles.department` already exist.
 
-- Add a **"My profile"** menu in the sidebar footer user block (`src/routes/_authenticated/route.tsx`, around lines 151–162) — a small dropdown on the avatar/name with two items: "My profile" → `/complete-onboarding`, and the existing "Sign out".
-- Inside `src/routes/_authenticated/complete-onboarding.tsx`, soften the copy when the user has already completed onboarding (heading becomes "My profile", the "You must complete this before continuing" tone is dropped, and the primary button says "Save changes" instead of "Complete onboarding"). Same fields, same save handlers.
+### 2. Shared UI helper — `DepartmentFilter`
+New file `src/components/department-filter.tsx`: a multi-select popover (checkbox list) built from the existing `Popover` + `Checkbox` primitives.
+- Props: `departments: string[]`, `selected: Set<string>`, `onChange(next: Set<string>): void`, optional `includeUnassigned?: boolean` (default true).
+- UI: button showing "All departments" or "N selected" / the single name; popover with a search input, "All" / "None" quick actions, checkbox per department, and an "Unassigned" row when enabled.
+- Empty selection = no filter (show everyone).
 
-No change to server functions, DB schema, or the completion validation logic — `completeMyOnboarding` still enforces required fields when a non-super-admin submits for the first time.
+### 3. Wire the filter into admin views
 
-## Out of scope
-- No new `/profile` route (reuses `/complete-onboarding`, which already has every field and upload).
-- No change to which fields are required, nor to the super-admin's ability to voluntarily fill the form later.
-- No email/notification changes.
+#### `src/routes/_authenticated/timesheet.tsx`
+- Add `DepartmentFilter` next to the existing month picker. Filter the pivoted `users` array by `profile.department` (treat missing as "Unassigned").
+- Add a **Project filter** (reuse the same multi-select pattern for `projects`) that hides non-selected project columns (and their totals). Empty = all projects.
+- CSV export respects both filters.
+
+#### `src/routes/_authenticated/project-burn.tsx`
+- Add `DepartmentFilter` beside the existing project single-select. Filter `dailyRows`, `byProject`, and the trend data by `profileById.get(user_id)?.department`.
+- Update the header count line to reflect filtered totals.
+
+#### `src/routes/_authenticated/hours-editor.tsx`
+- Add `DepartmentFilter` above the employees table. Filter the sorted `Profile[]` rows before rendering.
+
+#### `src/routes/_authenticated/finances.tsx`
+- Load `department` alongside `id, full_name, email` in the `finances-profiles` query.
+- Add `DepartmentFilter` above the roster table; filter the rendered rows. Roll-up stat cards keep counting the full roster (unchanged) — the filter only affects the visible list.
+
+### Out of scope
+- No filter on `/punch`, `/tasks`, `/leave`, `/dashboard` — those are personal views, not multi-user rosters.
+- No structured "departments" table or admin CRUD screen — departments remain free text, matching the current model. Colors on `/calendar` continue to come from `department_settings`.
+- No changes to RLS or migrations.
 
 ## Verification
-1. Sign in as a super admin whose `onboarding_completed = false` → lands on `/dashboard`, no redirect loop.
-2. Sign in as a non-super-admin whose `onboarding_completed = false` → redirected to `/complete-onboarding` as today.
-3. As any signed-in user, click avatar → "My profile" → `/complete-onboarding` opens with existing data and a "Save changes" button.
+1. On `/access`, create a test grant with a new department "QA"; refresh → the "QA" tag appears in Current grants, and the datalist offers "QA" next time.
+2. On `/timesheet`, pick month, select department "Marketing" → only Marketing employees rows shown; select projects → columns narrow; CSV matches.
+3. On `/project-burn`, pick a department → burn stats and daily table restrict to that department's contributions; combined with an existing project filter still works.
+4. On `/hours-editor` and `/finances`, department filter narrows the visible employee rows; clearing selection restores full list.

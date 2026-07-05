@@ -83,7 +83,7 @@ function ProjectsPage() {
   async function createProject() {
     if (!pName) return toast.error("Name required");
     if (!pCode.trim()) return toast.error("Project ID required (e.g. CLDM00XXX)");
-    const { error } = await supabase.from("projects").insert({ code: pCode.trim().toUpperCase(), name: pName, client_name: pClient || null, description: pDesc || null, status: pStatus, start_date: format(new Date(), "yyyy-MM-dd"), created_by: me!.id });
+    const { error } = await supabase.from("projects").insert({ code: pCode.trim().toUpperCase(), name: pName, client_name: pClient || null, description: pDesc || null, status: pStatus, start_date: format(new Date(), "yyyy-MM-dd"), created_by: me!.realId });
     if (error) return toast.error(error.message);
     toast.success("Project created");
     setPName(""); setPCode(""); setPClient(""); setPDesc(""); setOpenProject(false);

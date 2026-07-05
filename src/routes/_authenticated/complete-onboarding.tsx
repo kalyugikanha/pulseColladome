@@ -360,7 +360,7 @@ function CompleteOnboardingPage() {
               />
             ))}
           </section>
-          {(!allFollowed || !allReviewed) && (
+          {(!allFollowed || !allReviewed) && !alreadyCompleted && (
             <p className="text-xs text-muted-foreground">Tick every box above to enable the Complete onboarding button.</p>
           )}
         </CardContent>
@@ -370,8 +370,8 @@ function CompleteOnboardingPage() {
         <Button variant="outline" onClick={() => saveDraft()} disabled={saving || submitting}>
           {saving ? "Saving…" : "Save progress"}
         </Button>
-        <Button className="gradient-primary" onClick={submit} disabled={submitting || !allFollowed || !allReviewed}>
-          {submitting ? "Submitting…" : "Complete onboarding"}
+        <Button className="gradient-primary" onClick={submit} disabled={submitting || (!alreadyCompleted && (!allFollowed || !allReviewed))}>
+          {submitting ? "Submitting…" : alreadyCompleted ? "Save changes" : "Complete onboarding"}
         </Button>
       </div>
     </div>

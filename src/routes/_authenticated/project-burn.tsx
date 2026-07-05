@@ -27,12 +27,11 @@ function ProjectBurnPage() {
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
+  const [empSel, setEmpSel] = useState<Set<string>>(new Set());
 
   const canView = !!me && (me.isFinanceAdmin || me.isDepartmentHead || me.isReportingManager);
   const showCosts = !!me?.isFinanceAdmin;
-  // Only add a client-side department filter when the viewer is purely a
-  // department head. Reporting managers are scoped by RLS to their reports.
-  const deptScope = !!me && !me.isFinanceAdmin && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
+  const { deptScope, userScope } = useVisibilityScope(me);
 
   const { data: profiles } = useQuery({
     queryKey: ["pb-profiles", deptScope?.join(",") ?? "all"],

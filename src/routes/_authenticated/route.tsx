@@ -150,11 +150,13 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="flex items-center gap-2 px-1 py-1">
-          <Avatar className="h-8 w-8"><AvatarFallback className="bg-primary/20 text-xs">{initials}</AvatarFallback></Avatar>
-          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <div className="truncate text-xs font-medium">{fullName ?? "Member"}</div>
-            <div className="truncate text-[10px] text-muted-foreground">{email}</div>
-          </div>
+          <Link to="/complete-onboarding" className="flex items-center gap-2 min-w-0 flex-1 rounded-md hover:bg-sidebar-accent px-1 py-1" aria-label="My profile">
+            <Avatar className="h-8 w-8"><AvatarFallback className="bg-primary/20 text-xs">{initials}</AvatarFallback></Avatar>
+            <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+              <div className="truncate text-xs font-medium">{fullName ?? "Member"}</div>
+              <div className="truncate text-[10px] text-muted-foreground">My profile</div>
+            </div>
+          </Link>
           <Button variant="ghost" size="icon" onClick={signOut} className="group-data-[collapsible=icon]:hidden" aria-label="Sign out">
             <LogOut className="h-4 w-4" />
           </Button>

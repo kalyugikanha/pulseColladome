@@ -1,33 +1,64 @@
-## Plan
+## Diagnosis
 
-1. **Treat this as a redirect/callback mismatch, not a popup problem**
-   - The screenshot is on `accounts.google.com/signin/oauth/error?...`, which commonly hides a Google OAuth configuration error behind the “blocked” page.
-   - The current code builds the callback URL from the request origin, so it can generate different callback URLs depending on preview/published/domain context.
+This is **not an auth token issue**.
 
-2. **Make Google Calendar OAuth use one stable callback URL**
-   - Update the Calendar auth URL server function to always use the published app callback:
-     ```text
-     https://colladome-pulse.lovable.app/api/public/google/callback
-     ```
-   - Keep the callback handler exchanging the code with the same exact URL.
-   - This prevents Google from receiving preview/dev/cross-origin callback URLs that are not authorized.
+Your screenshot URL contains Google’s encoded error:
 
-3. **Block Calendar OAuth from preview/editor contexts**
-   - If the app is running in the Lovable preview/editor iframe, keep sending the user to the published dashboard instead of starting OAuth there.
-   - On the published dashboard, start OAuth with a full-page redirect only.
+```text
+redirect_uri_mismatch
+```
 
-4. **Show the exact callback URL in the UI**
-   - Update the Calendar troubleshooting panel to display/copy the one exact callback URL Google must allow.
-   - Add clearer text: if Google still shows this error after the code fix, the Google OAuth Client must include that exact callback URL in Authorized redirect URIs.
+That means Google is rejecting the Calendar OAuth request because the **redirect/callback URL in the app does not exactly match what is configured in your Google Cloud OAuth Client**.
 
-5. **Verify the flow**
-   - Confirm the generated Google OAuth URL contains the stable published `redirect_uri`.
-   - Confirm the callback route redirects back to `/dashboard` after a successful token save.
+Do **not** paste or rotate access tokens for this. The app should never use a manually copied Google auth token for user Calendar access.
 
-## Important note
+## What you need to do in Google Cloud
 
-If the Google Cloud OAuth client does not already include this exact Authorized redirect URI, no code change can bypass Google’s restriction. The app can generate the correct URL, but Google must allow it:
+In the same Google Cloud project where your Calendar OAuth Client ID/Secret were created:
+
+1. Go to **APIs & Services → Credentials**.
+2. Open the **OAuth 2.0 Client ID** used by this app for Calendar.
+3. Under **Authorized redirect URIs**, add this exact URL:
 
 ```text
 https://colladome-pulse.lovable.app/api/public/google/callback
 ```
+
+4. Under **Authorized JavaScript origins**, add:
+
+```text
+https://colladome-pulse.lovable.app
+```
+
+5. Make sure **Google Calendar API** is enabled in that Google Cloud project.
+6. If the OAuth consent screen is in **Testing**, add the Google account you are using as a **Test user**.
+7. Save changes, wait 1–2 minutes, then try the Calendar connect again from:
+
+```text
+https://colladome-pulse.lovable.app/dashboard
+```
+
+## What I will adjust in the app after approval
+
+1. **Add a clearer Calendar OAuth diagnostic panel**
+   - Show the exact required callback URL.
+   - Show the exact required JavaScript origin.
+   - Add copy buttons for both values.
+   - Replace the generic “403” wording with a specific `redirect_uri_mismatch` explanation.
+
+2. **Add a small server-side OAuth sanity check**
+   - Confirm the generated Google auth URL includes:
+     ```text
+     redirect_uri=https://colladome-pulse.lovable.app/api/public/google/callback
+     ```
+   - Surface a readable app error if Calendar OAuth env config is missing.
+
+3. **Keep the secure OAuth flow**
+   - No manual Google access tokens.
+   - No tokens in the browser.
+   - No iframe/popup workaround for `accounts.google.com`.
+   - Full-page redirect only from the published dashboard.
+
+## Key point
+
+The only “auth/token” values needed in the app are the saved Google OAuth **Client ID** and **Client Secret**. The error you shared is fixed by matching Google Cloud’s allowed redirect URI to the app’s callback URL exactly.

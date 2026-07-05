@@ -36,7 +36,7 @@ function HoursEditorPage() {
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (!meLoading && me && !(me.canManageProjects || me.isDepartmentHead)) navigate({ to: "/dashboard", replace: true });
+    if (!meLoading && me && !(me.canManageProjects || me.isDepartmentHead || me.isReportingManager)) navigate({ to: "/dashboard", replace: true });
   }, [me, meLoading, navigate]);
 
 
@@ -47,8 +47,8 @@ function HoursEditorPage() {
   const [addFor, setAddFor] = useState<string | null>(null);
   const [addCode, setAddCode] = useState<string>("");
 
-  const enabled = !!me && (me.canManageProjects || me.isDepartmentHead);
-  const deptScope = !!me && !me.canManageProjects && me.isDepartmentHead ? me.headOfDepartments : null;
+  const enabled = !!me && (me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
+  const deptScope = !!me && !me.canManageProjects && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
 
   const { data: profiles } = useQuery({
     queryKey: ["hours-editor-profiles", deptScope?.join(",") ?? "all"],
@@ -118,7 +118,7 @@ function HoursEditorPage() {
   }
 
   if (meLoading || !me) return <div className="text-muted-foreground">Loading…</div>;
-  if (!(me.canManageProjects || me.isDepartmentHead)) return null;
+  if (!(me.canManageProjects || me.isDepartmentHead || me.isReportingManager)) return null;
 
   const allDepts = Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort();
   const rows = (profiles ?? [])

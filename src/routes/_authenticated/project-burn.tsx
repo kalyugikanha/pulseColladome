@@ -27,9 +27,11 @@ function ProjectBurnPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
 
-  const canView = !!me && (me.isFinanceAdmin || me.isDepartmentHead);
+  const canView = !!me && (me.isFinanceAdmin || me.isDepartmentHead || me.isReportingManager);
   const showCosts = !!me?.isFinanceAdmin;
-  const deptScope = !!me && !me.isFinanceAdmin && me.isDepartmentHead ? me.headOfDepartments : null;
+  // Only add a client-side department filter when the viewer is purely a
+  // department head. Reporting managers are scoped by RLS to their reports.
+  const deptScope = !!me && !me.isFinanceAdmin && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
 
   const { data: profiles } = useQuery({
     queryKey: ["pb-profiles", deptScope?.join(",") ?? "all"],
@@ -206,7 +208,7 @@ function ProjectBurnPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold flex items-center gap-2"><Flame className="h-6 w-6 text-primary" /> Project Burn</h1>
-          <p className="text-sm text-muted-foreground">{showCosts ? "Daily burn allocated from salaries as team logs hours. Salary-share allocation." : `Project hours by teammate — ${(me?.headOfDepartments ?? []).join(", ") || "your team"}.`}</p>
+          <p className="text-sm text-muted-foreground">{showCosts ? "Daily burn allocated from salaries as team logs hours. Salary-share allocation." : `Project hours by teammate — ${(me?.headOfDepartments ?? []).join(", ") || (me?.isReportingManager ? "your direct reports" : "your team")}.`}</p>
 
         </div>
         <div className="flex items-center gap-2">

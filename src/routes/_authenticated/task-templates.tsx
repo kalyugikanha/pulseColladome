@@ -31,7 +31,7 @@ function Page() {
   const upsertFn = useServerFn(upsertTaskTemplate);
   const deleteFn = useServerFn(deleteTaskTemplate);
   const genFn = useServerFn(generateFromTemplate);
-  const canView = me?.canManageProjects || me?.isDepartmentHead || me?.isAdmin;
+  const canView = me?.canManageProjects || me?.isDepartmentHead || me?.isReportingManager || me?.isAdmin;
 
   const { data: templates } = useQuery({
     queryKey: ["task-templates"], enabled: !!canView,

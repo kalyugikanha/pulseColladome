@@ -16,7 +16,6 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedVendorsRouteImport } from './routes/_authenticated/vendors'
 import { Route as AuthenticatedTimesheetRouteImport } from './routes/_authenticated/timesheet'
-import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as AuthenticatedTasksOverviewRouteImport } from './routes/_authenticated/tasks-overview'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedTaskTemplatesRouteImport } from './routes/_authenticated/task-templates'
@@ -29,9 +28,11 @@ import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
 import { Route as AuthenticatedHoursEditorRouteImport } from './routes/_authenticated/hours-editor'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
+import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_authenticated/complete-onboarding'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
@@ -69,11 +70,6 @@ const AuthenticatedVendorsRoute = AuthenticatedVendorsRouteImport.update({
 const AuthenticatedTimesheetRoute = AuthenticatedTimesheetRouteImport.update({
   id: '/timesheet',
   path: '/timesheet',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
-  id: '/team',
-  path: '/team',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTasksOverviewRoute =
@@ -140,6 +136,11 @@ const AuthenticatedFinancesRoute = AuthenticatedFinancesRouteImport.update({
   path: '/finances',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDirectoryRoute = AuthenticatedDirectoryRouteImport.update({
+  id: '/directory',
+  path: '/directory',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -154,6 +155,11 @@ const AuthenticatedCompleteOnboardingRoute =
 const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
@@ -179,9 +185,11 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/access': typeof AuthenticatedAccessRoute
+  '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/leave': typeof AuthenticatedLeaveRoute
@@ -194,7 +202,6 @@ export interface FileRoutesByFullPath {
   '/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
-  '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
@@ -206,9 +213,11 @@ export interface FileRoutesByTo {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/access': typeof AuthenticatedAccessRoute
+  '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/leave': typeof AuthenticatedLeaveRoute
@@ -221,7 +230,6 @@ export interface FileRoutesByTo {
   '/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
-  '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
@@ -235,9 +243,11 @@ export interface FileRoutesById {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-oauth-launch': typeof GoogleCalendarOauthLaunchRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
+  '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
@@ -250,7 +260,6 @@ export interface FileRoutesById {
   '/_authenticated/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/tasks-overview': typeof AuthenticatedTasksOverviewRoute
-  '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
   '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
@@ -264,9 +273,11 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-oauth-launch'
     | '/access'
+    | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
     | '/dashboard'
+    | '/directory'
     | '/finances'
     | '/hours-editor'
     | '/leave'
@@ -279,7 +290,6 @@ export interface FileRouteTypes {
     | '/task-templates'
     | '/tasks'
     | '/tasks-overview'
-    | '/team'
     | '/timesheet'
     | '/vendors'
     | '/admin/taxonomy'
@@ -291,9 +301,11 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-oauth-launch'
     | '/access'
+    | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
     | '/dashboard'
+    | '/directory'
     | '/finances'
     | '/hours-editor'
     | '/leave'
@@ -306,7 +318,6 @@ export interface FileRouteTypes {
     | '/task-templates'
     | '/tasks'
     | '/tasks-overview'
-    | '/team'
     | '/timesheet'
     | '/vendors'
     | '/admin/taxonomy'
@@ -319,9 +330,11 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-oauth-launch'
     | '/_authenticated/access'
+    | '/_authenticated/attendance'
     | '/_authenticated/calendar'
     | '/_authenticated/complete-onboarding'
     | '/_authenticated/dashboard'
+    | '/_authenticated/directory'
     | '/_authenticated/finances'
     | '/_authenticated/hours-editor'
     | '/_authenticated/leave'
@@ -334,7 +347,6 @@ export interface FileRouteTypes {
     | '/_authenticated/task-templates'
     | '/_authenticated/tasks'
     | '/_authenticated/tasks-overview'
-    | '/_authenticated/team'
     | '/_authenticated/timesheet'
     | '/_authenticated/vendors'
     | '/_authenticated/admin/taxonomy'
@@ -399,13 +411,6 @@ declare module '@tanstack/react-router' {
       path: '/timesheet'
       fullPath: '/timesheet'
       preLoaderRoute: typeof AuthenticatedTimesheetRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/team': {
-      id: '/_authenticated/team'
-      path: '/team'
-      fullPath: '/team'
-      preLoaderRoute: typeof AuthenticatedTeamRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/tasks-overview': {
@@ -492,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFinancesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/directory': {
+      id: '/_authenticated/directory'
+      path: '/directory'
+      fullPath: '/directory'
+      preLoaderRoute: typeof AuthenticatedDirectoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -511,6 +523,13 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/calendar'
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/attendance': {
+      id: '/_authenticated/attendance'
+      path: '/attendance'
+      fullPath: '/attendance'
+      preLoaderRoute: typeof AuthenticatedAttendanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/access': {
@@ -539,9 +558,11 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccessRoute: typeof AuthenticatedAccessRoute
+  AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedCompleteOnboardingRoute: typeof AuthenticatedCompleteOnboardingRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedHoursEditorRoute: typeof AuthenticatedHoursEditorRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
@@ -554,7 +575,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTaskTemplatesRoute: typeof AuthenticatedTaskTemplatesRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedTasksOverviewRoute: typeof AuthenticatedTasksOverviewRoute
-  AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedTimesheetRoute: typeof AuthenticatedTimesheetRoute
   AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRoute
   AuthenticatedAdminTaxonomyRoute: typeof AuthenticatedAdminTaxonomyRoute
@@ -562,9 +582,11 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccessRoute: AuthenticatedAccessRoute,
+  AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedCompleteOnboardingRoute: AuthenticatedCompleteOnboardingRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedHoursEditorRoute: AuthenticatedHoursEditorRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
@@ -577,7 +599,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTaskTemplatesRoute: AuthenticatedTaskTemplatesRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedTasksOverviewRoute: AuthenticatedTasksOverviewRoute,
-  AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedTimesheetRoute: AuthenticatedTimesheetRoute,
   AuthenticatedVendorsRoute: AuthenticatedVendorsRoute,
   AuthenticatedAdminTaxonomyRoute: AuthenticatedAdminTaxonomyRoute,
@@ -597,13 +618,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } fr
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers } from "lucide-react";
+import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard } from "lucide-react";
 import { TopBar } from "@/components/top-bar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,7 +30,7 @@ const employeeItems = [
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
 ] as const;
 
-function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();
@@ -75,15 +75,22 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {(isAdmin || canManageProjects || isHrAdmin || isDepartmentHead) && (
+        {(isAdmin || canManageProjects || isHrAdmin || isDepartmentHead || isReportingManager) && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {(isAdmin || isDepartmentHead) && (
+                {(isAdmin || isDepartmentHead || isReportingManager) && (
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/team")}>
-                      <Link to="/team"><Users /><span>Team</span></Link>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/attendance")}>
+                      <Link to="/attendance"><Users /><span>Attendance</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {(isSuperAdmin || isHrAdmin || isDepartmentHead || isReportingManager) && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/directory")}>
+                      <Link to="/directory"><IdCard /><span>Employee Directory</span></Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
@@ -96,14 +103,14 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuItem>
                   </>
                 )}
-                {(isFinanceAdmin || isDepartmentHead) && (
+                {(isFinanceAdmin || isDepartmentHead || isReportingManager) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/project-burn")}>
                       <Link to="/project-burn"><Flame /><span>Project Burn</span></Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
-                {(canManageProjects || isDepartmentHead) && (
+                {(canManageProjects || isDepartmentHead || isReportingManager) && (
                   <>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
@@ -154,7 +161,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuItem>
                   </>
                 )}
-                {(isSuperAdmin || isDepartmentHead) && (
+                {(isSuperAdmin || isDepartmentHead || isReportingManager) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/taxonomy")}>
                       <Link to="/admin/taxonomy"><Layers /><span>Taxonomy</span></Link>
@@ -215,7 +222,7 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} fullName={user.fullName} email={user.email} />
+        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} isReportingManager={user.isReportingManager} fullName={user.fullName} email={user.email} />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />

@@ -33,13 +33,13 @@ function TimesheetPage() {
   const [drill, setDrill] = useState<{ user: string; code: string; name: string; entries: Array<{ date: string; hours: number; comments?: string }> } | null>(null);
 
   useEffect(() => {
-    if (!meLoading && me && !(me.isAdmin || me.canManageProjects || me.isDepartmentHead)) {
+    if (!meLoading && me && !(me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager)) {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [me, meLoading, navigate]);
 
-  const canView = !!me && (me.isAdmin || me.canManageProjects || me.isDepartmentHead);
-  const deptScope = !!me && !me.isAdmin && !me.canManageProjects && me.isDepartmentHead ? me.headOfDepartments : null;
+  const canView = !!me && (me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
+  const deptScope = !!me && !me.isAdmin && !me.canManageProjects && !me.isReportingManager && me.isDepartmentHead ? me.headOfDepartments : null;
 
   const { data: profiles } = useQuery({
     queryKey: ["ts-profiles", deptScope?.join(",") ?? "all"],

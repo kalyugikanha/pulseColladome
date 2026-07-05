@@ -1,18 +1,49 @@
-## Project Burn for department heads — hours-only view
+## Rename Team → Attendance, add Employee Directory, add reporting managers
 
-Kanishka can see the sidebar link but the page early-returns because she isn't a finance admin, and every query is gated on `me.isFinanceAdmin`. Plan: let department heads render the page with cost columns hidden and data scoped to their department members.
+Split today's Team page into two: **Attendance** (attendance + leave approvals only, for everyone who currently sees Team) and a new **Employee Directory** (edit users, department, reporting manager — HR/super admins edit, dept heads and reporting managers view their people). Add a `reporting_manager_id` on profiles so managers get a Kanishka-style scoped view of their direct reports across the app.
 
-### Changes (single file: `src/routes/_authenticated/project-burn.tsx`)
+### 1. DB migration
 
-1. **Remove the finance-only redirect**. Allow either `me.isFinanceAdmin` or `me.isDepartmentHead`. Redirect only when neither is true.
-2. **Enable queries** for both roles (change every `enabled: !!me?.isFinanceAdmin` to `!!me && (me.isFinanceAdmin || me.isDepartmentHead)`). Skip the `salaries` and `role_grants` queries entirely for non-finance viewers.
-3. **Scope profiles / logs** to `me.headOfDepartments` when the viewer is a department head (not finance). Finance keeps the full org view.
-4. **Hide cost columns and totals** for non-finance viewers: hide any column showing INR, hourly rate, salary, cost-per-project, cost totals, and the "monthly burn (₹)" summary card. Keep hours per project, hours totals, project selector, and department filter.
-5. **Header copy** switches to something like "Project hours by teammate — <Department>" when finance is hidden, so it's obvious what she's looking at.
+- Add `profiles.reporting_manager_id uuid null references public.profiles(id) on delete set null`, index on it.
+- Create SECURITY DEFINER helper `private.is_reporting_manager_of(_manager uuid, _user uuid)` returning boolean (walks `reporting_manager_id` — direct reports only, no transitive chain for v1).
+- Create SECURITY DEFINER helper `private.reports_to(_manager uuid)` returning `setof uuid` for use in scoping queries.
+- Add SELECT/UPDATE policies on `profiles`, `attendance_logs`, `leave_requests`, `tasks`, `punch_sessions` for reporting managers on their reports (mirroring existing dept-head policies but keyed on `is_reporting_manager_of`).
+- No changes to salary/finance tables — managers stay hours-only, same as dept heads.
 
-No RLS or backend changes — cost tables stay finance-only, so even a hand-crafted request from her session returns nothing.
+### 2. Current-user hook (`src/hooks/use-current-user.ts`)
 
-### Verify
+- Add `isReportingManager: boolean` and `directReportIds: string[]` (fetched via `profiles.select("id").eq("reporting_manager_id", user.id)`).
+- Include in the view-as branch.
 
-- View as Kanishka → /project-burn loads, shows 5 Marketing teammates, per-project hours grid, no INR anywhere.
-- View as Shubham (super/finance admin) → same page still shows salaries and INR burn totals as before.
+### 3. Sidebar (`src/routes/_authenticated/route.tsx`)
+
+- Rename the "Team" item to **"Attendance"** for everyone who currently sees it (admin / dept head / reporting manager). Keep same `/team` URL, or rename route to `/attendance` — I'll rename the route file for clarity.
+- Add **"Employee Directory"** item at `/directory`, visible to super admins, HR admins, dept heads, and reporting managers.
+- Extend the visibility conditions for Project Burn / Hours Editor / Timesheet / Tasks Overview / Task Templates / Taxonomy to include `isReportingManager` (mirrors dept-head treatment).
+
+### 4. Attendance page (`src/routes/_authenticated/attendance.tsx`, renamed from `team.tsx`)
+
+- Keep only two tabs: **Today's attendance** and **Leave approvals**.
+- Remove the "Members" tab and the make-admin toggle (moves to Employee Directory).
+- Scope: super/HR/admin see all; dept head sees `headOfDepartments`; reporting manager sees `directReportIds`.
+- Attendance list already shows punch-in / punch-out / hours per user for today — keep as-is; that satisfies "check for different durations for different users."
+
+### 5. New Employee Directory (`src/routes/_authenticated/directory.tsx`)
+
+- Table of employees with columns: name, email, department, reporting manager, employment type, joined on, role badges.
+- Filters: department, reporting manager, role.
+- Row actions:
+  - **Super admin / HR admin:** edit dialog to update `full_name`, `department` (dropdown from taxonomy), `reporting_manager_id` (searchable select of profiles), `employment_type`, `phone`.
+  - **Dept head / reporting manager:** read-only view scoped to their people (dept members or direct reports); no edit affordance.
+- Scope logic mirrors Attendance: full org for super/HR/admin, `headOfDepartments` for dept head, `directReportIds` for reporting manager.
+
+### 6. Reporting manager parity with dept head
+
+Wherever code branches on `isDepartmentHead` for scoping (Project Burn, Hours Editor, Timesheet, Tasks Overview, Task Templates, Taxonomy read), treat `isReportingManager` the same way, using `directReportIds` as the profile scope instead of `headOfDepartments`. Cost columns stay hidden for both.
+
+### Verification
+
+- **Shubham (super admin):** sidebar shows Attendance + Employee Directory. Attendance has only today + leave. Directory lists everyone; can edit dept + reporting manager.
+- **Kanishka (dept head, Marketing):** Attendance scoped to Marketing; Directory read-only Marketing list.
+- **New reporting manager with 3 reports:** Attendance shows only those 3; Directory read-only shows those 3; Project Burn / Hours Editor scoped to those 3, no INR.
+- **Regular employee:** no sidebar entry for Attendance or Directory.

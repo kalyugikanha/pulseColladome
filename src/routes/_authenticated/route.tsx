@@ -226,6 +226,7 @@ function AuthenticatedLayout() {
             <div className="flex-1" />
             <TopBar realUserId={user.realId} isSuperAdmin={user.realIsSuperAdmin} viewingAs={user.viewingAs} />
           </header>
+          <ViewAsBanner />
           <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto"><Outlet /></main>
         </div>
       </div>

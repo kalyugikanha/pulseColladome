@@ -66,6 +66,24 @@ function AccessPage() {
     },
   });
 
+  const { data: heads } = useQuery({
+    queryKey: ["access-department-heads"],
+    enabled: !!me?.isSuperAdmin,
+    queryFn: async () => {
+      const { data: dh } = await supabase.from("department_heads").select("department, user_id");
+      const ids = (dh ?? []).map((r) => r.user_id);
+      if (ids.length === 0) return {} as Record<string, string>;
+      const { data: profs } = await supabase.from("profiles").select("id, email").in("id", ids);
+      const emailToDept: Record<string, string> = {};
+      for (const row of dh ?? []) {
+        const p = (profs ?? []).find((x) => x.id === row.user_id);
+        if (p?.email) emailToDept[p.email.toLowerCase()] = row.department;
+      }
+      return emailToDept;
+    },
+  });
+
+
   async function addGrant() {
     const em = email.trim().toLowerCase();
     if (!em || !em.includes("@")) return toast.error("Valid email required");

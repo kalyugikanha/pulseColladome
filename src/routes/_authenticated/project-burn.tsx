@@ -122,11 +122,15 @@ function ProjectBurnPage() {
     return totals;
   }, [logs]);
 
+  // Restrict logs to profiles in scope (dept-head only sees her team).
+  const profileIdSet = useMemo(() => new Set((profiles ?? []).map((p) => p.id)), [profiles]);
+  const scopedLogs = useMemo(() => (logs ?? []).filter((r) => profileIdSet.size === 0 || profileIdSet.has(r.user_id)), [logs, profileIdSet]);
+
   // Daily rows: [date, project_code, user_id, hours, burn]
   type DailyRow = { date: string; code: string; name: string; user_id: string; hours: number; burn: number };
   const dailyRows: DailyRow[] = useMemo(() => {
     const out: DailyRow[] = [];
-    for (const row of logs ?? []) {
+    for (const row of scopedLogs) {
       const monthlyHrs = monthlyUserTotals.get(row.user_id) ?? 0;
       const salary = salaryByUser.get(row.user_id) ?? 0;
       for (const t of row.tasks ?? []) {
@@ -138,7 +142,7 @@ function ProjectBurnPage() {
       }
     }
     return out.sort((a, b) => b.date.localeCompare(a.date));
-  }, [logs, monthlyUserTotals, salaryByUser]);
+  }, [scopedLogs, monthlyUserTotals, salaryByUser]);
 
   const projects = useMemo(() => {
     const map = new Map<string, string>();
@@ -148,6 +152,7 @@ function ProjectBurnPage() {
 
   const deptFilteredDaily = useMemo(() => dailyRows.filter((r) => passesDept(r.user_id)), [dailyRows, deptSel, deptById]);
   const filteredDaily = useMemo(() => projectFilter === "all" ? deptFilteredDaily : deptFilteredDaily.filter((r) => r.code === projectFilter), [deptFilteredDaily, projectFilter]);
+
 
   // Aggregated by project
   const byProject = useMemo(() => {

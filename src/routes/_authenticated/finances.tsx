@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Wallet, IndianRupee, Users, UserPlus, Loader2 } from "lucide-react";
 import { provisionPendingUsers } from "@/lib/admin-users.functions";
+import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,

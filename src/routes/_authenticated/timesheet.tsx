@@ -87,25 +87,29 @@ function TimesheetPage() {
   }, [view, month, rangeFrom, rangeTo, day]);
 
   const { data: profiles } = useQuery({
-    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", reporteeScope?.join(",") ?? "all"],
+    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let q = supabase.from("profiles").select("id, full_name, email, department");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
-      if (reporteeScope && reporteeScope.length) q = q.in("id", reporteeScope);
+      if (userScope && userScope.length) q = q.in("id", userScope);
       return (await q).data as Profile[] ?? [];
     },
   });
 
+  const visibleUserIds = useMemo(() => (profiles ?? []).map((p) => p.id), [profiles]);
+  const visibleUserIdSet = useMemo(() => new Set(visibleUserIds), [visibleUserIds]);
+  const hasScope = !!deptScope || !!userScope;
+
   const { data: logs } = useQuery({
-    queryKey: ["ts-logs", startIso, endIso, reporteeScope?.join(",") ?? "all"],
-    enabled: canView,
+    queryKey: ["ts-logs", startIso, endIso, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
     queryFn: async () => {
       let q = supabase
         .from("attendance_logs")
         .select("id, user_id, date, tasks, approved_at")
         .gte("date", startIso).lt("date", endIso);
-      if (reporteeScope && reporteeScope.length) q = q.in("user_id", reporteeScope);
+      if (hasScope) q = q.in("user_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as LogRow[];

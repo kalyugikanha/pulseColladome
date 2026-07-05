@@ -263,20 +263,25 @@ function ProjectBurnPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Daily burn — {month}</CardTitle>
+          <CardTitle>{showCosts ? `Daily burn — ${month}` : `Daily hours — ${month}`}</CardTitle>
           <CardDescription>{projectFilter === "all" ? "All projects" : projects.find((p) => p.code === projectFilter)?.name}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-end gap-1 h-32">
-            {dailyTrend.map((d) => (
-              <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" title={`${d.date}: ${inr(d.burn)} · ${d.hours.toFixed(1)}h`}>
-                <div className="w-full rounded-t bg-primary/70" style={{ height: `${(d.burn / trendMax) * 100}%`, minHeight: d.burn > 0 ? 2 : 0 }} />
-                <span className="text-[9px] text-muted-foreground">{Number(d.date.slice(8, 10))}</span>
-              </div>
-            ))}
+            {dailyTrend.map((d) => {
+              const metric = showCosts ? d.burn : d.hours;
+              const max = showCosts ? trendMax : Math.max(1, ...dailyTrend.map((x) => x.hours));
+              return (
+                <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1" title={`${d.date}: ${showCosts ? inr(d.burn) + " · " : ""}${d.hours.toFixed(1)}h`}>
+                  <div className="w-full rounded-t bg-primary/70" style={{ height: `${(metric / max) * 100}%`, minHeight: metric > 0 ? 2 : 0 }} />
+                  <span className="text-[9px] text-muted-foreground">{Number(d.date.slice(8, 10))}</span>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
+
 
       <Card>
         <CardHeader><CardTitle>Burn by project</CardTitle></CardHeader>

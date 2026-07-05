@@ -338,7 +338,7 @@ function ProjectBurnPage() {
                       <TableCell>{nameById.get(r.user_id) ?? "—"}</TableCell>
                       <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>
                       <TableCell className="text-right">{r.hours.toFixed(1)}</TableCell>
-                      <TableCell className="text-right">{inr(r.burn)}</TableCell>
+                      {showCosts && <TableCell className="text-right">{inr(r.burn)}</TableCell>}
                     </TableRow>
                   ))}
                 </TableBody>

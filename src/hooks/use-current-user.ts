@@ -89,7 +89,7 @@ export function useCurrentUser() {
 
 
       return {
-        id: user.id,
+        id: viewingAs && viewAsUserId ? viewAsUserId : user.id,
         realId: user.id,
         email: vEmail,
         fullName: vName,

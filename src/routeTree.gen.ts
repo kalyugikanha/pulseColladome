@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedVendorsRouteImport } from './routes/_authenticated/vendors'
 import { Route as AuthenticatedTimesheetRouteImport } from './routes/_authenticated/timesheet'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
+import { Route as AuthenticatedTasksOverviewRouteImport } from './routes/_authenticated/tasks-overview'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedTaskTemplatesRouteImport } from './routes/_authenticated/task-templates'
 import { Route as AuthenticatedResourcesRouteImport } from './routes/_authenticated/resources'
@@ -74,6 +75,12 @@ const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
   path: '/team',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTasksOverviewRoute =
+  AuthenticatedTasksOverviewRouteImport.update({
+    id: '/tasks-overview',
+    path: '/tasks-overview',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
@@ -179,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/resources': typeof AuthenticatedResourcesRoute
   '/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
@@ -204,6 +212,7 @@ export interface FileRoutesByTo {
   '/resources': typeof AuthenticatedResourcesRoute
   '/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
@@ -231,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/resources': typeof AuthenticatedResourcesRoute
   '/_authenticated/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
+  '/_authenticated/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
@@ -258,6 +268,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/task-templates'
     | '/tasks'
+    | '/tasks-overview'
     | '/team'
     | '/timesheet'
     | '/vendors'
@@ -283,6 +294,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/task-templates'
     | '/tasks'
+    | '/tasks-overview'
     | '/team'
     | '/timesheet'
     | '/vendors'
@@ -309,6 +321,7 @@ export interface FileRouteTypes {
     | '/_authenticated/resources'
     | '/_authenticated/task-templates'
     | '/_authenticated/tasks'
+    | '/_authenticated/tasks-overview'
     | '/_authenticated/team'
     | '/_authenticated/timesheet'
     | '/_authenticated/vendors'
@@ -380,6 +393,13 @@ declare module '@tanstack/react-router' {
       path: '/team'
       fullPath: '/team'
       preLoaderRoute: typeof AuthenticatedTeamRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tasks-overview': {
+      id: '/_authenticated/tasks-overview'
+      path: '/tasks-overview'
+      fullPath: '/tasks-overview'
+      preLoaderRoute: typeof AuthenticatedTasksOverviewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/tasks': {
@@ -513,6 +533,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedResourcesRoute: typeof AuthenticatedResourcesRoute
   AuthenticatedTaskTemplatesRoute: typeof AuthenticatedTaskTemplatesRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
+  AuthenticatedTasksOverviewRoute: typeof AuthenticatedTasksOverviewRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedTimesheetRoute: typeof AuthenticatedTimesheetRoute
   AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRoute
@@ -534,6 +555,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedResourcesRoute: AuthenticatedResourcesRoute,
   AuthenticatedTaskTemplatesRoute: AuthenticatedTaskTemplatesRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
+  AuthenticatedTasksOverviewRoute: AuthenticatedTasksOverviewRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedTimesheetRoute: AuthenticatedTimesheetRoute,
   AuthenticatedVendorsRoute: AuthenticatedVendorsRoute,

@@ -243,7 +243,7 @@ function DirectoryPage() {
             </TableHeader>
             <TableBody>
               {rows.map((p) => (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} className={p.is_active === false ? "opacity-60" : ""}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-8 w-8">
@@ -252,11 +252,17 @@ function DirectoryPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="text-sm font-medium">{p.full_name ?? "—"}</div>
+                        <div className="text-sm font-medium flex items-center gap-2">
+                          {p.full_name ?? "—"}
+                          {p.is_active === false && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Inactive</Badge>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">{p.email ?? "—"}</div>
                       </div>
                     </div>
                   </TableCell>
+
                   <TableCell className="text-sm">
                     {p.department ?? <span className="text-muted-foreground">—</span>}
                   </TableCell>

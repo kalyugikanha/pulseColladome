@@ -111,6 +111,8 @@ function DirectoryPage() {
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (profiles ?? []).filter((p) => {
+      if (activeFilter === "active" && p.is_active === false) return false;
+      if (activeFilter === "inactive" && p.is_active !== false) return false;
       if (deptFilter !== "all" && (p.department ?? "") !== deptFilter) return false;
       if (!q) return true;
       return (
@@ -119,7 +121,8 @@ function DirectoryPage() {
         (p.department ?? "").toLowerCase().includes(q)
       );
     });
-  }, [profiles, search, deptFilter]);
+  }, [profiles, search, deptFilter, activeFilter]);
+
 
   if (me && !canView) throw redirect({ to: "/dashboard" });
 

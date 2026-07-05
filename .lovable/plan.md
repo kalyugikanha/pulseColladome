@@ -1,17 +1,11 @@
-## Give department heads full taxonomy access
+## Hours editor blank for Kanishka
 
-Currently the Taxonomy page (Domains / Departments / Task Types) is gated to super admins in the UI, and RLS only allows `admin` role to write. Kanishka (Marketing Head) can't reach or edit it.
+Line 121 of `src/routes/_authenticated/hours-editor.tsx` still has `if (!me.isSuperAdmin) return null;` — an early return that fires before the grid renders. The earlier fix updated the redirect guard and query scope, but missed this second gate, so department heads land on an empty page.
 
-### Changes
+### Fix
 
-**1. Migration** — extend RLS write policies on `taxonomy_domains`, `taxonomy_departments`, `taxonomy_task_types` so department heads (anyone with a row in `public.department_heads`) can INSERT / UPDATE / DELETE, in addition to admins. Reads already allow all authenticated users.
+Replace with `if (!(me.canManageProjects || me.isDepartmentHead)) return null;` to match the redirect guard and query `enabled` flag. Also swap the "Super admin only." helper caption to something accurate ("Edit teammates' monthly hours per project.").
 
-**2. Frontend gate** — in `src/routes/_authenticated/admin.taxonomy.tsx`, change the guard from `isSuperAdmin || isAdmin` to also allow `isDepartmentHead`.
+### Verify
 
-**3. Sidebar** — add Taxonomy to the admin group for department heads too (currently likely admin-only).
-
-No changes to server functions — they run under the caller's Supabase session, so RLS handles authorization.
-
-### Verification
-
-View as Kanishka → Admin sidebar shows Taxonomy → open it, add/rename/delete a domain, department, and task type without permission errors.
+View as Kanishka → /hours-editor loads the grid populated with the 5 Marketing teammates.

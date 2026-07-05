@@ -118,7 +118,7 @@ function HoursEditorPage() {
   }
 
   if (meLoading || !me) return <div className="text-muted-foreground">Loading…</div>;
-  if (!me.isSuperAdmin) return null;
+  if (!(me.canManageProjects || me.isDepartmentHead)) return null;
 
   const allDepts = Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort();
   const rows = (profiles ?? [])
@@ -142,7 +142,7 @@ function HoursEditorPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold flex items-center gap-2"><Clock className="h-6 w-6" /> Hours editor</h1>
-          <p className="text-sm text-muted-foreground">Super admin only. Edit any teammate's monthly hours per project.</p>
+          <p className="text-sm text-muted-foreground">Edit teammates' monthly hours per project.</p>
         </div>
         <div className="flex items-center gap-2">
           <MultiSelectFilter

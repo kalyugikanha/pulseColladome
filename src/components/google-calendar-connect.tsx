@@ -196,9 +196,10 @@ export function GoogleCalendarConnectCard() {
 
   useEffect(() => {
     const embedded = window.top !== window.self;
+    const previewHost = window.location.hostname.includes("preview") || window.location.hostname.includes("lovableproject.com");
     const lovablePreview =
       /(^|\.)(lovable\.app|lovableproject\.com)$/.test(window.location.hostname) &&
-      (window.location.hostname.includes("preview") || document.referrer.includes("lovable.dev") || embedded);
+      (previewHost || embedded);
 
     setOrigin(window.location.origin);
     setIsLovablePreview(lovablePreview);

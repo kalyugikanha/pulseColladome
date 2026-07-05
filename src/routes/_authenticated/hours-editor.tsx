@@ -118,7 +118,7 @@ function HoursEditorPage() {
   }
 
   if (meLoading || !me) return <div className="text-muted-foreground">Loading…</div>;
-  if (!me.isSuperAdmin) return null;
+  if (!(me.canManageProjects || me.isDepartmentHead)) return null;
 
   const allDepts = Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort();
   const rows = (profiles ?? [])

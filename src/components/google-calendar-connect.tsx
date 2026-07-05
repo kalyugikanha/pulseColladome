@@ -66,7 +66,7 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
       title: 'Google shows "Access blocked" or a 403 page',
       body: (
         <>
-          The Google OAuth consent screen isn&apos;t published, or this account isn&apos;t on the test-user list.
+          The Google OAuth consent screen isn&apos;t published, this account isn&apos;t on the test-user list, or the Calendar read/event scopes are not allowed.
           {isLovablePreview
             ? " The Lovable preview URL is often rejected by Google — try the published app instead."
             : " Publish the consent screen or add this Google account as a test user in Google Cloud."}{" "}
@@ -108,6 +108,10 @@ function GoogleTroubleshootingPanel({ lastError, onClearError, isLovablePreview,
           </div>
         </>
       ),
+    },
+    {
+      title: "Booking says permission is missing",
+      body: <>Reconnect Google Calendar once. The team booking utility needs the additional Calendar event permission.</>,
     },
     {
       title: "Signed in with the wrong Google account",

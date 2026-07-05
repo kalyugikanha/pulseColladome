@@ -32,6 +32,7 @@ function googleErrorMessage(error: string, description: string | null) {
       <p>Google rejected the callback URL. Add this exact URL under <strong>Authorized redirect URIs</strong> in the Google Cloud OAuth client used by this app:</p>
       <p><code>${GOOGLE_CALENDAR_CALLBACK_URL}</code></p>
       <p>Also add <code>https://colladome-pulse.lovable.app</code> under <strong>Authorized JavaScript origins</strong>.</p>
+      <p>The consent screen should include Calendar read access and Calendar event booking access.</p>
     `;
   }
 
@@ -39,6 +40,7 @@ function googleErrorMessage(error: string, description: string | null) {
     return `
       <h2 class="err">Google Calendar permission denied</h2>
       <p>Make sure the Google Calendar API is enabled and this Google account is allowed on the OAuth consent screen.</p>
+      <p>The required Calendar scopes are read access plus event booking access.</p>
       <p>If the consent screen is in Testing, add this Google account as a test user.</p>
     `;
   }

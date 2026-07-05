@@ -1,0 +1,245 @@
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Lock, Save, CheckCircle2 } from "lucide-react";
+import { format } from "date-fns";
+import { toast } from "sonner";
+
+type Task = { project_code?: string; project_name?: string; hours?: number; comments?: string };
+type Project = { code: string; name: string };
+
+export type DayEditorProps = {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  userId: string;
+  userName: string;
+  date: string; // yyyy-mm-dd
+  canEdit: boolean;      // may edit while not approved
+  canApprove: boolean;   // may toggle approval + edit even when approved
+  onSaved?: () => void;
+};
+
+export function DayEditorSheet({ open, onOpenChange, userId, userName, date, canEdit, canApprove, onSaved }: DayEditorProps) {
+  const qc = useQueryClient();
+  const [rows, setRows] = useState<Task[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const { data: projects } = useQuery({
+    queryKey: ["day-editor-projects"],
+    enabled: open,
+    queryFn: async () => (await supabase.from("projects").select("code, name").order("code")).data as Project[] ?? [],
+  });
+
+  const { data: log, refetch } = useQuery({
+    queryKey: ["day-editor", userId, date],
+    enabled: open && !!userId && !!date,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("attendance_logs")
+        .select("id, user_id, date, tasks, total_hours, approved_at, approved_by")
+        .eq("user_id", userId)
+        .eq("date", date)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    setRows(((log?.tasks as Task[] | null) ?? []).map((t) => ({ ...t })));
+  }, [log, open]);
+
+  const projectByCode = useMemo(() => new Map((projects ?? []).map((p) => [p.code, p])), [projects]);
+  const isApproved = !!log?.approved_at;
+  const locked = isApproved && !canApprove;
+  const mayEdit = (canEdit && !isApproved) || canApprove;
+
+  const total = rows.reduce((s, r) => s + (Number(r.hours) || 0), 0);
+
+  function updateRow(i: number, patch: Partial<Task>) {
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+  function deleteRow(i: number) {
+    setRows((prev) => prev.filter((_, idx) => idx !== i));
+  }
+  function addRow() {
+    setRows((prev) => [...prev, { project_code: "", project_name: "", hours: 0, comments: "" }]);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const cleaned = rows
+        .filter((r) => r.project_code && Number(r.hours) > 0)
+        .map((r) => ({
+          project_code: r.project_code,
+          project_name: r.project_name || projectByCode.get(r.project_code!)?.name || r.project_code,
+          hours: Number(r.hours) || 0,
+          comments: r.comments?.trim() || undefined,
+        }));
+      const totalHrs = cleaned.reduce((s, r) => s + r.hours, 0);
+      const { data: userRes } = await supabase.auth.getUser();
+      const myId = userRes.user?.id ?? null;
+
+      if (log?.id) {
+        const { error } = await supabase
+          .from("attendance_logs")
+          .update({ tasks: cleaned, total_hours: totalHrs, last_edited_by: myId })
+          .eq("id", log.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("attendance_logs")
+          .insert({ user_id: userId, date, tasks: cleaned, total_hours: totalHrs, last_edited_by: myId });
+        if (error) throw error;
+      }
+      toast.success("Saved");
+      await refetch();
+      qc.invalidateQueries({ queryKey: ["ts-logs"] });
+      qc.invalidateQueries({ queryKey: ["my-ts-logs"] });
+      qc.invalidateQueries({ queryKey: ["pb-logs"] });
+      onSaved?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleApproval() {
+    if (!canApprove) return;
+    setSaving(true);
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const myId = userRes.user?.id ?? null;
+
+      if (!log?.id) {
+        // Create the row first if there isn't one — approval requires a row.
+        const cleaned = rows
+          .filter((r) => r.project_code && Number(r.hours) > 0)
+          .map((r) => ({ project_code: r.project_code, project_name: r.project_name || projectByCode.get(r.project_code!)?.name || r.project_code, hours: Number(r.hours) || 0, comments: r.comments?.trim() || undefined }));
+        const totalHrs = cleaned.reduce((s, r) => s + r.hours, 0);
+        const { error } = await supabase.from("attendance_logs").insert({
+          user_id: userId, date, tasks: cleaned, total_hours: totalHrs,
+          approved_at: new Date().toISOString(), approved_by: myId, last_edited_by: myId,
+        });
+        if (error) throw error;
+      } else if (isApproved) {
+        const { error } = await supabase.from("attendance_logs").update({ approved_at: null, approved_by: null }).eq("id", log.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("attendance_logs").update({ approved_at: new Date().toISOString(), approved_by: myId }).eq("id", log.id);
+        if (error) throw error;
+      }
+      toast.success(isApproved ? "Unapproved" : "Approved");
+      await refetch();
+      qc.invalidateQueries({ queryKey: ["ts-logs"] });
+      qc.invalidateQueries({ queryKey: ["my-ts-logs"] });
+      onSaved?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Approval failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            {userName}
+            {isApproved && <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>}
+            {locked && <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> Locked</Badge>}
+          </SheetTitle>
+          <SheetDescription>
+            {format(new Date(date + "T00:00:00"), "EEEE, d MMM yyyy")} — {total.toFixed(1)} hrs
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-4 space-y-3">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[180px]">Project</TableHead>
+                <TableHead className="w-[90px] text-right">Hours</TableHead>
+                <TableHead>Comments</TableHead>
+                <TableHead className="w-[40px]" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 && (
+                <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
+              )}
+              {rows.map((r, i) => (
+                <TableRow key={i}>
+                  <TableCell>
+                    <Select
+                      value={r.project_code ?? ""}
+                      onValueChange={(v) => updateRow(i, { project_code: v, project_name: projectByCode.get(v)?.name ?? v })}
+                      disabled={!mayEdit}
+                    >
+                      <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {(projects ?? []).map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Input
+                      type="number" min={0} step={0.25}
+                      value={r.hours ?? 0}
+                      onChange={(e) => updateRow(i, { hours: Number(e.target.value) })}
+                      disabled={!mayEdit}
+                      className="h-8 text-right font-mono"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      value={r.comments ?? ""}
+                      onChange={(e) => updateRow(i, { comments: e.target.value })}
+                      disabled={!mayEdit}
+                      className="h-8"
+                      placeholder="Optional"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" disabled={!mayEdit} onClick={() => deleteRow(i)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={addRow} disabled={!mayEdit}>
+              <Plus className="h-4 w-4 mr-1" /> Add row
+            </Button>
+            <div className="flex items-center gap-2">
+              {canApprove && (
+                <Button variant={isApproved ? "outline" : "secondary"} size="sm" onClick={toggleApproval} disabled={saving}>
+                  {isApproved ? "Unapprove day" : "Approve day"}
+                </Button>
+              )}
+              <Button size="sm" onClick={save} disabled={saving || !mayEdit}>
+                <Save className="h-4 w-4 mr-1" /> Save
+              </Button>
+            </div>
+          </div>
+          {!mayEdit && !canApprove && (
+            <p className="text-xs text-muted-foreground pt-1">This day is approved and locked. Ask your manager to unapprove to make changes.</p>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

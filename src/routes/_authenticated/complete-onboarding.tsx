@@ -202,6 +202,13 @@ function CompleteOnboardingPage() {
   }
 
   async function submit() {
+    const isCompleted = !!(data?.profile as { onboarding_completed?: boolean } | null)?.onboarding_completed;
+    if (isCompleted) {
+      await saveDraft();
+      qc.invalidateQueries({ queryKey: ["current-user"] });
+      qc.invalidateQueries({ queryKey: ["my-onboarding"] });
+      return;
+    }
     if (!allFollowed) { toast.error("Please follow all our social channels and tick each box"); return; }
     if (!allReviewed) { toast.error("Please leave a review on each platform and tick each box"); return; }
     setSubmitting(true);
@@ -227,14 +234,18 @@ function CompleteOnboardingPage() {
     return <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading…</div>;
   }
 
+  const alreadyCompleted = !!(data?.profile as { onboarding_completed?: boolean } | null)?.onboarding_completed;
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <header>
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-          <ClipboardCheck className="h-6 w-6 text-primary" /> Complete your onboarding
+          <ClipboardCheck className="h-6 w-6 text-primary" /> {alreadyCompleted ? "My profile" : "Complete your onboarding"}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Fill in your details, upload the required documents, then follow &amp; review Colladome. Access to the tool unlocks once everything is submitted.
+          {alreadyCompleted
+            ? "Update your details, documents, and social links anytime."
+            : "Fill in your details, upload the required documents, then follow & review Colladome. Access to the tool unlocks once everything is submitted."}
         </p>
       </header>
 
@@ -356,7 +367,7 @@ function CompleteOnboardingPage() {
               />
             ))}
           </section>
-          {(!allFollowed || !allReviewed) && (
+          {(!allFollowed || !allReviewed) && !alreadyCompleted && (
             <p className="text-xs text-muted-foreground">Tick every box above to enable the Complete onboarding button.</p>
           )}
         </CardContent>
@@ -366,8 +377,8 @@ function CompleteOnboardingPage() {
         <Button variant="outline" onClick={() => saveDraft()} disabled={saving || submitting}>
           {saving ? "Saving…" : "Save progress"}
         </Button>
-        <Button className="gradient-primary" onClick={submit} disabled={submitting || !allFollowed || !allReviewed}>
-          {submitting ? "Submitting…" : "Complete onboarding"}
+        <Button className="gradient-primary" onClick={submit} disabled={submitting || (!alreadyCompleted && (!allFollowed || !allReviewed))}>
+          {submitting ? "Submitting…" : alreadyCompleted ? "Save changes" : "Complete onboarding"}
         </Button>
       </div>
     </div>

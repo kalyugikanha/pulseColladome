@@ -24,6 +24,7 @@ const employeeItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Punch In/Out", url: "/punch", icon: Clock },
   { title: "My Tasks", url: "/tasks", icon: ListChecks },
+  { title: "My Timesheet", url: "/my-timesheet", icon: TableProperties },
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Leave", url: "/leave", icon: CalendarRange },
   { title: "Team Calendar", url: "/calendar", icon: CalendarDays },
@@ -112,11 +113,6 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                 )}
                 {(canManageProjects || isDepartmentHead || isReportingManager) && (
                   <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
-                        <Link to="/hours-editor"><Clock /><span>Hours Editor</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/timesheet")}>
                         <Link to="/timesheet"><TableProperties /><span>Timesheet</span></Link>

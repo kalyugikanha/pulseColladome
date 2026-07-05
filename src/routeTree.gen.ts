@@ -24,9 +24,9 @@ import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProjectBurnRouteImport } from './routes/_authenticated/project-burn'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedMyTimesheetRouteImport } from './routes/_authenticated/my-timesheet'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
-import { Route as AuthenticatedHoursEditorRouteImport } from './routes/_authenticated/hours-editor'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -115,6 +115,12 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMyTimesheetRoute =
+  AuthenticatedMyTimesheetRouteImport.update({
+    id: '/my-timesheet',
+    path: '/my-timesheet',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
   id: '/meetings',
   path: '/meetings',
@@ -125,12 +131,6 @@ const AuthenticatedLeaveRoute = AuthenticatedLeaveRouteImport.update({
   path: '/leave',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedHoursEditorRoute =
-  AuthenticatedHoursEditorRouteImport.update({
-    id: '/hours-editor',
-    path: '/hours-editor',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedFinancesRoute = AuthenticatedFinancesRouteImport.update({
   id: '/finances',
   path: '/finances',
@@ -191,9 +191,9 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
-  '/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
+  '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -219,9 +219,9 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
-  '/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
+  '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -249,9 +249,9 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
-  '/_authenticated/hours-editor': typeof AuthenticatedHoursEditorRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
+  '/_authenticated/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/project-burn': typeof AuthenticatedProjectBurnRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
@@ -279,9 +279,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/directory'
     | '/finances'
-    | '/hours-editor'
     | '/leave'
     | '/meetings'
+    | '/my-timesheet'
     | '/onboarding'
     | '/project-burn'
     | '/projects'
@@ -307,9 +307,9 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/directory'
     | '/finances'
-    | '/hours-editor'
     | '/leave'
     | '/meetings'
+    | '/my-timesheet'
     | '/onboarding'
     | '/project-burn'
     | '/projects'
@@ -336,9 +336,9 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/directory'
     | '/_authenticated/finances'
-    | '/_authenticated/hours-editor'
     | '/_authenticated/leave'
     | '/_authenticated/meetings'
+    | '/_authenticated/my-timesheet'
     | '/_authenticated/onboarding'
     | '/_authenticated/project-burn'
     | '/_authenticated/projects'
@@ -469,6 +469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/my-timesheet': {
+      id: '/_authenticated/my-timesheet'
+      path: '/my-timesheet'
+      fullPath: '/my-timesheet'
+      preLoaderRoute: typeof AuthenticatedMyTimesheetRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/meetings': {
       id: '/_authenticated/meetings'
       path: '/meetings'
@@ -481,13 +488,6 @@ declare module '@tanstack/react-router' {
       path: '/leave'
       fullPath: '/leave'
       preLoaderRoute: typeof AuthenticatedLeaveRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/hours-editor': {
-      id: '/_authenticated/hours-editor'
-      path: '/hours-editor'
-      fullPath: '/hours-editor'
-      preLoaderRoute: typeof AuthenticatedHoursEditorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/finances': {
@@ -564,9 +564,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
-  AuthenticatedHoursEditorRoute: typeof AuthenticatedHoursEditorRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
+  AuthenticatedMyTimesheetRoute: typeof AuthenticatedMyTimesheetRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedProjectBurnRoute: typeof AuthenticatedProjectBurnRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
@@ -588,9 +588,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
-  AuthenticatedHoursEditorRoute: AuthenticatedHoursEditorRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
+  AuthenticatedMyTimesheetRoute: AuthenticatedMyTimesheetRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedProjectBurnRoute: AuthenticatedProjectBurnRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,

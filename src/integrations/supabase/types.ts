@@ -16,10 +16,13 @@ export type Database = {
     Tables: {
       attendance_logs: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           daily_note: string | null
           date: string
           id: string
+          last_edited_by: string | null
           next_actions: string | null
           punch_in_time: string | null
           punch_out_time: string | null
@@ -29,10 +32,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           daily_note?: string | null
           date: string
           id?: string
+          last_edited_by?: string | null
           next_actions?: string | null
           punch_in_time?: string | null
           punch_out_time?: string | null
@@ -42,10 +48,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           daily_note?: string | null
           date?: string
           id?: string
+          last_edited_by?: string | null
           next_actions?: string | null
           punch_in_time?: string | null
           punch_out_time?: string | null

@@ -25,27 +25,36 @@ function TeamPage() {
   const [commentFor, setCommentFor] = useState<string | null>(null);
   const [comment, setComment] = useState("");
 
+  const canView = !!me && (me.isAdmin || me.isDepartmentHead);
+  const deptScope = !!me && !me.isAdmin && me.isDepartmentHead ? me.headOfDepartments : null;
+
   const { data } = useQuery({
-    queryKey: ["team", me?.id],
-    enabled: !!me?.isAdmin,
+    queryKey: ["team", me?.id, deptScope?.join(",") ?? "all"],
+    enabled: canView,
     queryFn: async () => {
-      const [people, todayAtt, pending, roles] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, email"),
+      let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
+      if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
+      const [people, todayAtt, roles] = await Promise.all([
+        peopleQ,
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", today),
-        supabase.rpc("admin_get_leave_requests", { _status: "pending" }),
         supabase.from("user_roles").select("user_id, role"),
       ]);
       const peopleList = people.data ?? [];
       const nameById = new Map(peopleList.map((p) => [p.id, p]));
-      const pendingWithUser = (pending.data ?? []).map((r: any) => ({
-        ...r,
-        user: nameById.get(r.user_id) ? { full_name: nameById.get(r.user_id)!.full_name, email: nameById.get(r.user_id)!.email } : null,
-      }));
+      const pendingReq = me?.isAdmin
+        ? await supabase.rpc("admin_get_leave_requests", { _status: "pending" })
+        : await supabase.from("leave_requests").select("*").eq("status", "pending");
+      const pendingWithUser = (pendingReq.data ?? [])
+        .filter((r: any) => !deptScope || nameById.has(r.user_id))
+        .map((r: any) => ({
+          ...r,
+          user: nameById.get(r.user_id) ? { full_name: nameById.get(r.user_id)!.full_name, email: nameById.get(r.user_id)!.email } : null,
+        }));
       return { people: peopleList, todayAtt: todayAtt.data ?? [], pending: pendingWithUser, roles: roles.data ?? [] };
     },
   });
 
-  if (me && !me.isAdmin) {
+  if (me && !canView) {
     throw redirect({ to: "/dashboard" });
   }
 
@@ -157,7 +166,7 @@ function TeamPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {isAdmin && <Badge className="gradient-primary"><Shield className="h-3 w-3 mr-1" /> Admin</Badge>}
-                      {!isSelf && (
+                      {!isSelf && me?.isAdmin && (
                         <Button size="sm" variant="outline" onClick={() => toggleAdmin(p.id, !isAdmin)}>{isAdmin ? "Revoke admin" : "Make admin"}</Button>
                       )}
                     </div>

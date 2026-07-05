@@ -33,17 +33,22 @@ function TimesheetPage() {
   const [drill, setDrill] = useState<{ user: string; code: string; name: string; entries: Array<{ date: string; hours: number; comments?: string }> } | null>(null);
 
   useEffect(() => {
-    if (!meLoading && me && !(me.isAdmin || me.canManageProjects)) {
+    if (!meLoading && me && !(me.isAdmin || me.canManageProjects || me.isDepartmentHead)) {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [me, meLoading, navigate]);
 
-  const canView = !!me && (me.isAdmin || me.canManageProjects);
+  const canView = !!me && (me.isAdmin || me.canManageProjects || me.isDepartmentHead);
+  const deptScope = !!me && !me.isAdmin && !me.canManageProjects && me.isDepartmentHead ? me.headOfDepartments : null;
 
   const { data: profiles } = useQuery({
-    queryKey: ["ts-profiles"],
+    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all"],
     enabled: canView,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department")).data as Profile[] ?? [],
+    queryFn: async () => {
+      let q = supabase.from("profiles").select("id, full_name, email, department");
+      if (deptScope && deptScope.length) q = q.in("department", deptScope);
+      return (await q).data as Profile[] ?? [];
+    },
   });
 
   const { data: logs } = useQuery({

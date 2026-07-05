@@ -36,7 +36,7 @@ function HoursEditorPage() {
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (!meLoading && me && !me.canManageProjects) navigate({ to: "/dashboard", replace: true });
+    if (!meLoading && me && !(me.canManageProjects || me.isDepartmentHead)) navigate({ to: "/dashboard", replace: true });
   }, [me, meLoading, navigate]);
 
 
@@ -47,12 +47,17 @@ function HoursEditorPage() {
   const [addFor, setAddFor] = useState<string | null>(null);
   const [addCode, setAddCode] = useState<string>("");
 
-  const enabled = !!me?.isSuperAdmin;
+  const enabled = !!me && (me.canManageProjects || me.isDepartmentHead);
+  const deptScope = !!me && !me.canManageProjects && me.isDepartmentHead ? me.headOfDepartments : null;
 
   const { data: profiles } = useQuery({
-    queryKey: ["hours-editor-profiles"],
+    queryKey: ["hours-editor-profiles", deptScope?.join(",") ?? "all"],
     enabled,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department, is_placeholder").order("full_name")).data as Profile[] ?? [],
+    queryFn: async () => {
+      let q = supabase.from("profiles").select("id, full_name, email, department, is_placeholder").order("full_name");
+      if (deptScope && deptScope.length) q = q.in("department", deptScope);
+      return (await q).data as Profile[] ?? [];
+    },
   });
 
   const { data: projects } = useQuery({

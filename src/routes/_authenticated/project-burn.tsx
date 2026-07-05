@@ -287,7 +287,7 @@ function ProjectBurnPage() {
         <CardHeader><CardTitle>Burn by project</CardTitle></CardHeader>
         <CardContent>
           {byProject.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-8 text-center">No time logged this month for users with salaries set.</div>
+            <div className="text-sm text-muted-foreground py-8 text-center">{showCosts ? "No time logged this month for users with salaries set." : "No time logged this month."}</div>
           ) : (
             <Table>
               <TableHeader><TableRow>

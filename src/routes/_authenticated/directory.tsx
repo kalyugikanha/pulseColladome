@@ -42,10 +42,19 @@ function DirectoryPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<"active" | "inactive" | "all">("active");
   const [editing, setEditing] = useState<Profile | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Profile | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const setActiveFn = useServerFn(setUserActive);
+  const deleteFn = useServerFn(deleteUserPermanently);
 
   const canView = !!me && (me.isSuperAdmin || me.isAdmin || me.isHrAdmin || me.isDepartmentHead || me.isReportingManager);
   const canEdit = !!me && (me.isSuperAdmin || me.isHrAdmin);
+  const canHardDelete = !!me && me.isSuperAdmin;
+
 
   const { data: profiles } = useQuery({
     queryKey: ["directory-profiles"],

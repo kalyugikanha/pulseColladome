@@ -143,6 +143,43 @@ function DirectoryPage() {
     qc.invalidateQueries({ queryKey: ["directory-profiles"] });
   }
 
+  async function toggleActive(p: Profile, active: boolean) {
+    if (!canEdit) return;
+    setBusy(true);
+    try {
+      await setActiveFn({ data: { user_id: p.id, active } });
+      toast.success(active ? "Reactivated" : "Deactivated");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["directory-profiles"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function hardDelete() {
+    if (!confirmDelete || !canHardDelete) return;
+    if (deleteConfirmText.trim().toLowerCase() !== (confirmDelete.email ?? "").toLowerCase()) {
+      toast.error("Email does not match");
+      return;
+    }
+    setBusy(true);
+    try {
+      await deleteFn({ data: { user_id: confirmDelete.id } });
+      toast.success("User permanently deleted");
+      setConfirmDelete(null);
+      setDeleteConfirmText("");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["directory-profiles"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">

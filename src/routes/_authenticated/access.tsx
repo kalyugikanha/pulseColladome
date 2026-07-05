@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Shield, Trash2, UserPlus } from "lucide-react";
+import { Shield, Trash2, UserPlus, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/access")({
   component: AccessPage,

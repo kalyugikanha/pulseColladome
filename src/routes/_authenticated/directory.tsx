@@ -373,15 +373,74 @@ function DirectoryPage() {
               </Field>
             </div>
           )}
+          <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {editing && editing.id !== me?.userId && (
+                editing.is_active === false ? (
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => toggleActive(editing, true)}>
+                    <UserCheck className="h-3.5 w-3.5 mr-1" /> Reactivate
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => toggleActive(editing, false)}>
+                    <UserX className="h-3.5 w-3.5 mr-1" /> Deactivate
+                  </Button>
+                )
+              )}
+              {canHardDelete && editing && editing.id !== me?.userId && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => { setConfirmDelete(editing); setDeleteConfirmText(""); }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete permanently
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+              <Button className="gradient-primary" onClick={save} disabled={busy}>Save</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!confirmDelete} onOpenChange={(o) => { if (!o) { setConfirmDelete(null); setDeleteConfirmText(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Permanently delete user
+            </DialogTitle>
+            <DialogDescription>
+              This wipes the user's auth login, profile, attendance, leave, salary, and all related records.
+              This action <strong>cannot be undone</strong>. Consider Deactivate instead.
+            </DialogDescription>
+          </DialogHeader>
+          {confirmDelete && (
+            <div className="space-y-2">
+              <p className="text-sm">
+                Type <span className="font-mono font-semibold">{confirmDelete.email}</span> to confirm:
+              </p>
+              <Input
+                autoFocus
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder={confirmDelete.email ?? ""}
+              />
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button className="gradient-primary" onClick={save}>Save</Button>
+            <Button variant="outline" onClick={() => { setConfirmDelete(null); setDeleteConfirmText(""); }}>Cancel</Button>
+            <Button variant="destructive" onClick={hardDelete} disabled={busy}>
+              Delete permanently
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

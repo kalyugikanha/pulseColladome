@@ -149,18 +149,18 @@ function TimesheetPage() {
   }, [rowTotals]);
 
   function exportCsv() {
-    const header = ["Employee", "Email", ...projects.map((p) => `${p.code} ${p.name}`), "Total"];
-    const rows = users.map((u) => {
+    const header = ["Employee", "Email", ...filteredProjects.map((p) => `${p.code} ${p.name}`), "Total"];
+    const rows = filteredUsers.map((u) => {
       const name = u.profile?.full_name ?? u.profile?.email ?? u.id;
       const email = u.profile?.email ?? "";
       const uMap = pivot.cells.get(u.id) ?? new Map();
-      const cells = projects.map((p) => {
+      const cells = filteredProjects.map((p) => {
         const v = uMap.get(p.code) ?? 0;
         return v > 0 ? String(v) : "";
       });
       return [name, email, ...cells, String(rowTotals.get(u.id) ?? 0)];
     });
-    const totalRow = ["Total", "", ...projects.map((p) => String(colTotals.get(p.code) ?? 0)), String(grandTotal)];
+    const totalRow = ["Total", "", ...filteredProjects.map((p) => String(colTotals.get(p.code) ?? 0)), String(grandTotal)];
     const csv = [header, ...rows, totalRow]
       .map((r) => r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))
       .join("\n");

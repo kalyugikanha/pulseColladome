@@ -76,7 +76,7 @@ function AttendancePage() {
   async function decide(id: string, status: "approved" | "rejected", adminComment?: string) {
     const { error } = await supabase
       .from("leave_requests")
-      .update({ status, admin_comment: adminComment || null, decided_by: me!.id, decided_at: new Date().toISOString() })
+      .update({ status, admin_comment: adminComment || null, decided_by: me!.realId, decided_at: new Date().toISOString() })
       .eq("id", id);
     if (error) return toast.error(error.message);
     toast.success(`Leave ${status}`);

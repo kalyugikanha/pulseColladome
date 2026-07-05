@@ -34,11 +34,12 @@ function ProjectBurnPage() {
   const { deptScope, userScope } = useVisibilityScope(me);
 
   const { data: profiles } = useQuery({
-    queryKey: ["pb-profiles", deptScope?.join(",") ?? "all"],
+    queryKey: ["pb-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let q = supabase.from("profiles").select("id, full_name, email, department");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
+      if (userScope && userScope.length) q = q.in("id", userScope);
       return (await q).data as Profile[] ?? [];
     },
   });
@@ -60,16 +61,18 @@ function ProjectBurnPage() {
     },
   });
 
+  const visibleUserIds = useMemo(() => (profiles ?? []).map((p) => p.id), [profiles]);
+  const hasScope = !!deptScope || !!userScope;
+
   const { data: logs } = useQuery({
-    queryKey: ["pb-logs", month, deptScope?.join(",") ?? "all"],
-    enabled: canView,
+    queryKey: ["pb-logs", month, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
     queryFn: async () => {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
       let q = supabase.from("attendance_logs").select("user_id, date, tasks").gte("date", start).lt("date", end).order("date");
-      // Scope logs to department members when viewer is a dept head only.
-      // (RLS already limits what they can read, but this trims payload.)
+      if (hasScope) q = q.in("user_id", visibleUserIds);
       return (await q).data as LogRow[] ?? [];
     },
   });

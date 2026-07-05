@@ -38,10 +38,11 @@ function googleErrorMessage(error: string, description: string | null) {
 
   if (error === "access_denied") {
     return `
-      <h2 class="err">Google Calendar permission denied</h2>
-      <p>Make sure the Google Calendar API is enabled and this Google account is allowed on the OAuth consent screen.</p>
+      <h2 class="err">Google Calendar access blocked by Google</h2>
+      <p>Google accepted the callback URL, but blocked this account because the OAuth consent screen has not completed Google verification or the account is not approved for testing.</p>
+      <p>If the consent screen is in <strong>Testing</strong>, add the signed-in Google account as a test user.</p>
+      <p>For access by people outside the test-user list, publish the consent screen and complete Google's verification process for the requested Calendar scopes.</p>
       <p>The required Calendar scopes are read access plus event booking access.</p>
-      <p>If the consent screen is in Testing, add this Google account as a test user.</p>
     `;
   }
 

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CalendarDays, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ function GoogleCalendarLaunchPage() {
   const getUrl = useServerFn(getGoogleAuthUrl);
   const disconnect = useServerFn(disconnectGoogleCalendar);
   const [error, setError] = useState<string | null>(null);
-  const [started, setStarted] = useState(false);
+  const launchStartedRef = useRef(false);
 
   const googleCloudChecklist = useMemo(
     () => [
@@ -44,8 +44,8 @@ function GoogleCalendarLaunchPage() {
     let cancelled = false;
 
     async function launch() {
-      if (started) return;
-      setStarted(true);
+      if (launchStartedRef.current) return;
+      launchStartedRef.current = true;
       setError(null);
 
       try {
@@ -77,7 +77,7 @@ function GoogleCalendarLaunchPage() {
     return () => {
       cancelled = true;
     };
-  }, [disconnect, getUrl, reconnect, started]);
+  }, [disconnect, getUrl, reconnect]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8">

@@ -235,20 +235,20 @@ function TimesheetPage() {
         <CardHeader>
           <CardTitle>Employee × Project — {month}</CardTitle>
           <CardDescription>
-            {users.length} employee{users.length === 1 ? "" : "s"} · {projects.length} project{projects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs
+            {filteredUsers.length} employee{filteredUsers.length === 1 ? "" : "s"} · {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs
             {" · "}Click a cell for the day-by-day breakdown.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {users.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-10 text-center">No hours logged in {month}.</div>
+          {filteredUsers.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-10 text-center">No hours logged in {month} for the selected filters.</div>
           ) : (
             <div className="overflow-auto max-h-[70vh] border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="sticky left-0 bg-card z-20 min-w-[200px]">Employee</TableHead>
-                    {projects.map((p) => (
+                    {filteredProjects.map((p) => (
                       <TableHead key={p.code} className="text-right whitespace-nowrap">
                         <div className="font-mono text-[10px] text-muted-foreground">{p.code}</div>
                         <div className="text-xs">{p.name}</div>
@@ -258,7 +258,7 @@ function TimesheetPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u) => {
+                  {filteredUsers.map((u) => {
                     const uMap = pivot.cells.get(u.id) ?? new Map<string, number>();
                     const name = u.profile?.full_name ?? u.profile?.email ?? "—";
                     return (
@@ -267,7 +267,7 @@ function TimesheetPage() {
                           <div className="font-medium">{name}</div>
                           {u.profile?.department && <div className="text-[10px] text-muted-foreground">{u.profile.department}</div>}
                         </TableCell>
-                        {projects.map((p) => {
+                        {filteredProjects.map((p) => {
                           const v = uMap.get(p.code) ?? 0;
                           return (
                             <TableCell key={p.code} className="text-right">
@@ -296,7 +296,7 @@ function TimesheetPage() {
                   })}
                   <TableRow className="border-t-2">
                     <TableCell className="sticky left-0 bg-card z-10 font-semibold">Total</TableCell>
-                    {projects.map((p) => (
+                    {filteredProjects.map((p) => (
                       <TableCell key={p.code} className="text-right font-semibold">{(colTotals.get(p.code) ?? 0).toFixed(1)}</TableCell>
                     ))}
                     <TableCell className="text-right sticky right-0 bg-card z-10 font-bold">{grandTotal.toFixed(1)}</TableCell>

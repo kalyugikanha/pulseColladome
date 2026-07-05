@@ -228,7 +228,7 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
           .from("profiles").select("id, full_name, department").eq("email", em).maybeSingle();
 
         if (existing) {
-          const patch: Record<string, unknown> = { department: entry.department };
+          const patch: { department: string; full_name?: string } = { department: entry.department };
           const currentName = (existing.full_name ?? "").trim().toLowerCase();
           const emailLocal = em.split("@")[0].toLowerCase();
           if (!currentName || currentName === emailLocal) {

@@ -32,11 +32,14 @@ export function useCurrentUser() {
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      const [{ data: profile }, { data: roles }, { data: sa }] = await Promise.all([
+      const [{ data: profile }, { data: roles }, { data: sa }, { data: headRows }] = await Promise.all([
         supabase.from("profiles").select("full_name, email, must_change_password, onboarding_completed").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase.from("super_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+        supabase.from("department_heads").select("department").eq("user_id", user.id),
       ]);
+      const realHeadOf = (headRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
+
       const isSuperAdmin = !!sa;
       const email = profile?.email ?? user.email ?? null;
       const realAdmin = isSuperAdmin || !!roles?.some((r) => r.role === "admin");

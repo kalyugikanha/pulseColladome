@@ -272,6 +272,12 @@ function ProjectBurnPage() {
             onChange={setDeptSel}
             includeUnassigned
           />
+          <MultiSelectFilter
+            label="Employee"
+            options={(profiles ?? []).map((p) => ({ value: p.id, label: p.full_name ?? p.email ?? "—", sub: p.email ?? undefined }))}
+            selected={empSel}
+            onChange={setEmpSel}
+          />
           <Select value={projectFilter} onValueChange={setProjectFilter}>
             <SelectTrigger className="w-52 h-9 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>

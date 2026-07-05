@@ -1,54 +1,62 @@
-## Goal
-1. Let super admins pick a **department** when they create an account or grant a role on `/access`, and show departments in the current-grants list.
-2. Add a **Department filter** on the admin analytics pages that list many people (Timesheet, Project Burn, Hours Editor, Finances), and add a **Project filter** on Timesheet (Project Burn already has one).
+## Why departments aren't showing in Current grants
+Every row in `role_grants` currently has `department = NULL` — the bulk provisioner writes it but hasn't been (re-)run since the column was added, and older grants pre-date the form field. The badge renders only when set, so the list looks empty. Fix = backfill from the canonical roster + from existing `profiles.department`, then keep future writes flowing (already wired).
 
-## Where "departments" come from
-There's no fixed department table — `profiles.department` is free text seeded by `role_grants.department` on first sign-in and editable from onboarding/profile. Filters will populate their options from the distinct set of `department` values present in the loaded profiles for that page, plus an "Unassigned" bucket for rows with no department. No new tables.
+## Plan
 
-## Changes
+### 1. Backfill departments on `role_grants`
+One-shot data update:
+- For every email in the hardcoded `TEAM_ROSTER` (`src/lib/admin-users.functions.ts`), copy `department` into `role_grants.department` where it's null.
+- For any other grant whose matching `profiles.email` has a non-null `department`, copy that value across.
+- Verify on `/access` → Current grants list now shows department badges.
 
-### 1. `/access` — add Department to both forms and show it in the list
-`src/routes/_authenticated/access.tsx`
-- **Create account** card: add a "Department" input (free text, with a `<datalist>` of existing departments pulled from `profiles`). Pass it as `department` in `createTeamUser({ data: ... })`.
-- **Grant a role** card: add a "Department" input with the same datalist. Include `department` in the `role_grants` upsert (`department` column already exists).
-- **Current grants** list: show a department badge next to the role badge when set. Order the list by department, then email.
+### 2. Reusable "Department Head" concept
+Data model (single migration):
+- New enum value `department_head` on `app_role` (piggybacks on the existing `user_roles` table + `has_role()` function — no new tables).
+- New table `public.department_heads (department text primary key, user_id uuid references auth.users on delete cascade, created_at, updated_at)` with GRANTs, RLS, and update trigger. This is the "who leads which department" mapping (one head per department, generalizable to any department).
+- RLS: `authenticated` can `SELECT`; only super admins / admins can `INSERT/UPDATE/DELETE`.
+- Security-definer helper `public.is_department_head_of(_user_id uuid, _department text) returns boolean` for policy reuse.
+- Security-definer helper `public.user_department(_user_id uuid) returns text` reading `profiles.department` (used inside policies so we don't recurse on `profiles`).
 
-`src/lib/admin-users.functions.ts`
-- In `createTeamUser`, include `department: data.department ?? null` in the `role_grants` upsert (currently only writes to profiles after user creation). This makes department persist even for grants that never trigger user creation, and matches the `bulkProvisionTeam` behavior.
+Grant Kanishka the role in the same migration:
+- Insert `('Marketing', <kanishka_user_id>)` into `department_heads`.
+- Insert `department_head` role into `user_roles` for her.
+- Also ensure her `profiles.department = 'Marketing'` and `role_grants.department = 'Marketing'`.
 
-No new server functions and no migration — `role_grants.department` and `profiles.department` already exist.
+### 3. Permissions — "Full department manager" for the head's department
+Extend RLS policies (additive — existing admin/self policies stay):
 
-### 2. Shared UI helper — `DepartmentFilter`
-New file `src/components/department-filter.tsx`: a multi-select popover (checkbox list) built from the existing `Popover` + `Checkbox` primitives.
-- Props: `departments: string[]`, `selected: Set<string>`, `onChange(next: Set<string>): void`, optional `includeUnassigned?: boolean` (default true).
-- UI: button showing "All departments" or "N selected" / the single name; popover with a search input, "All" / "None" quick actions, checkbox per department, and an "Unassigned" row when enabled.
-- Empty selection = no filter (show everyone).
+- **`profiles`**: dept head may `SELECT` and `UPDATE` rows where `user_department(profiles.id) = <their dept>`. Sensitive columns (salary-adjacent) stay off-limits — salary lives on `salaries`, which we do NOT expand.
+- **`leave_requests`**: dept head may `SELECT` all requests for their dept and `UPDATE` `status` / `admin_note` (approve/reject). Existing `handle_leave_status_change` trigger already updates balances.
+- **`attendance_logs` + `punch_sessions`**: dept head may `SELECT` and `UPDATE` (edit hours) rows belonging to users in their dept.
+- **`tasks`**: dept head may `SELECT / INSERT / UPDATE / DELETE` tasks whose `assignee_id` is in their dept (assign & manage tasks).
+- **`projects`**: dept head may `SELECT` all projects and `UPDATE` those where any member is in their dept — keeps project ownership with PMs/admins but lets her adjust team-scope details. (Confirm during implementation whether `projects.members` is an array column or via a join table; adjust predicate accordingly.)
+- **`salaries` / `employee_bank_details` / `vendor_payments` / `role_grants` / `super_admins`**: NO change — dept head cannot see or edit salary or access controls.
 
-### 3. Wire the filter into admin views
+### 4. Client-side surfacing
+Extend `useCurrentUser` (`src/hooks/use-current-user.ts`):
+- Fetch `department_heads` row where `user_id = auth uid` → expose `headOfDepartments: string[]` and `isDepartmentHead: boolean` on `CurrentUser`.
+- Preserve the same fields for the impersonated view when a super admin uses view-as.
 
-#### `src/routes/_authenticated/timesheet.tsx`
-- Add `DepartmentFilter` next to the existing month picker. Filter the pivoted `users` array by `profile.department` (treat missing as "Unassigned").
-- Add a **Project filter** (reuse the same multi-select pattern for `projects`) that hides non-selected project columns (and their totals). Empty = all projects.
-- CSV export respects both filters.
+Route gating (`src/routes/_authenticated/route.tsx`): treat `isDepartmentHead` as a manager-tier permission for showing:
+- `/leave` admin tab, `/hours-editor`, `/tasks` assign UI, `/timesheet`, `/project-burn` — same items admins see, but scoped by the RLS above.
 
-#### `src/routes/_authenticated/project-burn.tsx`
-- Add `DepartmentFilter` beside the existing project single-select. Filter `dailyRows`, `byProject`, and the trend data by `profileById.get(user_id)?.department`.
-- Update the header count line to reflect filtered totals.
+Scope filtering in admin views (no new logic, just seed the filter):
+- On `/hours-editor`, `/timesheet`, `/project-burn`, `/finances`, when the current user is a dept head (and not admin), default the Department multi-select to their `headOfDepartments` and disable "Select all" (they can still narrow further).
+- `/leave` admin tab: filter list to their department(s).
+- `/access`: dept heads do NOT get access here (super admin / hr_admin only, unchanged).
 
-#### `src/routes/_authenticated/hours-editor.tsx`
-- Add `DepartmentFilter` above the employees table. Filter the sorted `Profile[]` rows before rendering.
+### 5. UI badges
+- `/access` → Current grants: show `Marketing Head` badge when the user has both `department_head` role and a matching `department_heads` row.
+- `/team` roster: small "Head" chip next to the head's name in their department.
 
-#### `src/routes/_authenticated/finances.tsx`
-- Load `department` alongside `id, full_name, email` in the `finances-profiles` query.
-- Add `DepartmentFilter` above the roster table; filter the rendered rows. Roll-up stat cards keep counting the full roster (unchanged) — the filter only affects the visible list.
-
-### Out of scope
-- No filter on `/punch`, `/tasks`, `/leave`, `/dashboard` — those are personal views, not multi-user rosters.
-- No structured "departments" table or admin CRUD screen — departments remain free text, matching the current model. Colors on `/calendar` continue to come from `department_settings`.
-- No changes to RLS or migrations.
+### Out of scope (per your note — you'll define more later)
+- No admin CRUD screen for assigning department heads yet (Kanishka seeded via migration; we'll add a "Manage department heads" card on `/access` in a follow-up once you list what else she'll be doing).
+- No changes to salary visibility, vendor payments, or access-control tables.
+- No changes to `/dashboard` personal widgets.
 
 ## Verification
-1. On `/access`, create a test grant with a new department "QA"; refresh → the "QA" tag appears in Current grants, and the datalist offers "QA" next time.
-2. On `/timesheet`, pick month, select department "Marketing" → only Marketing employees rows shown; select projects → columns narrow; CSV matches.
-3. On `/project-burn`, pick a department → burn stats and daily table restrict to that department's contributions; combined with an existing project filter still works.
-4. On `/hours-editor` and `/finances`, department filter narrows the visible employee rows; clearing selection restores full list.
+1. `/access` → Current grants shows department badges for the whole roster, incl. `Marketing` for Kanishka + a `Marketing Head` badge.
+2. Sign in as Kanishka → sidebar shows manager pages; `/hours-editor` and `/timesheet` open pre-filtered to Marketing; opening a non-Marketing employee returns empty by RLS.
+3. Kanishka approves a Marketing leave request → status flips, balance decrements via existing trigger. Approving a non-Marketing request fails (RLS).
+4. Kanishka cannot see `/finances` salary values (kept admin-only) and cannot open `/access`.
+5. Admin/super admin behavior unchanged.

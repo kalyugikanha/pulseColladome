@@ -66,6 +66,24 @@ function AccessPage() {
     },
   });
 
+  const { data: heads } = useQuery({
+    queryKey: ["access-department-heads"],
+    enabled: !!me?.isSuperAdmin,
+    queryFn: async () => {
+      const { data: dh } = await supabase.from("department_heads").select("department, user_id");
+      const ids = (dh ?? []).map((r) => r.user_id);
+      if (ids.length === 0) return {} as Record<string, string>;
+      const { data: profs } = await supabase.from("profiles").select("id, email").in("id", ids);
+      const emailToDept: Record<string, string> = {};
+      for (const row of dh ?? []) {
+        const p = (profs ?? []).find((x) => x.id === row.user_id);
+        if (p?.email) emailToDept[p.email.toLowerCase()] = row.department;
+      }
+      return emailToDept;
+    },
+  });
+
+
   async function addGrant() {
     const em = email.trim().toLowerCase();
     if (!em || !em.includes("@")) return toast.error("Valid email required");
@@ -240,7 +258,11 @@ function AccessPage() {
                 <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1 flex-wrap">
                   <Badge variant="outline" className="capitalize">{g.role.replace("_", " ")}</Badge>
                   {g.department && <Badge variant="secondary">{g.department}</Badge>}
+                  {heads?.[g.email.toLowerCase()] && (
+                    <Badge className="gradient-primary"><Shield className="h-3 w-3 mr-1" />{heads[g.email.toLowerCase()]} Head</Badge>
+                  )}
                   {g.is_super_admin && <Badge className="gradient-primary"><Shield className="h-3 w-3 mr-1" /> Super admin</Badge>}
+
                 </div>
               </div>
               <Button variant="ghost" size="icon" onClick={() => removeGrant(g.email)}><Trash2 className="h-4 w-4" /></Button>

@@ -30,7 +30,7 @@ const employeeItems = [
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
 ] as const;
 
-function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();
@@ -75,12 +75,12 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {(isAdmin || canManageProjects || isHrAdmin) && (
+        {(isAdmin || canManageProjects || isHrAdmin || isDepartmentHead) && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {isAdmin && (
+                {(isAdmin || isDepartmentHead) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/team")}>
                       <Link to="/team"><Users /><span>Team</span></Link>
@@ -94,14 +94,16 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                         <Link to="/finances"><Wallet /><span>Finances</span></Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/project-burn")}>
-                        <Link to="/project-burn"><Flame /><span>Project Burn</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                   </>
                 )}
-                {canManageProjects && (
+                {(isFinanceAdmin || isDepartmentHead) && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/project-burn")}>
+                      <Link to="/project-burn"><Flame /><span>Project Burn</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {(canManageProjects || isDepartmentHead) && (
                   <>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/hours-editor")}>
@@ -115,6 +117,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuItem>
                   </>
                 )}
+
                 {(isSuperAdmin || isHrAdmin) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/onboarding")}>
@@ -189,7 +192,7 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} canManageProjects={user.canManageProjects} fullName={user.fullName} email={user.email} />
+        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} fullName={user.fullName} email={user.email} />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />

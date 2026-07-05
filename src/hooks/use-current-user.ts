@@ -14,11 +14,14 @@ export type CurrentUser = {
   isFinanceAdmin: boolean;
   isHrAdmin: boolean;
   canManageProjects: boolean;
+  isDepartmentHead: boolean;
+  headOfDepartments: string[];
   mustChangePassword: boolean;
   onboardingCompleted: boolean;
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
   realIsHrAdmin: boolean;
+
 };
 
 export function useCurrentUser() {
@@ -29,11 +32,14 @@ export function useCurrentUser() {
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      const [{ data: profile }, { data: roles }, { data: sa }] = await Promise.all([
+      const [{ data: profile }, { data: roles }, { data: sa }, { data: headRows }] = await Promise.all([
         supabase.from("profiles").select("full_name, email, must_change_password, onboarding_completed").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase.from("super_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+        supabase.from("department_heads").select("department").eq("user_id", user.id),
       ]);
+      const realHeadOf = (headRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
+
       const isSuperAdmin = !!sa;
       const email = profile?.email ?? user.email ?? null;
       const realAdmin = isSuperAdmin || !!roles?.some((r) => r.role === "admin");
@@ -77,6 +83,8 @@ export function useCurrentUser() {
         isFinanceAdmin: vIsFinance,
         isHrAdmin: vIsHr,
         canManageProjects: vCanManageProjects,
+        isDepartmentHead: realHeadOf.length > 0,
+        headOfDepartments: realHeadOf,
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         onboardingCompleted: !!(profile as { onboarding_completed?: boolean } | null)?.onboarding_completed,
         viewingAs,
@@ -85,5 +93,6 @@ export function useCurrentUser() {
       };
 
     },
+
   });
 }

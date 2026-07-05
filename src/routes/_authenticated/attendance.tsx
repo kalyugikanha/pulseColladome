@@ -47,14 +47,14 @@ function AttendancePage() {
       const pendingReq = me?.isAdmin
         ? await supabase.rpc("admin_get_leave_requests", { _status: "pending" })
         : await supabase.from("leave_requests").select("*").eq("status", "pending");
-      const pendingWithUser = (pendingReq.data ?? [])
-        .filter((r: { user_id: string }) => nameById.has(r.user_id) || me?.isAdmin)
-        .map((r: Record<string, unknown> & { user_id: string }) => ({
+      const pendingWithUser = ((pendingReq.data ?? []) as Array<Record<string, unknown> & { user_id: string }>)
+        .filter((r) => nameById.has(r.user_id) || me?.isAdmin)
+        .map((r) => ({
           ...r,
           user: nameById.get(r.user_id)
             ? { full_name: nameById.get(r.user_id)!.full_name, email: nameById.get(r.user_id)!.email }
             : null,
-        })) as Array<{
+        })) as unknown as Array<{
           id: string;
           leave_type: string;
           days: number;

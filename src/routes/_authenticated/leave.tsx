@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -12,13 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Plus } from "lucide-react";
+import { Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInCalendarDays } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/leave")({
   component: LeavePage,
 });
+
 
 const TYPES = [
   { v: "casual", l: "Casual" },
@@ -57,6 +58,38 @@ function LeavePage() {
     qc.invalidateQueries();
   }
 
+  const { data: manageable } = useQuery({
+    queryKey: ["leave-manageable", me?.id, me?.isAdmin],
+    enabled: !!me,
+    queryFn: async () => {
+      if (me!.isAdmin) {
+        const { data } = await supabase.from("profiles")
+          .select("id, full_name, email, department")
+          .eq("is_active", true)
+          .neq("id", me!.id)
+          .order("full_name", { ascending: true });
+        return data ?? [];
+      }
+      const [{ data: heads }, { data: reports }] = await Promise.all([
+        supabase.from("department_heads").select("department").eq("user_id", me!.id),
+        supabase.from("profiles").select("id, full_name, email, department").eq("reporting_manager_id", me!.id).eq("is_active", true),
+      ]);
+      const depts = (heads ?? []).map((h) => h.department).filter(Boolean) as string[];
+      let deptPeople: any[] = [];
+      if (depts.length > 0) {
+        const { data } = await supabase.from("profiles")
+          .select("id, full_name, email, department")
+          .in("department", depts)
+          .eq("is_active", true)
+          .neq("id", me!.id);
+        deptPeople = data ?? [];
+      }
+      const merged = new Map<string, any>();
+      [...(reports ?? []), ...deptPeople].forEach((p) => merged.set(p.id, p));
+      return Array.from(merged.values()).sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? ""));
+    },
+  });
+
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4 flex-wrap">
@@ -64,27 +97,33 @@ function LeavePage() {
           <h1 className="font-display text-3xl font-bold">Leave</h1>
           <p className="text-muted-foreground text-sm mt-1">Request time off and track your balances.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button className="gradient-primary"><Plus className="h-4 w-4 mr-1" /> Request leave</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle className="font-display">New leave request</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1"><Label>Type</Label>
-                <Select value={type} onValueChange={(v) => setType(v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}</SelectContent>
-                </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          {(manageable?.length ?? 0) > 0 && (
+            <LogForTeammateDialog people={manageable ?? []} onSaved={() => qc.invalidateQueries()} />
+          )}
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button className="gradient-primary"><Plus className="h-4 w-4 mr-1" /> Request leave</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle className="font-display">New leave request</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1"><Label>Type</Label>
+                  <Select value={type} onValueChange={(v) => setType(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+                  <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+                </div>
+                <div className="space-y-1"><Label>Reason</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-                <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
-              </div>
-              <div className="space-y-1"><Label>Reason</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
-            </div>
-            <DialogFooter><Button onClick={submit} className="gradient-primary">Submit</Button></DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter><Button onClick={submit} className="gradient-primary">Submit</Button></DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
+
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {TYPES.map((t) => {
@@ -125,3 +164,101 @@ function LeavePage() {
     </div>
   );
 }
+
+type ManageablePerson = { id: string; full_name: string | null; email: string | null; department: string | null };
+
+function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[]; onSaved: () => void }) {
+  const { data: me } = useCurrentUser();
+  const [open, setOpen] = useState(false);
+  const [userId, setUserId] = useState<string>("");
+  const [type, setType] = useState<"casual"|"sick"|"earned"|"unpaid">("casual");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const sortedPeople = useMemo(
+    () => [...people].sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "")),
+    [people],
+  );
+
+  function reset() {
+    setUserId(""); setType("casual"); setStart(""); setEnd(""); setComment("");
+  }
+
+  async function submit() {
+    if (!userId) return toast.error("Pick an employee");
+    if (!start || !end) return toast.error("Pick dates");
+    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (days <= 0) return toast.error("End must be after start");
+    if (!comment.trim()) return toast.error("Add a short note");
+    setBusy(true);
+    const { error } = await supabase.from("leave_requests").insert({
+      user_id: userId,
+      leave_type: type,
+      start_date: start,
+      end_date: end,
+      days,
+      reason: `Logged by ${me?.fullName ?? "manager"}`,
+      status: "approved",
+      admin_comment: comment.trim(),
+      decided_by: me!.id,
+      decided_at: new Date().toISOString(),
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Leave logged for teammate");
+    reset();
+    setOpen(false);
+    onSaved();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="gap-2"><UserPlus className="h-4 w-4" /> Log leave for teammate</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-display">Log leave on behalf of a teammate</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Employee</Label>
+            <Select value={userId} onValueChange={setUserId}>
+              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                {sortedPeople.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.full_name ?? p.email}{p.department ? ` · ${p.department}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Type</Label>
+            <Select value={type} onValueChange={(v) => setType(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+          </div>
+          <div className="space-y-1">
+            <Label>Comment</Label>
+            <Textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Reason / context (required)" />
+          </div>
+          <p className="text-xs text-muted-foreground">This will be recorded as an approved leave and will deduct from their balance.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="gradient-primary">{busy ? "Saving…" : "Log leave"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

@@ -206,7 +206,8 @@ function DayView({ empMap }: { empMap: Map<string, Employee> }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {rows.length === 0 && <p className="text-sm text-muted-foreground">Nobody's on leave that day.</p>}
+        {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
+        {!isLoading && rows.length === 0 && <p className="text-sm text-muted-foreground">Nobody's on leave that day.</p>}
         {TYPES.map((t) => {
           const list = byType.get(t.v) ?? [];
           if (list.length === 0) return null;

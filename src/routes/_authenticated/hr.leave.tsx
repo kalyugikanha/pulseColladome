@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,10 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { CalendarRange, Plus, Check, X } from "lucide-react";
 import { format, differenceInCalendarDays, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
+import { logLeaveForEmployee } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/_authenticated/hr/leave")({
   component: HrLeavePage,
@@ -459,6 +460,7 @@ function RequestsTable({ rows, empMap, onChanged }: { rows: LeaveRow[]; empMap: 
 }
 
 function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved: () => void }) {
+  const logLeaveFn = useServerFn(logLeaveForEmployee);
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState("");
   const [type, setType] = useState<LType>("casual");
@@ -484,15 +486,16 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
       end_date: end,
       days,
       reason: reason.trim() || "Logged by HR",
-      status: "approved" as const,
-      admin_comment: "Logged & approved by HR/Super Admin",
-      decided_at: new Date().toISOString(),
     };
-    const { error } = await supabase.from("leave_requests").insert(payload);
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success("Leave logged and approved — balance updated");
-    reset(); setOpen(false); onSaved();
+    try {
+      await logLeaveFn({ data: payload });
+      toast.success("Leave logged and approved — balance updated");
+      reset(); setOpen(false); onSaved();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
 

@@ -1,21 +1,23 @@
-## Fix: Leave request FK error for placeholder profiles
+## Plan
 
-Some active profiles (Anjali, Trisha, Deepak, Juhi, Manvi, Neetu) exist in `public.profiles` but have no matching `auth.users` row. Inserting a leave request for them fails the `leave_requests_user_id_fkey` FK.
+1. **Move HR leave logging into a server function**
+   - Add a protected backend function for “log leave for employee”.
+   - Gate it to super admin / HR admin only.
+   - Accept employee, leave type, dates, days, and note.
 
-### Changes
+2. **Resolve placeholder profile IDs before inserting**
+   - When the selected profile has no matching auth account, find the real auth user by email.
+   - If a real auth user exists, use that auth user ID for `leave_requests.user_id` instead of the placeholder profile ID.
+   - Also make sure the real profile row exists and has the employee details, so the leave appears under the right person.
 
-1. **New server function** `syncMissingAuthAccounts` in `src/lib/admin-users.functions.ts`
-   - Gated by super-admin check (`requireSupabaseAuth` + `has_role`/`super_admins`).
-   - Loads active profiles missing an `auth.users` row.
-   - For each: calls `supabaseAdmin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { full_name } })`.
-   - The existing `handle_new_user` trigger re-points FK-referenced rows (attendance_logs, leave_requests, tasks, salaries, etc.) from the placeholder profile id to the new auth id and deletes the placeholder.
-   - Returns `{ synced, alreadyOk, errors[] }`.
+3. **Handle missing accounts clearly**
+   - If no backend auth account exists for that employee email, return a clear message like: “This employee account is not synced yet. Run Sync missing accounts from Access first.”
+   - This avoids the raw foreign key error.
 
-2. **UI on `/access`** (admin/access page)
-   - Add a "Sync missing accounts" button next to the existing "Run provisioning" button.
-   - Reuse the same result panel format to show synced count and per-email errors.
+4. **Update the HR Leave UI**
+   - Replace the direct browser insert into `leave_requests` with the new server function call.
+   - Keep the existing form and success behavior unchanged.
 
-### Out of scope
-- Changing the `leave_requests.user_id` FK target.
-- Blocking the leave dialog client-side.
-- Any change to non-Colladome domain handling (trigger already enforces).
+5. **Verify Anjali’s case**
+   - Confirm the current selected Anjali row is the placeholder profile ID.
+   - After implementation, test logging 3 unpaid days in June and confirm the request is created without the foreign key error.

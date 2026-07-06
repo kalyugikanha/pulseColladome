@@ -190,14 +190,30 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
             {task.description && <p className="text-sm text-muted-foreground mb-4 whitespace-pre-wrap">{task.description}</p>}
 
-            <Tabs defaultValue="comments">
+            <Tabs defaultValue={(task as { is_multi_stage?: boolean }).is_multi_stage ? "workflow" : "comments"}>
               <TabsList className="w-full flex-wrap h-auto">
+                <TabsTrigger value="workflow"><Workflow className="h-3.5 w-3.5 mr-1" />Workflow</TabsTrigger>
                 <TabsTrigger value="comments"><MessageSquare className="h-3.5 w-3.5 mr-1" />Comments</TabsTrigger>
                 <TabsTrigger value="checklist"><ListChecks className="h-3.5 w-3.5 mr-1" />Checklist</TabsTrigger>
                 <TabsTrigger value="deps"><GitBranch className="h-3.5 w-3.5 mr-1" />Dependencies</TabsTrigger>
                 <TabsTrigger value="watchers"><Users className="h-3.5 w-3.5 mr-1" />Watchers</TabsTrigger>
                 <TabsTrigger value="history"><HistoryIcon className="h-3.5 w-3.5 mr-1" />History</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="workflow">
+                <TaskStagesPanel
+                  taskId={taskId!}
+                  canManage={
+                    !!me && (
+                      me.isAdmin || me.isSuperAdmin || me.canManageProjects ||
+                      me.isDepartmentHead || me.isReportingManager ||
+                      me.id === (task as { created_by?: string }).created_by ||
+                      isAssignee
+                    )
+                  }
+                />
+              </TabsContent>
+
 
               <TabsContent value="comments" className="space-y-3">
                 <div className="space-y-2">

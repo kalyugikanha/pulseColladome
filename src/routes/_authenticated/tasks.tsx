@@ -70,6 +70,8 @@ function TasksPage() {
   const [tax_, setTax] = useState<TaxonomyValue>({ domainId: null, departmentId: null, taskTypeIds: [] });
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [multiStage, setMultiStage] = useState(false);
+  const [stages, setStages] = useState<StageInput[]>([]);
 
   useEffect(() => {
     if (!open) return;

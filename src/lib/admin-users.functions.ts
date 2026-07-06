@@ -405,26 +405,53 @@ export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
     const alreadyOk: string[] = [];
     const errors: { email: string; message: string }[] = [];
 
+    const describeErr = (e: unknown) => {
+      if (!e) return "Unknown error";
+      if (e instanceof Error) return e.message || JSON.stringify(e);
+      if (typeof e === "object") {
+        const o = e as { message?: string; error_description?: string; error?: string; msg?: string };
+        return o.message || o.error_description || o.error || o.msg || JSON.stringify(e);
+      }
+      return String(e);
+    };
+
     for (const p of profiles ?? []) {
       const em = (p.email ?? "").trim().toLowerCase();
       if (!em || !em.includes("@")) continue;
       const domain = em.split("@")[1];
       if (domain !== "colladome.com" && domain !== "colladome.in") continue;
-      if (authEmails.has(em)) { alreadyOk.push(em); continue; }
-      const { error } = await supabaseAdmin.auth.admin.createUser({
-        email: em,
-        password: "Test@123",
-        email_confirm: true,
-        user_metadata: { full_name: p.full_name ?? em.split("@")[0] },
-      });
-      if (error) {
-        if (/already registered|already exists|duplicate/i.test(error.message)) {
-          alreadyOk.push(em);
-        } else {
-          errors.push({ email: em, message: error.message });
-        }
+
+      let authId: string | null = null;
+      if (authEmails.has(em)) {
+        const { data: existingId } = await supabaseAdmin.rpc("find_auth_user_id_by_email", { _email: em });
+        authId = (existingId as string | null) ?? null;
+        alreadyOk.push(em);
       } else {
-        synced.push(em);
+        const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
+          email: em,
+          password: "Test@123",
+          email_confirm: true,
+          user_metadata: { full_name: p.full_name ?? em.split("@")[0] },
+        });
+        if (error && !/already registered|already exists|duplicate/i.test(error.message ?? "")) {
+          errors.push({ email: em, message: describeErr(error) });
+          continue;
+        }
+        authId = created?.user?.id ?? null;
+        if (!authId) {
+          const { data: lookedUp } = await supabaseAdmin.rpc("find_auth_user_id_by_email", { _email: em });
+          authId = (lookedUp as string | null) ?? null;
+        }
+        if (authId) synced.push(em);
+      }
+
+      // Re-link profile row to the auth user id (handles placeholder profiles like Anjali).
+      if (authId && authId !== p.id) {
+        try {
+          await ensureProfileForAuthUser(supabaseAdmin, authId, p, context.userId);
+        } catch (e) {
+          errors.push({ email: em, message: `profile relink failed: ${describeErr(e)}` });
+        }
       }
     }
 

@@ -106,6 +106,7 @@ function OnboardingPage() {
   async function submit() {
     const em = email.trim().toLowerCase();
     if (!em || !em.includes("@")) return toast.error("Valid email required");
+    if (!/@colladome\.(com|in)$/i.test(em)) return toast.error("Email must be @colladome.com or @colladome.in");
     if (!fullName.trim()) return toast.error("Full name required");
     setSubmitting(true);
     try {

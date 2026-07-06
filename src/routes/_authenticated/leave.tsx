@@ -58,6 +58,38 @@ function LeavePage() {
     qc.invalidateQueries();
   }
 
+  const { data: manageable } = useQuery({
+    queryKey: ["leave-manageable", me?.id, me?.isAdmin],
+    enabled: !!me,
+    queryFn: async () => {
+      if (me!.isAdmin) {
+        const { data } = await supabase.from("profiles")
+          .select("id, full_name, email, department")
+          .eq("is_active", true)
+          .neq("id", me!.id)
+          .order("full_name", { ascending: true });
+        return data ?? [];
+      }
+      const [{ data: heads }, { data: reports }] = await Promise.all([
+        supabase.from("department_heads").select("department").eq("user_id", me!.id),
+        supabase.from("profiles").select("id, full_name, email, department").eq("reporting_manager_id", me!.id).eq("is_active", true),
+      ]);
+      const depts = (heads ?? []).map((h) => h.department).filter(Boolean) as string[];
+      let deptPeople: any[] = [];
+      if (depts.length > 0) {
+        const { data } = await supabase.from("profiles")
+          .select("id, full_name, email, department")
+          .in("department", depts)
+          .eq("is_active", true)
+          .neq("id", me!.id);
+        deptPeople = data ?? [];
+      }
+      const merged = new Map<string, any>();
+      [...(reports ?? []), ...deptPeople].forEach((p) => merged.set(p.id, p));
+      return Array.from(merged.values()).sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? ""));
+    },
+  });
+
   return (
     <div className="space-y-6">
       <header className="flex items-end justify-between gap-4 flex-wrap">
@@ -65,27 +97,33 @@ function LeavePage() {
           <h1 className="font-display text-3xl font-bold">Leave</h1>
           <p className="text-muted-foreground text-sm mt-1">Request time off and track your balances.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button className="gradient-primary"><Plus className="h-4 w-4 mr-1" /> Request leave</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle className="font-display">New leave request</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1"><Label>Type</Label>
-                <Select value={type} onValueChange={(v) => setType(v as any)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}</SelectContent>
-                </Select>
+        <div className="flex items-center gap-2 flex-wrap">
+          {(manageable?.length ?? 0) > 0 && (
+            <LogForTeammateDialog people={manageable ?? []} onSaved={() => qc.invalidateQueries()} />
+          )}
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button className="gradient-primary"><Plus className="h-4 w-4 mr-1" /> Request leave</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle className="font-display">New leave request</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1"><Label>Type</Label>
+                  <Select value={type} onValueChange={(v) => setType(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+                  <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+                </div>
+                <div className="space-y-1"><Label>Reason</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-                <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
-              </div>
-              <div className="space-y-1"><Label>Reason</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
-            </div>
-            <DialogFooter><Button onClick={submit} className="gradient-primary">Submit</Button></DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter><Button onClick={submit} className="gradient-primary">Submit</Button></DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </header>
+
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {TYPES.map((t) => {

@@ -1,35 +1,30 @@
-## Changes to `/finances`
+## Problem
 
-### 1. Hide employees not yet effective in the selected month
+For Manvi (and Trisha), the salary is ₹5,000/month effective **2026-06-15**, but the June "Actual salary" shows the full ₹5,000 instead of the expected ~half.
 
-An employee (profile or pending invite) is "effective in month M" when their **earliest salary `effective_from` (or, if no salary row yet, their profile `joined_on` / role_grant hint) is on or before the last day of M**. Currently the Salaries table and top cards include Sohil (joined July 1) and Shweksha (joined July 6) when June is selected.
+## Root cause
 
-- Load `joined_on` for profiles (already read via `select` — add the column).
-- Compute `earliestEffectiveByUser` = min(`salaries.effective_from`) per user; if none, use `profiles.joined_on`.
-- Filter both the **Salaries table rows** and the **top-card counts / totals** to only include profiles where `earliestEffective <= last day of selected month`.
-- Same treatment for `pendingGrants`: skip a grant if its matched profile (by email) isn't effective yet, or — for grants with no profile — hide until the invite has a `joined_on` or salary in-range (grants have no join date, so keep the current behavior: show them only when the current month is `>=` today's month — i.e. hide pending invites for past months).
+`monthlyContribByUser` in `src/routes/_authenticated/finances.tsx` walks every day of the month and, for each day, picks whichever salary row was active that day. If the user has an **earlier salary row** (e.g. a previous ₹5,000 record effective before June), days 1–14 are paid from the old row and days 15–30 from the new one — so the month total still adds up to ₹5,000. The "prorated from 2026-06-15" hint is shown based only on the newest row's date, hiding the fact that the earlier row is filling in the pre-15 days.
 
-### 2. Replace "Rate" with "Proposed salary" + "Actual salary"; reorder columns
+The top card ("Actual salary pool") uses the same map and inherits the same bug.
 
-New Salaries table columns, left→right:
+## Fix
 
-`Employee | Email | Status | Type | Effective from | Proposed salary | Actual salary`
+Change the proration so it uses **only the currently-effective salary** (the newest row with `effective_from ≤ monthEnd`), prorated across the days it actually covers within the selected month:
 
-- **Proposed salary** = the raw configured amount for the effective salary row (or from the invite grant when pending): monthly amount, or `<rate>/hr` for hourly comp. Same value the current "Rate" cell shows.
-- **Actual salary** = pro-rated for the selected month:
-  - **Monthly comp**: walk each day of the selected month, sum `monthly_salary / daysInMonth` for the days the salary was active (already computed in `monthlyContribByUser` — reuse it). If salary starts mid-month (e.g. Manvi June 15), this naturally yields `monthly_salary * 16/30`.
-  - **Hourly comp**: `hours logged that month × hourly_rate` (reuse existing `userHoursThisMonth`).
-  - Pending grants with no salary row yet: show `—` (nothing accrued).
-- Show a small `(prorated from <effective_from>)` hint under Actual when the salary started inside the selected month.
+```text
+effectiveDays = daysInMonth - max(0, day_of_month(effective_from) - 1)   // if effective_from is in this month
+             = daysInMonth                                                // if effective_from is before this month
+actual = monthly_salary * effectiveDays / daysInMonth
+```
 
-### 3. Update top cards to use "actual" numbers
+For Manvi in June: `5000 * 16 / 30 ≈ ₹2,666.67`. If she had no earlier row this already matched; with an earlier row it now correctly ignores it.
 
-- **Configured pool** → rename to **"Actual salary pool"**; keep the current pro-rated math (`monthlyContribByUser` + hourly billed hours), but restrict the sum to the effective-in-month roster from step 1.
-- **Employees with salary** and **on roster** counts also use the effective-in-month roster and effective-in-month pending grants.
-- Total burn card unchanged (already driven by logs in-month).
+Hourly comp is unchanged (hours × rate).
 
-### 4. Files touched
+## Scope
 
-- `src/routes/_authenticated/finances.tsx` — add `joined_on` to the profiles query; add `earliestEffectiveByUser` memo + `isEffectiveInMonth` helper; filter `visibleProfiles` / `visiblePendingGrants` / Salaries table by it; reorder columns and add Actual salary cell; rename Configured pool card.
+Single file:
+- `src/routes/_authenticated/finances.tsx` — rewrite the `monthlyContribByUser` memo to use only `currentSalaryByUser.get(userId)` and prorate from its `effective_from`. Everything downstream (Salaries table "Actual salary" cell, "Actual salary pool" top card) picks up the fix automatically.
 
-No schema changes, no server-fn changes.
+No schema, server-fn, or UI-structure changes.

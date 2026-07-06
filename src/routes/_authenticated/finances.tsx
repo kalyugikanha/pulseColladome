@@ -192,7 +192,8 @@ function FinancesPage() {
           alloc = hours * Number(salary.hourly_rate ?? 0);
         } else {
           const share = hours / total;
-          alloc = share * Number(salary.monthly_salary ?? 0);
+          const actual = monthlyContribByUser.get(userId) ?? 0;
+          alloc = share * actual;
         }
         const cur = result.get(code) ?? { code, name, burn: 0, hours: 0 };
         cur.burn += alloc;
@@ -202,7 +203,7 @@ function FinancesPage() {
       }
     }
     return result;
-  }, [logs, currentSalaryByUser]);
+  }, [logs, currentSalaryByUser, monthlyContribByUser]);
 
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);

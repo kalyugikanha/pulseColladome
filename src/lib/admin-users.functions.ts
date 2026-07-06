@@ -170,6 +170,8 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
   });
 
 type TeamEntry = {
+  comp_type?: "monthly" | "hourly";
+  hourly_rate?: number;
   email: string;
   full_name: string;
   role: Role;

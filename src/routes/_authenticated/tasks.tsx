@@ -85,7 +85,7 @@ function TasksPage() {
     queryKey: ["my-tasks", me?.id], enabled: !!me,
     queryFn: async () => (await supabase
       .from("tasks")
-      .select("*, project:projects(id,name,client_name), task_types:task_task_types(task_type:taxonomy_task_types(id,name))")
+      .select("*, project:projects(id,name,client_name), task_types:task_task_types(task_type:taxonomy_task_types(id,name)), current_stage:task_stages!tasks_current_stage_fkey(id,name,kind,status,owner:profiles!task_stages_owner_id_fkey(id,full_name))")
       .or(`assignee_id.eq.${me!.id},reviewer_id.eq.${me!.id}`)
       .order("due_date", { ascending: true, nullsFirst: false })).data ?? [],
   });

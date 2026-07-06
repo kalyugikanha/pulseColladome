@@ -640,6 +640,7 @@ export type Database = {
           department: string | null
           email: string
           is_super_admin: boolean
+          reporting_manager_email: string | null
           role: Database["public"]["Enums"]["app_role"]
         }
         Insert: {
@@ -648,6 +649,7 @@ export type Database = {
           department?: string | null
           email: string
           is_super_admin?: boolean
+          reporting_manager_email?: string | null
           role?: Database["public"]["Enums"]["app_role"]
         }
         Update: {
@@ -656,6 +658,7 @@ export type Database = {
           department?: string | null
           email?: string
           is_super_admin?: boolean
+          reporting_manager_email?: string | null
           role?: Database["public"]["Enums"]["app_role"]
         }
         Relationships: []

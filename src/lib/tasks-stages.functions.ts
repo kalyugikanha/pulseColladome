@@ -77,8 +77,8 @@ export const submitStage = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("advance_task_stage", {
       _stage_id: data.stageId,
       _action: "submit",
-      _note: data.note?.trim() || null,
-      _reassign_to: null,
+      _note: data.note?.trim() || undefined,
+      _reassign_to: undefined,
     });
     if (error) throw stageError(error);
     return { ok: true };
@@ -92,8 +92,8 @@ export const approveStage = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("advance_task_stage", {
       _stage_id: data.stageId,
       _action: "approve",
-      _note: data.note?.trim() || null,
-      _reassign_to: null,
+      _note: data.note?.trim() || undefined,
+      _reassign_to: undefined,
     });
     if (error) throw stageError(error);
     return { ok: true };
@@ -109,7 +109,7 @@ export const rejectStage = createServerFn({ method: "POST" })
       _stage_id: data.stageId,
       _action: "reject",
       _note: data.note.trim(),
-      _reassign_to: null,
+      _reassign_to: undefined,
     });
     if (error) throw stageError(error);
     return { ok: true };
@@ -123,7 +123,7 @@ export const reassignStage = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("advance_task_stage", {
       _stage_id: data.stageId,
       _action: "reassign",
-      _note: data.note?.trim() || null,
+      _note: data.note?.trim() || undefined,
       _reassign_to: data.ownerId,
     });
     if (error) throw stageError(error);

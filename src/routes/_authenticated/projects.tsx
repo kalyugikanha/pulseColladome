@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, FolderKanban, Clock, Pencil, Wallet } from "lucide-react";
+import { Plus, FolderKanban, Clock, Pencil, Wallet, Search } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -26,6 +26,7 @@ function ProjectsPage() {
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [logFor, setLogFor] = useState<{ id: string; code: string; name: string } | null>(null);
   const [editProject, setEditProject] = useState<any | null>(null);
+  const [search, setSearch] = useState("");
 
   const [pName, setPName] = useState(""); const [pCode, setPCode] = useState(""); const [pClient, setPClient] = useState(""); const [pDesc, setPDesc] = useState(""); const [pStatus, setPStatus] = useState<"active"|"on_hold"|"completed">("active");
   const [tTitle, setTTitle] = useState(""); const [tDesc, setTDesc] = useState(""); const [tDue, setTDue] = useState(""); const [tPri, setTPri] = useState<"low"|"medium"|"high">("medium"); const [tAssign, setTAssign] = useState<string>("");
@@ -131,10 +132,24 @@ function ProjectsPage() {
         )}
       </header>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, project ID, or client" className="pl-9" />
+      </div>
+
+      {(() => {
+        const q = search.trim().toLowerCase();
+        const filtered = q
+          ? (projects ?? []).filter((p: any) =>
+              [p.name, p.code, p.client_name].some((v) => (v ?? "").toString().toLowerCase().includes(q)),
+            )
+          : (projects ?? []);
+        return (<>
       {(projects?.length ?? 0) === 0 && <Card><CardContent className="p-10 text-center text-muted-foreground">No projects yet.</CardContent></Card>}
+      {(projects?.length ?? 0) > 0 && filtered.length === 0 && <Card><CardContent className="p-10 text-center text-muted-foreground">No projects match "{search}".</CardContent></Card>}
 
       <div className="grid gap-4">
-        {projects?.map((p: any) => (
+        {filtered.map((p: any) => (
           <Card key={p.id}>
             <CardHeader className="flex flex-row items-start justify-between">
               <div>
@@ -219,6 +234,8 @@ function ProjectsPage() {
           </Card>
         ))}
       </div>
+        </>);
+      })()}
 
       <Dialog open={!!logFor} onOpenChange={(o) => !o && setLogFor(null)}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">

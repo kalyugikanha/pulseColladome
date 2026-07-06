@@ -20,9 +20,9 @@ export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
 });
 
-type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
+type Profile = { id: string; full_name: string | null; email: string | null; department: string | null; is_active: boolean | null };
 type Salary = { id: string; user_id: string; monthly_salary: number | null; hourly_rate: number | null; comp_type: "monthly" | "hourly"; currency: string; effective_from: string };
-type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly" };
+type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly"; department: string | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
 
 function monthKey(d: string | Date) {

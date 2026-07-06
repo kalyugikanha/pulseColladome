@@ -12,16 +12,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ExternalLink, Plus } from "lucide-react";
+import { ExternalLink, Plus, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
+import { StageEditor } from "@/components/tasks/stage-editor";
 import { TaxonomyPicker, AssetLinksEditor, useTaxonomy, type TaxonomyValue } from "@/components/taxonomy-picker";
 import {
   createTaskFull, listUserPresets, bumpUserPreset, listRolePresets,
 } from "@/lib/tasks-plus.functions";
 import { listAwaitingMyReview, setReviewer as setReviewerFn } from "@/lib/tasks-workflow.functions";
+import { setTaskStages, type StageInput } from "@/lib/tasks-stages.functions";
 
 export const Route = createFileRoute("/_authenticated/tasks")({ component: TasksPage });
 

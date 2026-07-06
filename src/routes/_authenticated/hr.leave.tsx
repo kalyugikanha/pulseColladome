@@ -444,11 +444,10 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [reason, setReason] = useState("");
-  const [preApproved, setPreApproved] = useState(true);
   const [busy, setBusy] = useState(false);
 
   function reset() {
-    setUserId(""); setType("casual"); setStart(""); setEnd(""); setReason(""); setPreApproved(true);
+    setUserId(""); setType("casual"); setStart(""); setEnd(""); setReason("");
   }
 
   async function submit() {
@@ -457,7 +456,6 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
     const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
     if (days <= 0) return toast.error("End must be after start");
     setBusy(true);
-    const status: LStatus = preApproved ? "approved" : "pending";
     const payload = {
       user_id: userId,
       leave_type: type,
@@ -465,16 +463,17 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
       end_date: end,
       days,
       reason: reason.trim() || "Logged by HR",
-      status,
-      admin_comment: preApproved ? "Pre-approved by HR" : null,
-      decided_at: preApproved ? new Date().toISOString() : null,
+      status: "approved" as const,
+      admin_comment: "Logged & approved by HR/Super Admin",
+      decided_at: new Date().toISOString(),
     };
     const { error } = await supabase.from("leave_requests").insert(payload);
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success(preApproved ? "Leave logged and approved" : "Leave logged as pending");
+    toast.success("Leave logged and approved — balance updated");
     reset(); setOpen(false); onSaved();
   }
+
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
@@ -511,11 +510,8 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
             <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
           </div>
           <div className="space-y-1"><Label>Reason / note</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional context" /></div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox checked={preApproved} onCheckedChange={(v) => setPreApproved(v === true)} />
-            <span>Mark as pre-approved (updates balance immediately)</span>
-          </label>
-          <p className="text-xs text-muted-foreground">Past dates are allowed — useful for logging leaves that already happened.</p>
+          <p className="text-xs text-muted-foreground">Leave is auto-approved and deducted from the employee's balance. Past dates are allowed.</p>
+
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>

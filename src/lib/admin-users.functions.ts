@@ -498,17 +498,34 @@ export const logLeaveForEmployee = createServerFn({ method: "POST" })
     if (rpcErr) throw new Error(`Lookup failed: ${rpcErr.message}`);
     authUserId = (rpcId as string | null) ?? null;
 
-    // Fallback: if the selected profile row IS itself an auth user id, use it.
+    // Auto-provision auth account if missing.
     if (!authUserId) {
-      const { data: sameIdUser } = await supabaseAdmin
-        .rpc("find_auth_user_id_by_email", { _email: selectedProfile.email });
-      authUserId = (sameIdUser as string | null) ?? null;
-    }
-
-    if (!authUserId) {
-      throw new Error(
-        `${selectedProfile.email} has no backend account yet. Open Access → "Sync missing accounts", then try again.`,
-      );
+      const describeErr = (e: unknown) => {
+        if (!e) return "Unknown error";
+        if (e instanceof Error) return e.message || JSON.stringify(e);
+        if (typeof e === "object") {
+          const o = e as { message?: string; error_description?: string; error?: string; msg?: string; code?: string };
+          return o.message || o.error_description || o.error || o.msg || o.code || JSON.stringify(e);
+        }
+        return String(e);
+      };
+      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email: selectedProfile.email,
+        password: "Test@123",
+        email_confirm: true,
+        user_metadata: { full_name: selectedProfile.full_name ?? selectedProfile.email.split("@")[0] },
+      });
+      if (createErr && !/already registered|already exists|duplicate/i.test(createErr.message ?? "")) {
+        throw new Error(`Could not provision ${selectedProfile.email}: ${describeErr(createErr)}`);
+      }
+      authUserId = created?.user?.id ?? null;
+      if (!authUserId) {
+        const { data: lookedUp } = await supabaseAdmin.rpc("find_auth_user_id_by_email", { _email: selectedProfile.email });
+        authUserId = (lookedUp as string | null) ?? null;
+      }
+      if (!authUserId) {
+        throw new Error(`Could not resolve backend account for ${selectedProfile.email} after provisioning.`);
+      }
     }
 
     await ensureProfileForAuthUser(supabaseAdmin, authUserId, selectedProfile, context.userId);

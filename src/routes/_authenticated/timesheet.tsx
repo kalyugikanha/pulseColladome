@@ -282,7 +282,7 @@ function TimesheetPage() {
           <CardHeader>
             <CardTitle>Employee × Project — {label}</CardTitle>
             <CardDescription>
-              {filteredUsers.length} employee{filteredUsers.length === 1 ? "" : "s"} · {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs · Click a cell to view daily breakdown.
+              {filteredUsers.length} employee{filteredUsers.length === 1 ? "" : "s"} · {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs · Click a cell for daily breakdown{canEdit ? ", or use “Edit day” to add / change hours" : ""}.
             </CardDescription>
           </CardHeader>
           <CardContent>

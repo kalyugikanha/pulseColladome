@@ -40,7 +40,7 @@ function FinancesPage() {
     queryKey: ["finances-profiles"],
     enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department, is_active").order("full_name");
+      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department, is_active, joined_on").order("full_name");
       if (error) throw error;
       return (data ?? []) as Profile[];
     },

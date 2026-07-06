@@ -1,20 +1,28 @@
-## Add "Logged hours" column to Finances table
+## Insert June 30, 2026 time entries for 3 employees
 
-Update `src/routes/_authenticated/finances.tsx` to show total logged hours per employee for the selected month, making it easy to see why some salaries are unallocated (0 hours logged).
+Add timesheet entries on **2026-06-30** via `attendance_logs` so unallocated salaries in Finances become project-coded.
 
-### Changes
+### Entries
 
-1. **Compute per-user total logged hours for the month** — aggregate all time entries (across all projects) grouped by `user_id` within the selected month's date range. Currently the page only sums project-coded hours per user for the burn calc; this new memo will include every time entry regardless of project coding.
+**Chirag Bansal** (`79b55659…`) — new row
+- CLDM00567 · Colladome Business Development — 200 h
+- total_hours: 200
 
-2. **Add a "Logged hours" column to the employee table** — new column between the employee name and the burn amount, showing e.g. `168.0 hrs` or `0.0 hrs`.
+**HEMANTH SRIDHAR** (`f83d4464…`) — new row
+- CLDM00000 · Colladome Social Media — 120 h
+- total_hours: 120
 
-3. **Apply to both sections:**
-   - Allocated employee rows: show their total logged hours for the month.
-   - Unallocated employee detail rows (Akash, Chirag, Shraddha, Hemanth): show `0.0 hrs` (or their actual logged hours if any exist that weren't project-coded).
+**Shraddha Saxena** (`6dd230de…`) — existing empty row (`tasks: []`, 0 h) → update
+- CLDM00565 · Colladome Documentation — 50 h
+- CLDM00101 · Colladome Internal Coordination & Management — 50 h
+- CLDM00104 · Colladome RA — 50 h
+- CLDM00568 · Colladome Hiring — 50 h
+- total_hours: 200
 
-4. **No changes to calculations** — this is a display-only addition to help trace the numbers.
+### Method
 
-### Technical notes
+Single SQL migration:
+- `INSERT` new `attendance_logs` rows for Chirag and Hemanth (date `2026-06-30`, `tasks` JSONB with `project_code`, `project_name`, `hours`).
+- `UPDATE` Shraddha's existing 2026-06-30 row, setting `tasks` and `total_hours`.
 
-- Reuse existing `timeEntries` query; add a `loggedHoursByUser` memo keyed by `user_id`.
-- Add one `<TableHead>` and one `<TableCell>` per row; keep column alignment right for numeric.
+Note: 200h and 120h on a single calendar day are unrealistic, but these look like month-aggregate backfills posted on the last day of June to trace unallocated salary in the Finances view. Confirm if instead you want these split across the month.

@@ -513,6 +513,17 @@ function FinancesPage() {
                     <TableCell className="text-right text-muted-foreground">{totalBurn > 0 ? ((r.burn / totalBurn) * 100).toFixed(1) : "0"}%</TableCell>
                   </TableRow>
                 ))}
+                {totalUnallocated > 0 && (
+                  <TableRow className="bg-muted/30">
+                    <TableCell className="font-medium text-muted-foreground italic" title={unallocatedRows.map((r) => `${r.name}: ${inr(r.amount)}`).join("\n")}>
+                      Unallocated (no project hours)
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">0.0</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{inr(totalUnallocated)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((totalUnallocated / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           )}

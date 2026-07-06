@@ -1,55 +1,87 @@
 ## Goal
 
-Lock signups to `@colladome.com` / `@colladome.in` via Google SSO only, and stop creating duplicate profiles when someone in the roster signs in for the first time — instead, merge onto the pre-seeded row keyed by email.
+Turn onboarding into an HR-approved gate: employees upload screenshot proof for every social follow, every review, and the LinkedIn "now working at Colladome" update. After submit, portal stays locked until HR admin (or super admin) approves. Approval automatically fires a welcome-post task to Kanishka in Marketing.
 
-## 1. Restrict sign-in to Colladome Google accounts
+## 1. New required screenshot proofs
 
-**Frontend (`src/routes/auth.tsx`)**
-- Remove email/password sign-up UI. Keep only "Continue with Google".
-- Sign-in email/password stays only if you want a fallback for existing legacy accounts — otherwise remove too. (Default: remove.)
-- Call `lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin, extraParams: { hd: "*", prompt: "select_account" } })` so Google hides personal Gmail accounts in the picker.
+Add these to `employee_documents.doc_type` (extend the type union) and mark them required in `completeMyOnboarding`:
 
-**Backend enforcement (authoritative — `hd` alone is not enough)**
-- Update `handle_new_user` trigger: if `lower(split_part(NEW.email,'@',2))` is not in (`colladome.com`, `colladome.in`), `RAISE EXCEPTION` — aborts the auth insert, so no profile/role rows are created and the user gets an error instead of an account.
-- Add same check in a `BEFORE UPDATE OF email` trigger on `auth.users` to block email changes to outside domains.
-- Disable email/password provider via `configure_auth` (keep Google only).
-- Ensure `configure_social_auth` has Google enabled (already done).
+- `follow_facebook`, `follow_instagram`, `follow_twitter`, `follow_linkedin`, `follow_youtube`, `follow_pinterest`, `follow_whatsapp`
+- `review_google_jaipur`, `review_google_hyderabad`, `review_glassdoor`, `review_ambitionbox`
+- `linkedin_employment` (screenshot of their own LinkedIn profile showing "Works at Colladome")
 
-## 2. Email as the merge key (no more duplicates)
+**Complete-onboarding page changes:**
+- Replace the "tick the box" pattern for follows/reviews with per-item **screenshot upload rows** (same UX as the existing document uploads). Uploading a file for `follow_facebook` counts as confirmation; the tick disappears.
+- Add a new "LinkedIn — proof of employment update" section with its own upload slot.
+- Optional "About you / hobbies & interests" textarea → stored on `profiles.hobbies` (new column). Feeds the welcome post.
+- Submit button becomes **"Submit for HR approval"**. On success, redirect to a "Waiting for HR approval" screen instead of `/dashboard`.
 
-**Schema change — `role_grants` becomes the pre-seed table keyed by email**
-- Add column `reporting_manager_email text` to `role_grants`.
-- Add unique index on `lower(email)`.
+## 2. Approval gate
 
-**Rewrite `handle_new_user` merge logic**
-When a new `auth.users` row appears:
-1. Normalize `em := lower(NEW.email)`.
-2. Look up `role_grants` by `lower(email) = em`. This row carries department, default salary, super-admin flag, role, and now `reporting_manager_email`.
-3. Look up any **existing placeholder profile** by `lower(email) = em` where `id` does not correspond to an `auth.users` row (orphan seeded before signup).
-   - If found: **update that profile's `id` to `NEW.id`** (single `UPDATE profiles SET id = NEW.id, avatar_url = COALESCE(...), must_change_password = false WHERE id = <orphan_id>`), then let cascading FKs follow. If FK cascades don't cover a table (e.g. `leave_balances`, `salaries`, `user_roles`), re-point them explicitly in the same trigger.
-   - If not found: `INSERT` a fresh profile as today.
-4. Resolve `reporting_manager_id`: `SELECT id FROM profiles WHERE lower(email) = lower(role_grants.reporting_manager_email)`. Store on the profile. If manager hasn't signed in yet, leave null.
-5. After merging, run a **back-link pass**: `UPDATE profiles SET reporting_manager_id = NEW.id WHERE lower(reporting_manager_email_pending) = em` so people who signed in before their manager get linked when the manager arrives. (Requires storing `reporting_manager_email` on `profiles` too — add column.)
+**Schema (`profiles`)**
+- Add `onboarding_submitted_at timestamptz`
+- Add `onboarding_approved_at timestamptz`
+- Add `onboarding_approved_by uuid` (FK profiles)
+- Add `onboarding_rejected_at timestamptz`
+- Add `onboarding_rejection_reason text`
+- Add `hobbies text`
 
-**Backfill migration (one-time)**
-- Populate `role_grants.reporting_manager_email` for the current roster (Kanishka → shubham@colladome.in, plus any others you provide). For now: only Kanishka → Shubham.
-- Merge existing duplicates: for each `(colladome.com, colladome.in)` pair or `(gmail.com, colladome.*)` pair with the same person, keep the `@colladome.*` row, re-point FKs, delete the other profile.
-- Delete orphaned placeholder profile rows whose `id` has no matching `auth.users` AND whose email now belongs to a merged profile.
-- Purge any existing non-Colladome `auth.users` (Gmail, etc.) — this signs them out permanently. Confirm before running.
+**`completeMyOnboarding` server fn**
+- Validate everything (all fields + all new proof docs). On success: set `onboarding_completed=true`, `onboarding_submitted_at=now()`. Do NOT set `onboarding_approved_at`.
 
-## 3. UI follow-ups
+**Portal gate (`_authenticated/route.tsx`)**
+- If `profile.onboarding_required` AND `onboarding_approved_at IS NULL`:
+  - If `onboarding_submitted_at IS NULL` → redirect to `/complete-onboarding` (existing behavior).
+  - Else → redirect to a new `/onboarding-pending` route showing "Submitted, waiting for HR approval" + rejection reason if any + "Edit submission" button back to `/complete-onboarding`.
+- HR admin and super admin bypass this gate (so approvers can always sign in).
 
-- Directory: show `reporting_manager` name resolved from `reporting_manager_id`.
-- Onboarding admin form: when adding a future employee, write to `role_grants` (email + department + reporting_manager_email + role) instead of creating a placeholder `profiles` row. Profile materializes automatically on first Google sign-in.
+## 3. HR approval UI
 
-## Open confirmations before I build
+New route `/_authenticated/hr.onboarding.tsx` (visible to `hr_admin` + super admin, sidebar entry "Onboarding approvals"):
+- Tabs: **Pending**, **Approved**, **Rejected**
+- Each row → drawer with:
+  - All personal/work/bank fields
+  - Uploaded documents (existing signed-URL viewer already exists via `getEmployeeDocumentUrl`)
+  - Each social follow + review screenshot preview (signed URL)
+  - LinkedIn employment screenshot preview
+  - Hobbies / about section
+  - **Approve** button and **Reject with reason** button
 
-1. Remove email/password entirely (sign-up **and** sign-in), Google-only? Default: yes.
-2. Purge existing non-Colladome auth users (e.g. `kathatsandhya07@gmail.com`)? Default: yes.
-3. Only reporting-manager mapping right now is **Kanishka → Shubham** — correct? Others added later via Directory.
+**Server fns (`src/lib/onboarding-approvals.functions.ts`)**
+- `listOnboardingSubmissions({ status })` — auth: hr_admin | super_admin
+- `approveOnboarding({ user_id })` — auth: hr_admin | super_admin. Sets approval fields, then calls `createWelcomeTask(user_id)` inline.
+- `rejectOnboarding({ user_id, reason })` — auth: hr_admin | super_admin. Sets rejection fields and clears `onboarding_submitted_at` so employee can resubmit.
 
-## Technical notes
+## 4. Auto welcome-post task for Kanishka
 
-- `auth.users` triggers can `RAISE EXCEPTION` to block signup; error surfaces to the client as a Supabase auth error.
-- Updating `profiles.id` requires FKs on dependent tables to be `ON UPDATE CASCADE`, or explicit re-pointing in the trigger. Migration will audit `leave_balances`, `salaries`, `user_roles`, `tasks`, `punch_sessions`, `attendance_logs`, `employee_bank_details`, `employee_documents`, `leave_requests`, `super_admins` and re-point in one transaction.
-- `hd:"*"` restricts Google's account chooser to Workspace accounts but is bypassable — the DB trigger is the real gate.
+On approval, insert into `tasks`:
+- `assignee_id` = Kanishka's profile id (looked up by `email = 'kanishka@colladome.in'`). If not found, log a warning and skip (approval still succeeds).
+- `title` = `Welcome post — {full_name}`
+- `description` = markdown with: full name, department, joined_on, hobbies/about, LinkedIn URL, profile picture URL (signed URL not appropriate; use the storage path so Marketing can pull it, plus the person's Instagram/Twitter handles if provided).
+- `status` = `todo`, `priority` = `normal`, `due_date` = `now() + 3 days`
+- `created_by` = approver's `userId`
+
+Idempotency: before insert, check whether a task with `title = 'Welcome post — {full_name}'` and `assignee_id` = Kanishka already exists in the last 30 days; skip if so.
+
+## 5. Access to the tool during pending review
+
+- Employee can still open `/complete-onboarding` to edit uploads if HR rejects.
+- All other authenticated routes redirect to `/onboarding-pending` for that user.
+
+## Files touched
+
+- **Migration**: profile columns above + extend doc_type check if it's an enum (currently text — no migration needed for values, just for new columns).
+- `src/lib/onboarding.functions.ts` — extend `OnboardingDocType`, extend `REQUIRED_DOCS`, add hobbies to profile patch, split submit into "submit for approval" flow.
+- `src/lib/onboarding-approvals.functions.ts` — **new**, list/approve/reject + welcome task creator.
+- `src/routes/_authenticated/complete-onboarding.tsx` — swap follow/review checkboxes for screenshot uploads, add hobbies + LinkedIn employment upload, update copy.
+- `src/routes/_authenticated/onboarding-pending.tsx` — **new** waiting screen.
+- `src/routes/_authenticated/hr.onboarding.tsx` — **new** HR approvals dashboard.
+- `src/routes/_authenticated/route.tsx` — extend gate to check approval status (bypass for hr_admin/super_admin).
+- Sidebar — add "Onboarding approvals" link for hr_admin/super_admin.
+
+## Confirmations before I build
+
+1. **Rejection returns employee to `/complete-onboarding` to fix and re-submit** — correct? (default: yes.)
+2. **HR admin & super admin bypass their own approval gate** so they can log in without needing a second HR to approve them — correct? (default: yes.)
+3. **Kanishka's welcome task = single task assigned to her personally** (not to a "Marketing" project queue). Due in 3 days, `normal` priority. OK? Adjust if you want a specific project or higher priority.
+4. **Hobbies field** — add as a single free-text "About you / hobbies & interests" box. OK, or do you want individual fields (hobbies, hometown, fun fact, favourite food)?

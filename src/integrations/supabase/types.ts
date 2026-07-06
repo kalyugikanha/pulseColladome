@@ -424,6 +424,7 @@ export type Database = {
           facebook_url: string | null
           full_name: string | null
           github_url: string | null
+          hobbies: string | null
           id: string
           instagram_url: string | null
           is_active: boolean
@@ -433,9 +434,14 @@ export type Database = {
           marriage_anniversary: string | null
           must_change_password: boolean
           notes: string | null
+          onboarding_approved_at: string | null
+          onboarding_approved_by: string | null
           onboarding_completed: boolean
           onboarding_completed_at: string | null
+          onboarding_rejected_at: string | null
+          onboarding_rejection_reason: string | null
           onboarding_required: boolean
+          onboarding_submitted_at: string | null
           permanent_address: string | null
           personal_email: string | null
           phone: string | null
@@ -462,6 +468,7 @@ export type Database = {
           facebook_url?: string | null
           full_name?: string | null
           github_url?: string | null
+          hobbies?: string | null
           id: string
           instagram_url?: string | null
           is_active?: boolean
@@ -471,9 +478,14 @@ export type Database = {
           marriage_anniversary?: string | null
           must_change_password?: boolean
           notes?: string | null
+          onboarding_approved_at?: string | null
+          onboarding_approved_by?: string | null
           onboarding_completed?: boolean
           onboarding_completed_at?: string | null
+          onboarding_rejected_at?: string | null
+          onboarding_rejection_reason?: string | null
           onboarding_required?: boolean
+          onboarding_submitted_at?: string | null
           permanent_address?: string | null
           personal_email?: string | null
           phone?: string | null
@@ -500,6 +512,7 @@ export type Database = {
           facebook_url?: string | null
           full_name?: string | null
           github_url?: string | null
+          hobbies?: string | null
           id?: string
           instagram_url?: string | null
           is_active?: boolean
@@ -509,9 +522,14 @@ export type Database = {
           marriage_anniversary?: string | null
           must_change_password?: boolean
           notes?: string | null
+          onboarding_approved_at?: string | null
+          onboarding_approved_by?: string | null
           onboarding_completed?: boolean
           onboarding_completed_at?: string | null
+          onboarding_rejected_at?: string | null
+          onboarding_rejection_reason?: string | null
           onboarding_required?: boolean
+          onboarding_submitted_at?: string | null
           permanent_address?: string | null
           personal_email?: string | null
           phone?: string | null
@@ -526,6 +544,13 @@ export type Database = {
           youtube_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_onboarding_approved_by_fkey"
+            columns: ["onboarding_approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_reporting_manager_id_fkey"
             columns: ["reporting_manager_id"]
@@ -1397,6 +1422,18 @@ export type Database = {
         | "masters"
         | "resume"
         | "profile_picture"
+        | "follow_facebook"
+        | "follow_instagram"
+        | "follow_twitter"
+        | "follow_linkedin"
+        | "follow_youtube"
+        | "follow_pinterest"
+        | "follow_whatsapp"
+        | "review_google_jaipur"
+        | "review_google_hyderabad"
+        | "review_glassdoor"
+        | "review_ambitionbox"
+        | "linkedin_employment"
       leave_status: "pending" | "approved" | "rejected"
       leave_type: "casual" | "sick" | "earned" | "unpaid"
       project_status: "active" | "on_hold" | "completed"
@@ -1542,6 +1579,18 @@ export const Constants = {
         "masters",
         "resume",
         "profile_picture",
+        "follow_facebook",
+        "follow_instagram",
+        "follow_twitter",
+        "follow_linkedin",
+        "follow_youtube",
+        "follow_pinterest",
+        "follow_whatsapp",
+        "review_google_jaipur",
+        "review_google_hyderabad",
+        "review_glassdoor",
+        "review_ambitionbox",
+        "linkedin_employment",
       ],
       leave_status: ["pending", "approved", "rejected"],
       leave_type: ["casual", "sick", "earned", "unpaid"],

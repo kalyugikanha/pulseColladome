@@ -1,0 +1,1 @@
+CREATE POLICY "projects: all authenticated read" ON public.projects FOR SELECT TO authenticated USING (true);

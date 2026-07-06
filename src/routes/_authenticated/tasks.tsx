@@ -314,6 +314,21 @@ function TasksPage() {
             )}
 
             {canAssignOthers && (
+              <div className="rounded-md border border-border/60 p-3 flex items-start gap-3">
+                <Workflow className="h-4 w-4 mt-0.5 text-primary" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Multi-stage workflow</Label>
+                    <Switch checked={multiStage} onCheckedChange={setMultiStage} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Route this task through several owners in sequence — with approve / send-back handoffs.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {canAssignOthers && !multiStage && (
               <div className="space-y-1">
                 <Label>Assign to</Label>
                 <Select value={tAssignee} onValueChange={setTAssignee}>
@@ -331,7 +346,7 @@ function TasksPage() {
               </div>
             )}
 
-            {canAssignOthers && (
+            {canAssignOthers && !multiStage && (
               <div className="space-y-1">
                 <Label>Reviewer (optional)</Label>
                 <Select value={tReviewer || "none"} onValueChange={(v) => setTReviewer(v === "none" ? "" : v)}>
@@ -346,6 +361,16 @@ function TasksPage() {
                 <p className="text-xs text-muted-foreground">When the assignee marks done, the task moves to review.</p>
               </div>
             )}
+
+            {canAssignOthers && multiStage && (
+              <StageEditor
+                people={(assignees ?? []).map((u) => ({ id: u.id, full_name: u.full_name, email: null }))}
+                value={stages}
+                onChange={setStages}
+              />
+            )}
+
+
 
 
             <div className="space-y-1">

@@ -1,22 +1,15 @@
-## Action
+## Root cause
 
-Delete all 4 existing `leave_requests` rows for Hemanth Sridhar (`hemanth@colladome.in`) and reset his `leave_balances.used` for every leave type back to 0, so you can start the validation flow from a clean slate.
+`DayView` fires its Supabase query without waiting for `useCurrentUser` to resolve — every other query on the HR Leave page uses `enabled: !!me`, but this one doesn't. When Shraddha lands on `/hr/leave`, the day-view query can run before the Supabase auth session/JWT is attached; RLS then treats the call as anonymous, returns 0 rows, and the query result is cached as empty. Sibling queries (`hr-leave-month`, `hr-leave-requests-all`) don't hit this because they're gated on `!!me`.
 
-## SQL
+Confirmed: the row (`b8c58883…`, approved, 6–7 July, Hemanth) exists and RLS permits `hr_admin` to read it.
 
-```sql
-DELETE FROM leave_requests
-WHERE user_id = (SELECT id FROM profiles WHERE email = 'hemanth@colladome.in');
+## Fix
 
-UPDATE leave_balances
-SET used = 0
-WHERE user_id = (SELECT id FROM profiles WHERE email = 'hemanth@colladome.in');
-```
+`src/routes/_authenticated/hr.leave.tsx` → `DayView`:
 
-After this runs, the trigger fix + Day-view/Attendance changes from the previous turns are already in place, so:
+- Call `useCurrentUser()` inside `DayView`.
+- Add `enabled: !!me` to the day query and include `me?.id` in `queryKey` so it refetches once auth is ready.
+- Show a small "Loading…" placeholder in the card body while `!me || !data`.
 
-- HR/Super Admin "Log leave" will insert as `approved` and deduct balance immediately.
-- Attendance → Today will show Sridhar with an amber "On leave" badge and list him in the "On leave today" banner.
-- HR → Leave management → Day view will list him for the picked date.
-
-No code changes in this step — just data cleanup.
+No other changes — the underlying create/approve/deduct flow works and the row is already in the DB.

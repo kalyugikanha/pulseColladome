@@ -225,22 +225,12 @@ function FinancesPage() {
     let sum = 0;
     for (const p of visibleProfiles) {
       const s = currentSalaryByUser.get(p.id);
-      if (s) {
-        if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
-        else sum += monthlyContribByUser.get(p.id) ?? 0;
-      } else if (p.email) {
-        const g = grantByEmail.get(p.email.toLowerCase());
-        if (g?.comp_type === "hourly") sum += Number(g.default_hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
-        else sum += Number(g?.default_monthly_salary ?? 0);
-      }
-    }
-    for (const g of visiblePendingGrants) {
-      if (g.comp_type === "hourly") {
-        // no hours possible without a user id
-      } else sum += Number(g.default_monthly_salary ?? 0);
+      if (!s) continue;
+      if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
+      else sum += monthlyContribByUser.get(p.id) ?? 0;
     }
     return sum;
-  }, [visibleProfiles, visiblePendingGrants, currentSalaryByUser, monthlyContribByUser, grantByEmail, userHoursThisMonth]);
+  }, [visibleProfiles, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth]);
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {

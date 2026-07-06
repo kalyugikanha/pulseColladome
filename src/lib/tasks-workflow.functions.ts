@@ -3,8 +3,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type TaskStatus = "todo" | "in_progress" | "review" | "done";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 async function logActivity(
-  supabase: { from: (t: string) => { insert: (v: unknown) => Promise<{ error: unknown }> } },
+  supabase: any,
   taskId: string,
   actorId: string,
   kind: string,
@@ -19,7 +20,7 @@ async function logActivity(
 }
 
 async function notify(
-  supabase: { from: (t: string) => { insert: (v: unknown) => Promise<{ error: unknown }> } },
+  supabase: any,
   userId: string, kind: string, taskId: string | null, commentId: string | null, body: string,
 ) {
   if (!userId) return;

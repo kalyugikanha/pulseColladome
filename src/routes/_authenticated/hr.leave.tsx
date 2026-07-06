@@ -147,10 +147,12 @@ function typeColor(t: LType) {
 }
 
 function DayView({ empMap }: { empMap: Map<string, Employee> }) {
+  const { data: me } = useCurrentUser();
   const [day, setDay] = useState(() => format(new Date(), "yyyy-MM-dd"));
 
-  const { data } = useQuery({
-    queryKey: ["hr-leave-day", day],
+  const { data, isLoading } = useQuery({
+    queryKey: ["hr-leave-day", day, me?.id],
+    enabled: !!me,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leave_requests")
@@ -162,6 +164,7 @@ function DayView({ empMap }: { empMap: Map<string, Employee> }) {
       return (data ?? []) as LeaveRow[];
     },
   });
+
 
   // Dedupe by user_id — prefer approved over pending
   const dedupedByUser = new Map<string, LeaveRow>();

@@ -464,21 +464,24 @@ export const logLeaveForEmployee = createServerFn({ method: "POST" })
     if (profileErr) throw new Error(profileErr.message);
     if (!selectedProfile?.email) throw new Error("Employee profile is missing an email address");
 
-    let authUserId = await findAuthUserIdByEmail(supabaseAdmin, selectedProfile.email);
+    // Prefer a direct DB lookup (avoids Auth admin listUsers pagination + trigger side-effects).
+    let authUserId: string | null = null;
+    const { data: rpcId, error: rpcErr } = await supabaseAdmin
+      .rpc("find_auth_user_id_by_email", { _email: selectedProfile.email });
+    if (rpcErr) throw new Error(`Lookup failed: ${rpcErr.message}`);
+    authUserId = (rpcId as string | null) ?? null;
+
+    // Fallback: if the selected profile row IS itself an auth user id, use it.
     if (!authUserId) {
-      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email: selectedProfile.email,
-        password: "Test@123",
-        email_confirm: true,
-        user_metadata: { full_name: selectedProfile.full_name ?? selectedProfile.email.split("@")[0] },
-      });
-      if (createErr && !/already registered|already exists|duplicate/i.test(createErr.message)) {
-        throw new Error(`This employee account is not synced yet: ${createErr.message}`);
-      }
-      authUserId = created?.user?.id ?? (await findAuthUserIdByEmail(supabaseAdmin, selectedProfile.email));
+      const { data: sameIdUser } = await supabaseAdmin
+        .rpc("find_auth_user_id_by_email", { _email: selectedProfile.email });
+      authUserId = (sameIdUser as string | null) ?? null;
     }
+
     if (!authUserId) {
-      throw new Error("This employee account is not synced yet. Run Sync missing accounts from Access first.");
+      throw new Error(
+        `${selectedProfile.email} has no backend account yet. Open Access → "Sync missing accounts", then try again.`,
+      );
     }
 
     await ensureProfileForAuthUser(supabaseAdmin, authUserId, selectedProfile, context.userId);

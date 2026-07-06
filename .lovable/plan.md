@@ -1,20 +1,21 @@
-## Goal
-Make the Finances "Configured pool" count only rows from the `salaries` table so it matches the finance sheet.
+## Fix: Leave request FK error for placeholder profiles
 
-## Changes (`src/routes/_authenticated/finances.tsx`)
+Some active profiles (Anjali, Trisha, Deepak, Juhi, Manvi, Neetu) exist in `public.profiles` but have no matching `auth.users` row. Inserting a leave request for them fails the `leave_requests_user_id_fkey` FK.
 
-In `totalConfiguredPool`:
-- For each visible active profile: include it only when it has an entry in `currentSalaryByUser` (i.e., a real `salaries` row). Monthly comp uses the pro-rated `monthlyContribByUser`; hourly uses `hourly_rate × hours` (unchanged).
-- Remove the `grantByEmail` fallback branch — profiles without a salary row no longer contribute.
-- Remove the `visiblePendingGrants` addition to the pool — pending signups have no `salaries` row.
+### Changes
 
-Keep the "Pending signups" stat card as-is (still surfaces the count of invited-but-not-registered people from `role_grants`).
+1. **New server function** `syncMissingAuthAccounts` in `src/lib/admin-users.functions.ts`
+   - Gated by super-admin check (`requireSupabaseAuth` + `has_role`/`super_admins`).
+   - Loads active profiles missing an `auth.users` row.
+   - For each: calls `supabaseAdmin.auth.admin.createUser({ email, email_confirm: true, user_metadata: { full_name } })`.
+   - The existing `handle_new_user` trigger re-points FK-referenced rows (attendance_logs, leave_requests, tasks, salaries, etc.) from the placeholder profile id to the new auth id and deletes the placeholder.
+   - Returns `{ synced, alreadyOk, errors[] }`.
 
-Update the sub-labels:
-- Configured pool: "salaries table only".
-- Employees with salary: unchanged (already counts profiles with a `salaries` row).
+2. **UI on `/access`** (admin/access page)
+   - Add a "Sync missing accounts" button next to the existing "Run provisioning" button.
+   - Reuse the same result panel format to show synced count and per-email errors.
 
-## Out of scope
-- Removing/rewriting the grants table or the "Pending signups" card.
-- Changing the burn calculation.
-- Auto-adding missing salary rows — you'll set those via the existing "Set salary" dialog.
+### Out of scope
+- Changing the `leave_requests.user_id` FK target.
+- Blocking the leave dialog client-side.
+- Any change to non-Colladome domain handling (trigger already enforces).

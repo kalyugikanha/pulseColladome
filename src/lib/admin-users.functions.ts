@@ -253,7 +253,9 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
 
           const { error: sErr } = await supabaseAdmin.from("salaries").upsert({
             user_id: existing.id,
-            monthly_salary: entry.monthly_salary,
+            comp_type: isHourly ? "hourly" : "monthly",
+            monthly_salary: isHourly ? null : entry.monthly_salary,
+            hourly_rate: isHourly ? (entry.hourly_rate ?? null) : null,
             effective_from: new Date().toISOString().slice(0, 10),
             currency: "INR",
           }, { onConflict: "user_id,effective_from" });

@@ -164,3 +164,101 @@ function LeavePage() {
     </div>
   );
 }
+
+type ManageablePerson = { id: string; full_name: string | null; email: string | null; department: string | null };
+
+function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[]; onSaved: () => void }) {
+  const { data: me } = useCurrentUser();
+  const [open, setOpen] = useState(false);
+  const [userId, setUserId] = useState<string>("");
+  const [type, setType] = useState<"casual"|"sick"|"earned"|"unpaid">("casual");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const sortedPeople = useMemo(
+    () => [...people].sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "")),
+    [people],
+  );
+
+  function reset() {
+    setUserId(""); setType("casual"); setStart(""); setEnd(""); setComment("");
+  }
+
+  async function submit() {
+    if (!userId) return toast.error("Pick an employee");
+    if (!start || !end) return toast.error("Pick dates");
+    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (days <= 0) return toast.error("End must be after start");
+    if (!comment.trim()) return toast.error("Add a short note");
+    setBusy(true);
+    const { error } = await supabase.from("leave_requests").insert({
+      user_id: userId,
+      leave_type: type,
+      start_date: start,
+      end_date: end,
+      days,
+      reason: `Logged by ${me?.fullName ?? "manager"}`,
+      status: "approved",
+      admin_comment: comment.trim(),
+      decided_by: me!.id,
+      decided_at: new Date().toISOString(),
+    });
+    setBusy(false);
+    if (error) return toast.error(error.message);
+    toast.success("Leave logged for teammate");
+    reset();
+    setOpen(false);
+    onSaved();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="gap-2"><UserPlus className="h-4 w-4" /> Log leave for teammate</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-display">Log leave on behalf of a teammate</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Employee</Label>
+            <Select value={userId} onValueChange={setUserId}>
+              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                {sortedPeople.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.full_name ?? p.email}{p.department ? ` · ${p.department}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Type</Label>
+            <Select value={type} onValueChange={(v) => setType(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+          </div>
+          <div className="space-y-1">
+            <Label>Comment</Label>
+            <Textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Reason / context (required)" />
+          </div>
+          <p className="text-xs text-muted-foreground">This will be recorded as an approved leave and will deduct from their balance.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="gradient-primary">{busy ? "Saving…" : "Log leave"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

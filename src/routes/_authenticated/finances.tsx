@@ -368,11 +368,15 @@ function FinancesPage() {
                     : (monthlyContribByUser.get(p.id) ?? 0);
                   const effDate = new Date(s.effective_from);
                   const startedMidMonth = s.comp_type === "monthly" && effDate >= monthStart && effDate <= monthEnd;
+                  const unpaid = unpaidDaysByUser.get(p.id) ?? 0;
                   actualNode = (
                     <div className="flex flex-col items-end">
                       <span>{inr(actual)}</span>
                       {startedMidMonth && (
                         <span className="text-[10px] text-muted-foreground">prorated from {s.effective_from}</span>
+                      )}
+                      {unpaid > 0 && s.comp_type === "monthly" && (
+                        <span className="text-[10px] text-muted-foreground">− {unpaid} unpaid day{unpaid === 1 ? "" : "s"}</span>
                       )}
                     </div>
                   );

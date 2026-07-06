@@ -355,6 +355,12 @@ function CalendarPage() {
                 className="pl-8"
               />
             </div>
+            <EmployeePicker
+              profiles={visibleProfiles}
+              selected={filters.employees}
+              onChange={(next) => setFilters((f) => ({ ...f, employees: next }))}
+            />
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">

@@ -49,7 +49,7 @@ function FinancesPage() {
   const { data: grants } = useQuery({
     queryKey: ["finances-grants"],
     enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => (await supabase.from("role_grants").select("email, role, default_monthly_salary").order("email")).data as Grant[] ?? [],
+    queryFn: async () => (await supabase.from("role_grants").select("email, role, default_monthly_salary, default_hourly_rate, comp_type").order("email")).data as Grant[] ?? [],
   });
 
   const { data: salaries } = useQuery({
@@ -59,7 +59,7 @@ function FinancesPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("salaries")
-        .select("id, user_id, monthly_salary, currency, effective_from")
+        .select("id, user_id, monthly_salary, hourly_rate, comp_type, currency, effective_from")
         .order("effective_from", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Salary[];

@@ -1,25 +1,37 @@
-## Goal
-Stop forcing onboarding on existing employees, but keep it mandatory for any new employee created from now on. Existing users can still access the onboarding/profile page voluntarily from the sidebar avatar.
+## Team Calendar — enhancements
 
-## Approach
+### 1. Date navigation
+- Add a date picker (shadcn `Calendar` in `Popover`) next to the Month prev/next controls. Selecting a date sets `cursor` and opens that day's detail sheet.
+- Add a "Today" button for quick reset.
+- Keep month grid as-is.
 
-### 1. Database migration
-- Backfill: mark all existing profiles as onboarded so the redirect no longer triggers for them.
-  - `UPDATE public.profiles SET onboarding_completed = true, onboarding_completed_at = COALESCE(onboarding_completed_at, now()) WHERE onboarding_completed IS DISTINCT FROM true;`
-- Change the default for new rows so future signups start as NOT onboarded:
-  - `ALTER TABLE public.profiles ALTER COLUMN onboarding_completed SET DEFAULT false;`
-- Update `handle_new_user()` trigger to explicitly insert `onboarding_completed = false` for new users (so behavior is explicit regardless of default), keeping all other logic identical.
+### 2. Employee selector (multi-select dropdown)
+- Add an "Employees" `Popover` next to the existing search input, showing a scrollable checkbox list of all `visibleProfiles` (with search-in-list).
+- Selected user IDs become a `Set<string>` filter; `matchesFilters` uses it (in addition to the free-text search and department filters).
+- Show selected count as a badge; "Clear" resets.
+- Free-text search stays; new dropdown is complementary.
 
-Result: the ~1920 existing users are flagged complete; anyone created afterward (via HR admin/super admin invite → signup) gets `false` and hits the forced onboarding flow.
+### 3. Cross-user visibility
+- Already unrestricted server-side (`listTeamCalendarEvents` uses admin client and returns all profiles + events/bookings). No changes needed; confirm private events still show as "Busy".
 
-### 2. Frontend
-No change needed to the redirect logic in `src/routes/_authenticated/route.tsx` — it already redirects only when `!user.onboardingCompleted`. The sidebar footer already links the avatar to `/complete-onboarding`, so existing users retain voluntary access to fill it out later.
+### 4. Smart Book Time flow
+Rework `BookingDialog` into a 3-step flow:
 
-## Technical details
-- Single migration file with the UPDATE, ALTER DEFAULT, and updated `handle_new_user` function.
-- No RLS/policy changes.
-- No code changes to routes, hooks, or server functions.
+1. **Attendees** — Multi-select from directory (same dropdown component as filter). Optional: allow adding external emails as chips.
+2. **Time window** — Pick a date (default today), duration (15 / 30 / 45 / 60 / 90 min), and working-hours range (default 09:00–19:00 local).
+3. **Suggested slots** — Compute mutually-free slots by:
+   - Server fn `findAvailableSlots({ userIds, dateISO, durationMin, windowStart, windowEnd })` (new) that queries `google_calendar_events` + `team_calendar_bookings` + approved `leave_requests` for all selected users on that date, merges busy intervals, and returns free slots ≥ duration.
+   - Client renders slots as clickable chips. On click, populate start/end and show "Confirm booking" (title + description + optional location) → calls existing `createTeamCalendarBooking` with attendee emails resolved from selected user IDs.
+   - Manual override: "Pick custom time" reveals the existing datetime-local inputs.
 
-## Out of scope
-- Any change to what fields are required during onboarding.
-- Any change to the HR admin invite flow itself.
+### Technical notes
+- New server fn added to `src/lib/google-calendar.functions.ts` reading via `supabaseAdmin` (no user restriction — matches current openness). Returns `{ busy: Interval[], free: Interval[] }`.
+- Slot computation: sort busy intervals, merge overlaps, walk the working window in `durationMin` steps (or gap-based) to emit free slots.
+- All-day events / full-day leaves block the entire working window for that user.
+- Reuse existing shadcn `Calendar`, `Popover`, `Checkbox`, `Command` (for searchable multi-select).
+- No schema/RLS changes; no changes to auth or existing sync logic.
+
+### Files
+- `src/routes/_authenticated/calendar.tsx` — date picker, Today button, employee multi-select dropdown, rewritten `BookingDialog`.
+- `src/lib/google-calendar.functions.ts` — new `findAvailableSlots` server fn.
+- `src/components/ui/*` — add `command.tsx` / `checkbox.tsx` only if missing.

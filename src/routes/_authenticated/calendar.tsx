@@ -5,13 +5,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useHolidays, weeklyOffLabel } from "@/hooks/use-holidays";
-import { createTeamCalendarBooking, listTeamCalendarEvents, syncMyGoogleCalendar } from "@/lib/google-calendar.functions";
+import { createTeamCalendarBooking, findAvailableSlots, listTeamCalendarEvents, syncMyGoogleCalendar } from "@/lib/google-calendar.functions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,7 +25,9 @@ import {
 import {
   ChevronLeft, ChevronRight, PartyPopper, Search, Cake, Trophy,
   CalendarClock, Filter, Settings2, X, RefreshCw, Plus, Link as LinkIcon, AlertCircle,
+  CalendarIcon, Users, ArrowLeft, ArrowRight, Check,
 } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,
@@ -71,6 +75,7 @@ function yearsBetween(from: string, on: Date): number {
 type Filters = {
   q: string;
   depts: Set<string>;
+  employees: Set<string>;
   showLeave: boolean;
   showMeetings: boolean;
   showBirthdays: boolean;
@@ -86,15 +91,18 @@ function CalendarPage() {
   const syncGoogleCalendar = useServerFn(syncMyGoogleCalendar);
   const [cursor, setCursor] = useState(new Date());
   const [openDay, setOpenDay] = useState<Date | null>(null);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     q: "",
     depts: new Set(),
+    employees: new Set(),
     showLeave: true,
     showMeetings: true,
     showBirthdays: true,
     showAnniversaries: true,
     showHolidays: true,
   });
+
 
   const monthStart = startOfMonth(cursor);
   const monthEnd = endOfMonth(cursor);
@@ -176,6 +184,7 @@ function CalendarPage() {
     if (!userId) return true;
     const p = profileById.get(userId);
     if (!p) return true;
+    if (filters.employees.size && !filters.employees.has(userId)) return false;
     if (filters.depts.size && (!p.department || !filters.depts.has(p.department))) return false;
     if (filters.q.trim()) {
       const q = filters.q.trim().toLowerCase();
@@ -184,6 +193,7 @@ function CalendarPage() {
     }
     return true;
   };
+
 
   const eventsForDay = (d: Date) => {
     const list: { title: string; owner?: string | null; dept?: string | null; kind: "internal" | "client" | "booking" | "private"; time?: string; userId?: string; details?: string | null }[] = [];
@@ -261,6 +271,7 @@ function CalendarPage() {
   const activeFilters =
     (filters.q ? 1 : 0) +
     filters.depts.size +
+    filters.employees.size +
     [filters.showLeave, filters.showMeetings, filters.showBirthdays, filters.showAnniversaries, filters.showHolidays]
       .filter((v) => !v).length;
 
@@ -271,15 +282,36 @@ function CalendarPage() {
           <h1 className="font-display text-3xl font-bold">Team Calendar</h1>
           <p className="text-muted-foreground text-sm mt-1">Leave, meetings, birthdays & anniversaries at a glance.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <BookingDialog profiles={visibleProfiles} onSaved={() => qc.invalidateQueries({ queryKey: ["team-google-calendar"] })} />
           <MyDatesDialog />
           {me?.isAdmin && <DeptColorsDialog depts={allDepts} colorFor={colorForDept} onSaved={() => qc.invalidateQueries({ queryKey: ["department-settings"] })} />}
+          <Button variant="outline" size="sm" onClick={() => { setCursor(new Date()); setOpenDay(new Date()); }}>Today</Button>
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2"><CalendarIcon className="h-4 w-4" />Jump to date</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <CalendarPicker
+                mode="single"
+                selected={cursor}
+                onSelect={(d) => {
+                  if (!d) return;
+                  setCursor(d);
+                  setOpenDay(d);
+                  setDatePickerOpen(false);
+                }}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" size="icon" onClick={() => setCursor(addMonths(cursor, -1))}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="font-display font-semibold min-w-[140px] text-center">{format(cursor, "MMMM yyyy")}</div>
           <Button variant="outline" size="icon" onClick={() => setCursor(addMonths(cursor, 1))}><ChevronRight className="h-4 w-4" /></Button>
         </div>
       </header>
+
 
       <Card className="border-primary/30 bg-primary/5">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
@@ -323,6 +355,12 @@ function CalendarPage() {
                 className="pl-8"
               />
             </div>
+            <EmployeePicker
+              profiles={visibleProfiles}
+              selected={filters.employees}
+              onChange={(next) => setFilters((f) => ({ ...f, employees: next }))}
+            />
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-2">
@@ -373,7 +411,7 @@ function CalendarPage() {
                   </div>
                 )}
                 {activeFilters > 0 && (
-                  <Button variant="ghost" size="sm" className="w-full" onClick={() => setFilters({ q: "", depts: new Set(), showLeave: true, showMeetings: true, showBirthdays: true, showAnniversaries: true, showHolidays: true })}>
+                  <Button variant="ghost" size="sm" className="w-full" onClick={() => setFilters({ q: "", depts: new Set(), employees: new Set(), showLeave: true, showMeetings: true, showBirthdays: true, showAnniversaries: true, showHolidays: true })}>
                     <X className="h-3 w-3 mr-1" /> Clear filters
                   </Button>
                 )}
@@ -627,38 +665,167 @@ function DayDetailSheet({
   );
 }
 
-function BookingDialog({ profiles, onSaved }: { profiles: Array<{ email: string | null; full_name: string | null }>; onSaved: () => void }) {
+type ProfileLite = { id: string; email: string | null; full_name: string | null; department?: string | null };
+
+function EmployeePicker({ profiles, selected, onChange, label = "Employees", buttonSize = "sm" }: {
+  profiles: ProfileLite[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+  label?: string;
+  buttonSize?: "sm" | "default";
+}) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return profiles;
+    return profiles.filter((p) => `${p.full_name ?? ""} ${p.email ?? ""}`.toLowerCase().includes(needle));
+  }, [profiles, q]);
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onChange(next);
+  };
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size={buttonSize} className="gap-2">
+          <Users className="h-4 w-4" />
+          {label}
+          {selected.size > 0 && <Badge variant="secondary" className="h-5 px-1.5">{selected.size}</Badge>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start">
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search employees…" className="pl-8 h-8" />
+          </div>
+        </div>
+        <div className="max-h-72 overflow-y-auto p-1">
+          {filtered.length === 0 && <div className="p-3 text-sm text-muted-foreground text-center">No matches</div>}
+          {filtered.map((p) => {
+            const on = selected.has(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={() => toggle(p.id)}
+                className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted ${on ? "bg-primary/10" : ""}`}
+              >
+                <Checkbox checked={on} onCheckedChange={() => toggle(p.id)} onClick={(e) => e.stopPropagation()} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate">{p.full_name ?? p.email}</div>
+                  {p.department && <div className="text-[11px] text-muted-foreground truncate">{p.department}</div>}
+                </div>
+                {on && <Check className="h-4 w-4 text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+        {selected.size > 0 && (
+          <div className="border-t p-2">
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => onChange(new Set())}>
+              <X className="h-3 w-3 mr-1" /> Clear ({selected.size})
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function BookingDialog({ profiles, onSaved }: { profiles: ProfileLite[]; onSaved: () => void }) {
   const createBooking = useServerFn(createTeamCalendarBooking);
+  const findSlots = useServerFn(findAvailableSlots);
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [busy, setBusy] = useState(false);
+  const [attendeeIds, setAttendeeIds] = useState<Set<string>>(new Set());
+  const [externalEmails, setExternalEmails] = useState("");
+  const [date, setDate] = useState<Date>(new Date());
+  const [duration, setDuration] = useState(30);
+  const [windowStart, setWindowStart] = useState("09:00");
+  const [windowEnd, setWindowEnd] = useState("19:00");
+  const [manualStart, setManualStart] = useState("");
+  const [manualEnd, setManualEnd] = useState("");
+  const [useManual, setUseManual] = useState(false);
+  const [slots, setSlots] = useState<{ startISO: string; endISO: string }[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<{ startISO: string; endISO: string } | null>(null);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [title, setTitle] = useState("");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [attendees, setAttendees] = useState("");
   const [description, setDescription] = useState("");
 
-  async function save() {
+  function reset() {
+    setStep(1);
+    setAttendeeIds(new Set());
+    setExternalEmails("");
+    setDate(new Date());
+    setDuration(30);
+    setWindowStart("09:00");
+    setWindowEnd("19:00");
+    setSlots([]);
+    setSelectedSlot(null);
+    setManualStart("");
+    setManualEnd("");
+    setUseManual(false);
+    setTitle("");
+    setDescription("");
+  }
+
+  async function loadSlots() {
+    setLoadingSlots(true);
+    setSelectedSlot(null);
+    try {
+      const [sh, sm] = windowStart.split(":").map(Number);
+      const [eh, em] = windowEnd.split(":").map(Number);
+      const dayStart = new Date(date); dayStart.setHours(sh, sm, 0, 0);
+      const dayEnd = new Date(date); dayEnd.setHours(eh, em, 0, 0);
+      if (dayEnd <= dayStart) {
+        toast.error("Window end must be after start.");
+        setLoadingSlots(false);
+        return;
+      }
+      const result = await findSlots({ data: {
+        userIds: Array.from(attendeeIds),
+        windowStartISO: dayStart.toISOString(),
+        windowEndISO: dayEnd.toISOString(),
+        durationMin: duration,
+        stepMin: 15,
+      }});
+      setSlots(result.slots ?? []);
+      setStep(3);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not load availability");
+    } finally {
+      setLoadingSlots(false);
+    }
+  }
+
+  async function confirmBooking() {
+    if (!title.trim()) { toast.error("Add a title"); return; }
+    let startISO: string, endISO: string;
+    if (useManual) {
+      if (!manualStart || !manualEnd) { toast.error("Pick start and end"); return; }
+      startISO = new Date(manualStart).toISOString();
+      endISO = new Date(manualEnd).toISOString();
+    } else {
+      if (!selectedSlot) { toast.error("Pick a time slot"); return; }
+      startISO = selectedSlot.startISO;
+      endISO = selectedSlot.endISO;
+    }
+    const selectedEmails = Array.from(attendeeIds)
+      .map((id) => profiles.find((p) => p.id === id)?.email)
+      .filter(Boolean) as string[];
+    const extras = externalEmails.split(/[\n,]/).map((v) => v.trim()).filter(Boolean);
+    const attendeeEmails = Array.from(new Set([...selectedEmails, ...extras]));
+
     setBusy(true);
     try {
-      const result = await createBooking({ data: {
-        title,
-        startISO: new Date(start).toISOString(),
-        endISO: new Date(end).toISOString(),
-        attendeeEmails: attendees.split(/[\n,]/).map((v) => v.trim()).filter(Boolean),
-        description,
-      } });
-      if (!result.ok) {
-        toast.error(result.error ?? "Booking saved, but Google Calendar creation failed.");
-      } else {
-        toast.success("Team time booked");
-      }
-      setOpen(false);
-      setTitle("");
-      setStart("");
-      setEnd("");
-      setAttendees("");
-      setDescription("");
+      const result = await createBooking({ data: { title, startISO, endISO, attendeeEmails, description } });
+      if (!result.ok) toast.error(result.error ?? "Booking saved, but Google Calendar creation failed.");
+      else toast.success("Team time booked");
       onSaved();
+      setOpen(false);
+      reset();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not book team time");
     } finally {
@@ -666,37 +833,147 @@ function BookingDialog({ profiles, onSaved }: { profiles: Array<{ email: string 
     }
   }
 
-  const teamEmails = profiles.map((p) => p.email).filter(Boolean) as string[];
+  const selectedProfiles = profiles.filter((p) => attendeeIds.has(p.id));
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Book time</Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Book team time</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Client review, sprint planning…" /></div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5"><Label>Starts</Label><Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-            <div className="space-y-1.5"><Label>Ends</Label><Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+        <DialogHeader>
+          <DialogTitle>Book team time</DialogTitle>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+            <span className={step >= 1 ? "text-primary font-medium" : ""}>1. Attendees</span>
+            <span>→</span>
+            <span className={step >= 2 ? "text-primary font-medium" : ""}>2. Time window</span>
+            <span>→</span>
+            <span className={step >= 3 ? "text-primary font-medium" : ""}>3. Pick slot</span>
           </div>
-          <div className="space-y-1.5">
-            <Label>Attendees</Label>
-            <Textarea rows={3} value={attendees} onChange={(e) => setAttendees(e.target.value)} placeholder="name@colladome.com, teammate@colladome.com" />
-            {teamEmails.length > 0 && <div className="text-[11px] text-muted-foreground">Paste comma-separated work emails. {teamEmails.length} team emails are available in directory.</div>}
+        </DialogHeader>
+
+        {step === 1 && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Who's attending?</Label>
+              <EmployeePicker profiles={profiles} selected={attendeeIds} onChange={setAttendeeIds} label="Select attendees" buttonSize="default" />
+              {selectedProfiles.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-2">
+                  {selectedProfiles.map((p) => (
+                    <Badge key={p.id} variant="secondary" className="gap-1">
+                      {p.full_name ?? p.email}
+                      <button onClick={() => { const n = new Set(attendeeIds); n.delete(p.id); setAttendeeIds(n); }}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>External emails (optional)</Label>
+              <Textarea rows={2} value={externalEmails} onChange={(e) => setExternalEmails(e.target.value)} placeholder="client@example.com, partner@x.com" />
+            </div>
           </div>
-          <div className="space-y-1.5"><Label>What is this time for?</Label><Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
-          <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-muted-foreground">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-            <span>If booking fails with permission error, reconnect Google Calendar once so it grants event booking permission.</span>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start gap-2 font-normal">
+                    <CalendarIcon className="h-4 w-4" />{format(date, "PPP")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarPicker mode="single" selected={date} onSelect={(d) => d && setDate(d)} initialFocus className="p-3 pointer-events-auto" />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid gap-3 grid-cols-3">
+              <div className="space-y-1.5">
+                <Label>Duration</Label>
+                <select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm">
+                  {[15,30,45,60,90,120].map((m) => <option key={m} value={m}>{m} min</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5"><Label>From</Label><Input type="time" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>To</Label><Input type="time" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} /></div>
+            </div>
+            <div className="text-xs text-muted-foreground">Finding mutually-free time for {attendeeIds.size} {attendeeIds.size === 1 ? "person" : "people"}.</div>
           </div>
-        </div>
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button><Button onClick={save} disabled={busy}>{busy ? "Booking…" : "Book"}</Button></DialogFooter>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-3">
+            {!useManual && (
+              <div className="space-y-2">
+                <Label>Available slots on {format(date, "MMM d")}</Label>
+                {slots.length === 0 ? (
+                  <div className="text-sm text-muted-foreground rounded-md border border-dashed p-4 text-center">
+                    No mutually-free slots in this window. Widen the window, shorten the duration, or pick another day.
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                    {slots.map((s) => {
+                      const on = selectedSlot?.startISO === s.startISO;
+                      return (
+                        <button
+                          key={s.startISO}
+                          onClick={() => setSelectedSlot(s)}
+                          className={`rounded-md border px-2 py-1 text-xs ${on ? "border-primary bg-primary/20 text-primary" : "border-border hover:border-primary/60"}`}
+                        >
+                          {format(new Date(s.startISO), "HH:mm")}–{format(new Date(s.endISO), "HH:mm")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <button className="text-xs text-primary hover:underline" onClick={() => setUseManual(true)}>Or pick a custom time…</button>
+              </div>
+            )}
+            {useManual && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5"><Label>Starts</Label><Input type="datetime-local" value={manualStart} onChange={(e) => setManualStart(e.target.value)} /></div>
+                <div className="space-y-1.5"><Label>Ends</Label><Input type="datetime-local" value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} /></div>
+                <button className="col-span-2 text-xs text-primary hover:underline text-left" onClick={() => setUseManual(false)}>← Back to suggested slots</button>
+              </div>
+            )}
+            <div className="space-y-1.5"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Client review, sprint planning…" /></div>
+            <div className="space-y-1.5"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+            <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-2 text-[11px] text-muted-foreground">
+              <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-warning" />
+              <span>If booking fails with a permission error, reconnect Google Calendar to grant booking permission.</span>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          {step > 1 && <Button variant="outline" onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)} disabled={busy || loadingSlots}><ArrowLeft className="h-4 w-4" /> Back</Button>}
+          <div className="flex-1" />
+          {step === 1 && (
+            <Button onClick={() => setStep(2)} disabled={attendeeIds.size === 0 && !externalEmails.trim()}>
+              Next <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+          {step === 2 && (
+            <Button onClick={loadSlots} disabled={loadingSlots || attendeeIds.size === 0}>
+              {loadingSlots ? "Finding…" : <>Find slots <ArrowRight className="h-4 w-4" /></>}
+            </Button>
+          )}
+          {step === 3 && (
+            <Button onClick={confirmBooking} disabled={busy || (!useManual && !selectedSlot) || !title.trim()}>
+              {busy ? "Booking…" : "Book"}
+            </Button>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (

@@ -1,38 +1,35 @@
-## Problem
+## Changes to `/finances`
 
-Anjali's profile (`anjali@colladome.in`) has no matching `auth.users` row. The server function tries `supabaseAdmin.auth.admin.createUser(...)` for her, that call fails, and the client shows `This employee account is not synced yet: {}` — the underlying error object serializes to `{}` because we only read `.message`, which is empty on some Auth admin errors (typically "Database error creating new user" triggered by `handle_new_user`).
+### 1. Hide employees not yet effective in the selected month
 
-Two things need to change:
+An employee (profile or pending invite) is "effective in month M" when their **earliest salary `effective_from` (or, if no salary row yet, their profile `joined_on` / role_grant hint) is on or before the last day of M**. Currently the Salaries table and top cards include Sohil (joined July 1) and Shweksha (joined July 6) when June is selected.
 
-1. Stop depending on `auth.admin.createUser` from inside the leave flow — the `handle_new_user` trigger does heavy profile migration and can fail for edge-case profiles, and even when it fails we get an opaque error.
-2. Actually solve Anjali's case so leave can be logged today.
+- Load `joined_on` for profiles (already read via `select` — add the column).
+- Compute `earliestEffectiveByUser` = min(`salaries.effective_from`) per user; if none, use `profiles.joined_on`.
+- Filter both the **Salaries table rows** and the **top-card counts / totals** to only include profiles where `earliestEffective <= last day of selected month`.
+- Same treatment for `pendingGrants`: skip a grant if its matched profile (by email) isn't effective yet, or — for grants with no profile — hide until the invite has a `joined_on` or salary in-range (grants have no join date, so keep the current behavior: show them only when the current month is `>=` today's month — i.e. hide pending invites for past months).
 
-## Plan
+### 2. Replace "Rate" with "Proposed salary" + "Actual salary"; reorder columns
 
-**1. Add a Postgres helper (migration)**
+New Salaries table columns, left→right:
 
-Create `public.find_auth_user_id_by_email(_email text) returns uuid` as `security definer`, searching `auth.users` by lower(email). Grant `execute` to `authenticated`. This lets the server function look up the real auth id reliably (no `listUsers` pagination, no reliance on trigger side effects).
+`Employee | Email | Status | Type | Effective from | Proposed salary | Actual salary`
 
-**2. Rework `logLeaveForEmployee` in `src/lib/admin-users.functions.ts`**
+- **Proposed salary** = the raw configured amount for the effective salary row (or from the invite grant when pending): monthly amount, or `<rate>/hr` for hourly comp. Same value the current "Rate" cell shows.
+- **Actual salary** = pro-rated for the selected month:
+  - **Monthly comp**: walk each day of the selected month, sum `monthly_salary / daysInMonth` for the days the salary was active (already computed in `monthlyContribByUser` — reuse it). If salary starts mid-month (e.g. Manvi June 15), this naturally yields `monthly_salary * 16/30`.
+  - **Hourly comp**: `hours logged that month × hourly_rate` (reuse existing `userHoursThisMonth`).
+  - Pending grants with no salary row yet: show `—` (nothing accrued).
+- Show a small `(prorated from <effective_from>)` hint under Actual when the salary started inside the selected month.
 
-- Look up the auth id via the new RPC first (instead of `listUsers`).
-- If no auth user exists, do NOT call `auth.admin.createUser` inline. Instead:
-  - If `profiles.id` equals an existing `auth.users.id` (i.e. the profile IS a real user row that just isn't linked by email), use `profiles.id` directly.
-  - Otherwise return a clear, actionable error: `"<email> has no backend account yet. Open Access → Sync missing accounts, then try again."` — no more `{}`.
-- Wrap every admin call with a helper that surfaces `err.message || err.error_description || JSON.stringify(err)` so we never render `{}` again.
-- Keep the existing "ensure profile row exists for auth id, mark placeholder inactive, ensure leave_balances, insert leave_requests" steps.
+### 3. Update top cards to use "actual" numbers
 
-**3. Harden `syncMissingAuthAccounts` for this case**
+- **Configured pool** → rename to **"Actual salary pool"**; keep the current pro-rated math (`monthlyContribByUser` + hourly billed hours), but restrict the sum to the effective-in-month roster from step 1.
+- **Employees with salary** and **on roster** counts also use the effective-in-month roster and effective-in-month pending grants.
+- Total burn card unchanged (already driven by logs in-month).
 
-- After each `auth.admin.createUser` (or when it reports "already registered"), resolve the resulting auth id via the new RPC and immediately call the same `ensureProfileForAuthUser` helper used by the leave path, so the profile row is re-pointed to the auth id in one shot. Report per-email errors with full messages (no `{}`).
+### 4. Files touched
 
-**4. Manual recovery for Anjali (one-off data change, run after step 1 ships)**
+- `src/routes/_authenticated/finances.tsx` — add `joined_on` to the profiles query; add `earliestEffectiveByUser` memo + `isEffectiveInMonth` helper; filter `visibleProfiles` / `visiblePendingGrants` / Salaries table by it; reorder columns and add Actual salary cell; rename Configured pool card.
 
-- Call `syncMissingAuthAccounts` from `/access` — with the improvements above it will create `anjali@colladome.in` in auth and rewire the profile.
-- Verify by re-logging her 3 unpaid days in June.
-
-## Files touched
-
-- `supabase/migrations/*` — new `find_auth_user_id_by_email` RPC + grants.
-- `src/lib/admin-users.functions.ts` — `logLeaveForEmployee` no longer creates users; better error surfacing; `syncMissingAuthAccounts` calls `ensureProfileForAuthUser` and returns full error text.
-- No UI changes required; existing toast on `/hr/leave` and `/access` already renders `error.message`.
+No schema changes, no server-fn changes.

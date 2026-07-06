@@ -84,6 +84,25 @@ function FinancesPage() {
     },
   });
 
+  const { data: unpaidLeaves } = useQuery({
+    queryKey: ["finances-unpaid-leaves", month],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("leave_requests")
+        .select("user_id, start_date, end_date, leave_type, status")
+        .eq("leave_type", "unpaid")
+        .eq("status", "approved")
+        .lte("start_date", end)
+        .gte("end_date", start);
+      if (error) throw error;
+      return (data ?? []) as Array<{ user_id: string; start_date: string; end_date: string }>;
+    },
+  });
+
   // Latest effective salary per user as of selected month (used by burn + salary table)
   const currentSalaryByUser = useMemo(() => {
     const map = new Map<string, Salary>();

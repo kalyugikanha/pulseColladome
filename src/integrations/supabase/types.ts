@@ -1359,6 +1359,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "task_templates_created_by_profile_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_default_assignee_profile_fkey"
+            columns: ["default_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_templates_department_id_fkey"
             columns: ["department_id"]
             isOneToOne: false

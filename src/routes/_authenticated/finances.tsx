@@ -408,6 +408,7 @@ function FinancesPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Effective from</TableHead>
+                <TableHead className="text-right">Logged hours</TableHead>
                 <TableHead className="text-right">Proposed salary</TableHead>
                 <TableHead className="text-right">Actual salary</TableHead>
               </TableRow>

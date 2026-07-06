@@ -199,15 +199,12 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
       start_date: start,
       end_date: end,
       days,
-      reason: `Logged by ${me?.fullName ?? "manager"}`,
-      status: "approved",
-      admin_comment: comment.trim(),
-      decided_by: me!.id,
-      decided_at: new Date().toISOString(),
+      reason: `Logged by ${me?.fullName ?? "manager"}: ${comment.trim()}`,
+      status: "pending",
     });
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Leave logged for teammate");
+    toast.success("Leave submitted for approval");
     reset();
     setOpen(false);
     onSaved();

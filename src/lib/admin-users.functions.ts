@@ -456,7 +456,19 @@ export const logLeaveForEmployee = createServerFn({ method: "POST" })
     if (profileErr) throw new Error(profileErr.message);
     if (!selectedProfile?.email) throw new Error("Employee profile is missing an email address");
 
-    const authUserId = await findAuthUserIdByEmail(supabaseAdmin, selectedProfile.email);
+    let authUserId = await findAuthUserIdByEmail(supabaseAdmin, selectedProfile.email);
+    if (!authUserId) {
+      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email: selectedProfile.email,
+        password: "Test@123",
+        email_confirm: true,
+        user_metadata: { full_name: selectedProfile.full_name ?? selectedProfile.email.split("@")[0] },
+      });
+      if (createErr && !/already registered|already exists|duplicate/i.test(createErr.message)) {
+        throw new Error(`This employee account is not synced yet: ${createErr.message}`);
+      }
+      authUserId = created?.user?.id ?? await findAuthUserIdByEmail(supabaseAdmin, selectedProfile.email);
+    }
     if (!authUserId) {
       throw new Error("This employee account is not synced yet. Run Sync missing accounts from Access first.");
     }

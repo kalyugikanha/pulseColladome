@@ -1,15 +1,34 @@
-## Root cause
+## Plan
 
-`DayView` fires its Supabase query without waiting for `useCurrentUser` to resolve — every other query on the HR Leave page uses `enabled: !!me`, but this one doesn't. When Shraddha lands on `/hr/leave`, the day-view query can run before the Supabase auth session/JWT is attached; RLS then treats the call as anonymous, returns 0 rows, and the query result is cached as empty. Sibling queries (`hr-leave-month`, `hr-leave-requests-all`) don't hit this because they're gated on `!!me`.
+The leave row exists and is approved for Sridhar from today through tomorrow, but the app’s authenticated database requests for `leave_requests` are being rejected with a permission error. That is why HR Leave shows `0 total · 0 approved · 0 pending`, and Attendance cannot mark Sridhar as on leave.
 
-Confirmed: the row (`b8c58883…`, approved, 6–7 July, Hemanth) exists and RLS permits `hr_admin` to read it.
+### Changes to make
 
-## Fix
+1. **Restore backend table access for signed-in users**
+   - Add the missing authenticated access grant on `leave_requests`.
+   - Keep existing row-level rules unchanged, so only admins, HR admins, reporting managers, department heads, and the employee’s own scoped views can see the rows they are allowed to see.
+   - Add service/admin backend access for the same table.
+   - Do **not** grant anonymous public access.
 
-`src/routes/_authenticated/hr.leave.tsx` → `DayView`:
+2. **Verify the live flow**
+   - Confirm Shraddha/HR Admin and Super Admin queries can read the approved Sridhar leave.
+   - Confirm HR Leave day view counts it as `1 total · 1 approved · 0 pending` for today.
+   - Confirm Attendance can receive Sridhar’s approved casual leave for today and display him as on leave.
 
-- Call `useCurrentUser()` inside `DayView`.
-- Add `enabled: !!me` to the day query and include `me?.id` in `queryKey` so it refetches once auth is ready.
-- Show a small "Loading…" placeholder in the card body while `!me || !data`.
+### Technical details
 
-No other changes — the underlying create/approve/deduct flow works and the row is already in the DB.
+The network response shows:
+
+```text
+permission denied for table leave_requests
+Hint: GRANT SELECT ON public.leave_requests TO authenticated;
+```
+
+Current grants for `leave_requests` are empty, while RLS policies already exist. The migration will add:
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.leave_requests TO authenticated;
+GRANT ALL ON public.leave_requests TO service_role;
+```
+
+No frontend query change is needed for this specific issue unless verification reveals a separate UI bug after backend access is restored.

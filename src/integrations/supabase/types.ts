@@ -410,6 +410,61 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string
+          comment_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          read_at: string | null
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          read_at?: string | null
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          body?: string
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          read_at?: string | null
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "task_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -776,6 +831,277 @@ export type Database = {
         }
         Relationships: []
       }
+      task_activity: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          from_value: string | null
+          id: string
+          kind: string
+          note: string | null
+          task_id: string
+          to_value: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          from_value?: string | null
+          id?: string
+          kind: string
+          note?: string | null
+          task_id: string
+          to_value?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          from_value?: string | null
+          id?: string
+          kind?: string
+          note?: string | null
+          task_id?: string
+          to_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_activity_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_activity_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_comment_attachments: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          kind: string
+          label: string | null
+          url: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          url: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comment_attachments_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "task_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_comments: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          id: string
+          parent_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "task_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comments_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_dependencies: {
+        Row: {
+          created_at: string
+          depends_on_task_id: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          depends_on_task_id: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          depends_on_task_id?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_dependencies_depends_on_task_id_fkey"
+            columns: ["depends_on_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_dependencies_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_mentions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          mentioned_user_id: string
+          read_at: string | null
+          task_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          mentioned_user_id: string
+          read_at?: string | null
+          task_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          mentioned_user_id?: string
+          read_at?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_mentions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "task_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_mentions_mentioned_user_id_fkey"
+            columns: ["mentioned_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_mentions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_subtasks: {
+        Row: {
+          created_at: string
+          done: boolean
+          id: string
+          position: number
+          task_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          done?: boolean
+          id?: string
+          position?: number
+          task_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          done?: boolean
+          id?: string
+          position?: number
+          task_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_subtasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_task_types: {
         Row: {
           task_id: string
@@ -915,10 +1241,47 @@ export type Database = {
           },
         ]
       }
+      task_watchers: {
+        Row: {
+          created_at: string
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_watchers_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_watchers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           asset_links: Json
           assignee_id: string | null
+          completion_percent: number
           created_at: string
           created_by: string | null
           department_id: string | null
@@ -928,6 +1291,8 @@ export type Database = {
           id: string
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string
+          review_state: string
+          reviewer_id: string | null
           status: Database["public"]["Enums"]["task_status"]
           template_id: string | null
           title: string
@@ -936,6 +1301,7 @@ export type Database = {
         Insert: {
           asset_links?: Json
           assignee_id?: string | null
+          completion_percent?: number
           created_at?: string
           created_by?: string | null
           department_id?: string | null
@@ -945,6 +1311,8 @@ export type Database = {
           id?: string
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id: string
+          review_state?: string
+          reviewer_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           template_id?: string | null
           title: string
@@ -953,6 +1321,7 @@ export type Database = {
         Update: {
           asset_links?: Json
           assignee_id?: string | null
+          completion_percent?: number
           created_at?: string
           created_by?: string | null
           department_id?: string | null
@@ -962,6 +1331,8 @@ export type Database = {
           id?: string
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string
+          review_state?: string
+          reviewer_id?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           template_id?: string | null
           title?: string
@@ -994,6 +1365,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1336,6 +1714,54 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_scores: {
+        Row: {
+          created_at: string
+          employee_id: string
+          feedback: string | null
+          id: string
+          manager_id: string | null
+          score: number
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          feedback?: string | null
+          id?: string
+          manager_id?: string | null
+          score: number
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          feedback?: string | null
+          id?: string
+          manager_id?: string | null
+          score?: number
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_scores_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_scores_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       team_leave_calendar: {
@@ -1384,6 +1810,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      can_view_task: { Args: { _task_id: string }; Returns: boolean }
       get_my_leave_requests: {
         Args: never
         Returns: {
@@ -1439,7 +1866,7 @@ export type Database = {
       project_status: "active" | "on_hold" | "completed"
       task_priority: "low" | "medium" | "high"
       task_recurrence: "none" | "weekly" | "monthly"
-      task_status: "todo" | "in_progress" | "done"
+      task_status: "todo" | "in_progress" | "review" | "done"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1597,7 +2024,7 @@ export const Constants = {
       project_status: ["active", "on_hold", "completed"],
       task_priority: ["low", "medium", "high"],
       task_recurrence: ["none", "weekly", "monthly"],
-      task_status: ["todo", "in_progress", "done"],
+      task_status: ["todo", "in_progress", "review", "done"],
     },
   },
 } as const

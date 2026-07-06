@@ -15,15 +15,18 @@ import { Label } from "@/components/ui/label";
 import { ExternalLink, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { TaxonomyPicker, AssetLinksEditor, useTaxonomy, type TaxonomyValue } from "@/components/taxonomy-picker";
 import {
   createTaskFull, listUserPresets, bumpUserPreset, listRolePresets,
 } from "@/lib/tasks-plus.functions";
+import { listAwaitingMyReview, setReviewer as setReviewerFn } from "@/lib/tasks-workflow.functions";
 
 export const Route = createFileRoute("/_authenticated/tasks")({ component: TasksPage });
 
-const STATUS: Array<"todo" | "in_progress" | "done"> = ["todo", "in_progress", "done"];
-const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In Progress", done: "Done" };
+const STATUS: Array<"todo" | "in_progress" | "review" | "done"> = ["todo", "in_progress", "review", "done"];
+const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In Progress", review: "In Review", done: "Done" };
 
 function TasksPage() {
   const { data: me } = useCurrentUser();
@@ -60,8 +63,10 @@ function TasksPage() {
   const [tDue, setTDue] = useState("");
   const [tPri, setTPri] = useState<"low" | "medium" | "high">("medium");
   const [tAssignee, setTAssignee] = useState<string>("");
+  const [tReviewer, setTReviewer] = useState<string>("");
   const [tax_, setTax] = useState<TaxonomyValue>({ domainId: null, departmentId: null, taskTypeIds: [] });
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -76,8 +81,14 @@ function TasksPage() {
     queryFn: async () => (await supabase
       .from("tasks")
       .select("*, project:projects(id,name,client_name), task_types:task_task_types(task_type:taxonomy_task_types(id,name))")
-      .eq("assignee_id", me!.id)
+      .or(`assignee_id.eq.${me!.id},reviewer_id.eq.${me!.id}`)
       .order("due_date", { ascending: true, nullsFirst: false })).data ?? [],
+  });
+
+  const awaitingFn = useServerFn(listAwaitingMyReview);
+  const { data: awaiting } = useQuery({
+    queryKey: ["awaiting-my-review", me?.id], enabled: !!me,
+    queryFn: () => awaitingFn(),
   });
 
   const { data: projects } = useQuery({
@@ -132,29 +143,36 @@ function TasksPage() {
   }, [presets, tax]);
 
   async function updateStatus(id: string, status: string) {
-    const { error } = await supabase.from("tasks").update({ status: status as "todo"|"in_progress"|"done" }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Task updated");
-    qc.invalidateQueries();
+    try {
+      const { setTaskStatus } = await import("@/lib/tasks-workflow.functions");
+      await setTaskStatus({ data: { taskId: id, status: status as "todo"|"in_progress"|"review"|"done" } });
+      toast.success("Task updated");
+      qc.invalidateQueries();
+    } catch (e) { toast.error((e as Error).message); }
   }
 
   function resetForm() {
     setTProject(""); setTTitle(""); setTDesc(""); setTDue(""); setTPri("medium");
-    setTAssignee(me?.id ?? "");
+    setTAssignee(me?.id ?? ""); setTReviewer("");
     setTax({ domainId: null, departmentId: null, taskTypeIds: [] }); setLinks([]);
   }
+
+  const setReviewerSrv = useServerFn(setReviewerFn);
 
   async function submit() {
     if (!tTitle.trim()) return toast.error("Title required");
     if (!tProject) return toast.error("Project required");
     const assigneeId = tAssignee || me!.id;
     try {
-      await createFn({ data: {
+      const task = await createFn({ data: {
         projectId: tProject, title: tTitle.trim(), description: tDesc.trim(),
         dueDate: tDue || null, priority: tPri, assigneeId,
         assetLinks: links.filter((l) => l.url.trim()),
         domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds,
       }});
+      if (tReviewer && task?.id) {
+        await setReviewerSrv({ data: { taskId: task.id, reviewerId: tReviewer } });
+      }
       // bump preset
       await bumpFn({ data: { domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeId: tax_.taskTypeIds[0] ?? null } });
       toast.success("Task created");
@@ -182,6 +200,26 @@ function TasksPage() {
         </Button>
       </header>
 
+      {(awaiting?.length ?? 0) > 0 && (
+        <Card className="border-primary/50">
+          <CardHeader><CardTitle className="font-display text-base">Awaiting my review</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {awaiting!.map((t) => (
+              <button key={t.id} onClick={() => setOpenTaskId(t.id)}
+                className="w-full text-left flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 hover:bg-primary/10">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{t.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {(t.project as { name?: string } | null)?.name} · assignee {(t.assignee as { full_name?: string } | null)?.full_name ?? "—"}
+                  </div>
+                </div>
+                <Badge>Review</Badge>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {(tasks?.length ?? 0) === 0 ? (
         <Card><CardContent className="p-10 text-center text-muted-foreground">No tasks yet.</CardContent></Card>
       ) : (
@@ -192,8 +230,10 @@ function TasksPage() {
               {list!.map((t) => {
                 const types = (t.task_types as { task_type: { id: string; name: string } | null }[] | null)?.map((x) => x.task_type).filter(Boolean) ?? [];
                 const linkArr = (t.asset_links as { label: string; url: string }[] | null) ?? [];
+                const pct = (t as { completion_percent?: number }).completion_percent ?? 0;
                 return (
-                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3">
+                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3 hover:border-primary/40 cursor-pointer"
+                    onClick={() => setOpenTaskId(t.id)}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium">{t.title}</span>
@@ -201,20 +241,26 @@ function TasksPage() {
                         {types.map((tt) => <Badge key={tt!.id} variant="secondary">{tt!.name}</Badge>)}
                       </div>
                       {t.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>}
-                      <div className="flex flex-wrap gap-2 mt-1">
+                      <div className="flex flex-wrap gap-2 mt-1 items-center">
                         {t.due_date && <span className="text-xs text-muted-foreground">Due {format(new Date(t.due_date), "MMM d, yyyy")}</span>}
                         {linkArr.map((l, i) => (
-                          <a key={i} href={l.url} target="_blank" rel="noreferrer"
+                          <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
                             className="text-xs inline-flex items-center gap-1 text-primary hover:underline">
                             <ExternalLink className="h-3 w-3" />{l.label || new URL(l.url).hostname}
                           </a>
                         ))}
                       </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Progress value={pct} className="h-1.5 flex-1" />
+                        <span className="text-[10px] text-muted-foreground w-9 text-right">{pct}%</span>
+                      </div>
                     </div>
-                    <Select value={t.status} onValueChange={(v) => updateStatus(t.id, v)}>
-                      <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>{STATUS.map((s) => (<SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>))}</SelectContent>
-                    </Select>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Select value={t.status} onValueChange={(v) => updateStatus(t.id, v)}>
+                        <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>{STATUS.map((s) => (<SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>))}</SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 );
               })}
@@ -222,6 +268,9 @@ function TasksPage() {
           </Card>
         ))
       )}
+
+      <TaskDetailSheet taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
+
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -257,6 +306,23 @@ function TasksPage() {
                 <p className="text-xs text-muted-foreground">You can assign to yourself, your direct reports, and members of departments you head.</p>
               </div>
             )}
+
+            {canAssignOthers && (
+              <div className="space-y-1">
+                <Label>Reviewer (optional)</Label>
+                <Select value={tReviewer || "none"} onValueChange={(v) => setTReviewer(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="No reviewer" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— No reviewer —</SelectItem>
+                    {(assignees ?? []).filter((u) => u.id !== (tAssignee || me?.id)).map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.full_name ?? "Unnamed"}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">When the assignee marks done, the task moves to review.</p>
+              </div>
+            )}
+
 
             <div className="space-y-1">
               <Label>Project</Label>

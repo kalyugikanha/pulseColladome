@@ -248,7 +248,7 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
             <Label>Comment</Label>
             <Textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Reason / context (required)" />
           </div>
-          <p className="text-xs text-muted-foreground">This will be recorded as an approved leave and will deduct from their balance.</p>
+          <p className="text-xs text-muted-foreground">This will be sent for approval to their reporting manager / department head.</p>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>

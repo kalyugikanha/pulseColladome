@@ -164,12 +164,15 @@ function TasksPage() {
     if (!tProject) return toast.error("Project required");
     const assigneeId = tAssignee || me!.id;
     try {
-      await createFn({ data: {
+      const task = await createFn({ data: {
         projectId: tProject, title: tTitle.trim(), description: tDesc.trim(),
         dueDate: tDue || null, priority: tPri, assigneeId,
         assetLinks: links.filter((l) => l.url.trim()),
         domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds,
       }});
+      if (tReviewer && task?.id) {
+        await setReviewerSrv({ data: { taskId: task.id, reviewerId: tReviewer } });
+      }
       // bump preset
       await bumpFn({ data: { domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeId: tax_.taskTypeIds[0] ?? null } });
       toast.success("Task created");

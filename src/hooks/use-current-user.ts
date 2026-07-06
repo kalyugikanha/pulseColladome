@@ -20,6 +20,7 @@ export type CurrentUser = {
   directReportIds: string[];
   mustChangePassword: boolean;
   onboardingCompleted: boolean;
+  onboardingRequired: boolean;
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
   realIsHrAdmin: boolean;
@@ -35,7 +36,7 @@ export function useCurrentUser() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       const [{ data: profile }, { data: roles }, { data: sa }, { data: headRows }, { data: reportRows }] = await Promise.all([
-        supabase.from("profiles").select("full_name, email, must_change_password, onboarding_completed").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("full_name, email, must_change_password, onboarding_completed, onboarding_required").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase.from("super_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
         supabase.from("department_heads").select("department").eq("user_id", user.id),
@@ -105,6 +106,7 @@ export function useCurrentUser() {
 
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         onboardingCompleted: !!(profile as { onboarding_completed?: boolean } | null)?.onboarding_completed,
+        onboardingRequired: (profile as { onboarding_required?: boolean } | null)?.onboarding_required !== false,
         viewingAs,
         realIsSuperAdmin: isSuperAdmin,
         realIsHrAdmin,

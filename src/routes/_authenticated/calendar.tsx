@@ -184,6 +184,7 @@ function CalendarPage() {
     if (!userId) return true;
     const p = profileById.get(userId);
     if (!p) return true;
+    if (filters.employees.size && !filters.employees.has(userId)) return false;
     if (filters.depts.size && (!p.department || !filters.depts.has(p.department))) return false;
     if (filters.q.trim()) {
       const q = filters.q.trim().toLowerCase();
@@ -192,6 +193,7 @@ function CalendarPage() {
     }
     return true;
   };
+
 
   const eventsForDay = (d: Date) => {
     const list: { title: string; owner?: string | null; dept?: string | null; kind: "internal" | "client" | "booking" | "private"; time?: string; userId?: string; details?: string | null }[] = [];

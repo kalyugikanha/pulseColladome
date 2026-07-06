@@ -149,13 +149,13 @@ export const createTaskFull = createServerFn({ method: "POST" })
     const { data: task, error } = await supabase.rpc("create_task_full", {
       _project_id: data.projectId,
       _title: title,
-      _description: data.description?.trim() || null,
-      _due_date: data.dueDate || null,
+      _description: data.description?.trim() || undefined,
+      _due_date: data.dueDate || undefined,
       _priority: data.priority,
       _assignee_id: data.assigneeId,
       _asset_links: data.assetLinks,
-      _domain_id: data.domainId,
-      _department_id: data.departmentId,
+      _domain_id: data.domainId ?? undefined,
+      _department_id: data.departmentId ?? undefined,
       _task_type_ids: data.taskTypeIds,
     });
     if (error) throw taskCreateError(error);

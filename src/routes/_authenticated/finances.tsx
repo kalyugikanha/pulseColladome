@@ -461,6 +461,7 @@ function FinancesPage() {
                       <Badge variant="outline" className="text-[10px] capitalize">{effType}</Badge>
                     </TableCell>
                     <TableCell>{s?.effective_from ?? (p.joined_on ? <span className="text-muted-foreground text-xs">joined {p.joined_on}</span> : "—")}</TableCell>
+                    <TableCell className="text-right tabular-nums">{(userHoursThisMonth.get(p.id) ?? 0).toFixed(1)}</TableCell>
                     <TableCell className="text-right">{proposedNode}</TableCell>
                     <TableCell className="text-right">{actualNode}</TableCell>
                   </TableRow>

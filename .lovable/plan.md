@@ -1,33 +1,73 @@
 
-## Why you can't edit today
+## What's actually happening on June 30
 
-In the admin **Timesheet** pivot view (Weekly / Monthly / Employee × Project) the cells are read-only "click to see daily breakdown" buttons. The pencil Edit action only exists (a) inside the drill sheet next to each already-logged entry, and (b) in the "Day" view. There is no per-row Edit affordance on the main grid, so on the pivot there is literally no button to press for another employee — even though as super admin you have permission.
+I checked the database. Bilu's June upload IS there — e.g. Aakash on **2026-06-30** has 25 task entries totalling hundreds of hours, all approved. Nothing is lost.
 
-Two side gaps make this worse:
-- `canEdit` doesn't include `me.isAdmin`, so a plain admin can't edit either.
-- Pivot cells with 0 hours don't open anything, so you can't add hours for an employee/project pair that has none yet.
+Why you can't see them when you "edit Akash":
+- Today is **6 July 2026**, so the Timesheet opens on **Month = July 2026** by default.
+- The "Edit day…" popover is constrained to the currently selected range (July 1 – July 31), so **June dates are disabled** in that mini calendar.
+- To reach June 30 today you'd have to: change Month dropdown → June → then click Edit day → pick 30. That's the "clumsy UX" you're describing.
 
-## Change (frontend only)
+So the data is fine — the UI is forcing you through Month → Range → Cell → Popover → Day just to touch one day.
 
-`src/routes/_authenticated/timesheet.tsx`
+## Walk-through of the two edit scenarios today (for context)
 
-1. **Widen `canEdit`** to include admins:
-   `me.isSuperAdmin || me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager`
+- **Single day for one employee**: pick Month → pick Employee row → click "Edit day…" popover → pick a date inside that month → DayEditorSheet opens with that day's project/hours rows.
+- **Bulk month for many employees**: no real bulk editor exists. You'd have to open each employee × each day one at a time. Bilu's June upload didn't happen through this UI — it was a direct DB seed.
 
-2. **Add an "Edit day…" column** at the end of each employee row in the pivot table (visible when `canEdit`). It's a small popover with a date picker constrained to the currently selected range. Picking a date opens the existing `DayEditorSheet` for `{userId, userName, date}`.
+## Proposed redesign — daily-only, Clockify-style
 
-3. **Add an "Add / edit another day"** button at the top of the drill sheet (per employee × project) with the same date picker → opens `DayEditorSheet` for a chosen day. Lets an admin add hours to a day that isn't already in the list.
+Remove Month / Range views from the Admin Timesheet. Keep **one** primary surface: a **Day view** that always answers "what did everyone do on this date?" and lets you edit inline.
 
-4. Update the pivot description copy to mention the new Edit affordance.
+### Layout
 
-## Not changing
+```text
+┌─ Timesheet ────────────────────────────────────────────────┐
+│  ◀  Mon, 30 Jun 2026  ▶     [📅 Jump to date]              │
+│  Dept ▾   Employee ▾   Projects ▾        [Export CSV]      │
+├────────────────────────────────────────────────────────────┤
+│ Employee     │ Project                │ Hrs │ Notes │ ✓ │ ⋯│
+│ Aakash       │ CLDM00524 Selfup       │ 30  │ …     │ ✅ │✎│
+│ Aakash       │ CLDM00418 Bus Arabia   │ 20  │ …     │ ✅ │✎│
+│              │ + Add project…                            │
+│ Anjali       │ CLDM00522 Oswal        │ 20  │ June w│ ✅ │✎│
+│ Deepak       │ CLDM00481 Briskon      │ 45  │ June w│ ✅ │✎│
+│  …                                                         │
+│ Day total: 1,284 hrs · 18 employees · 42 project rows       │
+└────────────────────────────────────────────────────────────┘
+```
 
-- Database / RLS — super admin already has full ALL on `attendance_logs`; the reporting-manager / dept-head UPDATE policies cover the widened `canEdit` cases.
-- Approval flow, balance/trigger logic, DayEditorSheet internals.
-- `my-timesheet.tsx` (self view).
+### Interactions
 
-## Verify
+- **Date navigation**: prev / next day arrows + a "Jump to date" popover (unbounded calendar, no per-month gating). URL keeps `?date=YYYY-MM-DD` so it's shareable/refreshable.
+- **Employee grouping**: rows grouped by employee, sub-rows per project entry for that day, then a "+ Add project" ghost row per employee to add another line (project select + hours + notes).
+- **Inline edit** (admin/super-admin): hours & notes are editable in-place; project is a dropdown. Save on blur / Enter with a toast.
+- **Row menu (⋯)**: Delete entry, Approve/Unapprove day, "Open full editor" (still opens the existing `DayEditorSheet` for power edits).
+- **Day approval**: single ✅ per employee-day (same `attendance_logs.approved_at` we use now); one-click toggle.
+- **Filters**: Department, Employee, Projects — same MultiSelectFilter, applied client-side to the day's rows.
+- **Empty employees**: option "Show employees with no entries" so you can add hours for someone who didn't log anything that day.
+- **Export CSV**: exports the currently visible day.
 
-- As super admin: on the Weekly view, each employee row shows "Edit day…" → pick a date → sheet opens with that employee's tasks → change hours → Save → toast "Saved" → pivot refreshes.
-- As a plain admin (no reporting relationship): same flow now works.
-- As a normal employee: no Edit column appears (unchanged).
+### What gets removed
+
+- Month view, Range view, ViewMode switch, month/year selects, range pickers.
+- `EditDayPopover` (the constrained mini calendar) — replaced by the always-available date navigator.
+- Pivot table Employee × Project. (See below if you want a summary.)
+
+### Monthly totals — optional secondary tab
+
+Clockify keeps daily entry primary but still has reports. Recommended: a small **"Reports"** sub-tab (read-only) with the old Employee×Project pivot for a chosen month, purely for export/summary — no edit affordances. Say the word if you want this included; otherwise we drop it entirely.
+
+### No database / policy changes
+
+RLS on `attendance_logs` already lets super-admins & admins update `tasks`, `total_hours`, `last_edited_by`, `approved_at`. Inline edits reuse the same update path as `DayEditorSheet.save()`. Employee timesheet page (`my-timesheet.tsx`), approvals flow, leave, and dashboards are untouched.
+
+## Files that change
+
+- `src/routes/_authenticated/timesheet.tsx` — rewritten around a single Day view + inline row editor.
+- `src/components/day-editor-sheet.tsx` — kept as-is; still opened from the "Open full editor" menu item.
+- (Optional) `src/components/timesheet-day-row.tsx` — new small component for the inline-editable row, to keep the route file readable.
+
+## Open question before I build
+
+Do you want the **Reports (monthly pivot, read-only)** sub-tab kept for month-end export, or drop it entirely and rely on CSV export of individual days? Reply "keep reports" or "drop reports" and I'll finalise.

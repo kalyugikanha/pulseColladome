@@ -65,7 +65,7 @@ export function useCurrentUser() {
       let vIsSuper = isSuperAdmin;
       let vIsFinance = realFinance;
       let vIsHr = realIsHrAdmin;
-      let vCanManageProjects = realAdmin || !!roles?.some((r) => r.role === "project_manager");
+      let vCanManageProjects = realAdmin || realIsHrAdmin || realHeadOf.length > 0 || !!roles?.some((r) => r.role === "project_manager");
       let vHeadOf = realHeadOf;
       let vReportIds = realReportIds;
 
@@ -86,8 +86,8 @@ export function useCurrentUser() {
           vIsAdmin = vIsSuper || !!otherRoles?.some((r) => r.role === "admin");
           vIsFinance = !!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase());
           vIsHr = !!otherRoles?.some((r) => r.role === "hr_admin");
-          vCanManageProjects = vIsAdmin || !!otherRoles?.some((r) => r.role === "project_manager");
           vHeadOf = (otherHeadRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
+          vCanManageProjects = vIsAdmin || vIsHr || vHeadOf.length > 0 || !!otherRoles?.some((r) => r.role === "project_manager");
           vReportIds = ((otherReports ?? []) as Array<{ id: string }>).map((r) => r.id);
         }
       }

@@ -53,7 +53,7 @@ export function useCurrentUser() {
       const isSuperAdmin = !!sa;
       const email = profile?.email ?? user.email ?? null;
       const realAdmin = isSuperAdmin || !!roles?.some((r) => r.role === "admin");
-      const realFinance = !!email && FINANCE_EMAILS.includes(email.toLowerCase());
+      const realFinance = isSuperAdmin || (!!email && FINANCE_EMAILS.includes(email.toLowerCase()));
 
       const realIsHrAdmin = !!roles?.some((r) => r.role === "hr_admin");
 
@@ -84,7 +84,7 @@ export function useCurrentUser() {
           ]);
           vIsSuper = !!otherSa;
           vIsAdmin = vIsSuper || !!otherRoles?.some((r) => r.role === "admin");
-          vIsFinance = !!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase());
+          vIsFinance = vIsSuper || (!!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase()));
           vIsHr = !!otherRoles?.some((r) => r.role === "hr_admin");
           vHeadOf = (otherHeadRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
           vCanManageProjects = vIsAdmin || vIsHr || vHeadOf.length > 0 || !!otherRoles?.some((r) => r.role === "project_manager");

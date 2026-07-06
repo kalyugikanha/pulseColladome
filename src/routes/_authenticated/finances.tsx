@@ -120,6 +120,28 @@ function FinancesPage() {
   // Pro-rated monthly contribution per user for the selected month.
   // Walks each day of the month and picks whichever salary was in force that day.
   // Hourly comp is skipped here — it's billed as hours×rate elsewhere.
+  // Approved unpaid leave days per user that fall within the selected month.
+  const unpaidDaysByUser = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!unpaidLeaves) return map;
+    const [y, m] = month.split("-").map(Number);
+    const mStart = Date.UTC(y, m - 1, 1);
+    const mEnd = Date.UTC(y, m, 0);
+    const DAY = 86400000;
+    for (const lr of unpaidLeaves) {
+      const s = Date.parse(lr.start_date);
+      const e = Date.parse(lr.end_date);
+      if (isNaN(s) || isNaN(e)) continue;
+      const from = Math.max(s, mStart);
+      const to = Math.min(e, mEnd);
+      if (to < from) continue;
+      const days = Math.round((to - from) / DAY) + 1;
+      map.set(lr.user_id, (map.get(lr.user_id) ?? 0) + days);
+    }
+    return map;
+  }, [unpaidLeaves, month]);
+
+  // Pro-rated monthly contribution per user for the selected month.
   const monthlyContribByUser = useMemo(() => {
     const map = new Map<string, number>();
     const [y, m] = month.split("-").map(Number);
@@ -131,12 +153,13 @@ function FinancesPage() {
       const eff = new Date(s.effective_from);
       const startDay = eff > monthStart ? eff.getUTCDate() : 1;
       const effectiveDays = daysInMonth - startDay + 1;
-      if (effectiveDays <= 0) continue;
-      const contrib = Number(s.monthly_salary ?? 0) * effectiveDays / daysInMonth;
+      const payableDays = Math.max(0, effectiveDays - (unpaidDaysByUser.get(userId) ?? 0));
+      if (payableDays <= 0) continue;
+      const contrib = Number(s.monthly_salary ?? 0) * payableDays / daysInMonth;
       if (contrib > 0) map.set(userId, contrib);
     }
     return map;
-  }, [currentSalaryByUser, month]);
+  }, [currentSalaryByUser, unpaidDaysByUser, month]);
 
   // Compute per-project burn using salary-share allocation
   const burnByProject = useMemo(() => {

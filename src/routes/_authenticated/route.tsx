@@ -133,6 +133,20 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuItem>
                   </>
                 )}
+                {(isAdmin || isSuperAdmin || isHrAdmin || isReportingManager) && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname === "/performance"}>
+                      <Link to="/performance"><Star /><span>Team Performance</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {(isAdmin || isSuperAdmin || isHrAdmin || isReportingManager || isDepartmentHead || canManageProjects) && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/analytics")}>
+                      <Link to="/analytics"><BarChart3 /><span>Output Analytics</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
 
                 {(isSuperAdmin || isHrAdmin) && (
                   <>

@@ -383,7 +383,7 @@ function CalendarPage() {
                   </div>
                 )}
                 {activeFilters > 0 && (
-                  <Button variant="ghost" size="sm" className="w-full" onClick={() => setFilters({ q: "", depts: new Set(), showLeave: true, showMeetings: true, showBirthdays: true, showAnniversaries: true, showHolidays: true })}>
+                  <Button variant="ghost" size="sm" className="w-full" onClick={() => setFilters({ q: "", depts: new Set(), employees: new Set(), showLeave: true, showMeetings: true, showBirthdays: true, showAnniversaries: true, showHolidays: true })}>
                     <X className="h-3 w-3 mr-1" /> Clear filters
                   </Button>
                 )}

@@ -132,10 +132,24 @@ function ProjectsPage() {
         )}
       </header>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, project ID, or client" className="pl-9" />
+      </div>
+
+      {(() => {
+        const q = search.trim().toLowerCase();
+        const filtered = q
+          ? (projects ?? []).filter((p: any) =>
+              [p.name, p.code, p.client_name].some((v) => (v ?? "").toString().toLowerCase().includes(q)),
+            )
+          : (projects ?? []);
+        return (<>
       {(projects?.length ?? 0) === 0 && <Card><CardContent className="p-10 text-center text-muted-foreground">No projects yet.</CardContent></Card>}
+      {(projects?.length ?? 0) > 0 && filtered.length === 0 && <Card><CardContent className="p-10 text-center text-muted-foreground">No projects match "{search}".</CardContent></Card>}
 
       <div className="grid gap-4">
-        {projects?.map((p: any) => (
+        {filtered.map((p: any) => (
           <Card key={p.id}>
             <CardHeader className="flex flex-row items-start justify-between">
               <div>

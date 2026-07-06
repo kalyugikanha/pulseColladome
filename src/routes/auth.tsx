@@ -22,8 +22,8 @@ function AuthPage() {
   async function handleGoogle() {
     setLoading(true);
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-      extraParams: { hd: "*", prompt: "select_account" },
+      redirect_uri: `${window.location.origin}/auth/callback`,
+      extraParams: { prompt: "select_account" },
     });
     if (result.error) {
       const msg = result.error.message || "Google sign-in failed";

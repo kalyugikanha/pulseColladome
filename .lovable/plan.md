@@ -1,16 +1,25 @@
 ## Goal
-Make the Finances "Configured pool" stat reflect only active teammates in the currently selected departments, so June's total matches what's actually being paid out.
+Pro-rate the "Configured pool" so a salary that becomes effective mid-month only counts for the days it applies to, and any prior salary covers the earlier days of that month.
+
+## Rule
+For the selected month with `D` days:
+- If a user's latest effective salary started **on or before the 1st of the month** → count the full `monthly_salary` (unchanged).
+- If it started **during the month** on day `k` → count `monthly_salary × (D − k + 1) / D` for that salary, plus the **previous** salary (if any, effective before this month) contributes `monthly_salary_prev × (k − 1) / D` for the earlier days.
+- Multiple raises inside the same month are handled by summing per-segment contributions across all `salaries` rows whose effective window overlaps the month.
+- Hourly comp is already based on hours logged that month — leave it as-is.
+- Grants and pending grants have no effective date — leave them as full monthly (unchanged).
 
 ## Changes (`src/routes/_authenticated/finances.tsx`)
-
-1. **Load `is_active`** on the profiles query (`profiles` select adds `is_active`) and extend the `Profile` type.
-2. **Department + active filter** applied once, reused by all stats:
-   - Build `visibleProfiles = profiles.filter(p => p.is_active !== false && (deptSel.size === 0 || deptSel.has(p.department ?? UNASSIGNED)))`.
-   - Use `visibleProfiles` (instead of raw `profiles`) inside `totalConfiguredPool`, `usersWithSalary` count, and the "on roster" sub-label.
-3. **Pending grants**: only include a pending grant in the pool when either no departments are selected, or the grant's `department` (already selected in the query) is in `deptSel`. Add `department` to the `role_grants` select and `Grant` type.
-4. **Inactive teammates never count** in the pool regardless of filter (they're excluded in step 2). Pending grants remain unaffected by active status — they have no profile yet.
-5. Keep the salary table below untouched (it already lists everyone; the fix is scoped to the top-line stat the user asked about).
+1. Replace `currentSalaryByUser` (single latest row) with a helper `monthlySalaryFor(userId, month)` that:
+   - Sorts that user's `salaries` rows by `effective_from`.
+   - Walks day-by-day segments across `[month_start, month_end]`, applying the salary in force on each segment.
+   - Returns `{ contribution: number, comp_type: "monthly" | "hourly", hourly_rate: number | null, monthly_salary: number | null, activeAtEnd: Salary | null }`. The `activeAtEnd` field replaces the old "latest salary" lookup for places that only need to know the current comp (salary table row, burn allocation).
+2. In `totalConfiguredPool`: for monthly comp use `contribution` directly instead of the full `monthly_salary`. Hourly stays `hourly_rate × hours`.
+3. `usersWithSalary`: count users where any salary segment overlaps the month (i.e., `contribution > 0` or `activeAtEnd` set).
+4. Burn calculation (`burnByProject`) keeps using `activeAtEnd` so per-project allocation matches the currently-in-force comp — this isn't what the user asked about and won't change.
+5. Salary table (Configured salaries card) keeps showing `activeAtEnd` for the current rate.
 
 ## Out of scope
-- Changing the burn calculation, the salary table rendering, or the salaries schema.
-- Historical back-dating of `deactivated_at` — active status is evaluated as "currently active".
+- Pro-rating the burn table (only the Configured pool stat is affected).
+- Handling salary end-dates / terminations mid-month beyond what `is_active` already excludes.
+- UI change to show the pro-ration factor per user (can add later if requested).

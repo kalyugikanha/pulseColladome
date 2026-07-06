@@ -198,7 +198,7 @@ const TEAM_ROSTER: TeamEntry[] = [
   { email: "neetu@colladome.in",              full_name: "Neetu Rauniyar",         role: "employee",        is_super_admin: false, monthly_salary: 2000,  department: "Business Development" },
   { email: "sarita@colladome.in",             full_name: "Sarita Kumari",          role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Business Development" },
   { email: "riyanshi@colladome.in",           full_name: "Riyanshi Sharma",        role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Business Development" },
-  { email: "arpit@colladome.in",              full_name: "Arpit Kast",             role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Development" },
+  { email: "arpit@colladome.in",              full_name: "Arpit Kast",             role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Development", comp_type: "hourly", hourly_rate: 400 },
 ];
 
 export const bulkProvisionTeam = createServerFn({ method: "POST" })

@@ -75,6 +75,7 @@ function yearsBetween(from: string, on: Date): number {
 type Filters = {
   q: string;
   depts: Set<string>;
+  employees: Set<string>;
   showLeave: boolean;
   showMeetings: boolean;
   showBirthdays: boolean;
@@ -90,15 +91,18 @@ function CalendarPage() {
   const syncGoogleCalendar = useServerFn(syncMyGoogleCalendar);
   const [cursor, setCursor] = useState(new Date());
   const [openDay, setOpenDay] = useState<Date | null>(null);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     q: "",
     depts: new Set(),
+    employees: new Set(),
     showLeave: true,
     showMeetings: true,
     showBirthdays: true,
     showAnniversaries: true,
     showHolidays: true,
   });
+
 
   const monthStart = startOfMonth(cursor);
   const monthEnd = endOfMonth(cursor);

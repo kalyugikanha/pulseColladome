@@ -84,7 +84,7 @@ function FinancesPage() {
     },
   });
 
-  // Latest effective salary per user as of selected month
+  // Latest effective salary per user as of selected month (used by burn + salary table)
   const currentSalaryByUser = useMemo(() => {
     const map = new Map<string, Salary>();
     if (!salaries) return map;
@@ -94,6 +94,44 @@ function FinancesPage() {
       if (new Date(s.effective_from) > cutoff) continue;
       const existing = map.get(s.user_id);
       if (!existing || new Date(s.effective_from) > new Date(existing.effective_from)) map.set(s.user_id, s);
+    }
+    return map;
+  }, [salaries, month]);
+
+  // Pro-rated monthly contribution per user for the selected month.
+  // Walks each day of the month and picks whichever salary was in force that day.
+  // Hourly comp is skipped here — it's billed as hours×rate elsewhere.
+  const monthlyContribByUser = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!salaries) return map;
+    const [y, m] = month.split("-").map(Number);
+    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+    // Group by user, sorted ascending by effective_from
+    const byUser = new Map<string, Salary[]>();
+    for (const s of salaries) {
+      const arr = byUser.get(s.user_id) ?? [];
+      arr.push(s);
+      byUser.set(s.user_id, arr);
+    }
+    for (const arr of byUser.values()) arr.sort((a, b) => a.effective_from.localeCompare(b.effective_from));
+
+    for (const [userId, arr] of byUser) {
+      let contrib = 0;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayDate = new Date(Date.UTC(y, m - 1, day));
+        // Find latest salary whose effective_from <= dayDate
+        let active: Salary | null = null;
+        for (const s of arr) {
+          if (new Date(s.effective_from) <= dayDate) active = s;
+          else break;
+        }
+        if (!active) continue;
+        if (active.comp_type === "monthly") {
+          contrib += Number(active.monthly_salary ?? 0) / daysInMonth;
+        }
+      }
+      if (contrib > 0) map.set(userId, contrib);
     }
     return map;
   }, [salaries, month]);

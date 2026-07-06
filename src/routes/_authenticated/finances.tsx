@@ -528,15 +528,20 @@ function FinancesPage() {
                       <TableCell className="text-right font-medium text-muted-foreground">{inr(totalUnallocated)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((totalUnallocated / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
                     </TableRow>
-                    {unallocatedRows.map((r) => (
-                      <TableRow key={`unallocated-${r.userId}`} className="bg-muted/20">
-                        <TableCell className="pl-8 text-sm text-muted-foreground">{r.name}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">—</TableCell>
-                        <TableCell className="text-right text-muted-foreground">0.0</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{inr(r.amount)}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((r.amount / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
-                      </TableRow>
-                    ))}
+                    {unallocatedRows.map((r) => {
+                      const loggedHrs = userHoursThisMonth.get(r.userId) ?? 0;
+                      return (
+                        <TableRow key={`unallocated-${r.userId}`} className="bg-muted/20">
+                          <TableCell className="pl-8 text-sm text-muted-foreground">{r.name}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {loggedHrs > 0 ? `${loggedHrs.toFixed(1)} hrs logged (no project code)` : "no hours logged"}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground tabular-nums">{loggedHrs.toFixed(1)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{inr(r.amount)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((r.amount / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </>
                 )}
               </TableBody>

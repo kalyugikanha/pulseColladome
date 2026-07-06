@@ -144,6 +144,16 @@ function FinancesPage() {
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
   const usersWithSalary = currentSalaryByUser.size;
 
+  const userHoursThisMonth = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const row of logs ?? []) {
+      let sum = 0;
+      for (const t of row.tasks ?? []) sum += Number(t.hours) || 0;
+      m.set(row.user_id, (m.get(row.user_id) ?? 0) + sum);
+    }
+    return m;
+  }, [logs]);
+
   // Merge profiles + grants so uninvited-but-signed-up and invited-but-unsigned users both appear
   const profileEmails = useMemo(() => new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]), [profiles]);
   const pendingGrants = useMemo(() => (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())), [grants, profileEmails]);
@@ -157,12 +167,22 @@ function FinancesPage() {
     let sum = 0;
     for (const p of profiles ?? []) {
       const s = currentSalaryByUser.get(p.id);
-      if (s) sum += Number(s.monthly_salary);
-      else if (p.email) sum += Number(grantByEmail.get(p.email.toLowerCase())?.default_monthly_salary ?? 0);
+      if (s) {
+        if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
+        else sum += Number(s.monthly_salary ?? 0);
+      } else if (p.email) {
+        const g = grantByEmail.get(p.email.toLowerCase());
+        if (g?.comp_type === "hourly") sum += Number(g.default_hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
+        else sum += Number(g?.default_monthly_salary ?? 0);
+      }
     }
-    for (const g of pendingGrants) sum += Number(g.default_monthly_salary ?? 0);
+    for (const g of pendingGrants) {
+      if (g.comp_type === "hourly") {
+        // no hours possible without a user id
+      } else sum += Number(g.default_monthly_salary ?? 0);
+    }
     return sum;
-  }, [profiles, currentSalaryByUser, grantByEmail, pendingGrants]);
+  }, [profiles, currentSalaryByUser, grantByEmail, pendingGrants, userHoursThisMonth]);
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {

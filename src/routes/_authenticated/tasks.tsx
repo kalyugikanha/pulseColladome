@@ -160,14 +160,22 @@ function TasksPage() {
     setTProject(""); setTTitle(""); setTDesc(""); setTDue(""); setTPri("medium");
     setTAssignee(me?.id ?? ""); setTReviewer("");
     setTax({ domainId: null, departmentId: null, taskTypeIds: [] }); setLinks([]);
+    setMultiStage(false); setStages([]);
   }
 
   const setReviewerSrv = useServerFn(setReviewerFn);
+  const setStagesSrv = useServerFn(setTaskStages);
 
   async function submit() {
     if (!tTitle.trim()) return toast.error("Title required");
     if (!tProject) return toast.error("Project required");
-    const assigneeId = tAssignee || me!.id;
+    if (multiStage) {
+      if (stages.length === 0) return toast.error("Add at least one workflow stage.");
+      for (const s of stages) {
+        if (!s.name.trim() || !s.owner_id) return toast.error("Fill in every stage name and owner.");
+      }
+    }
+    const assigneeId = multiStage ? (stages[0].owner_id) : (tAssignee || me!.id);
     try {
       const task = await createFn({ data: {
         projectId: tProject, title: tTitle.trim(), description: tDesc.trim(),
@@ -175,8 +183,11 @@ function TasksPage() {
         assetLinks: links.filter((l) => l.url.trim()),
         domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds,
       }});
-      if (tReviewer && task?.id) {
+      if (tReviewer && task?.id && !multiStage) {
         await setReviewerSrv({ data: { taskId: task.id, reviewerId: tReviewer } });
+      }
+      if (multiStage && task?.id) {
+        await setStagesSrv({ data: { taskId: task.id, stages } });
       }
       // bump preset
       await bumpFn({ data: { domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeId: tax_.taskTypeIds[0] ?? null } });
@@ -186,6 +197,7 @@ function TasksPage() {
       qc.invalidateQueries();
     } catch (e) { toast.error((e as Error).message); }
   }
+
 
   const grouped: Record<string, typeof tasks> = {};
   (tasks ?? []).forEach((t) => {

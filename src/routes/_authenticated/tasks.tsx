@@ -81,8 +81,14 @@ function TasksPage() {
     queryFn: async () => (await supabase
       .from("tasks")
       .select("*, project:projects(id,name,client_name), task_types:task_task_types(task_type:taxonomy_task_types(id,name))")
-      .eq("assignee_id", me!.id)
+      .or(`assignee_id.eq.${me!.id},reviewer_id.eq.${me!.id}`)
       .order("due_date", { ascending: true, nullsFirst: false })).data ?? [],
+  });
+
+  const awaitingFn = useServerFn(listAwaitingMyReview);
+  const { data: awaiting } = useQuery({
+    queryKey: ["awaiting-my-review", me?.id], enabled: !!me,
+    queryFn: () => awaitingFn(),
   });
 
   const { data: projects } = useQuery({

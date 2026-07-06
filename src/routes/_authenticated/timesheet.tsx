@@ -65,7 +65,7 @@ function TimesheetPage() {
   }, [me, meLoading, navigate]);
 
   const canView = !!me && (me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
-  const canEdit = !!me && (me.isSuperAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
+  const canEdit = !!me && (me.isSuperAdmin || me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
   const canApprove = canEdit;
   const { deptScope, userScope } = useVisibilityScope(me);
 

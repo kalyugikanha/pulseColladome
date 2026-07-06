@@ -155,6 +155,7 @@ function DayView({ empMap }: { empMap: Map<string, Employee> }) {
       const { data, error } = await supabase
         .from("leave_requests")
         .select("*")
+        .in("status", ["approved", "pending"])
         .lte("start_date", day)
         .gte("end_date", day);
       if (error) throw new Error(error.message);
@@ -162,7 +163,15 @@ function DayView({ empMap }: { empMap: Map<string, Employee> }) {
     },
   });
 
-  const rows = data ?? [];
+  // Dedupe by user_id — prefer approved over pending
+  const dedupedByUser = new Map<string, LeaveRow>();
+  for (const r of data ?? []) {
+    const existing = dedupedByUser.get(r.user_id);
+    if (!existing || (existing.status !== "approved" && r.status === "approved")) {
+      dedupedByUser.set(r.user_id, r);
+    }
+  }
+  const rows = Array.from(dedupedByUser.values());
   const approved = rows.filter((r) => r.status === "approved");
   const pending = rows.filter((r) => r.status === "pending");
   const byType = new Map<LType, LeaveRow[]>();
@@ -170,6 +179,14 @@ function DayView({ empMap }: { empMap: Map<string, Employee> }) {
     if (!byType.has(r.leave_type)) byType.set(r.leave_type, []);
     byType.get(r.leave_type)!.push(r);
   }
+  for (const list of byType.values()) {
+    list.sort((a, b) => {
+      const an = empMap.get(a.user_id)?.full_name ?? empMap.get(a.user_id)?.email ?? "";
+      const bn = empMap.get(b.user_id)?.full_name ?? empMap.get(b.user_id)?.email ?? "";
+      return an.localeCompare(bn);
+    });
+  }
+
 
   return (
     <Card>

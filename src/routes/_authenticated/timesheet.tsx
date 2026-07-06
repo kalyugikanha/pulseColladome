@@ -65,7 +65,7 @@ function TimesheetPage() {
   }, [me, meLoading, navigate]);
 
   const canView = !!me && (me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
-  const canEdit = !!me && (me.isSuperAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
+  const canEdit = !!me && (me.isSuperAdmin || me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager);
   const canApprove = canEdit;
   const { deptScope, userScope } = useVisibilityScope(me);
 
@@ -282,7 +282,7 @@ function TimesheetPage() {
           <CardHeader>
             <CardTitle>Employee × Project — {label}</CardTitle>
             <CardDescription>
-              {filteredUsers.length} employee{filteredUsers.length === 1 ? "" : "s"} · {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs · Click a cell to view daily breakdown.
+              {filteredUsers.length} employee{filteredUsers.length === 1 ? "" : "s"} · {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs · Click a cell for daily breakdown{canEdit ? ", or use “Edit day” to add / change hours" : ""}.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -301,6 +301,7 @@ function TimesheetPage() {
                         </TableHead>
                       ))}
                       <TableHead className="text-right sticky right-0 bg-card z-20 font-semibold">Total</TableHead>
+                      {canEdit && <TableHead className="text-right whitespace-nowrap">Edit</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -332,6 +333,15 @@ function TimesheetPage() {
                             );
                           })}
                           <TableCell className="text-right sticky right-0 bg-card z-10 font-semibold">{(rowTotals.get(u.id) ?? 0).toFixed(1)}</TableCell>
+                          {canEdit && (
+                            <TableCell className="text-right">
+                              <EditDayPopover
+                                rangeStart={startIso}
+                                rangeEnd={endIso}
+                                onPick={(d) => setEditor({ userId: u.id, userName: name, date: d })}
+                              />
+                            </TableCell>
+                          )}
                         </TableRow>
                       );
                     })}
@@ -339,6 +349,7 @@ function TimesheetPage() {
                       <TableCell className="sticky left-0 bg-card z-10 font-semibold">Total</TableCell>
                       {filteredProjects.map((p) => <TableCell key={p.code} className="text-right font-semibold">{(colTotals.get(p.code) ?? 0).toFixed(1)}</TableCell>)}
                       <TableCell className="text-right sticky right-0 bg-card z-10 font-bold">{grandTotal.toFixed(1)}</TableCell>
+                      {canEdit && <TableCell />}
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -404,6 +415,16 @@ function TimesheetPage() {
                   <span className="font-mono text-xs mr-2">{drill.code}</span>{drill.name} — {drill.entries.reduce((s, e) => s + e.hours, 0).toFixed(1)} hrs
                 </SheetDescription>
               </SheetHeader>
+              {canEdit && (
+                <div className="mt-4 flex justify-end">
+                  <EditDayPopover
+                    rangeStart={startIso}
+                    rangeEnd={endIso}
+                    label="Add / edit another day"
+                    onPick={(d) => { setEditor({ userId: drill.userId, userName: drill.user, date: d }); setDrill(null); }}
+                  />
+                </div>
+              )}
               <div className="mt-4">
                 <Table>
                   <TableHeader><TableRow>
@@ -465,6 +486,57 @@ function DatePickerButton({ value, onChange, label }: { value: Date; onChange: (
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="end">
         <Calendar mode="single" selected={value} onSelect={(d) => d && onChange(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function EditDayPopover({
+  rangeStart,
+  rangeEnd,
+  onPick,
+  label = "Edit day…",
+}: {
+  rangeStart: string;
+  rangeEnd: string;
+  onPick: (date: string) => void;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const start = useMemo(() => new Date(`${rangeStart}T00:00:00`), [rangeStart]);
+  // endIso is exclusive; step back one day for the picker's max.
+  const end = useMemo(() => {
+    const e = new Date(`${rangeEnd}T00:00:00`);
+    e.setDate(e.getDate() - 1);
+    return e;
+  }, [rangeEnd]);
+  const [selected, setSelected] = useState<Date>(() => {
+    const today = new Date();
+    if (today >= start && today <= end) return today;
+    return end;
+  });
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8">
+          <Pencil className="h-3 w-3 mr-1" /> {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={selected}
+          onSelect={(d) => {
+            if (!d) return;
+            setSelected(d);
+            setOpen(false);
+            onPick(ymd(d));
+          }}
+          defaultMonth={selected}
+          disabled={{ before: start, after: end }}
+          initialFocus
+          className={cn("p-3 pointer-events-auto")}
+        />
       </PopoverContent>
     </Popover>
   );

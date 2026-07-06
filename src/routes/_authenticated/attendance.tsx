@@ -30,18 +30,26 @@ function AttendancePage() {
   const { deptScope, userScope } = useVisibilityScope(me);
 
   const { data } = useQuery({
-    queryKey: ["attendance", me?.id, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
+    queryKey: ["attendance", me?.id, today, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
       if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
-      const [people, todayAtt] = await Promise.all([
+      const [people, todayAtt, todayLeaves] = await Promise.all([
         peopleQ,
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", today),
+        supabase.from("leave_requests")
+          .select("user_id, leave_type, start_date, end_date, reason")
+          .eq("status", "approved")
+          .lte("start_date", today)
+          .gte("end_date", today),
       ]);
       const peopleList = people.data ?? [];
       const nameById = new Map(peopleList.map((p) => [p.id, p]));
+      const scopedLeaves = ((todayLeaves.data ?? []) as Array<{
+        user_id: string; leave_type: string; start_date: string; end_date: string; reason: string | null;
+      }>).filter((l) => nameById.has(l.user_id));
       const pendingReq = me?.isAdmin
         ? await supabase.rpc("admin_get_leave_requests", { _status: "pending" })
         : await supabase.from("leave_requests").select("*").eq("status", "pending");
@@ -61,9 +69,10 @@ function AttendancePage() {
           reason?: string | null;
           user: { full_name: string | null; email: string | null } | null;
         }>;
-      return { people: peopleList, todayAtt: todayAtt.data ?? [], pending: pendingWithUser };
+      return { people: peopleList, todayAtt: todayAtt.data ?? [], pending: pendingWithUser, onLeave: scopedLeaves };
     },
   });
+
 
   if (me && !canView) {
     throw redirect({ to: "/dashboard" });

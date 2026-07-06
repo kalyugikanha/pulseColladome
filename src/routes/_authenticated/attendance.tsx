@@ -119,48 +119,82 @@ function AttendancePage() {
               <CardDescription>Punch times and hours worked per teammate</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {sortedPeople.length === 0 && (
-                <p className="text-sm text-muted-foreground">No teammates in your scope.</p>
-              )}
-              {sortedPeople.map((p) => {
-                const a = data?.todayAtt.find((x) => x.user_id === p.id);
-                const status = a?.punch_in_time && !a.punch_out_time ? "in" : a?.punch_out_time ? "out" : "absent";
+              {(() => {
+                const onLeaveList = data?.onLeave ?? [];
+                const onLeaveById = new Map(onLeaveList.map((l) => [l.user_id, l]));
+                const nameById = new Map((data?.people ?? []).map((p) => [p.id, p]));
+                const onLeaveNames = onLeaveList
+                  .map((l) => nameById.get(l.user_id)?.full_name ?? nameById.get(l.user_id)?.email)
+                  .filter(Boolean) as string[];
                 return (
-                  <div key={p.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs bg-primary/20">
-                          {(p.full_name ?? p.email ?? "?").slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="text-sm font-medium">{p.full_name ?? p.email}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {a?.punch_in_time ? `In at ${format(new Date(a.punch_in_time), "HH:mm")}` : "Not punched in"}
-                          {a?.punch_out_time ? ` · Out ${format(new Date(a.punch_out_time), "HH:mm")}` : ""}
-                          {p.department ? ` · ${p.department}` : ""}
-                        </div>
+                  <>
+                    {onLeaveNames.length > 0 && (
+                      <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
+                        <span className="font-medium">On leave today ({onLeaveNames.length}):</span>{" "}
+                        <span className="text-muted-foreground">{onLeaveNames.join(" • ")}</span>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {a?.total_hours && (
-                        <span className="text-xs font-mono text-muted-foreground">
-                          {Number(a.total_hours).toFixed(2)}h
-                        </span>
-                      )}
-                      <Badge
-                        variant={status === "in" ? "default" : status === "out" ? "secondary" : "outline"}
-                        className={status === "in" ? "gradient-primary" : ""}
-                      >
-                        {status === "in" ? "Punched in" : status === "out" ? "Signed off" : "Absent"}
-                      </Badge>
-                    </div>
-                  </div>
+                    )}
+                    {sortedPeople.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No teammates in your scope.</p>
+                    )}
+                    {sortedPeople.map((p) => {
+                      const a = data?.todayAtt.find((x) => x.user_id === p.id);
+                      const leave = onLeaveById.get(p.id);
+                      const status = leave
+                        ? "leave"
+                        : a?.punch_in_time && !a.punch_out_time ? "in" : a?.punch_out_time ? "out" : "absent";
+                      return (
+                        <div key={p.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs bg-primary/20">
+                                {(p.full_name ?? p.email ?? "?").slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="text-sm font-medium">{p.full_name ?? p.email}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {leave
+                                  ? `On approved leave · ${format(new Date(leave.start_date), "d MMM")} – ${format(new Date(leave.end_date), "d MMM")}`
+                                  : (
+                                    <>
+                                      {a?.punch_in_time ? `In at ${format(new Date(a.punch_in_time), "HH:mm")}` : "Not punched in"}
+                                      {a?.punch_out_time ? ` · Out ${format(new Date(a.punch_out_time), "HH:mm")}` : ""}
+                                    </>
+                                  )}
+                                {p.department ? ` · ${p.department}` : ""}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {!leave && a?.total_hours && (
+                              <span className="text-xs font-mono text-muted-foreground">
+                                {Number(a.total_hours).toFixed(2)}h
+                              </span>
+                            )}
+                            {status === "leave" ? (
+                              <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 capitalize">
+                                On leave · {leave!.leave_type}
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant={status === "in" ? "default" : status === "out" ? "secondary" : "outline"}
+                                className={status === "in" ? "gradient-primary" : ""}
+                              >
+                                {status === "in" ? "Punched in" : status === "out" ? "Signed off" : "Absent"}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
                 );
-              })}
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
+
 
         <TabsContent value="leave" className="mt-4">
           <Card>

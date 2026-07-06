@@ -63,7 +63,7 @@ function AuthPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-              Please sign in with your <span className="font-semibold">@colladome.com</span> Google account.
+              Please sign in with your <span className="font-semibold">@colladome.com OR @colladome.in</span> Google account.
               If you don't have one yet, please check with <span className="font-semibold">HR</span>.
             </div>
             <Button variant="outline" className="w-full" onClick={handleGoogle} disabled={loading}>

@@ -85,6 +85,42 @@ function TasksPage() {
     queryFn: async () => (await supabase.from("projects").select("id, name").order("name")).data ?? [],
   });
 
+  const canAssignOthers = !!me && (
+    me.isAdmin || me.isSuperAdmin || me.canManageProjects ||
+    me.isReportingManager || me.isDepartmentHead
+  );
+  const unscopedAssignees = !!me && (me.isAdmin || me.isSuperAdmin || me.canManageProjects);
+
+  const { data: assignees } = useQuery({
+    queryKey: ["assignable-users", me?.id, unscopedAssignees, me?.directReportIds, me?.headOfDepartments],
+    enabled: !!me && canAssignOthers,
+    queryFn: async () => {
+      const rows: Array<{ id: string; full_name: string | null; department: string | null }> = [];
+      const seen = new Set<string>();
+      const push = (arr: typeof rows) => arr.forEach((r) => { if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); } });
+
+      if (unscopedAssignees) {
+        const { data } = await supabase.from("profiles").select("id, full_name, department").order("full_name");
+        push((data ?? []) as typeof rows);
+      } else {
+        const ids = Array.from(new Set([me!.id, ...(me!.directReportIds ?? [])]));
+        if (ids.length) {
+          const { data } = await supabase.from("profiles").select("id, full_name, department").in("id", ids);
+          push((data ?? []) as typeof rows);
+        }
+        if (me!.isDepartmentHead && me!.headOfDepartments.length) {
+          const { data } = await supabase.from("profiles").select("id, full_name, department").in("department", me!.headOfDepartments);
+          push((data ?? []) as typeof rows);
+        }
+      }
+      rows.sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? ""));
+      return rows;
+    },
+  });
+
+  useEffect(() => { if (me && !tAssignee) setTAssignee(me.id); }, [me, tAssignee]);
+
+
   const presetChips = useMemo(() => {
     if (!presets || !tax) return [];
     return presets.map((p) => {

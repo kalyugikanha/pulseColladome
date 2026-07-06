@@ -1822,10 +1822,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      can_manage_task_taxonomy: {
-        Args: { _task_id: string; _user_id?: string }
-        Returns: boolean
-      }
       can_view_task: { Args: { _task_id: string }; Returns: boolean }
       create_task_full: {
         Args: {

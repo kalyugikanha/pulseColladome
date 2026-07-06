@@ -21,8 +21,8 @@ export const Route = createFileRoute("/_authenticated/finances")({
 });
 
 type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
-type Salary = { id: string; user_id: string; monthly_salary: number; currency: string; effective_from: string };
-type Grant = { email: string; role: string; default_monthly_salary: number | null };
+type Salary = { id: string; user_id: string; monthly_salary: number | null; hourly_rate: number | null; comp_type: "monthly" | "hourly"; currency: string; effective_from: string };
+type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly" };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
 
 function monthKey(d: string | Date) {
@@ -49,7 +49,8 @@ function FinancesPage() {
   const { data: grants } = useQuery({
     queryKey: ["finances-grants"],
     enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => (await supabase.from("role_grants").select("email, role, default_monthly_salary").order("email")).data as Grant[] ?? [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    queryFn: async () => (await (supabase as any).from("role_grants").select("email, role, default_monthly_salary, default_hourly_rate, comp_type").order("email")).data as Grant[] ?? [],
   });
 
   const { data: salaries } = useQuery({
@@ -59,7 +60,7 @@ function FinancesPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("salaries")
-        .select("id, user_id, monthly_salary, currency, effective_from")
+        .select("id, user_id, monthly_salary, hourly_rate, comp_type, currency, effective_from")
         .order("effective_from", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Salary[];
@@ -117,14 +118,19 @@ function FinancesPage() {
         userTotalHours.set(row.user_id, (userTotalHours.get(row.user_id) ?? 0) + hrs);
       }
     }
-    // Salary-share allocation
+    // Allocation: hourly comp bills hours×rate directly; monthly comp uses salary-share.
     for (const [userId, projMap] of userHoursByProject) {
       const total = userTotalHours.get(userId) ?? 0;
       const salary = currentSalaryByUser.get(userId);
       if (!salary || total <= 0) continue;
       for (const [code, { hours, name }] of projMap) {
-        const share = hours / total;
-        const alloc = share * Number(salary.monthly_salary);
+        let alloc = 0;
+        if (salary.comp_type === "hourly") {
+          alloc = hours * Number(salary.hourly_rate ?? 0);
+        } else {
+          const share = hours / total;
+          alloc = share * Number(salary.monthly_salary ?? 0);
+        }
         const cur = result.get(code) ?? { code, name, burn: 0, hours: 0 };
         cur.burn += alloc;
         cur.hours += hours;
@@ -139,6 +145,16 @@ function FinancesPage() {
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
   const usersWithSalary = currentSalaryByUser.size;
 
+  const userHoursThisMonth = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const row of logs ?? []) {
+      let sum = 0;
+      for (const t of row.tasks ?? []) sum += Number(t.hours) || 0;
+      m.set(row.user_id, (m.get(row.user_id) ?? 0) + sum);
+    }
+    return m;
+  }, [logs]);
+
   // Merge profiles + grants so uninvited-but-signed-up and invited-but-unsigned users both appear
   const profileEmails = useMemo(() => new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]), [profiles]);
   const pendingGrants = useMemo(() => (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())), [grants, profileEmails]);
@@ -152,12 +168,22 @@ function FinancesPage() {
     let sum = 0;
     for (const p of profiles ?? []) {
       const s = currentSalaryByUser.get(p.id);
-      if (s) sum += Number(s.monthly_salary);
-      else if (p.email) sum += Number(grantByEmail.get(p.email.toLowerCase())?.default_monthly_salary ?? 0);
+      if (s) {
+        if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
+        else sum += Number(s.monthly_salary ?? 0);
+      } else if (p.email) {
+        const g = grantByEmail.get(p.email.toLowerCase());
+        if (g?.comp_type === "hourly") sum += Number(g.default_hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
+        else sum += Number(g?.default_monthly_salary ?? 0);
+      }
     }
-    for (const g of pendingGrants) sum += Number(g.default_monthly_salary ?? 0);
+    for (const g of pendingGrants) {
+      if (g.comp_type === "hourly") {
+        // no hours possible without a user id
+      } else sum += Number(g.default_monthly_salary ?? 0);
+    }
     return sum;
-  }, [profiles, currentSalaryByUser, grantByEmail, pendingGrants]);
+  }, [profiles, currentSalaryByUser, grantByEmail, pendingGrants, userHoursThisMonth]);
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {
@@ -209,7 +235,8 @@ function FinancesPage() {
                 <TableHead>Employee</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Monthly salary</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="text-right">Rate</TableHead>
                 <TableHead>Effective from</TableHead>
               </TableRow>
             </TableHeader>
@@ -220,17 +247,28 @@ function FinancesPage() {
               }).map((p) => {
                 const s = currentSalaryByUser.get(p.id);
                 const grant = p.email ? grantByEmail.get(p.email.toLowerCase()) : undefined;
-                const grantSalary = grant?.default_monthly_salary != null ? Number(grant.default_monthly_salary) : null;
+                const effType: "monthly" | "hourly" = s?.comp_type ?? grant?.comp_type ?? "monthly";
+                const rateNode = s
+                  ? (s.comp_type === "hourly"
+                      ? <span>{inr(Number(s.hourly_rate ?? 0))}<span className="text-[10px] text-muted-foreground">/hr</span></span>
+                      : inr(Number(s.monthly_salary ?? 0)))
+                  : grant && (grant.comp_type === "hourly" ? grant.default_hourly_rate != null : grant.default_monthly_salary != null)
+                    ? <span className="text-muted-foreground">
+                        {grant.comp_type === "hourly"
+                          ? <>{inr(Number(grant.default_hourly_rate))}<span className="text-[10px]">/hr</span></>
+                          : inr(Number(grant.default_monthly_salary))}
+                        {" "}<span className="text-[10px]">(from invite)</span>
+                      </span>
+                    : <span className="text-muted-foreground">Not set</span>;
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.email}</TableCell>
                     <TableCell><Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/40">Active</Badge></TableCell>
-                    <TableCell className="text-right">
-                      {s ? inr(Number(s.monthly_salary))
-                        : grantSalary != null ? <span className="text-muted-foreground">{inr(grantSalary)} <span className="text-[10px]">(from invite)</span></span>
-                        : <span className="text-muted-foreground">Not set</span>}
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] capitalize">{effType}</Badge>
                     </TableCell>
+                    <TableCell className="text-right">{rateNode}</TableCell>
                     <TableCell>{s?.effective_from ?? "—"}</TableCell>
                   </TableRow>
                 );
@@ -240,8 +278,11 @@ function FinancesPage() {
                   <TableCell className="font-medium">{nameFromEmail(g.email)}</TableCell>
                   <TableCell className="text-muted-foreground">{g.email}</TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Pending signup</Badge></TableCell>
+                  <TableCell><Badge variant="outline" className="text-[10px] capitalize">{g.comp_type ?? "monthly"}</Badge></TableCell>
                   <TableCell className="text-right">
-                    {g.default_monthly_salary != null ? inr(Number(g.default_monthly_salary)) : <span className="text-muted-foreground">Not set</span>}
+                    {g.comp_type === "hourly"
+                      ? (g.default_hourly_rate != null ? <>{inr(Number(g.default_hourly_rate))}<span className="text-[10px] text-muted-foreground">/hr</span></> : <span className="text-muted-foreground">Not set</span>)
+                      : (g.default_monthly_salary != null ? inr(Number(g.default_monthly_salary)) : <span className="text-muted-foreground">Not set</span>)}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
                 </TableRow>
@@ -328,6 +369,7 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 function SalaryDialog({ profiles, onSaved }: { profiles: Profile[]; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState("");
+  const [compType, setCompType] = useState<"monthly" | "hourly">("monthly");
   const [amount, setAmount] = useState("");
   const [effective, setEffective] = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
@@ -336,27 +378,30 @@ function SalaryDialog({ profiles, onSaved }: { profiles: Profile[]; onSaved: () 
     if (!userId || !amount) return toast.error("Employee and amount are required.");
     setSaving(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from("salaries").insert({
+      const payload: Record<string, unknown> = {
         user_id: userId,
-        monthly_salary: Number(amount),
+        comp_type: compType,
         effective_from: effective,
-      });
+        monthly_salary: compType === "monthly" ? Number(amount) : null,
+        hourly_rate: compType === "hourly" ? Number(amount) : null,
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("salaries").upsert(payload, { onConflict: "user_id,effective_from" });
       if (error) throw error;
-      toast.success("Salary saved.");
+      toast.success("Compensation saved.");
       onSaved();
       setOpen(false);
       setUserId(""); setAmount("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save salary");
+      toast.error(err instanceof Error ? err.message : "Could not save compensation");
     } finally { setSaving(false); }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm">Set / update salary</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm">Set / update compensation</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Set monthly salary</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Set compensation</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Employee</Label>
@@ -365,7 +410,17 @@ function SalaryDialog({ profiles, onSaved }: { profiles: Profile[]; onSaved: () 
               {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
             </select>
           </div>
-          <div className="space-y-1"><Label>Monthly salary (INR)</Label><Input type="number" min="0" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+          <div className="space-y-1">
+            <Label>Compensation type</Label>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={compType === "monthly" ? "default" : "outline"} onClick={() => setCompType("monthly")}>Monthly salary</Button>
+              <Button type="button" size="sm" variant={compType === "hourly" ? "default" : "outline"} onClick={() => setCompType("hourly")}>Hourly rate</Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label>{compType === "hourly" ? "Hourly rate (INR/hr)" : "Monthly salary (INR)"}</Label>
+            <Input type="number" min="0" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
           <div className="space-y-1"><Label>Effective from</Label><Input type="date" value={effective} onChange={(e) => setEffective(e.target.value)} /></div>
         </div>
         <DialogFooter>

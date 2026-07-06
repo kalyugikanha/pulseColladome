@@ -715,7 +715,9 @@ export type Database = {
       }
       role_grants: {
         Row: {
+          comp_type: string
           created_at: string
+          default_hourly_rate: number | null
           default_monthly_salary: number | null
           department: string | null
           email: string
@@ -724,7 +726,9 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
         }
         Insert: {
+          comp_type?: string
           created_at?: string
+          default_hourly_rate?: number | null
           default_monthly_salary?: number | null
           department?: string | null
           email: string
@@ -733,7 +737,9 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"]
         }
         Update: {
+          comp_type?: string
           created_at?: string
+          default_hourly_rate?: number | null
           default_monthly_salary?: number | null
           department?: string | null
           email?: string
@@ -777,31 +783,37 @@ export type Database = {
       }
       salaries: {
         Row: {
+          comp_type: string
           created_at: string
           currency: string
           effective_from: string
+          hourly_rate: number | null
           id: string
-          monthly_salary: number
+          monthly_salary: number | null
           notes: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          comp_type?: string
           created_at?: string
           currency?: string
           effective_from?: string
+          hourly_rate?: number | null
           id?: string
-          monthly_salary: number
+          monthly_salary?: number | null
           notes?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          comp_type?: string
           created_at?: string
           currency?: string
           effective_from?: string
+          hourly_rate?: number | null
           id?: string
-          monthly_salary?: number
+          monthly_salary?: number | null
           notes?: string | null
           updated_at?: string
           user_id?: string

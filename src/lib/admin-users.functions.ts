@@ -170,6 +170,8 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
   });
 
 type TeamEntry = {
+  comp_type?: "monthly" | "hourly";
+  hourly_rate?: number;
   email: string;
   full_name: string;
   role: Role;
@@ -196,7 +198,7 @@ const TEAM_ROSTER: TeamEntry[] = [
   { email: "neetu@colladome.in",              full_name: "Neetu Rauniyar",         role: "employee",        is_super_admin: false, monthly_salary: 2000,  department: "Business Development" },
   { email: "sarita@colladome.in",             full_name: "Sarita Kumari",          role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Business Development" },
   { email: "riyanshi@colladome.in",           full_name: "Riyanshi Sharma",        role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Business Development" },
-  { email: "arpit@colladome.in",              full_name: "Arpit Kast",             role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Development" },
+  { email: "arpit@colladome.in",              full_name: "Arpit Kast",             role: "employee",        is_super_admin: false, monthly_salary: 0,     department: "Development", comp_type: "hourly", hourly_rate: 400 },
 ];
 
 export const bulkProvisionTeam = createServerFn({ method: "POST" })
@@ -215,11 +217,14 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
     for (const entry of TEAM_ROSTER) {
       const em = entry.email.toLowerCase();
       try {
+        const isHourly = entry.comp_type === "hourly";
         const { error: grantErr } = await supabaseAdmin.from("role_grants").upsert({
           email: em,
           role: entry.role,
           is_super_admin: entry.is_super_admin,
-          default_monthly_salary: entry.monthly_salary,
+          default_monthly_salary: isHourly ? null : entry.monthly_salary,
+          default_hourly_rate: isHourly ? (entry.hourly_rate ?? null) : null,
+          comp_type: isHourly ? "hourly" : "monthly",
           department: entry.department,
         }, { onConflict: "email" });
         if (grantErr) throw new Error(`role_grants: ${grantErr.message}`);
@@ -248,7 +253,9 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
 
           const { error: sErr } = await supabaseAdmin.from("salaries").upsert({
             user_id: existing.id,
-            monthly_salary: entry.monthly_salary,
+            comp_type: isHourly ? "hourly" : "monthly",
+            monthly_salary: isHourly ? null : entry.monthly_salary,
+            hourly_rate: isHourly ? (entry.hourly_rate ?? null) : null,
             effective_from: new Date().toISOString().slice(0, 10),
             currency: "INR",
           }, { onConflict: "user_id,effective_from" });

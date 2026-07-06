@@ -271,6 +271,7 @@ function CalendarPage() {
   const activeFilters =
     (filters.q ? 1 : 0) +
     filters.depts.size +
+    filters.employees.size +
     [filters.showLeave, filters.showMeetings, filters.showBirthdays, filters.showAnniversaries, filters.showHolidays]
       .filter((v) => !v).length;
 
@@ -281,15 +282,36 @@ function CalendarPage() {
           <h1 className="font-display text-3xl font-bold">Team Calendar</h1>
           <p className="text-muted-foreground text-sm mt-1">Leave, meetings, birthdays & anniversaries at a glance.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <BookingDialog profiles={visibleProfiles} onSaved={() => qc.invalidateQueries({ queryKey: ["team-google-calendar"] })} />
           <MyDatesDialog />
           {me?.isAdmin && <DeptColorsDialog depts={allDepts} colorFor={colorForDept} onSaved={() => qc.invalidateQueries({ queryKey: ["department-settings"] })} />}
+          <Button variant="outline" size="sm" onClick={() => { setCursor(new Date()); setOpenDay(new Date()); }}>Today</Button>
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2"><CalendarIcon className="h-4 w-4" />Jump to date</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <CalendarPicker
+                mode="single"
+                selected={cursor}
+                onSelect={(d) => {
+                  if (!d) return;
+                  setCursor(d);
+                  setOpenDay(d);
+                  setDatePickerOpen(false);
+                }}
+                initialFocus
+                className="p-3 pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           <Button variant="outline" size="icon" onClick={() => setCursor(addMonths(cursor, -1))}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="font-display font-semibold min-w-[140px] text-center">{format(cursor, "MMMM yyyy")}</div>
           <Button variant="outline" size="icon" onClick={() => setCursor(addMonths(cursor, 1))}><ChevronRight className="h-4 w-4" /></Button>
         </div>
       </header>
+
 
       <Card className="border-primary/30 bg-primary/5">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">

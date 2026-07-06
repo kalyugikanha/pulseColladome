@@ -207,7 +207,6 @@ function FinancesPage() {
 
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
-  
 
   const userHoursThisMonth = useMemo(() => {
     const m = new Map<string, number>();
@@ -218,6 +217,44 @@ function FinancesPage() {
     }
     return m;
   }, [logs]);
+
+  // Per-user allocated burn (sum across projects for that user).
+  const allocatedByUser = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!logs) return m;
+    for (const row of logs) {
+      const salary = currentSalaryByUser.get(row.user_id);
+      if (!salary) continue;
+      let projectHours = 0;
+      for (const t of row.tasks ?? []) {
+        const code = t.project_code?.trim();
+        const h = Number(t.hours) || 0;
+        if (code && h > 0) projectHours += h;
+      }
+      if (projectHours <= 0) continue;
+      // We only need totals here; compute via same rules as burnByProject.
+      // Accumulate row-level project hours, allocation happens below.
+      m.set(row.user_id, (m.get(row.user_id) ?? 0) + projectHours);
+    }
+    // Convert accumulated project hours into actual allocated burn per user.
+    const out = new Map<string, number>();
+    for (const [uid, projHrs] of m) {
+      const salary = currentSalaryByUser.get(uid);
+      if (!salary || projHrs <= 0) continue;
+      if (salary.comp_type === "hourly") {
+        out.set(uid, projHrs * Number(salary.hourly_rate ?? 0));
+      } else {
+        // All project hours = 100% of that user's monthly contribution
+        // (share sums to 1 when totalHours = projectHours; if user also has non-project hours,
+        // share < 1 and the remainder is the unallocated portion).
+        const totalHrs = userHoursThisMonth.get(uid) ?? projHrs;
+        const share = totalHrs > 0 ? projHrs / totalHrs : 0;
+        out.set(uid, share * (monthlyContribByUser.get(uid) ?? 0));
+      }
+    }
+    return out;
+  }, [logs, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth]);
+
 
   // Merge profiles + grants so uninvited-but-signed-up and invited-but-unsigned users both appear
   const profileEmails = useMemo(() => new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]), [profiles]);
@@ -299,6 +336,24 @@ function FinancesPage() {
     return sum;
   }, [visibleProfiles, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth]);
 
+  // Unallocated: actual salary that couldn't be attributed to any project (typically zero project hours).
+  const unallocatedRows = useMemo(() => {
+    const rows: Array<{ userId: string; name: string; amount: number }> = [];
+    for (const p of visibleProfiles) {
+      const s = currentSalaryByUser.get(p.id);
+      if (!s) continue;
+      const actual = s.comp_type === "hourly"
+        ? Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0)
+        : (monthlyContribByUser.get(p.id) ?? 0);
+      const allocated = allocatedByUser.get(p.id) ?? 0;
+      const gap = actual - allocated;
+      if (gap > 0.5) rows.push({ userId: p.id, name: p.full_name || p.email || "—", amount: gap });
+    }
+    return rows.sort((a, b) => b.amount - a.amount);
+  }, [visibleProfiles, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth, allocatedByUser]);
+  const totalUnallocated = useMemo(() => unallocatedRows.reduce((s, r) => s + r.amount, 0), [unallocatedRows]);
+
+
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {
     throw redirect({ to: "/dashboard" });
@@ -328,7 +383,7 @@ function FinancesPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-        <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs logged`} />
+        <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={totalUnallocated > 0 ? `${totalHours.toFixed(1)} hrs · ${inr(totalUnallocated)} unallocated` : `${totalHours.toFixed(1)} hrs logged`} />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Proposed salary pool" value={inr(totalProposedPool)} sub="full configured amount" />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Actual salary pool" value={inr(totalConfiguredPool)} sub="pro-rated + unpaid leave" />
         <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${visibleProfiles.length + visiblePendingGrants.length} on roster`} />
@@ -458,6 +513,17 @@ function FinancesPage() {
                     <TableCell className="text-right text-muted-foreground">{totalBurn > 0 ? ((r.burn / totalBurn) * 100).toFixed(1) : "0"}%</TableCell>
                   </TableRow>
                 ))}
+                {totalUnallocated > 0 && (
+                  <TableRow className="bg-muted/30">
+                    <TableCell className="font-medium text-muted-foreground italic" title={unallocatedRows.map((r) => `${r.name}: ${inr(r.amount)}`).join("\n")}>
+                      Unallocated (no project hours)
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">0.0</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{inr(totalUnallocated)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((totalUnallocated / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           )}

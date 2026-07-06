@@ -144,6 +144,21 @@ function AccessPage() {
     }
   }
 
+  async function runSyncMissing() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await syncMissingFn();
+      setSyncResult(res);
+      toast.success(`Sync done — ${res.synced.length} created, ${res.alreadyOk.length} ok, ${res.errors.length} errors`);
+      qc.invalidateQueries({ queryKey: ["role-grants"] });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header>

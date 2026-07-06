@@ -1,16 +1,16 @@
 ## Goal
-Give super admins a direct "Delete permanently" action for deactivated teammates on the Directory page, so they don't have to open the edit dialog to find it.
+Make the Finances "Configured pool" stat reflect only active teammates in the currently selected departments, so June's total matches what's actually being paid out.
 
-## Current state
-- `deleteUserPermanently` server fn already exists and wipes auth + all user-scoped rows. Super-admin-gated.
-- The Directory edit dialog already has a "Delete permanently" button (guarded by `canHardDelete`, which is true for super admins), with an email-typing confirm dialog.
-- Users deactivated via the edit dialog show up in the table only when the "Inactive" (or "All") filter is selected. There is no row-level delete affordance.
+## Changes (`src/routes/_authenticated/finances.tsx`)
 
-## Changes (UI only, `src/routes/_authenticated/directory.tsx`)
-1. In the row Actions cell, when the viewer is a super admin (`canHardDelete`) AND the row is deactivated (`p.is_active === false`) AND it is not the viewer themselves, render a small destructive "Delete" icon button next to Edit.
-2. Clicking it opens the existing `confirmDelete` dialog (reuse the current email-typing confirmation flow, `hardDelete` handler, and toast + query invalidation). No new server fn, no schema change.
-3. Keep the existing button inside the edit dialog as-is for discoverability.
+1. **Load `is_active`** on the profiles query (`profiles` select adds `is_active`) and extend the `Profile` type.
+2. **Department + active filter** applied once, reused by all stats:
+   - Build `visibleProfiles = profiles.filter(p => p.is_active !== false && (deptSel.size === 0 || deptSel.has(p.department ?? UNASSIGNED)))`.
+   - Use `visibleProfiles` (instead of raw `profiles`) inside `totalConfiguredPool`, `usersWithSalary` count, and the "on roster" sub-label.
+3. **Pending grants**: only include a pending grant in the pool when either no departments are selected, or the grant's `department` (already selected in the query) is in `deptSel`. Add `department` to the `role_grants` select and `Grant` type.
+4. **Inactive teammates never count** in the pool regardless of filter (they're excluded in step 2). Pending grants remain unaffected by active status — they have no profile yet.
+5. Keep the salary table below untouched (it already lists everyone; the fix is scoped to the top-line stat the user asked about).
 
 ## Out of scope
-- Bulk delete, soft-delete grace period, or exporting the user's data before deletion.
-- Any change to the deletion server function or its cascading table list.
+- Changing the burn calculation, the salary table rendering, or the salaries schema.
+- Historical back-dating of `deactivated_at` — active status is evaluated as "currently active".

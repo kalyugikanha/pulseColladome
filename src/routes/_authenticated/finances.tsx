@@ -20,9 +20,9 @@ export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
 });
 
-type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
+type Profile = { id: string; full_name: string | null; email: string | null; department: string | null; is_active: boolean | null };
 type Salary = { id: string; user_id: string; monthly_salary: number | null; hourly_rate: number | null; comp_type: "monthly" | "hourly"; currency: string; effective_from: string };
-type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly" };
+type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly"; department: string | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
 
 function monthKey(d: string | Date) {
@@ -40,7 +40,7 @@ function FinancesPage() {
     queryKey: ["finances-profiles"],
     enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department").order("full_name");
+      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department, is_active").order("full_name");
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
@@ -50,7 +50,7 @@ function FinancesPage() {
     queryKey: ["finances-grants"],
     enabled: !!me?.isFinanceAdmin,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    queryFn: async () => (await (supabase as any).from("role_grants").select("email, role, default_monthly_salary, default_hourly_rate, comp_type").order("email")).data as Grant[] ?? [],
+    queryFn: async () => (await (supabase as any).from("role_grants").select("email, role, default_monthly_salary, default_hourly_rate, comp_type, department").order("email")).data as Grant[] ?? [],
   });
 
   const { data: salaries } = useQuery({
@@ -143,7 +143,7 @@ function FinancesPage() {
 
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
-  const usersWithSalary = currentSalaryByUser.size;
+  
 
   const userHoursThisMonth = useMemo(() => {
     const m = new Map<string, number>();
@@ -164,9 +164,28 @@ function FinancesPage() {
     return m;
   }, [grants]);
   const nameFromEmail = (e: string) => e.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // Active + department-filtered roster used by the top-line stats
+  const visibleProfiles = useMemo(() => {
+    return (profiles ?? []).filter((p) => {
+      if (p.is_active === false) return false;
+      if (deptSel.size === 0) return true;
+      return deptSel.has(p.department ?? UNASSIGNED);
+    });
+  }, [profiles, deptSel]);
+  const visiblePendingGrants = useMemo(() => {
+    if (deptSel.size === 0) return pendingGrants;
+    return pendingGrants.filter((g) => deptSel.has(g.department ?? UNASSIGNED));
+  }, [pendingGrants, deptSel]);
+
+  const usersWithSalary = useMemo(
+    () => visibleProfiles.filter((p) => currentSalaryByUser.has(p.id)).length,
+    [visibleProfiles, currentSalaryByUser],
+  );
+
   const totalConfiguredPool = useMemo(() => {
     let sum = 0;
-    for (const p of profiles ?? []) {
+    for (const p of visibleProfiles) {
       const s = currentSalaryByUser.get(p.id);
       if (s) {
         if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
@@ -177,13 +196,13 @@ function FinancesPage() {
         else sum += Number(g?.default_monthly_salary ?? 0);
       }
     }
-    for (const g of pendingGrants) {
+    for (const g of visiblePendingGrants) {
       if (g.comp_type === "hourly") {
         // no hours possible without a user id
       } else sum += Number(g.default_monthly_salary ?? 0);
     }
     return sum;
-  }, [profiles, currentSalaryByUser, grantByEmail, pendingGrants, userHoursThisMonth]);
+  }, [visibleProfiles, visiblePendingGrants, currentSalaryByUser, grantByEmail, userHoursThisMonth]);
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {
@@ -215,9 +234,9 @@ function FinancesPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs logged`} />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="all salaries incl. pending" />
-        <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${(profiles?.length ?? 0) + pendingGrants.length} on roster`} />
-        <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(pendingGrants.length)} sub="invite sent, not registered" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="active salaries incl. pending" />
+        <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${visibleProfiles.length + visiblePendingGrants.length} on roster`} />
+        <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(visiblePendingGrants.length)} sub="invite sent, not registered" />
       </div>
 
       <Card>

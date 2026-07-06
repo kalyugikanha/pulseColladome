@@ -1,0 +1,12 @@
+REVOKE EXECUTE ON FUNCTION private.heads_department(uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION private.is_department_head(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION private.is_head_of_user(uuid, uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION private.is_reporting_manager_of(uuid, uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION private.user_department(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.can_view_task(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.heads_department(uuid, text) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.is_department_head(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.is_head_of_user(uuid, uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.is_reporting_manager_of(uuid, uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION private.user_department(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_view_task(uuid) TO authenticated, service_role;

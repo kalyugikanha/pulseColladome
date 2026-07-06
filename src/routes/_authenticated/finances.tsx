@@ -368,6 +368,7 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 function SalaryDialog({ profiles, onSaved }: { profiles: Profile[]; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState("");
+  const [compType, setCompType] = useState<"monthly" | "hourly">("monthly");
   const [amount, setAmount] = useState("");
   const [effective, setEffective] = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
@@ -376,27 +377,30 @@ function SalaryDialog({ profiles, onSaved }: { profiles: Profile[]; onSaved: () 
     if (!userId || !amount) return toast.error("Employee and amount are required.");
     setSaving(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from("salaries").insert({
+      const payload: Record<string, unknown> = {
         user_id: userId,
-        monthly_salary: Number(amount),
+        comp_type: compType,
         effective_from: effective,
-      });
+        monthly_salary: compType === "monthly" ? Number(amount) : null,
+        hourly_rate: compType === "hourly" ? Number(amount) : null,
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from("salaries").upsert(payload, { onConflict: "user_id,effective_from" });
       if (error) throw error;
-      toast.success("Salary saved.");
+      toast.success("Compensation saved.");
       onSaved();
       setOpen(false);
       setUserId(""); setAmount("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save salary");
+      toast.error(err instanceof Error ? err.message : "Could not save compensation");
     } finally { setSaving(false); }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm">Set / update salary</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm">Set / update compensation</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Set monthly salary</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Set compensation</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Employee</Label>
@@ -405,7 +409,17 @@ function SalaryDialog({ profiles, onSaved }: { profiles: Profile[]; onSaved: () 
               {profiles.map((p) => <option key={p.id} value={p.id}>{p.full_name || p.email}</option>)}
             </select>
           </div>
-          <div className="space-y-1"><Label>Monthly salary (INR)</Label><Input type="number" min="0" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+          <div className="space-y-1">
+            <Label>Compensation type</Label>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant={compType === "monthly" ? "default" : "outline"} onClick={() => setCompType("monthly")}>Monthly salary</Button>
+              <Button type="button" size="sm" variant={compType === "hourly" ? "default" : "outline"} onClick={() => setCompType("hourly")}>Hourly rate</Button>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label>{compType === "hourly" ? "Hourly rate (INR/hr)" : "Monthly salary (INR)"}</Label>
+            <Input type="number" min="0" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
           <div className="space-y-1"><Label>Effective from</Label><Input type="date" value={effective} onChange={(e) => setEffective(e.target.value)} /></div>
         </div>
         <DialogFooter>

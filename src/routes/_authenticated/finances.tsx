@@ -40,7 +40,7 @@ function FinancesPage() {
     queryKey: ["finances-profiles"],
     enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department").order("full_name");
+      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department, is_active").order("full_name");
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
@@ -50,7 +50,7 @@ function FinancesPage() {
     queryKey: ["finances-grants"],
     enabled: !!me?.isFinanceAdmin,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    queryFn: async () => (await (supabase as any).from("role_grants").select("email, role, default_monthly_salary, default_hourly_rate, comp_type").order("email")).data as Grant[] ?? [],
+    queryFn: async () => (await (supabase as any).from("role_grants").select("email, role, default_monthly_salary, default_hourly_rate, comp_type, department").order("email")).data as Grant[] ?? [],
   });
 
   const { data: salaries } = useQuery({

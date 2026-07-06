@@ -307,6 +307,23 @@ function TasksPage() {
               </div>
             )}
 
+            {canAssignOthers && (
+              <div className="space-y-1">
+                <Label>Reviewer (optional)</Label>
+                <Select value={tReviewer || "none"} onValueChange={(v) => setTReviewer(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="No reviewer" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— No reviewer —</SelectItem>
+                    {(assignees ?? []).filter((u) => u.id !== (tAssignee || me?.id)).map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.full_name ?? "Unnamed"}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">When the assignee marks done, the task moves to review.</p>
+              </div>
+            )}
+
+
             <div className="space-y-1">
               <Label>Project</Label>
               <Select value={tProject} onValueChange={setTProject}>

@@ -173,13 +173,13 @@ function TimesheetPage() {
     const myId = userRes.user?.id ?? null;
 
     if (existing?.id) {
-      const patch: Record<string, unknown> = { tasks: cleaned, total_hours: totalHrs, last_edited_by: myId };
-      if (opts && "approvedAt" in opts) { patch.approved_at = opts.approvedAt; patch.approved_by = opts.approvedBy ?? null; }
+      const patch = { tasks: cleaned, total_hours: totalHrs, last_edited_by: myId,
+        ...(opts && "approvedAt" in opts ? { approved_at: opts.approvedAt ?? null, approved_by: opts.approvedBy ?? null } : {}) };
       const { error } = await supabase.from("attendance_logs").update(patch).eq("id", existing.id);
       if (error) throw error;
     } else {
-      const insert: Record<string, unknown> = { user_id: userId, date: dateIso, tasks: cleaned, total_hours: totalHrs, last_edited_by: myId };
-      if (opts && "approvedAt" in opts) { insert.approved_at = opts.approvedAt; insert.approved_by = opts.approvedBy ?? null; }
+      const insert = { user_id: userId, date: dateIso, tasks: cleaned, total_hours: totalHrs, last_edited_by: myId,
+        ...(opts && "approvedAt" in opts ? { approved_at: opts.approvedAt ?? null, approved_by: opts.approvedBy ?? null } : {}) };
       const { error } = await supabase.from("attendance_logs").insert(insert);
       if (error) throw error;
     }

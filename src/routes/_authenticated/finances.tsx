@@ -234,9 +234,9 @@ function FinancesPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs logged`} />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="all salaries incl. pending" />
-        <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${(profiles?.length ?? 0) + pendingGrants.length} on roster`} />
-        <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(pendingGrants.length)} sub="invite sent, not registered" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="active salaries incl. pending" />
+        <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${visibleProfiles.length + visiblePendingGrants.length} on roster`} />
+        <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(visiblePendingGrants.length)} sub="invite sent, not registered" />
       </div>
 
       <Card>

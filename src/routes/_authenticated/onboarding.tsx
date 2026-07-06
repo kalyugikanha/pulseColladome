@@ -52,7 +52,7 @@ function OnboardingPage() {
 
   if (me && !me.isSuperAdmin && !me.isHrAdmin) throw redirect({ to: "/dashboard" });
 
-  const canSetSalary = !!me?.isSuperAdmin;
+  const canSetSalary = !!(me?.isSuperAdmin || me?.isHrAdmin);
   const canPromote = !!me?.isSuperAdmin;
 
   // Form state

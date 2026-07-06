@@ -25,8 +25,11 @@ function AccessPage() {
   const qc = useQueryClient();
   const createUserFn = useServerFn(createTeamUser);
   const bulkProvisionFn = useServerFn(bulkProvisionTeam);
+  const syncMissingFn = useServerFn(syncMissingAuthAccounts);
   const [provisioning, setProvisioning] = useState(false);
   const [provisionResult, setProvisionResult] = useState<{ created: string[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: string[]; alreadyOk: string[]; errors: { email: string; message: string }[] } | null>(null);
 
   // Grant-only form (existing)
   const [email, setEmail] = useState("");

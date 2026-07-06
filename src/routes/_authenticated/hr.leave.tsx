@@ -458,7 +458,7 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
     if (days <= 0) return toast.error("End must be after start");
     setBusy(true);
     const status: LStatus = preApproved ? "approved" : "pending";
-    const payload: Record<string, unknown> = {
+    const payload = {
       user_id: userId,
       leave_type: type,
       start_date: start,
@@ -466,11 +466,9 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
       days,
       reason: reason.trim() || "Logged by HR",
       status,
+      admin_comment: preApproved ? "Pre-approved by HR" : null,
+      decided_at: preApproved ? new Date().toISOString() : null,
     };
-    if (preApproved) {
-      payload.admin_comment = "Pre-approved by HR";
-      payload.decided_at = new Date().toISOString();
-    }
     const { error } = await supabase.from("leave_requests").insert(payload);
     setBusy(false);
     if (error) return toast.error(error.message);

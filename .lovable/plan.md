@@ -1,39 +1,22 @@
-## Goal
+## Action
 
-Make today's leave visible on two surfaces:
+Delete all 4 existing `leave_requests` rows for Hemanth Sridhar (`hemanth@colladome.in`) and reset his `leave_balances.used` for every leave type back to 0, so you can start the validation flow from a clean slate.
 
-1. **HR → Leave management → Day view** — show approved + pending leave for the picked date, deduped per person (Hemanth's 6–7 July leave will appear).
-2. **Attendance → Today** — show who's on approved leave today, and mark them as "On leave" instead of "Absent".
+## SQL
 
-## Changes
+```sql
+DELETE FROM leave_requests
+WHERE user_id = (SELECT id FROM profiles WHERE email = 'hemanth@colladome.in');
 
-### 1. HR Day view (`src/routes/_authenticated/hr.leave.tsx` → `DayView`)
+UPDATE leave_balances
+SET used = 0
+WHERE user_id = (SELECT id FROM profiles WHERE email = 'hemanth@colladome.in');
+```
 
-- Restrict the query to visible statuses: `.in("status", ["approved", "pending"])` so cancelled/rejected rows don't inflate the counts.
-- Dedupe by `user_id`: if a person has multiple overlapping rows (e.g. an earlier `pending` + later `approved`), keep the approved one.
-- Sort cards inside each type by employee name.
-- Header stays "On leave on {date}" with counts `total · approved · pending`.
+After this runs, the trigger fix + Day-view/Attendance changes from the previous turns are already in place, so:
 
-### 2. Attendance Today (`src/routes/_authenticated/attendance.tsx` → `AttendancePage`)
+- HR/Super Admin "Log leave" will insert as `approved` and deduct balance immediately.
+- Attendance → Today will show Sridhar with an amber "On leave" badge and list him in the "On leave today" banner.
+- HR → Leave management → Day view will list him for the picked date.
 
-- Extend the main `useQuery` to also fetch today's approved leaves for scoped users:
-  ```
-  supabase.from("leave_requests")
-    .select("user_id, leave_type, start_date, end_date, reason")
-    .eq("status", "approved")
-    .lte("start_date", today).gte("end_date", today)
-  ```
-  (Scoped by `deptScope` / `userScope` via a follow-up in-memory filter using the already-fetched people list.)
-- Build `onLeaveById = Map<user_id, leaveRow>`.
-- In the Today card:
-  - Add a top banner: "On leave today: {names, joined with •}" (hidden when empty).
-  - For each row, if `onLeaveById.has(p.id)`, render a distinct **"On leave · {type}"** badge (amber) in place of Absent/Signed off. Punch info line is replaced with "On approved leave — {start}–{end}".
-- Include `today` and a stable leave key in `queryKey` so it invalidates alongside attendance.
-
-### 3. Cache invalidation
-
-- `LogLeaveDialog.onSaved` already calls `qc.invalidateQueries()`, which will refresh both Day view and Attendance automatically after logging a leave.
-
-## Out of scope
-
-- Dashboard tile / calendar module — not requested; can be added later if needed.
+No code changes in this step — just data cleanup.

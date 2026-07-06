@@ -1,29 +1,33 @@
 
-## Why the leave didn't appear for Kanishka
+## Why you can't edit today
 
-The "Log leave for teammate" dialog inserts the row with `status: 'approved'`, `decided_by = me`, and `decided_at = now()`. That skips the approval queue entirely — Sridhar's leave was already marked approved (and balance deducted) by the super-admin who logged it, so Kanishka never saw a pending item.
+In the admin **Timesheet** pivot view (Weekly / Monthly / Employee × Project) the cells are read-only "click to see daily breakdown" buttons. The pencil Edit action only exists (a) inside the drill sheet next to each already-logged entry, and (b) in the "Day" view. There is no per-row Edit affordance on the main grid, so on the pivot there is literally no button to press for another employee — even though as super admin you have permission.
 
-## Change
+Two side gaps make this worse:
+- `canEdit` doesn't include `me.isAdmin`, so a plain admin can't edit either.
+- Pivot cells with 0 hours don't open anything, so you can't add hours for an employee/project pair that has none yet.
 
-Route every teammate-logged leave through the normal approval chain.
+## Change (frontend only)
 
-### `src/routes/_authenticated/leave.tsx` — `LogForTeammateDialog.submit()`
-- Insert with:
-  - `status: 'pending'`
-  - remove `decided_by` and `decided_at`
-  - keep `reason` populated as `"Logged by <name>: <comment>"` (so the note is visible to the approver in the pending card, since `admin_comment` is the approver's field)
-  - drop `admin_comment` from the insert
-- Update the helper text in the dialog from "recorded as an approved leave and will deduct from their balance" to "sent for approval to their reporting manager / department head".
-- Update the success toast to "Leave submitted for approval".
+`src/routes/_authenticated/timesheet.tsx`
 
-### No database / RLS changes
-The existing INSERT policies for reporting managers, dept heads, and admins already allow inserting pending rows. The existing approval flow (manager / head / admin approve → `handle_leave_status_change` trigger deducts balance) will handle it correctly.
+1. **Widen `canEdit`** to include admins:
+   `me.isSuperAdmin || me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager`
 
-### Not changing
-- Self-request flow
-- Approval UI
-- Balance trigger
-- Calendar rendering
+2. **Add an "Edit day…" column** at the end of each employee row in the pivot table (visible when `canEdit`). It's a small popover with a date picker constrained to the currently selected range. Picking a date opens the existing `DayEditorSheet` for `{userId, userName, date}`.
 
-### Follow-up note for the user
-The existing leave for Sridhar is already in `approved` state. If you want Kanishka to review it, we can either (a) leave it as-is (already counted), or (b) I can flip that specific row back to `pending` after this change ships — tell me which.
+3. **Add an "Add / edit another day"** button at the top of the drill sheet (per employee × project) with the same date picker → opens `DayEditorSheet` for a chosen day. Lets an admin add hours to a day that isn't already in the list.
+
+4. Update the pivot description copy to mention the new Edit affordance.
+
+## Not changing
+
+- Database / RLS — super admin already has full ALL on `attendance_logs`; the reporting-manager / dept-head UPDATE policies cover the widened `canEdit` cases.
+- Approval flow, balance/trigger logic, DayEditorSheet internals.
+- `my-timesheet.tsx` (self view).
+
+## Verify
+
+- As super admin: on the Weekly view, each employee row shows "Edit day…" → pick a date → sheet opens with that employee's tasks → change hours → Save → toast "Saved" → pivot refreshes.
+- As a plain admin (no reporting relationship): same flow now works.
+- As a normal employee: no Edit column appears (unchanged).

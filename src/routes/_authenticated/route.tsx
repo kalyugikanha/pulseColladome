@@ -31,6 +31,7 @@ const employeeItems = [
   { title: "Leave", url: "/leave", icon: CalendarRange },
   { title: "Team Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
+  { title: "My Performance", url: "/performance", icon: Star },
 ] as const;
 
 function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; fullName: string | null; email: string | null }) {

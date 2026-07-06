@@ -490,3 +490,54 @@ function DatePickerButton({ value, onChange, label }: { value: Date; onChange: (
     </Popover>
   );
 }
+
+function EditDayPopover({
+  rangeStart,
+  rangeEnd,
+  onPick,
+  label = "Edit day…",
+}: {
+  rangeStart: string;
+  rangeEnd: string;
+  onPick: (date: string) => void;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const start = useMemo(() => new Date(`${rangeStart}T00:00:00`), [rangeStart]);
+  // endIso is exclusive; step back one day for the picker's max.
+  const end = useMemo(() => {
+    const e = new Date(`${rangeEnd}T00:00:00`);
+    e.setDate(e.getDate() - 1);
+    return e;
+  }, [rangeEnd]);
+  const [selected, setSelected] = useState<Date>(() => {
+    const today = new Date();
+    if (today >= start && today <= end) return today;
+    return end;
+  });
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8">
+          <Pencil className="h-3 w-3 mr-1" /> {label}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={selected}
+          onSelect={(d) => {
+            if (!d) return;
+            setSelected(d);
+            setOpen(false);
+            onPick(ymd(d));
+          }}
+          defaultMonth={selected}
+          disabled={{ before: start, after: end }}
+          initialFocus
+          className={cn("p-3 pointer-events-auto")}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}

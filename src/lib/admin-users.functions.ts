@@ -467,7 +467,7 @@ export const logLeaveForEmployee = createServerFn({ method: "POST" })
       if (createErr && !/already registered|already exists|duplicate/i.test(createErr.message)) {
         throw new Error(`This employee account is not synced yet: ${createErr.message}`);
       }
-      authUserId = created?.user?.id ?? await findAuthUserIdByEmail(supabaseAdmin, selectedProfile.email);
+      authUserId = created?.user?.id ?? (await findAuthUserIdByEmail(supabaseAdmin, selectedProfile.email));
     }
     if (!authUserId) {
       throw new Error("This employee account is not synced yet. Run Sync missing accounts from Access first.");

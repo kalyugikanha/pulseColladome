@@ -164,9 +164,28 @@ function FinancesPage() {
     return m;
   }, [grants]);
   const nameFromEmail = (e: string) => e.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // Active + department-filtered roster used by the top-line stats
+  const visibleProfiles = useMemo(() => {
+    return (profiles ?? []).filter((p) => {
+      if (p.is_active === false) return false;
+      if (deptSel.size === 0) return true;
+      return deptSel.has(p.department ?? UNASSIGNED);
+    });
+  }, [profiles, deptSel]);
+  const visiblePendingGrants = useMemo(() => {
+    if (deptSel.size === 0) return pendingGrants;
+    return pendingGrants.filter((g) => deptSel.has(g.department ?? UNASSIGNED));
+  }, [pendingGrants, deptSel]);
+
+  const usersWithSalary = useMemo(
+    () => visibleProfiles.filter((p) => currentSalaryByUser.has(p.id)).length,
+    [visibleProfiles, currentSalaryByUser],
+  );
+
   const totalConfiguredPool = useMemo(() => {
     let sum = 0;
-    for (const p of profiles ?? []) {
+    for (const p of visibleProfiles) {
       const s = currentSalaryByUser.get(p.id);
       if (s) {
         if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
@@ -177,13 +196,13 @@ function FinancesPage() {
         else sum += Number(g?.default_monthly_salary ?? 0);
       }
     }
-    for (const g of pendingGrants) {
+    for (const g of visiblePendingGrants) {
       if (g.comp_type === "hourly") {
         // no hours possible without a user id
       } else sum += Number(g.default_monthly_salary ?? 0);
     }
     return sum;
-  }, [profiles, currentSalaryByUser, grantByEmail, pendingGrants, userHoursThisMonth]);
+  }, [visibleProfiles, visiblePendingGrants, currentSalaryByUser, grantByEmail, userHoursThisMonth]);
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {

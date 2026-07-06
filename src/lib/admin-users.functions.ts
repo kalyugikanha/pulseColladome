@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type Role = "admin" | "employee" | "project_manager" | "hr_admin";
 type EmploymentType = "full_time" | "intern" | "contract" | "consultant";
+type LeaveType = "casual" | "sick" | "earned" | "unpaid";
 
 type ProfilePatch = {
   full_name?: string | null;
@@ -14,6 +15,87 @@ type ProfilePatch = {
   notes?: string | null;
   must_change_password?: boolean;
 };
+
+async function findAuthUserIdByEmail(supabaseAdmin: any, email: string) {
+  const target = email.trim().toLowerCase();
+  let page = 1;
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(error.message);
+    const match = (data?.users ?? []).find((u: { id: string; email?: string | null }) =>
+      (u.email ?? "").trim().toLowerCase() === target,
+    );
+    if (match) return match.id;
+    if (!data || (data.users?.length ?? 0) < 1000) return null;
+    page += 1;
+  }
+}
+
+async function ensureProfileForAuthUser(supabaseAdmin: any, authUserId: string, sourceProfile: any, actorId: string) {
+  const { data: existing, error: existingErr } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("id", authUserId)
+    .maybeSingle();
+  if (existingErr) throw new Error(existingErr.message);
+
+  const profilePayload = {
+    id: authUserId,
+    full_name: sourceProfile.full_name ?? sourceProfile.email?.split("@")[0] ?? "Employee",
+    email: sourceProfile.email,
+    avatar_url: sourceProfile.avatar_url ?? null,
+    must_change_password: sourceProfile.must_change_password ?? false,
+    department: sourceProfile.department ?? null,
+    is_placeholder: false,
+    date_of_birth: sourceProfile.date_of_birth ?? null,
+    joined_on: sourceProfile.joined_on ?? null,
+    phone: sourceProfile.phone ?? null,
+    employment_type: sourceProfile.employment_type ?? null,
+    notes: sourceProfile.notes ?? null,
+    personal_email: sourceProfile.personal_email ?? null,
+    permanent_address: sourceProfile.permanent_address ?? null,
+    marriage_anniversary: sourceProfile.marriage_anniversary ?? null,
+    linkedin_url: sourceProfile.linkedin_url ?? null,
+    github_url: sourceProfile.github_url ?? null,
+    profile_picture_url: sourceProfile.profile_picture_url ?? null,
+    day_start_time: sourceProfile.day_start_time ?? null,
+    standup_time: sourceProfile.standup_time ?? null,
+    onboarding_completed: sourceProfile.onboarding_completed ?? false,
+    onboarding_completed_at: sourceProfile.onboarding_completed_at ?? null,
+    facebook_url: sourceProfile.facebook_url ?? null,
+    instagram_url: sourceProfile.instagram_url ?? null,
+    twitter_url: sourceProfile.twitter_url ?? null,
+    youtube_url: sourceProfile.youtube_url ?? null,
+    pinterest_url: sourceProfile.pinterest_url ?? null,
+    social_follows_confirmed_at: sourceProfile.social_follows_confirmed_at ?? null,
+    reviews_confirmed_at: sourceProfile.reviews_confirmed_at ?? null,
+    reporting_manager_id: sourceProfile.reporting_manager_id === authUserId ? null : (sourceProfile.reporting_manager_id ?? null),
+    is_active: true,
+    onboarding_required: sourceProfile.onboarding_required ?? true,
+    onboarding_submitted_at: sourceProfile.onboarding_submitted_at ?? null,
+    onboarding_approved_at: sourceProfile.onboarding_approved_at ?? null,
+    onboarding_approved_by: sourceProfile.onboarding_approved_by === authUserId ? null : (sourceProfile.onboarding_approved_by ?? null),
+    onboarding_rejected_at: sourceProfile.onboarding_rejected_at ?? null,
+    onboarding_rejection_reason: sourceProfile.onboarding_rejection_reason ?? null,
+    hobbies: sourceProfile.hobbies ?? null,
+  };
+
+  if (existing) {
+    const { error } = await supabaseAdmin.from("profiles").update(profilePayload).eq("id", authUserId);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabaseAdmin.from("profiles").insert(profilePayload);
+    if (error) throw new Error(error.message);
+  }
+
+  if (sourceProfile.id !== authUserId) {
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({ is_active: false, deactivated_at: new Date().toISOString(), deactivated_by: actorId })
+      .eq("id", sourceProfile.id);
+    if (error) throw new Error(error.message);
+  }
+}
 
 export const createTeamUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

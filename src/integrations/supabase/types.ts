@@ -435,6 +435,7 @@ export type Database = {
           notes: string | null
           onboarding_completed: boolean
           onboarding_completed_at: string | null
+          onboarding_required: boolean
           permanent_address: string | null
           personal_email: string | null
           phone: string | null
@@ -472,6 +473,7 @@ export type Database = {
           notes?: string | null
           onboarding_completed?: boolean
           onboarding_completed_at?: string | null
+          onboarding_required?: boolean
           permanent_address?: string | null
           personal_email?: string | null
           phone?: string | null
@@ -509,6 +511,7 @@ export type Database = {
           notes?: string | null
           onboarding_completed?: boolean
           onboarding_completed_at?: string | null
+          onboarding_required?: boolean
           permanent_address?: string | null
           personal_email?: string | null
           phone?: string | null

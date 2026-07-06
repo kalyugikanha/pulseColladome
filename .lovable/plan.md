@@ -1,18 +1,37 @@
-# Google-only Sign-in
+# Grandfather existing users past onboarding
 
-Simplify `src/routes/auth.tsx` so employees can only sign in with Google.
+Only enforce onboarding for users created from now onward. Existing users can skip.
 
-## Changes (frontend only, `src/routes/auth.tsx`)
+## Migration (single)
 
-- Remove the email/password Tabs (Sign in + Create account), the `handleEmail` function, and related state (`mode`, `email`, `password`, `fullName`).
-- Keep only the "Continue with Google" button (existing `handleGoogle` flow via `lovable.auth.signInWithOAuth("google", ...)`).
-- Replace the current helper copy with a clear prompt:
-  > "Please sign in with your **@colladome.com** Google account. If you don't have one yet, please check with HR."
-- Add a small secondary note that Google Calendar sync is still connected separately from the Team Calendar page (kept from current copy).
-- Update `CardTitle` / `CardDescription` to match ("Sign in to Pulse" / "Google sign-in only — use your Colladome Google account.").
-- Remove now-unused imports: `Input`, `Label`, `Tabs*`, `supabase` (only used by removed email flow), `Activity`.
+1. Add `public.profiles.onboarding_required boolean NOT NULL DEFAULT true`.
+2. Backfill: `UPDATE public.profiles SET onboarding_required = false WHERE created_at < now();` (i.e. all currently-existing rows are exempt).
+3. Update `public.handle_new_user()` trigger to insert `onboarding_required = true` for new signups (default already handles it, but set explicitly for clarity).
+
+New users going forward get `onboarding_required = true`; existing users have `false`.
+
+## Server (`src/lib/onboarding.functions.ts` and `src/hooks/use-current-user.ts`)
+
+- Expose `onboarding_required` on the current-user hook alongside `onboardingCompleted`.
+
+## Route gate (`src/routes/_authenticated/route.tsx`, line ~207)
+
+Change the redirect condition from:
+```
+!user.onboardingCompleted
+```
+to:
+```
+user.onboardingRequired && !user.onboardingCompleted
+```
+So existing users (with `onboarding_required = false`) are never forced to `/complete-onboarding`. New users still are.
+
+## Complete-onboarding page (`src/routes/_authenticated/complete-onboarding.tsx`)
+
+No functional change — existing users can still visit it voluntarily via the "My profile" link to fill things in; they just aren't forced.
 
 ## Not changing
 
-- Auth backend, Google OAuth config, provider settings, or any other route.
-- Existing users signed in via email/password continue to work; they simply have no UI to sign in that way here. (If you also want to disable the email provider entirely at the backend level, say so and I'll add that step.)
+- The onboarding checklist / task list itself.
+- Admin onboarding overview page.
+- Any RLS policies (column is user-readable via existing profile SELECT policy).

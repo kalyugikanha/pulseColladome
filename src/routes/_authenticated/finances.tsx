@@ -49,7 +49,8 @@ function FinancesPage() {
   const { data: grants } = useQuery({
     queryKey: ["finances-grants"],
     enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => (await supabase.from("role_grants").select("email, role, default_monthly_salary, default_hourly_rate, comp_type").order("email")).data as Grant[] ?? [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    queryFn: async () => (await (supabase as any).from("role_grants").select("email, role, default_monthly_salary, default_hourly_rate, comp_type").order("email")).data as Grant[] ?? [],
   });
 
   const { data: salaries } = useQuery({

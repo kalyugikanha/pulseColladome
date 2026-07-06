@@ -1,32 +1,25 @@
-## What’s happening
+## Goal
+Stop forcing onboarding on existing employees, but keep it mandatory for any new employee created from now on. Existing users can still access the onboarding/profile page voluntarily from the sidebar avatar.
 
-The screenshot is no longer a callback URI mismatch. Google is now blocking the Calendar OAuth app because the Google Cloud OAuth consent screen is in Testing and the signed-in Google account is not an approved test user, or the consent screen has not been published/verified.
+## Approach
 
-## Plan
+### 1. Database migration
+- Backfill: mark all existing profiles as onboarded so the redirect no longer triggers for them.
+  - `UPDATE public.profiles SET onboarding_completed = true, onboarding_completed_at = COALESCE(onboarding_completed_at, now()) WHERE onboarding_completed IS DISTINCT FROM true;`
+- Change the default for new rows so future signups start as NOT onboarded:
+  - `ALTER TABLE public.profiles ALTER COLUMN onboarding_completed SET DEFAULT false;`
+- Update `handle_new_user()` trigger to explicitly insert `onboarding_completed = false` for new users (so behavior is explicit regardless of default), keeping all other logic identical.
 
-1. **Keep the existing Calendar OAuth redirect URI unchanged**
-   - Continue using `https://colladome-pulse.lovable.app/api/public/google/callback` for the Calendar OAuth flow.
-   - Do not change the app’s normal Google sign-in flow.
+Result: the ~1920 existing users are flagged complete; anyone created afterward (via HR admin/super admin invite → signup) gets `false` and hits the forced onboarding flow.
 
-2. **Improve the Calendar connection page guidance**
-   - Update the Google Calendar connect screen to explicitly distinguish:
-     - `redirect_uri_mismatch`: callback URI issue
-     - `access_denied` / `403`: Google consent screen verification or test-user issue
-   - Show the exact Google account from the blocked screen as something that must be added under Google Cloud OAuth consent screen test users while the app is in Testing.
+### 2. Frontend
+No change needed to the redirect logic in `src/routes/_authenticated/route.tsx` — it already redirects only when `!user.onboardingCompleted`. The sidebar footer already links the avatar to `/complete-onboarding`, so existing users retain voluntary access to fill it out later.
 
-3. **Improve the callback error page**
-   - Update the current `access_denied` message to say this means Google accepted the callback but blocked access because the app has not completed verification or the account is not an approved tester.
-   - Include the required remedy: add the user as a test user in Google Cloud, or publish/verify the OAuth consent screen if this is for public users.
+## Technical details
+- Single migration file with the UPDATE, ALTER DEFAULT, and updated `handle_new_user` function.
+- No RLS/policy changes.
+- No code changes to routes, hooks, or server functions.
 
-4. **Optional safer Calendar scopes adjustment**
-   - Review whether both Calendar scopes are truly required.
-   - If booking creation is needed, keep `calendar.events`.
-   - If the app only reads events, reduce to `calendar.readonly` to make Google verification easier.
-
-## What you still need to do in Google Cloud
-
-- Open the OAuth consent screen for the same Google Cloud project as the saved Calendar Client ID.
-- If publishing status is **Testing**, add `shubham@colladome.com` as a test user.
-- If this should work for anyone outside test users, complete Google’s app verification/publishing process.
-- Keep the authorized redirect URI exactly:
-  `https://colladome-pulse.lovable.app/api/public/google/callback`
+## Out of scope
+- Any change to what fields are required during onboarding.
+- Any change to the HR admin invite flow itself.

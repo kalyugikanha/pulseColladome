@@ -46,11 +46,10 @@ export const createTeamUser = createServerFn({ method: "POST" })
     let isSuperAdmin = !!data.is_super_admin;
     let defaultSalary = data.default_monthly_salary ?? null;
 
-    // HR admins can't create admins or super admins, and can't set salaries
+    // HR admins can't create admins or super admins, but can set a tentative salary
     if (!isSuper) {
       if (role === "admin" || role === "hr_admin") role = "employee";
       isSuperAdmin = false;
-      defaultSalary = null;
     }
 
     const full_name = (data.full_name ?? email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())).trim();

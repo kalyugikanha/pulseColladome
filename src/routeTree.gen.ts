@@ -36,6 +36,7 @@ import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
 import { Route as ApiAssistantTranscribeRouteImport } from './routes/api/assistant/transcribe'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
+import { Route as AuthenticatedHrLeaveRouteImport } from './routes/_authenticated/hr.leave'
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
 
@@ -178,6 +179,11 @@ const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   path: '/api/assistant/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedHrLeaveRoute = AuthenticatedHrLeaveRouteImport.update({
+  id: '/hr/leave',
+  path: '/hr/leave',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminTaxonomyRoute =
   AuthenticatedAdminTaxonomyRouteImport.update({
     id: '/admin/taxonomy',
@@ -216,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
@@ -246,6 +253,7 @@ export interface FileRoutesByTo {
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
@@ -278,6 +286,7 @@ export interface FileRoutesById {
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
   '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
@@ -310,6 +319,7 @@ export interface FileRouteTypes {
     | '/timesheet'
     | '/vendors'
     | '/admin/taxonomy'
+    | '/hr/leave'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
     | '/api/public/google/callback'
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/timesheet'
     | '/vendors'
     | '/admin/taxonomy'
+    | '/hr/leave'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
     | '/api/public/google/callback'
@@ -371,6 +382,7 @@ export interface FileRouteTypes {
     | '/_authenticated/timesheet'
     | '/_authenticated/vendors'
     | '/_authenticated/admin/taxonomy'
+    | '/_authenticated/hr/leave'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
     | '/api/public/google/callback'
@@ -578,6 +590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/hr/leave': {
+      id: '/_authenticated/hr/leave'
+      path: '/hr/leave'
+      fullPath: '/hr/leave'
+      preLoaderRoute: typeof AuthenticatedHrLeaveRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/taxonomy': {
       id: '/_authenticated/admin/taxonomy'
       path: '/admin/taxonomy'
@@ -617,6 +636,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTimesheetRoute: typeof AuthenticatedTimesheetRoute
   AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRoute
   AuthenticatedAdminTaxonomyRoute: typeof AuthenticatedAdminTaxonomyRoute
+  AuthenticatedHrLeaveRoute: typeof AuthenticatedHrLeaveRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -641,6 +661,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTimesheetRoute: AuthenticatedTimesheetRoute,
   AuthenticatedVendorsRoute: AuthenticatedVendorsRoute,
   AuthenticatedAdminTaxonomyRoute: AuthenticatedAdminTaxonomyRoute,
+  AuthenticatedHrLeaveRoute: AuthenticatedHrLeaveRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

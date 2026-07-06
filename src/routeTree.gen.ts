@@ -23,6 +23,7 @@ import { Route as AuthenticatedResourcesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/punch'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProjectBurnRouteImport } from './routes/_authenticated/project-burn'
+import { Route as AuthenticatedPerformanceRouteImport } from './routes/_authenticated/performance'
 import { Route as AuthenticatedOnboardingPendingRouteImport } from './routes/_authenticated/onboarding-pending'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMyTimesheetRouteImport } from './routes/_authenticated/my-timesheet'
@@ -112,6 +113,12 @@ const AuthenticatedProjectBurnRoute =
   AuthenticatedProjectBurnRouteImport.update({
     id: '/project-burn',
     path: '/project-burn',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPerformanceRoute =
+  AuthenticatedPerformanceRouteImport.update({
+    id: '/performance',
+    path: '/performance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedOnboardingPendingRoute =
@@ -227,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/onboarding-pending': typeof AuthenticatedOnboardingPendingRoute
+  '/performance': typeof AuthenticatedPerformanceRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
@@ -260,6 +268,7 @@ export interface FileRoutesByTo {
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/onboarding-pending': typeof AuthenticatedOnboardingPendingRoute
+  '/performance': typeof AuthenticatedPerformanceRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
@@ -295,6 +304,7 @@ export interface FileRoutesById {
   '/_authenticated/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/onboarding-pending': typeof AuthenticatedOnboardingPendingRoute
+  '/_authenticated/performance': typeof AuthenticatedPerformanceRoute
   '/_authenticated/project-burn': typeof AuthenticatedProjectBurnRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/punch': typeof AuthenticatedPunchRoute
@@ -330,6 +340,7 @@ export interface FileRouteTypes {
     | '/my-timesheet'
     | '/onboarding'
     | '/onboarding-pending'
+    | '/performance'
     | '/project-burn'
     | '/projects'
     | '/punch'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/my-timesheet'
     | '/onboarding'
     | '/onboarding-pending'
+    | '/performance'
     | '/project-burn'
     | '/projects'
     | '/punch'
@@ -397,6 +409,7 @@ export interface FileRouteTypes {
     | '/_authenticated/my-timesheet'
     | '/_authenticated/onboarding'
     | '/_authenticated/onboarding-pending'
+    | '/_authenticated/performance'
     | '/_authenticated/project-burn'
     | '/_authenticated/projects'
     | '/_authenticated/punch'
@@ -523,6 +536,13 @@ declare module '@tanstack/react-router' {
       path: '/project-burn'
       fullPath: '/project-burn'
       preLoaderRoute: typeof AuthenticatedProjectBurnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/performance': {
+      id: '/_authenticated/performance'
+      path: '/performance'
+      fullPath: '/performance'
+      preLoaderRoute: typeof AuthenticatedPerformanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/onboarding-pending': {
@@ -667,6 +687,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMyTimesheetRoute: typeof AuthenticatedMyTimesheetRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOnboardingPendingRoute: typeof AuthenticatedOnboardingPendingRoute
+  AuthenticatedPerformanceRoute: typeof AuthenticatedPerformanceRoute
   AuthenticatedProjectBurnRoute: typeof AuthenticatedProjectBurnRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedPunchRoute: typeof AuthenticatedPunchRoute
@@ -694,6 +715,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMyTimesheetRoute: AuthenticatedMyTimesheetRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOnboardingPendingRoute: AuthenticatedOnboardingPendingRoute,
+  AuthenticatedPerformanceRoute: AuthenticatedPerformanceRoute,
   AuthenticatedProjectBurnRoute: AuthenticatedProjectBurnRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedPunchRoute: AuthenticatedPunchRoute,

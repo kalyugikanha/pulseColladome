@@ -217,11 +217,14 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
     for (const entry of TEAM_ROSTER) {
       const em = entry.email.toLowerCase();
       try {
+        const isHourly = entry.comp_type === "hourly";
         const { error: grantErr } = await supabaseAdmin.from("role_grants").upsert({
           email: em,
           role: entry.role,
           is_super_admin: entry.is_super_admin,
-          default_monthly_salary: entry.monthly_salary,
+          default_monthly_salary: isHourly ? null : entry.monthly_salary,
+          default_hourly_rate: isHourly ? (entry.hourly_rate ?? null) : null,
+          comp_type: isHourly ? "hourly" : "monthly",
           department: entry.department,
         }, { onConflict: "email" });
         if (grantErr) throw new Error(`role_grants: ${grantErr.message}`);

@@ -248,6 +248,7 @@ function TasksPage() {
                 const types = (t.task_types as { task_type: { id: string; name: string } | null }[] | null)?.map((x) => x.task_type).filter(Boolean) ?? [];
                 const linkArr = (t.asset_links as { label: string; url: string }[] | null) ?? [];
                 const pct = (t as { completion_percent?: number }).completion_percent ?? 0;
+                const stage = (t as { current_stage?: { name: string; kind: string; status: string; owner: { full_name: string | null } | null } | null }).current_stage;
                 return (
                   <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3 hover:border-primary/40 cursor-pointer"
                     onClick={() => setOpenTaskId(t.id)}>
@@ -256,6 +257,12 @@ function TasksPage() {
                         <span className="text-sm font-medium">{t.title}</span>
                         <Badge variant="outline" className="capitalize">{t.priority}</Badge>
                         {types.map((tt) => <Badge key={tt!.id} variant="secondary">{tt!.name}</Badge>)}
+                        {stage && (
+                          <Badge variant="outline" className="text-[10px] gap-1 border-primary/40 text-primary">
+                            <Workflow className="h-3 w-3" />
+                            {stage.name}{stage.owner?.full_name ? ` · ${stage.owner.full_name}` : ""}
+                          </Badge>
+                        )}
                       </div>
                       {t.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>}
                       <div className="flex flex-wrap gap-2 mt-1 items-center">

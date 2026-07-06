@@ -474,6 +474,7 @@ function FinancesPage() {
                   <TableCell><Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Pending signup</Badge></TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px] capitalize">{g.comp_type ?? "monthly"}</Badge></TableCell>
                   <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
+                  <TableCell className="text-right text-muted-foreground">—</TableCell>
                   <TableCell className="text-right">
                     {g.comp_type === "hourly"
                       ? (g.default_hourly_rate != null ? <>{inr(Number(g.default_hourly_rate))}<span className="text-[10px] text-muted-foreground">/hr</span></> : <span className="text-muted-foreground">Not set</span>)

@@ -59,6 +59,7 @@ function TasksPage() {
   const [tDesc, setTDesc] = useState("");
   const [tDue, setTDue] = useState("");
   const [tPri, setTPri] = useState<"low" | "medium" | "high">("medium");
+  const [tAssignee, setTAssignee] = useState<string>("");
   const [tax_, setTax] = useState<TaxonomyValue>({ domainId: null, departmentId: null, taskTypeIds: [] });
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
 

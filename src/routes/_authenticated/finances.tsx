@@ -143,7 +143,7 @@ function FinancesPage() {
 
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
-  const usersWithSalary = currentSalaryByUser.size;
+  
 
   const userHoursThisMonth = useMemo(() => {
     const m = new Map<string, number>();

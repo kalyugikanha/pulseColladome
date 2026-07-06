@@ -1,61 +1,64 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { TableProperties, Download, CalendarIcon, Pencil, CheckCircle2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil } from "lucide-react";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DayEditorSheet } from "@/components/day-editor-sheet";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
+import { toast } from "sonner";
+import { z } from "zod";
+
+const searchSchema = z.object({ date: z.string().optional() });
 
 export const Route = createFileRoute("/_authenticated/timesheet")({
+  validateSearch: searchSchema,
   component: TimesheetPage,
 });
 
 type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
 type Task = { project_code?: string; project_name?: string; hours?: number; comments?: string };
-type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null };
+type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
+type Project = { code: string; name: string };
 
-type ViewMode = "month" | "range" | "day";
-
-function monthKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-function startOfWeek(d: Date) {
+function parseYmd(s: string) {
+  return new Date(`${s}T00:00:00`);
+}
+function addDays(d: Date, n: number) {
   const x = new Date(d);
-  const day = x.getDay();
-  const diff = (day + 6) % 7; // Monday start
-  x.setDate(x.getDate() - diff);
+  x.setDate(x.getDate() + n);
   return x;
 }
 
 function TimesheetPage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/timesheet" });
+  const search = useSearch({ from: "/_authenticated/timesheet" });
+  const qc = useQueryClient();
 
-  const [view, setView] = useState<ViewMode>("month");
-  const [month, setMonth] = useState(() => monthKey(new Date()));
-  const [rangeFrom, setRangeFrom] = useState<Date>(() => startOfWeek(new Date()));
-  const [rangeTo, setRangeTo] = useState<Date>(() => new Date());
-  const [day, setDay] = useState<Date>(() => new Date());
+  const day = useMemo(() => (search.date ? parseYmd(search.date) : new Date()), [search.date]);
+  const setDay = (d: Date) => navigate({ search: { date: ymd(d) }, replace: true });
 
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
   const [projSel, setProjSel] = useState<Set<string>>(new Set());
   const [empSel, setEmpSel] = useState<Set<string>>(new Set());
-  const [drill, setDrill] = useState<{ userId: string; user: string; code: string; name: string; entries: Array<{ date: string; hours: number; comments?: string; approved: boolean }> } | null>(null);
+  const [showEmpty, setShowEmpty] = useState(false);
   const [editor, setEditor] = useState<{ userId: string; userName: string; date: string } | null>(null);
 
   useEffect(() => {
@@ -69,22 +72,9 @@ function TimesheetPage() {
   const canApprove = canEdit;
   const { deptScope, userScope } = useVisibilityScope(me);
 
-  // Compute active date range based on view.
-  const { startIso, endIso, label } = useMemo(() => {
-    if (view === "month") {
-      const [y, m] = month.split("-").map(Number);
-      const s = new Date(y, m - 1, 1);
-      const e = new Date(y, m, 1);
-      return { startIso: ymd(s), endIso: ymd(e), label: month };
-    }
-    if (view === "range") {
-      const s = rangeFrom;
-      const e = new Date(rangeTo); e.setDate(e.getDate() + 1);
-      return { startIso: ymd(s), endIso: ymd(e), label: `${format(s, "d MMM")} – ${format(rangeTo, "d MMM yyyy")}` };
-    }
-    const e = new Date(day); e.setDate(e.getDate() + 1);
-    return { startIso: ymd(day), endIso: ymd(e), label: format(day, "EEEE, d MMM yyyy") };
-  }, [view, month, rangeFrom, rangeTo, day]);
+  const dateIso = ymd(day);
+  const nextDayIso = ymd(addDays(day, 1));
+  const dateLabel = format(day, "EEEE, d MMM yyyy");
 
   const { data: profiles } = useQuery({
     queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
@@ -98,17 +88,16 @@ function TimesheetPage() {
   });
 
   const visibleUserIds = useMemo(() => (profiles ?? []).map((p) => p.id), [profiles]);
-  const visibleUserIdSet = useMemo(() => new Set(visibleUserIds), [visibleUserIds]);
   const hasScope = !!deptScope || !!userScope;
 
-  const { data: logs } = useQuery({
-    queryKey: ["ts-logs", startIso, endIso, hasScope ? visibleUserIds.join(",") : "all"],
+  const { data: logs, refetch: refetchLogs } = useQuery({
+    queryKey: ["ts-logs", dateIso, hasScope ? visibleUserIds.join(",") : "all"],
     enabled: canView && (!hasScope || visibleUserIds.length > 0),
     queryFn: async () => {
       let q = supabase
         .from("attendance_logs")
-        .select("id, user_id, date, tasks, approved_at")
-        .gte("date", startIso).lt("date", endIso);
+        .select("id, user_id, date, tasks, approved_at, approved_by")
+        .gte("date", dateIso).lt("date", nextDayIso);
       if (hasScope) q = q.in("user_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
@@ -116,106 +105,179 @@ function TimesheetPage() {
     },
   });
 
+  const { data: projectsAll } = useQuery({
+    queryKey: ["ts-projects-all"],
+    enabled: canView,
+    queryFn: async () => (await supabase.from("projects").select("code, name").order("code")).data as Project[] ?? [],
+  });
+  const projectByCode = useMemo(() => new Map((projectsAll ?? []).map((p) => [p.code, p])), [projectsAll]);
 
   const profileById = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p])), [profiles]);
-  const approvedByDay = useMemo(() => {
+  const logByUser = useMemo(() => new Map((logs ?? []).map((r) => [r.user_id, r])), [logs]);
+
+  // Projects that actually appear in the day (for filter list).
+  const projectsInDay = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of logs ?? []) for (const t of r.tasks ?? []) {
+      const code = t.project_code?.trim();
+      if (code && !m.has(code)) m.set(code, t.project_name || code);
+    }
+    return Array.from(m.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
+  }, [logs]);
+
+  const allDepts = useMemo(() => {
     const s = new Set<string>();
-    for (const r of logs ?? []) if (r.approved_at) s.add(`${r.user_id}::${r.date}`);
-    return s;
-  }, [logs]);
+    for (const p of profiles ?? []) if (p.department) s.add(p.department);
+    return Array.from(s).sort();
+  }, [profiles]);
 
-  // Pivot: user_id -> project_code -> hours, plus drill entries.
-  const pivot = useMemo(() => {
-    const cells = new Map<string, Map<string, number>>();
-    const drillMap = new Map<string, Array<{ date: string; hours: number; comments?: string; approved: boolean }>>();
-    const projMap = new Map<string, string>();
-    const userSet = new Set<string>();
-    for (const row of logs ?? []) {
-      userSet.add(row.user_id);
-      for (const t of row.tasks ?? []) {
-        const code = t.project_code?.trim();
-        const h = Number(t.hours) || 0;
-        if (!code || h <= 0) continue;
-        if (!projMap.has(code)) projMap.set(code, t.project_name || code);
-        const uMap = cells.get(row.user_id) ?? new Map<string, number>();
-        uMap.set(code, (uMap.get(code) ?? 0) + h);
-        cells.set(row.user_id, uMap);
-        const k = `${row.user_id}::${code}`;
-        const arr = drillMap.get(k) ?? [];
-        arr.push({ date: row.date, hours: h, comments: t.comments, approved: !!row.approved_at });
-        drillMap.set(k, arr);
+  // Build rows: employees (filtered) with their tasks for the day.
+  type EmpRow = { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number };
+  const empRows = useMemo<EmpRow[]>(() => {
+    const src = (profiles ?? []).filter((p) => {
+      if (deptSel.size > 0) {
+        const d = p.department;
+        if (!(d ? deptSel.has(d) : deptSel.has(UNASSIGNED))) return false;
       }
-    }
-    return { cells, drillMap, projMap, userSet };
-  }, [logs]);
+      if (empSel.size > 0 && !empSel.has(p.id)) return false;
+      return true;
+    });
+    const out: EmpRow[] = src.map((p) => {
+      const log = logByUser.get(p.id) ?? null;
+      let tasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t }));
+      if (projSel.size > 0) tasks = tasks.filter((t) => t.project_code && projSel.has(t.project_code));
+      const total = tasks.reduce((s, t) => s + (Number(t.hours) || 0), 0);
+      return { profile: p, log, tasks, approved: !!log?.approved_at, total };
+    });
+    return out
+      .filter((r) => showEmpty || r.tasks.length > 0)
+      .sort((a, b) =>
+        (a.profile.full_name ?? a.profile.email ?? "").localeCompare(b.profile.full_name ?? b.profile.email ?? "")
+      );
+  }, [profiles, logByUser, deptSel, empSel, projSel, showEmpty]);
 
-  const projects = useMemo(() => Array.from(pivot.projMap.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code)), [pivot.projMap]);
-  const users = useMemo(() => Array.from(pivot.userSet)
-    .filter((id) => !hasScope || visibleUserIdSet.has(id))
-    .map((id) => ({ id, profile: profileById.get(id) }))
-    .sort((a, b) => (a.profile?.full_name ?? a.profile?.email ?? "").localeCompare(b.profile?.full_name ?? b.profile?.email ?? "")),
-    [pivot.userSet, profileById, hasScope, visibleUserIdSet]);
-  const allDepts = useMemo(() => { const s = new Set<string>(); for (const u of users) if (u.profile?.department) s.add(u.profile.department); return Array.from(s).sort(); }, [users]);
-  const filteredUsers = useMemo(() => users.filter((u) => {
-    if (deptSel.size > 0) {
-      const d = u.profile?.department;
-      if (!(d ? deptSel.has(d) : deptSel.has(UNASSIGNED))) return false;
-    }
-    if (empSel.size > 0 && !empSel.has(u.id)) return false;
-    return true;
-  }), [users, deptSel, empSel]);
-  const filteredProjects = useMemo(() => projSel.size === 0 ? projects : projects.filter((p) => projSel.has(p.code)), [projects, projSel]);
-  const filteredUserIds = useMemo(() => new Set(filteredUsers.map((u) => u.id)), [filteredUsers]);
-  const filteredProjCodes = useMemo(() => new Set(filteredProjects.map((p) => p.code)), [filteredProjects]);
+  const dayTotal = useMemo(() => empRows.reduce((s, r) => s + r.total, 0), [empRows]);
+  const entryCount = useMemo(() => empRows.reduce((s, r) => s + r.tasks.length, 0), [empRows]);
 
-  const rowTotals = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const u of filteredUsers) {
-      const uMap = pivot.cells.get(u.id);
-      if (!uMap) { m.set(u.id, 0); continue; }
-      let s = 0; for (const [code, v] of uMap) if (filteredProjCodes.has(code)) s += v;
-      m.set(u.id, s);
-    }
-    return m;
-  }, [pivot.cells, filteredUsers, filteredProjCodes]);
-  const colTotals = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const uid of filteredUserIds) { const uMap = pivot.cells.get(uid); if (!uMap) continue; for (const [code, v] of uMap) if (filteredProjCodes.has(code)) m.set(code, (m.get(code) ?? 0) + v); }
-    return m;
-  }, [pivot.cells, filteredUserIds, filteredProjCodes]);
-  const grandTotal = useMemo(() => { let s = 0; for (const v of rowTotals.values()) s += v; return s; }, [rowTotals]);
+  async function persistTasks(userId: string, existing: LogRow | null, newTasks: Task[], opts?: { approvedAt?: string | null; approvedBy?: string | null }) {
+    const cleaned = newTasks
+      .filter((r) => r.project_code && Number(r.hours) > 0)
+      .map((r) => ({
+        project_code: r.project_code,
+        project_name: r.project_name || projectByCode.get(r.project_code!)?.name || r.project_code,
+        hours: Number(r.hours) || 0,
+        comments: r.comments?.trim() || undefined,
+      }));
+    const totalHrs = cleaned.reduce((s, r) => s + (r.hours ?? 0), 0);
+    const { data: userRes } = await supabase.auth.getUser();
+    const myId = userRes.user?.id ?? null;
 
-  // Day view rows: one row per (user, date, project) with approved flag.
-  const dayViewRows = useMemo(() => {
-    if (view !== "day") return [];
-    const out: Array<{ userId: string; userName: string; date: string; code: string; name: string; hours: number; comments?: string; approved: boolean }> = [];
-    for (const row of logs ?? []) {
-      if (!filteredUserIds.has(row.user_id)) continue;
-      const uName = profileById.get(row.user_id)?.full_name ?? profileById.get(row.user_id)?.email ?? "—";
-      for (const t of row.tasks ?? []) {
-        const code = t.project_code?.trim(); const h = Number(t.hours) || 0;
-        if (!code || h <= 0) continue;
-        if (filteredProjCodes.size && !filteredProjCodes.has(code)) continue;
-        out.push({ userId: row.user_id, userName: uName, date: row.date, code, name: t.project_name || code, hours: h, comments: t.comments, approved: !!row.approved_at });
+    if (existing?.id) {
+      const patch = { tasks: cleaned, total_hours: totalHrs, last_edited_by: myId,
+        ...(opts && "approvedAt" in opts ? { approved_at: opts.approvedAt ?? null, approved_by: opts.approvedBy ?? null } : {}) };
+      const { error } = await supabase.from("attendance_logs").update(patch).eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const insert = { user_id: userId, date: dateIso, tasks: cleaned, total_hours: totalHrs, last_edited_by: myId,
+        ...(opts && "approvedAt" in opts ? { approved_at: opts.approvedAt ?? null, approved_by: opts.approvedBy ?? null } : {}) };
+      const { error } = await supabase.from("attendance_logs").insert(insert);
+      if (error) throw error;
+    }
+  }
+
+  async function updateTask(row: EmpRow, taskIndex: number, patch: Partial<Task>) {
+    // Task index refers to filtered tasks; map back to full task list.
+    const full = (row.log?.tasks ?? []).map((t) => ({ ...t }));
+    // Find nth match matching current filter
+    let matchIdx = -1, seen = -1;
+    for (let i = 0; i < full.length; i++) {
+      const t = full[i];
+      const passes = projSel.size === 0 || (t.project_code && projSel.has(t.project_code));
+      if (passes) { seen++; if (seen === taskIndex) { matchIdx = i; break; } }
+    }
+    if (matchIdx < 0) return;
+    full[matchIdx] = { ...full[matchIdx], ...patch };
+    if (patch.project_code) full[matchIdx].project_name = projectByCode.get(patch.project_code)?.name || patch.project_code;
+    try {
+      await persistTasks(row.profile.id, row.log, full);
+      await refetchLogs();
+      qc.invalidateQueries({ queryKey: ["my-ts-logs"] });
+      toast.success("Saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    }
+  }
+
+  async function deleteTask(row: EmpRow, taskIndex: number) {
+    const full = (row.log?.tasks ?? []).map((t) => ({ ...t }));
+    let matchIdx = -1, seen = -1;
+    for (let i = 0; i < full.length; i++) {
+      const t = full[i];
+      const passes = projSel.size === 0 || (t.project_code && projSel.has(t.project_code));
+      if (passes) { seen++; if (seen === taskIndex) { matchIdx = i; break; } }
+    }
+    if (matchIdx < 0) return;
+    full.splice(matchIdx, 1);
+    try {
+      await persistTasks(row.profile.id, row.log, full);
+      await refetchLogs();
+      qc.invalidateQueries({ queryKey: ["my-ts-logs"] });
+      toast.success("Deleted");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    }
+  }
+
+  async function addTask(row: EmpRow, code: string, hours: number) {
+    if (!code || hours <= 0) return;
+    const full = [...(row.log?.tasks ?? []).map((t) => ({ ...t })), { project_code: code, project_name: projectByCode.get(code)?.name || code, hours }];
+    try {
+      await persistTasks(row.profile.id, row.log, full);
+      await refetchLogs();
+      qc.invalidateQueries({ queryKey: ["my-ts-logs"] });
+      toast.success("Added");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Add failed");
+    }
+  }
+
+  async function toggleApproval(row: EmpRow) {
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const myId = userRes.user?.id ?? null;
+      if (row.approved) {
+        await persistTasks(row.profile.id, row.log, row.log?.tasks ?? [], { approvedAt: null, approvedBy: null });
+      } else {
+        await persistTasks(row.profile.id, row.log, row.log?.tasks ?? [], { approvedAt: new Date().toISOString(), approvedBy: myId });
       }
+      await refetchLogs();
+      qc.invalidateQueries({ queryKey: ["my-ts-logs"] });
+      toast.success(row.approved ? "Unapproved" : "Approved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Approval failed");
     }
-    return out.sort((a, b) => a.userName.localeCompare(b.userName));
-  }, [view, logs, filteredUserIds, filteredProjCodes, profileById]);
+  }
 
   function exportCsv() {
-    const header = ["Employee", "Email", ...filteredProjects.map((p) => `${p.code} ${p.name}`), "Total"];
-    const rows = filteredUsers.map((u) => {
-      const name = u.profile?.full_name ?? u.profile?.email ?? u.id;
-      const email = u.profile?.email ?? "";
-      const uMap = pivot.cells.get(u.id) ?? new Map();
-      const cells = filteredProjects.map((p) => { const v = uMap.get(p.code) ?? 0; return v > 0 ? String(v) : ""; });
-      return [name, email, ...cells, String(rowTotals.get(u.id) ?? 0)];
-    });
-    const totalRow = ["Total", "", ...filteredProjects.map((p) => String(colTotals.get(p.code) ?? 0)), String(grandTotal)];
-    const csv = [header, ...rows, totalRow].map((r) => r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const header = ["Employee", "Email", "Department", "Project Code", "Project", "Hours", "Notes", "Status"];
+    const rows: string[][] = [];
+    for (const r of empRows) {
+      if (r.tasks.length === 0) {
+        rows.push([r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "", "", "", "0", "", r.approved ? "Approved" : "Pending"]);
+        continue;
+      }
+      for (const t of r.tasks) {
+        rows.push([
+          r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "",
+          t.project_code ?? "", t.project_name ?? "",
+          String(t.hours ?? 0), t.comments ?? "", r.approved ? "Approved" : "Pending",
+        ]);
+      }
+    }
+    const csv = [header, ...rows].map((r) => r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `timesheet-${label}.csv`; a.click();
+    const a = document.createElement("a"); a.href = url; a.download = `timesheet-${dateIso}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -229,240 +291,99 @@ function TimesheetPage() {
           <h1 className="font-display text-2xl font-bold flex items-center gap-2">
             <TableProperties className="h-6 w-6 text-primary" /> Timesheet
           </h1>
-          <p className="text-sm text-muted-foreground">Hours logged by each employee. Click any cell or row to view and edit daily entries.</p>
+          <p className="text-sm text-muted-foreground">Daily hours per employee. Edit any row inline — no month/range juggling.</p>
         </div>
         <div className="flex items-end gap-2 flex-wrap">
-          <Select value={view} onValueChange={(v: ViewMode) => setView(v)}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="month">Month</SelectItem>
-              <SelectItem value="range">Range</SelectItem>
-              <SelectItem value="day">Day</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {view === "month" && (() => {
-            const [yr, mo] = month.split("-");
-            const now = new Date();
-            const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
-            const months = [["01", "January"], ["02", "February"], ["03", "March"], ["04", "April"], ["05", "May"], ["06", "June"], ["07", "July"], ["08", "August"], ["09", "September"], ["10", "October"], ["11", "November"], ["12", "December"]] as const;
-            return (
-              <>
-                <Select value={mo} onValueChange={(v) => setMonth(`${yr}-${v}`)}>
-                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                  <SelectContent>{months.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={yr} onValueChange={(v) => setMonth(`${v}-${mo}`)}>
-                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                  <SelectContent>{years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                </Select>
-              </>
-            );
-          })()}
-
-          {view === "range" && (
-            <>
-              <DatePickerButton value={rangeFrom} onChange={setRangeFrom} label="From" />
-              <DatePickerButton value={rangeTo} onChange={setRangeTo} label="To" />
-            </>
-          )}
-          {view === "day" && <DatePickerButton value={day} onChange={setDay} label="Day" />}
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setDay(addDays(day, -1))} aria-label="Previous day">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 min-w-[220px] justify-start">
+                  <CalendarIcon className="h-4 w-4 mr-2" /> {dateLabel}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={day} onSelect={(d) => d && setDay(d)} defaultMonth={day} initialFocus className={cn("p-3 pointer-events-auto")} />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setDay(addDays(day, 1))} aria-label="Next day">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" className="h-9" onClick={() => setDay(new Date())}>Today</Button>
+          </div>
 
           <MultiSelectFilter label="Department" options={allDepts.map((d) => ({ value: d, label: d }))} selected={deptSel} onChange={setDeptSel} includeUnassigned />
-          <MultiSelectFilter label="Employee" options={users.map((u) => ({ value: u.id, label: u.profile?.full_name ?? u.profile?.email ?? "—", sub: u.profile?.email ?? undefined }))} selected={empSel} onChange={setEmpSel} />
-          <MultiSelectFilter label="Projects" options={projects.map((p) => ({ value: p.code, label: p.name, sub: p.code }))} selected={projSel} onChange={setProjSel} />
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredUsers.length === 0}>
+          <MultiSelectFilter label="Employee" options={(profiles ?? []).map((p) => ({ value: p.id, label: p.full_name ?? p.email ?? "—", sub: p.email ?? undefined }))} selected={empSel} onChange={setEmpSel} />
+          <MultiSelectFilter label="Projects" options={projectsInDay.map((p) => ({ value: p.code, label: p.name, sub: p.code }))} selected={projSel} onChange={setProjSel} />
+          <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} disabled={empRows.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Export CSV
           </Button>
         </div>
       </header>
 
-      {view !== "day" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Employee × Project — {label}</CardTitle>
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div>
+            <CardTitle>{dateLabel}</CardTitle>
             <CardDescription>
-              {filteredUsers.length} employee{filteredUsers.length === 1 ? "" : "s"} · {filteredProjects.length} project{filteredProjects.length === 1 ? "" : "s"} · {grandTotal.toFixed(1)} total hrs · Click a cell for daily breakdown{canEdit ? ", or use “Edit day” to add / change hours" : ""}.
+              {empRows.length} employee{empRows.length === 1 ? "" : "s"} · {entryCount} entr{entryCount === 1 ? "y" : "ies"} · {dayTotal.toFixed(1)} total hrs
             </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {filteredUsers.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-10 text-center">No hours logged in this period.</div>
-            ) : (
-              <div className="overflow-auto max-h-[70vh] border rounded-md">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-card z-10">
-                    <TableRow>
-                      <TableHead className="sticky left-0 bg-card z-20 min-w-[200px]">Employee</TableHead>
-                      {filteredProjects.map((p) => (
-                        <TableHead key={p.code} className="text-right whitespace-nowrap">
-                          <div className="font-mono text-[10px] text-muted-foreground">{p.code}</div>
-                          <div className="text-xs">{p.name}</div>
-                        </TableHead>
-                      ))}
-                      <TableHead className="text-right sticky right-0 bg-card z-20 font-semibold">Total</TableHead>
-                      {canEdit && <TableHead className="text-right whitespace-nowrap">Edit</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((u) => {
-                      const uMap = pivot.cells.get(u.id) ?? new Map<string, number>();
-                      const name = u.profile?.full_name ?? u.profile?.email ?? "—";
-                      return (
-                        <TableRow key={u.id}>
-                          <TableCell className="sticky left-0 bg-card z-10">
-                            <div className="font-medium">{name}</div>
-                            {u.profile?.department && <div className="text-[10px] text-muted-foreground">{u.profile.department}</div>}
-                          </TableCell>
-                          {filteredProjects.map((p) => {
-                            const v = uMap.get(p.code) ?? 0;
-                            return (
-                              <TableCell key={p.code} className="text-right">
-                                {v > 0 ? (
-                                  <button
-                                    type="button" className="text-sm hover:underline"
-                                    onClick={() => setDrill({
-                                      userId: u.id, user: name, code: p.code, name: p.name,
-                                      entries: (pivot.drillMap.get(`${u.id}::${p.code}`) ?? []).sort((a, b) => a.date.localeCompare(b.date)),
-                                    })}
-                                  >{v}</button>
-                                ) : (
-                                  <span className="text-muted-foreground/40">·</span>
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                          <TableCell className="text-right sticky right-0 bg-card z-10 font-semibold">{(rowTotals.get(u.id) ?? 0).toFixed(1)}</TableCell>
-                          {canEdit && (
-                            <TableCell className="text-right">
-                              <EditDayPopover
-                                rangeStart={startIso}
-                                rangeEnd={endIso}
-                                onPick={(d) => setEditor({ userId: u.id, userName: name, date: d })}
-                              />
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      );
-                    })}
-                    <TableRow className="border-t-2">
-                      <TableCell className="sticky left-0 bg-card z-10 font-semibold">Total</TableCell>
-                      {filteredProjects.map((p) => <TableCell key={p.code} className="text-right font-semibold">{(colTotals.get(p.code) ?? 0).toFixed(1)}</TableCell>)}
-                      <TableCell className="text-right sticky right-0 bg-card z-10 font-bold">{grandTotal.toFixed(1)}</TableCell>
-                      {canEdit && <TableCell />}
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>{label}</CardTitle>
-            <CardDescription>{dayViewRows.length} entries · {dayViewRows.reduce((s, r) => s + r.hours, 0).toFixed(1)} total hrs</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {dayViewRows.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-10 text-center">No entries for this day.</div>
-            ) : (
+          </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+            <Checkbox checked={showEmpty} onCheckedChange={(v) => setShowEmpty(!!v)} />
+            Show employees with no entries
+          </label>
+        </CardHeader>
+        <CardContent>
+          {empRows.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-10 text-center">No entries for this day.</div>
+          ) : (
+            <div className="overflow-auto max-h-[75vh] border rounded-md">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
-                    <TableHead>Employee</TableHead><TableHead>Project</TableHead>
-                    <TableHead className="text-right">Hours</TableHead>
-                    <TableHead>Comments</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[80px]" />
+                    <TableHead className="min-w-[220px]">Employee</TableHead>
+                    <TableHead className="min-w-[240px]">Project</TableHead>
+                    <TableHead className="w-[110px] text-right">Hours</TableHead>
+                    <TableHead className="min-w-[200px]">Notes</TableHead>
+                    <TableHead className="w-[120px]">Status</TableHead>
+                    <TableHead className="w-[60px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dayViewRows.map((r, i) => (
-                    <TableRow key={`${r.userId}-${r.code}-${i}`}>
-                      <TableCell className="font-medium">{r.userName}</TableCell>
-                      <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>
-                      <TableCell className="text-right font-mono">{r.hours.toFixed(1)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.comments ?? ""}</TableCell>
-                      <TableCell>
-                        {r.approved
-                          ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
-                          : <Badge variant="outline">Pending</Badge>}
-                      </TableCell>
-                      <TableCell>
-                        {canEdit && (
-                          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditor({ userId: r.userId, userName: r.userName, date: r.date })}>
-                            <Pencil className="h-3 w-3 mr-1" /> Edit
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                  {empRows.map((row) => (
+                    <EmployeeBlock
+                      key={row.profile.id}
+                      row={row}
+                      projects={projectsAll ?? []}
+                      canEdit={canEdit}
+                      canApprove={canApprove}
+                      onUpdate={(i, p) => updateTask(row, i, p)}
+                      onDelete={(i) => deleteTask(row, i)}
+                      onAdd={(code, hrs) => addTask(row, code, hrs)}
+                      onToggleApproval={() => toggleApproval(row)}
+                      onOpenFull={() => setEditor({ userId: row.profile.id, userName: row.profile.full_name ?? row.profile.email ?? "—", date: dateIso })}
+                    />
                   ))}
+                  <TableRow className="border-t-2 bg-muted/30">
+                    <TableCell className="font-semibold">Day total</TableCell>
+                    <TableCell />
+                    <TableCell className="text-right font-bold font-mono">{dayTotal.toFixed(1)}</TableCell>
+                    <TableCell colSpan={3} />
+                  </TableRow>
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      <Sheet open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-          {drill && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{drill.user}</SheetTitle>
-                <SheetDescription>
-                  <span className="font-mono text-xs mr-2">{drill.code}</span>{drill.name} — {drill.entries.reduce((s, e) => s + e.hours, 0).toFixed(1)} hrs
-                </SheetDescription>
-              </SheetHeader>
-              {canEdit && (
-                <div className="mt-4 flex justify-end">
-                  <EditDayPopover
-                    rangeStart={startIso}
-                    rangeEnd={endIso}
-                    label="Add / edit another day"
-                    onPick={(d) => { setEditor({ userId: drill.userId, userName: drill.user, date: d }); setDrill(null); }}
-                  />
-                </div>
-              )}
-              <div className="mt-4">
-                <Table>
-                  <TableHeader><TableRow>
-                    <TableHead>Date</TableHead><TableHead className="text-right">Hours</TableHead>
-                    <TableHead>Comments</TableHead><TableHead>Status</TableHead><TableHead />
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {drill.entries.map((e, i) => (
-                      <TableRow key={`${e.date}-${i}`}>
-                        <TableCell className="text-xs">{format(new Date(e.date + "T00:00:00"), "d MMM")}</TableCell>
-                        <TableCell className="text-right">{e.hours}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{e.comments ?? ""}</TableCell>
-                        <TableCell>
-                          {e.approved
-                            ? <Badge variant="secondary" className="text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /></Badge>
-                            : <Badge variant="outline">·</Badge>}
-                        </TableCell>
-                        <TableCell>
-                          {canEdit && (
-                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditor({ userId: drill.userId, userName: drill.user, date: e.date }); setDrill(null); }}>
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
+            </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </CardContent>
+      </Card>
 
       {editor && (
         <DayEditorSheet
           open={!!editor}
-          onOpenChange={(o) => !o && setEditor(null)}
+          onOpenChange={(o) => { if (!o) { setEditor(null); refetchLogs(); } }}
           userId={editor.userId}
           userName={editor.userName}
           date={editor.date}
@@ -474,70 +395,177 @@ function TimesheetPage() {
   );
 }
 
-function DatePickerButton({ value, onChange, label }: { value: Date; onChange: (d: Date) => void; label: string }) {
+function EmployeeBlock({
+  row, projects, canEdit, canApprove,
+  onUpdate, onDelete, onAdd, onToggleApproval, onOpenFull,
+}: {
+  row: { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number };
+  projects: Project[];
+  canEdit: boolean;
+  canApprove: boolean;
+  onUpdate: (taskIndex: number, patch: Partial<Task>) => void;
+  onDelete: (taskIndex: number) => void;
+  onAdd: (code: string, hours: number) => void;
+  onToggleApproval: () => void;
+  onOpenFull: () => void;
+}) {
+  const [addOpen, setAddOpen] = useState(false);
+  const [addCode, setAddCode] = useState("");
+  const [addHrs, setAddHrs] = useState("");
+  const name = row.profile.full_name ?? row.profile.email ?? "—";
+  const dept = row.profile.department;
+  const locked = row.approved && !canApprove;
+  const mayEdit = (canEdit && !row.approved) || canApprove;
+  const rowspan = Math.max(1, row.tasks.length) + (mayEdit && addOpen ? 1 : 0) + 1; // + summary/add trigger
+
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-9">
-          <CalendarIcon className="h-4 w-4 mr-2" />
-          <span className="text-xs text-muted-foreground mr-1">{label}:</span>
-          {format(value, "d MMM yyyy")}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="end">
-        <Calendar mode="single" selected={value} onSelect={(d) => d && onChange(d)} initialFocus className={cn("p-3 pointer-events-auto")} />
-      </PopoverContent>
-    </Popover>
+    <>
+      {row.tasks.length === 0 ? (
+        <TableRow>
+          <TableCell>
+            <div className="font-medium">{name}</div>
+            {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
+          </TableCell>
+          <TableCell colSpan={3}>
+            <span className="text-sm text-muted-foreground italic">No entries</span>
+          </TableCell>
+          <TableCell>
+            <Badge variant="outline">Pending</Badge>
+          </TableCell>
+          <TableCell>
+            <RowMenu canApprove={canApprove} approved={row.approved} onToggleApproval={onToggleApproval} onOpenFull={onOpenFull} />
+          </TableCell>
+        </TableRow>
+      ) : (
+        row.tasks.map((t, i) => (
+          <TableRow key={`${row.profile.id}-${i}`}>
+            {i === 0 && (
+              <TableCell rowSpan={rowspan} className="align-top border-r">
+                <div className="font-medium">{name}</div>
+                {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
+                <div className="mt-2 text-xs font-mono">Total: <span className="font-bold">{row.total.toFixed(1)}</span></div>
+              </TableCell>
+            )}
+            <TableCell>
+              <Select value={t.project_code ?? ""} onValueChange={(v) => onUpdate(i, { project_code: v })} disabled={!mayEdit}>
+                <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </TableCell>
+            <TableCell className="text-right">
+              <InlineNumber value={Number(t.hours) || 0} disabled={!mayEdit} onCommit={(v) => onUpdate(i, { hours: v })} />
+            </TableCell>
+            <TableCell>
+              <InlineText value={t.comments ?? ""} disabled={!mayEdit} onCommit={(v) => onUpdate(i, { comments: v })} placeholder="Optional" />
+            </TableCell>
+            {i === 0 && (
+              <TableCell rowSpan={rowspan} className="align-top">
+                {row.approved
+                  ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
+                  : <Badge variant="outline">Pending</Badge>}
+                {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
+              </TableCell>
+            )}
+            <TableCell>
+              <div className="flex items-center gap-1 justify-end">
+                <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!mayEdit} onClick={() => onDelete(i)} aria-label="Delete row">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+                {i === 0 && <RowMenu canApprove={canApprove} approved={row.approved} onToggleApproval={onToggleApproval} onOpenFull={onOpenFull} />}
+              </div>
+            </TableCell>
+          </TableRow>
+        ))
+      )}
+      {mayEdit && row.tasks.length > 0 && addOpen && (
+        <TableRow className="bg-muted/20">
+          <TableCell>
+            <Select value={addCode} onValueChange={setAddCode}>
+              <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </TableCell>
+          <TableCell className="text-right">
+            <Input type="number" min={0} step={0.25} value={addHrs} onChange={(e) => setAddHrs(e.target.value)} className="h-8 text-right font-mono" placeholder="0" />
+          </TableCell>
+          <TableCell colSpan={2}>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => {
+                const h = Number(addHrs);
+                if (!addCode || !h || h <= 0) { toast.error("Pick a project and enter hours"); return; }
+                onAdd(addCode, h);
+                setAddCode(""); setAddHrs(""); setAddOpen(false);
+              }}>Add</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setAddOpen(false); setAddCode(""); setAddHrs(""); }}>Cancel</Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+      {mayEdit && row.tasks.length > 0 && !addOpen && (
+        <TableRow>
+          <TableCell colSpan={3}>
+            <Button size="sm" variant="ghost" className="h-7 text-muted-foreground" onClick={() => setAddOpen(true)}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add project
+            </Button>
+          </TableCell>
+          <TableCell />
+        </TableRow>
+      )}
+    </>
   );
 }
 
-function EditDayPopover({
-  rangeStart,
-  rangeEnd,
-  onPick,
-  label = "Edit day…",
-}: {
-  rangeStart: string;
-  rangeEnd: string;
-  onPick: (date: string) => void;
-  label?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const start = useMemo(() => new Date(`${rangeStart}T00:00:00`), [rangeStart]);
-  // endIso is exclusive; step back one day for the picker's max.
-  const end = useMemo(() => {
-    const e = new Date(`${rangeEnd}T00:00:00`);
-    e.setDate(e.getDate() - 1);
-    return e;
-  }, [rangeEnd]);
-  const [selected, setSelected] = useState<Date>(() => {
-    const today = new Date();
-    if (today >= start && today <= end) return today;
-    return end;
-  });
+function RowMenu({ canApprove, approved, onToggleApproval, onOpenFull }: { canApprove: boolean; approved: boolean; onToggleApproval: () => void; onOpenFull: () => void }) {
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button size="sm" variant="outline" className="h-8">
-          <Pencil className="h-3 w-3 mr-1" /> {label}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="end">
-        <Calendar
-          mode="single"
-          selected={selected}
-          onSelect={(d) => {
-            if (!d) return;
-            setSelected(d);
-            setOpen(false);
-            onPick(ymd(d));
-          }}
-          defaultMonth={selected}
-          disabled={{ before: start, after: end }}
-          initialFocus
-          className={cn("p-3 pointer-events-auto")}
-        />
-      </PopoverContent>
-    </Popover>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost" className="h-7 w-7"><MoreHorizontal className="h-4 w-4" /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={onOpenFull}>
+          <Pencil className="h-4 w-4 mr-2" /> Open full editor
+        </DropdownMenuItem>
+        {canApprove && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onToggleApproval}>
+              <CheckCircle2 className="h-4 w-4 mr-2" /> {approved ? "Unapprove day" : "Approve day"}
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function InlineNumber({ value, disabled, onCommit }: { value: number; disabled?: boolean; onCommit: (v: number) => void }) {
+  const [v, setV] = useState(String(value));
+  useEffect(() => { setV(String(value)); }, [value]);
+  return (
+    <Input
+      type="number" min={0} step={0.25} value={v} disabled={disabled}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => { const n = Number(v); if (!isNaN(n) && n !== value) onCommit(n); }}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      className="h-8 text-right font-mono"
+    />
+  );
+}
+
+function InlineText({ value, disabled, onCommit, placeholder }: { value: string; disabled?: boolean; onCommit: (v: string) => void; placeholder?: string }) {
+  const [v, setV] = useState(value);
+  useEffect(() => { setV(value); }, [value]);
+  return (
+    <Input
+      value={v} disabled={disabled} placeholder={placeholder}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => { if (v !== value) onCommit(v); }}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      className="h-8"
+    />
   );
 }

@@ -436,3 +436,103 @@ export const createTeamCalendarBooking = createServerFn({ method: "POST" })
     return { ok: true as const, booking, html_link: htmlLink };
   });
 
+export const findAvailableSlots = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    userIds: string[];
+    windowStartISO: string;
+    windowEndISO: string;
+    durationMin: number;
+    stepMin?: number;
+  }) => input)
+  .handler(async ({ data }) => {
+    const userIds = Array.from(new Set((data.userIds ?? []).filter(Boolean)));
+    const windowStart = new Date(data.windowStartISO).getTime();
+    const windowEnd = new Date(data.windowEndISO).getTime();
+    const durationMs = Math.max(5, data.durationMin) * 60_000;
+    const stepMs = Math.max(5, data.stepMin ?? 15) * 60_000;
+    if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd) || windowEnd <= windowStart) {
+      throw new Error("Invalid time window.");
+    }
+    if (userIds.length === 0) return { busy: [], slots: [] as { startISO: string; endISO: string }[] };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const dateFrom = new Date(windowStart).toISOString().slice(0, 10);
+    const dateTo = new Date(windowEnd).toISOString().slice(0, 10);
+
+    const [events, bookings, leaves] = await Promise.all([
+      supabaseAdmin
+        .from("google_calendar_events")
+        .select("user_id, start_at, end_at")
+        .in("user_id", userIds)
+        .lt("start_at", new Date(windowEnd).toISOString())
+        .gt("end_at", new Date(windowStart).toISOString()),
+      supabaseAdmin
+        .from("team_calendar_bookings")
+        .select("created_by, attendee_emails, start_at, end_at")
+        .lt("start_at", new Date(windowEnd).toISOString())
+        .gt("end_at", new Date(windowStart).toISOString()),
+      supabaseAdmin
+        .from("leave_requests")
+        .select("user_id, start_date, end_date, status")
+        .in("user_id", userIds)
+        .eq("status", "approved")
+        .lte("start_date", dateTo)
+        .gte("end_date", dateFrom),
+    ]);
+
+    const busy: [number, number][] = [];
+    const clip = (s: number, e: number) => {
+      const a = Math.max(s, windowStart);
+      const b = Math.min(e, windowEnd);
+      if (b > a) busy.push([a, b]);
+    };
+    (events.data ?? []).forEach((r: any) =>
+      clip(new Date(r.start_at).getTime(), new Date(r.end_at).getTime()));
+    // Emails of selected users to match booking attendees
+    const { data: selectedProfiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, email")
+      .in("id", userIds);
+    const selectedEmails = new Set((selectedProfiles ?? []).map((p: any) => (p.email ?? "").toLowerCase()).filter(Boolean));
+    (bookings.data ?? []).forEach((r: any) => {
+      const involvesUser = userIds.includes(r.created_by) ||
+        (Array.isArray(r.attendee_emails) && r.attendee_emails.some((e: string) => selectedEmails.has(String(e).toLowerCase())));
+      if (!involvesUser) return;
+      clip(new Date(r.start_at).getTime(), new Date(r.end_at).getTime());
+    });
+    (leaves.data ?? []).forEach((r: any) => {
+      const s = new Date(r.start_date + "T00:00:00").getTime();
+      const e = new Date(r.end_date + "T23:59:59").getTime();
+      clip(s, e);
+    });
+
+    // Merge busy intervals
+    busy.sort((a, b) => a[0] - b[0]);
+    const merged: [number, number][] = [];
+    for (const iv of busy) {
+      const last = merged[merged.length - 1];
+      if (last && iv[0] <= last[1]) last[1] = Math.max(last[1], iv[1]);
+      else merged.push([iv[0], iv[1]]);
+    }
+
+    // Walk window at stepMs, emit slot if fits without overlap
+    const slots: { startISO: string; endISO: string }[] = [];
+    let cursor = windowStart;
+    // round cursor up to next step boundary from windowStart
+    for (; cursor + durationMs <= windowEnd; cursor += stepMs) {
+      const slotEnd = cursor + durationMs;
+      const conflict = merged.some(([s, e]) => s < slotEnd && e > cursor);
+      if (!conflict) {
+        slots.push({ startISO: new Date(cursor).toISOString(), endISO: new Date(slotEnd).toISOString() });
+        if (slots.length >= 40) break;
+      }
+    }
+
+    return {
+      busy: merged.map(([s, e]) => ({ startISO: new Date(s).toISOString(), endISO: new Date(e).toISOString() })),
+      slots,
+    };
+  });
+
+

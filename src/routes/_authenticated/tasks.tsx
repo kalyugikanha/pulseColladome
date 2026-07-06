@@ -200,6 +200,26 @@ function TasksPage() {
         </Button>
       </header>
 
+      {(awaiting?.length ?? 0) > 0 && (
+        <Card className="border-primary/50">
+          <CardHeader><CardTitle className="font-display text-base">Awaiting my review</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {awaiting!.map((t) => (
+              <button key={t.id} onClick={() => setOpenTaskId(t.id)}
+                className="w-full text-left flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 hover:bg-primary/10">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{t.title}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {(t.project as { name?: string } | null)?.name} · assignee {(t.assignee as { full_name?: string } | null)?.full_name ?? "—"}
+                  </div>
+                </div>
+                <Badge>Review</Badge>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {(tasks?.length ?? 0) === 0 ? (
         <Card><CardContent className="p-10 text-center text-muted-foreground">No tasks yet.</CardContent></Card>
       ) : (
@@ -210,8 +230,10 @@ function TasksPage() {
               {list!.map((t) => {
                 const types = (t.task_types as { task_type: { id: string; name: string } | null }[] | null)?.map((x) => x.task_type).filter(Boolean) ?? [];
                 const linkArr = (t.asset_links as { label: string; url: string }[] | null) ?? [];
+                const pct = (t as { completion_percent?: number }).completion_percent ?? 0;
                 return (
-                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3">
+                  <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3 hover:border-primary/40 cursor-pointer"
+                    onClick={() => setOpenTaskId(t.id)}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium">{t.title}</span>
@@ -219,20 +241,26 @@ function TasksPage() {
                         {types.map((tt) => <Badge key={tt!.id} variant="secondary">{tt!.name}</Badge>)}
                       </div>
                       {t.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>}
-                      <div className="flex flex-wrap gap-2 mt-1">
+                      <div className="flex flex-wrap gap-2 mt-1 items-center">
                         {t.due_date && <span className="text-xs text-muted-foreground">Due {format(new Date(t.due_date), "MMM d, yyyy")}</span>}
                         {linkArr.map((l, i) => (
-                          <a key={i} href={l.url} target="_blank" rel="noreferrer"
+                          <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
                             className="text-xs inline-flex items-center gap-1 text-primary hover:underline">
                             <ExternalLink className="h-3 w-3" />{l.label || new URL(l.url).hostname}
                           </a>
                         ))}
                       </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Progress value={pct} className="h-1.5 flex-1" />
+                        <span className="text-[10px] text-muted-foreground w-9 text-right">{pct}%</span>
+                      </div>
                     </div>
-                    <Select value={t.status} onValueChange={(v) => updateStatus(t.id, v)}>
-                      <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>{STATUS.map((s) => (<SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>))}</SelectContent>
-                    </Select>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Select value={t.status} onValueChange={(v) => updateStatus(t.id, v)}>
+                        <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>{STATUS.map((s) => (<SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>))}</SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 );
               })}
@@ -240,6 +268,9 @@ function TasksPage() {
           </Card>
         ))
       )}
+
+      <TaskDetailSheet taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
+
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

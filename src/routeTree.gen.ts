@@ -14,6 +14,7 @@ import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthenticatedVendorsRouteImport } from './routes/_authenticated/vendors'
 import { Route as AuthenticatedTimesheetRouteImport } from './routes/_authenticated/timesheet'
 import { Route as AuthenticatedTasksOverviewRouteImport } from './routes/_authenticated/tasks-overview'
@@ -67,6 +68,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
 } as any)
 const AuthenticatedVendorsRoute = AuthenticatedVendorsRouteImport.update({
   id: '/vendors',
@@ -225,7 +231,7 @@ const ApiPublicGoogleCallbackRoute = ApiPublicGoogleCallbackRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/access': typeof AuthenticatedAccessRoute
@@ -251,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
@@ -260,7 +267,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/access': typeof AuthenticatedAccessRoute
@@ -286,6 +293,7 @@ export interface FileRoutesByTo {
   '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
@@ -297,7 +305,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/_authenticated/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/_authenticated/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
@@ -360,6 +369,7 @@ export interface FileRouteTypes {
     | '/tasks-overview'
     | '/timesheet'
     | '/vendors'
+    | '/auth/callback'
     | '/admin/taxonomy'
     | '/hr/leave'
     | '/hr/onboarding'
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/tasks-overview'
     | '/timesheet'
     | '/vendors'
+    | '/auth/callback'
     | '/admin/taxonomy'
     | '/hr/leave'
     | '/hr/onboarding'
@@ -431,6 +442,7 @@ export interface FileRouteTypes {
     | '/_authenticated/tasks-overview'
     | '/_authenticated/timesheet'
     | '/_authenticated/vendors'
+    | '/auth/callback'
     | '/_authenticated/admin/taxonomy'
     | '/_authenticated/hr/leave'
     | '/_authenticated/hr/onboarding'
@@ -442,7 +454,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   ChangePasswordRoute: typeof ChangePasswordRoute
   GoogleCalendarConnectRoute: typeof GoogleCalendarConnectRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
@@ -486,6 +498,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_authenticated/vendors': {
       id: '/_authenticated/vendors'
@@ -754,10 +773,20 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   ChangePasswordRoute: ChangePasswordRoute,
   GoogleCalendarConnectRoute: GoogleCalendarConnectRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,

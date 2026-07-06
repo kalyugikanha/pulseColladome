@@ -140,16 +140,18 @@ function TasksPage() {
 
   function resetForm() {
     setTProject(""); setTTitle(""); setTDesc(""); setTDue(""); setTPri("medium");
+    setTAssignee(me?.id ?? "");
     setTax({ domainId: null, departmentId: null, taskTypeIds: [] }); setLinks([]);
   }
 
   async function submit() {
     if (!tTitle.trim()) return toast.error("Title required");
     if (!tProject) return toast.error("Project required");
+    const assigneeId = tAssignee || me!.id;
     try {
       await createFn({ data: {
         projectId: tProject, title: tTitle.trim(), description: tDesc.trim(),
-        dueDate: tDue || null, priority: tPri, assigneeId: me!.id,
+        dueDate: tDue || null, priority: tPri, assigneeId,
         assetLinks: links.filter((l) => l.url.trim()),
         domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds,
       }});

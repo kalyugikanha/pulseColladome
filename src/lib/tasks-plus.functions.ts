@@ -262,17 +262,18 @@ type TemplateInput = {
 export const listTaskTemplates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data } = await context.supabase
+    const { data, error } = await context.supabase
       .from("task_templates")
       .select(`
         *,
-        assignee:profiles!task_templates_default_assignee_id_fkey(id, full_name, department),
+        assignee:profiles!task_templates_default_assignee_profile_fkey(id, full_name, department),
         project:projects(id, name),
         domain:taxonomy_domains(id, name),
         department:taxonomy_departments(id, name),
         task_types:task_template_task_types(task_type:taxonomy_task_types(id, name))
       `)
       .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
     return data ?? [];
   });
 

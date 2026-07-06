@@ -463,7 +463,7 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
       end_date: end,
       days,
       reason: reason.trim() || "Logged by HR",
-      status: "approved" as LStatus,
+      status: "approved" as const,
       admin_comment: "Logged & approved by HR/Super Admin",
       decided_at: new Date().toISOString(),
     };

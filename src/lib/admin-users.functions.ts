@@ -423,6 +423,75 @@ export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
     return { synced, alreadyOk, errors };
   });
 
+export const logLeaveForEmployee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    user_id: string;
+    leave_type: LeaveType;
+    start_date: string;
+    end_date: string;
+    days: number;
+    reason?: string | null;
+  }) => input)
+  .handler(async ({ data, context }) => {
+    const [{ data: superRow }, { data: roleRows }] = await Promise.all([
+      context.supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle(),
+      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    const isSuper = !!superRow;
+    const isHr = !!roleRows?.some((r) => r.role === "hr_admin");
+    if (!isSuper && !isHr) throw new Error("Forbidden");
+
+    if (!data.user_id) throw new Error("Pick an employee");
+    if (!data.start_date || !data.end_date) throw new Error("Pick dates");
+    if (!Number.isFinite(data.days) || data.days <= 0) throw new Error("End must be after start");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: selectedProfile, error: profileErr } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", data.user_id)
+      .maybeSingle();
+    if (profileErr) throw new Error(profileErr.message);
+    if (!selectedProfile?.email) throw new Error("Employee profile is missing an email address");
+
+    const authUserId = await findAuthUserIdByEmail(supabaseAdmin, selectedProfile.email);
+    if (!authUserId) {
+      throw new Error("This employee account is not synced yet. Run Sync missing accounts from Access first.");
+    }
+
+    await ensureProfileForAuthUser(supabaseAdmin, authUserId, selectedProfile, context.userId);
+
+    for (const leaveType of ["casual", "sick", "earned", "unpaid"] as const) {
+      const allocated = leaveType === "casual" || leaveType === "sick" ? 5 : 0;
+      const { error } = await supabaseAdmin
+        .from("leave_balances")
+        .upsert({ user_id: authUserId, leave_type: leaveType, allocated }, { onConflict: "user_id,leave_type", ignoreDuplicates: true });
+      if (error) throw new Error(error.message);
+    }
+
+    const { data: inserted, error: insertErr } = await supabaseAdmin
+      .from("leave_requests")
+      .insert({
+        user_id: authUserId,
+        leave_type: data.leave_type,
+        start_date: data.start_date,
+        end_date: data.end_date,
+        days: data.days,
+        reason: data.reason?.trim() || "Logged by HR",
+        status: "approved",
+        admin_comment: "Logged & approved by HR/Super Admin",
+        decided_by: context.userId,
+        decided_at: new Date().toISOString(),
+      })
+      .select("id, user_id")
+      .single();
+    if (insertErr) throw new Error(insertErr.message);
+
+    return { ok: true, leaveId: inserted.id, userId: inserted.user_id };
+  });
+
 export const setUserActive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string; active: boolean }) => input)

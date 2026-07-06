@@ -1823,6 +1823,46 @@ export type Database = {
         }
       }
       can_view_task: { Args: { _task_id: string }; Returns: boolean }
+      create_task_full: {
+        Args: {
+          _asset_links?: Json
+          _assignee_id?: string
+          _department_id?: string
+          _description?: string
+          _domain_id?: string
+          _due_date?: string
+          _priority?: Database["public"]["Enums"]["task_priority"]
+          _project_id: string
+          _task_type_ids?: string[]
+          _title: string
+        }
+        Returns: {
+          asset_links: Json
+          assignee_id: string | null
+          completion_percent: number
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          description: string | null
+          domain_id: string | null
+          due_date: string | null
+          id: string
+          priority: Database["public"]["Enums"]["task_priority"]
+          project_id: string
+          review_state: string
+          reviewer_id: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          template_id: string | null
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tasks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_my_leave_requests: {
         Args: never
         Returns: {

@@ -117,30 +117,48 @@ type TaskInput = {
   taskTypeIds: string[];
 };
 
+function taskCreateError(error: { message?: string; code?: string } | Error): Error {
+  const message = error.message ?? "Task could not be created";
+  const code = "code" in error ? error.code : undefined;
+
+  if (
+    code === "42501" ||
+    /row-level security|permission denied|insufficient privilege/i.test(message)
+  ) {
+    return new Error("You don't have permission to assign this task/type combination.");
+  }
+  if (code === "23503" || /foreign key/i.test(message)) {
+    return new Error("One of the selected task fields is no longer available. Please reselect project, assignee, and task type.");
+  }
+  if (code === "23514" || /required|check/i.test(message)) {
+    return new Error(message || "Please complete the required task fields.");
+  }
+
+  return new Error("Task could not be created. Please try again or contact an admin.");
+}
+
 export const createTaskFull = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: TaskInput) => d)
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { data: task, error } = await supabase.from("tasks").insert({
-      project_id: data.projectId,
-      title: data.title,
-      description: data.description || null,
-      due_date: data.dueDate || null,
-      priority: data.priority,
-      status: "todo",
-      assignee_id: data.assigneeId,
-      created_by: userId,
-      asset_links: data.assetLinks,
-      domain_id: data.domainId,
-      department_id: data.departmentId,
-    }).select().single();
-    if (error) throw error;
-    if (data.taskTypeIds.length > 0) {
-      await supabase.from("task_task_types").insert(
-        data.taskTypeIds.map((tt) => ({ task_id: task.id, task_type_id: tt }))
-      );
-    }
+    const title = data.title.trim();
+    if (!title) throw new Error("Task title is required.");
+    if (!data.projectId) throw new Error("Please select a project.");
+
+    const { supabase } = context;
+    const { data: task, error } = await supabase.rpc("create_task_full", {
+      _project_id: data.projectId,
+      _title: title,
+      _description: data.description?.trim() || undefined,
+      _due_date: data.dueDate || undefined,
+      _priority: data.priority,
+      _assignee_id: data.assigneeId,
+      _asset_links: data.assetLinks,
+      _domain_id: data.domainId ?? undefined,
+      _department_id: data.departmentId ?? undefined,
+      _task_type_ids: data.taskTypeIds,
+    });
+    if (error) throw taskCreateError(error);
     return task;
   });
 

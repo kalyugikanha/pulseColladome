@@ -1,14 +1,17 @@
-## Projects page: search + verify Aakash access
+## Plan
 
-### 1. Aakash's project access
-Aakash (`akash@colladome.in`) already has the `project_manager` role, and `can_manage_projects()` + the frontend `canManageProjects` flag both include `project_manager`. Backend-wise he should already see New/Edit/Task/Time-log buttons on `/projects`.
+1. **Fix backend table access for projects**
+   - Add the missing database access grants for `projects` so signed-in users can reach it through the app.
+   - Keep the existing row-level rules intact: only project managers, HR admins, admins, and department heads can create/edit projects.
 
-Action: no backend change needed. The likely cause is a stale cached session on his browser. If he still can't edit after a hard refresh / sign-out + sign-in, we'll instrument further — but the data + rules already permit him.
+2. **Verify Aakash’s permission path**
+   - Confirm `akash@colladome.in` still has the `project_manager` role.
+   - Confirm the project-management rule recognizes that role after the database access fix.
 
-### 2. Search on /projects
-- Add a search input in the header of `src/routes/_authenticated/projects.tsx`.
-- Case-insensitive substring match against `code`, `name`, and `client_name`.
-- Applied client-side over the already-fetched `projects` list before rendering the cards.
-- Empty-state message updates to "No projects match '<query>'" when the filter hides everything.
+3. **Validate in the app**
+   - Check that the Projects page can show the project actions for a user whose `canManageProjects` flag is true.
+   - Ensure the existing project search remains unchanged.
 
-No schema changes, no new dependencies.
+## Technical details
+
+The current blocker is not his role: Aakash has `project_manager`. The issue is that the `projects` table currently has no explicit Data API grants, so the app can be blocked before the row-level project-manager policy can allow create/edit. I’ll add the missing grants via a database migration only; no UI change is needed unless validation reveals a separate frontend issue.

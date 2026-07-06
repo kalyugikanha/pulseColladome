@@ -240,6 +240,24 @@ function TasksPage() {
               </div>
             )}
 
+            {canAssignOthers && (
+              <div className="space-y-1">
+                <Label>Assign to</Label>
+                <Select value={tAssignee} onValueChange={setTAssignee}>
+                  <SelectTrigger><SelectValue placeholder="Select a teammate" /></SelectTrigger>
+                  <SelectContent>
+                    {(assignees ?? []).map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.full_name ?? "Unnamed"}{u.id === me?.id ? " (me)" : ""}
+                        {u.department ? ` · ${u.department}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">You can assign to yourself, your direct reports, and members of departments you head.</p>
+              </div>
+            )}
+
             <div className="space-y-1">
               <Label>Project</Label>
               <Select value={tProject} onValueChange={setTProject}>

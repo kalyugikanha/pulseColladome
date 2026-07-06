@@ -146,7 +146,7 @@ export const createTaskFull = createServerFn({ method: "POST" })
     if (!data.projectId) throw new Error("Please select a project.");
 
     const { supabase } = context;
-    const { data: task, error } = await (supabase as any).rpc("create_task_full", {
+    const { data: task, error } = await supabase.rpc("create_task_full", {
       _project_id: data.projectId,
       _title: title,
       _description: data.description?.trim() || null,

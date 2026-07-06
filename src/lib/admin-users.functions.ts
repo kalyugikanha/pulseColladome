@@ -287,6 +287,60 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
     return { created, updated, errors };
   });
 
+export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: superRow } = await context.supabase
+      .from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle();
+    if (!superRow) throw new Error("Forbidden");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: profiles, error: pErr } = await supabaseAdmin
+      .from("profiles").select("id, email, full_name, is_active").eq("is_active", true);
+    if (pErr) throw new Error(pErr.message);
+
+    // Collect existing auth emails (paginated)
+    const authEmails = new Set<string>();
+    let page = 1;
+    while (true) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error) throw new Error(error.message);
+      for (const u of data?.users ?? []) if (u.email) authEmails.add(u.email.toLowerCase());
+      if (!data || (data.users?.length ?? 0) < 1000) break;
+      page += 1;
+    }
+
+    const synced: string[] = [];
+    const alreadyOk: string[] = [];
+    const errors: { email: string; message: string }[] = [];
+
+    for (const p of profiles ?? []) {
+      const em = (p.email ?? "").trim().toLowerCase();
+      if (!em || !em.includes("@")) continue;
+      const domain = em.split("@")[1];
+      if (domain !== "colladome.com" && domain !== "colladome.in") continue;
+      if (authEmails.has(em)) { alreadyOk.push(em); continue; }
+      const { error } = await supabaseAdmin.auth.admin.createUser({
+        email: em,
+        password: "Test@123",
+        email_confirm: true,
+        user_metadata: { full_name: p.full_name ?? em.split("@")[0] },
+      });
+      if (error) {
+        if (/already registered|already exists|duplicate/i.test(error.message)) {
+          alreadyOk.push(em);
+        } else {
+          errors.push({ email: em, message: error.message });
+        }
+      } else {
+        synced.push(em);
+      }
+    }
+
+    return { synced, alreadyOk, errors };
+  });
+
 export const setUserActive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string; active: boolean }) => input)

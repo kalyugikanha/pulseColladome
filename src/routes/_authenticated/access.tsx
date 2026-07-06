@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { createTeamUser, bulkProvisionTeam } from "@/lib/admin-users.functions";
+import { createTeamUser, bulkProvisionTeam, syncMissingAuthAccounts } from "@/lib/admin-users.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +25,11 @@ function AccessPage() {
   const qc = useQueryClient();
   const createUserFn = useServerFn(createTeamUser);
   const bulkProvisionFn = useServerFn(bulkProvisionTeam);
+  const syncMissingFn = useServerFn(syncMissingAuthAccounts);
   const [provisioning, setProvisioning] = useState(false);
   const [provisionResult, setProvisionResult] = useState<{ created: string[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: string[]; alreadyOk: string[]; errors: { email: string; message: string }[] } | null>(null);
 
   // Grant-only form (existing)
   const [email, setEmail] = useState("");
@@ -141,6 +144,21 @@ function AccessPage() {
     }
   }
 
+  async function runSyncMissing() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await syncMissingFn();
+      setSyncResult(res);
+      toast.success(`Sync done — ${res.synced.length} created, ${res.alreadyOk.length} ok, ${res.errors.length} errors`);
+      qc.invalidateQueries({ queryKey: ["role-grants"] });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header>
@@ -154,7 +172,21 @@ function AccessPage() {
           <CardDescription>Creates accounts for the full Colladome roster (temp password <code className="px-1 rounded bg-muted">Test@123</code>) and syncs roles, monthly salaries, and departments. Safe to re-run — existing users are updated, not duplicated.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button className="gradient-primary" onClick={runProvisioning} disabled={provisioning}>{provisioning ? "Provisioning…" : "Run provisioning"}</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button className="gradient-primary" onClick={runProvisioning} disabled={provisioning}>{provisioning ? "Provisioning…" : "Run provisioning"}</Button>
+            <Button variant="outline" onClick={runSyncMissing} disabled={syncing}>{syncing ? "Syncing…" : "Sync missing accounts"}</Button>
+          </div>
+          {syncResult && (
+            <div className="text-sm space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">Synced: {syncResult.synced.length}</Badge>
+                <Badge variant="outline">Already OK: {syncResult.alreadyOk.length}</Badge>
+                <Badge variant={syncResult.errors.length ? "destructive" : "outline"}>Errors: {syncResult.errors.length}</Badge>
+              </div>
+              {syncResult.synced.length > 0 && <details open><summary className="cursor-pointer text-muted-foreground">Synced ({syncResult.synced.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.synced.map((e) => <li key={e}>{e}</li>)}</ul></details>}
+              {syncResult.errors.length > 0 && <details open><summary className="cursor-pointer text-destructive">Errors</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.errors.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span>: {e.message}</li>)}</ul></details>}
+            </div>
+          )}
           {provisionResult && (
             <div className="text-sm space-y-2">
               <div className="flex flex-wrap gap-2">

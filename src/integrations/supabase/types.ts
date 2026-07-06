@@ -2029,6 +2029,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      find_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_my_leave_requests: {
         Args: never
         Returns: {

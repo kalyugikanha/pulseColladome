@@ -207,7 +207,6 @@ function FinancesPage() {
 
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
-  
 
   const userHoursThisMonth = useMemo(() => {
     const m = new Map<string, number>();
@@ -218,6 +217,44 @@ function FinancesPage() {
     }
     return m;
   }, [logs]);
+
+  // Per-user allocated burn (sum across projects for that user).
+  const allocatedByUser = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!logs) return m;
+    for (const row of logs) {
+      const salary = currentSalaryByUser.get(row.user_id);
+      if (!salary) continue;
+      let projectHours = 0;
+      for (const t of row.tasks ?? []) {
+        const code = t.project_code?.trim();
+        const h = Number(t.hours) || 0;
+        if (code && h > 0) projectHours += h;
+      }
+      if (projectHours <= 0) continue;
+      // We only need totals here; compute via same rules as burnByProject.
+      // Accumulate row-level project hours, allocation happens below.
+      m.set(row.user_id, (m.get(row.user_id) ?? 0) + projectHours);
+    }
+    // Convert accumulated project hours into actual allocated burn per user.
+    const out = new Map<string, number>();
+    for (const [uid, projHrs] of m) {
+      const salary = currentSalaryByUser.get(uid);
+      if (!salary || projHrs <= 0) continue;
+      if (salary.comp_type === "hourly") {
+        out.set(uid, projHrs * Number(salary.hourly_rate ?? 0));
+      } else {
+        // All project hours = 100% of that user's monthly contribution
+        // (share sums to 1 when totalHours = projectHours; if user also has non-project hours,
+        // share < 1 and the remainder is the unallocated portion).
+        const totalHrs = userHoursThisMonth.get(uid) ?? projHrs;
+        const share = totalHrs > 0 ? projHrs / totalHrs : 0;
+        out.set(uid, share * (monthlyContribByUser.get(uid) ?? 0));
+      }
+    }
+    return out;
+  }, [logs, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth]);
+
 
   // Merge profiles + grants so uninvited-but-signed-up and invited-but-unsigned users both appear
   const profileEmails = useMemo(() => new Set((profiles ?? []).map((p) => p.email?.toLowerCase()).filter(Boolean) as string[]), [profiles]);

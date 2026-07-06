@@ -1,28 +1,21 @@
 ## Goal
 
-Subtract approved **unpaid** leave days that fall inside the selected month from each user's effective working days, so the "Actual salary" reflects the deduction.
+Split the "Actual salary pool" top card into two cards: **Proposed salary pool** and **Actual salary pool**, matching the table columns.
 
-Example: Anjali on 3 unpaid days in June → `actual = monthly_salary × (effectiveDays − 3) / daysInMonth`.
+## Definitions
+
+- **Proposed salary pool**: sum of each effective employee's raw configured amount for the selected month.
+  - Monthly comp → `monthly_salary` (full month, ignoring effective_from proration and unpaid leaves)
+  - Hourly comp → `hourly_rate × hours_logged_this_month` (same as before — hourly has no "proposed" full-month figure)
+- **Actual salary pool**: existing `totalConfiguredPool` value — pro-rated by effective_from and reduced by approved unpaid leave days.
 
 ## Implementation
 
 In `src/routes/_authenticated/finances.tsx`:
 
-1. **Fetch approved unpaid leaves** for the selected month with a new `useQuery` on `leave_requests` filtered by `leave_type = 'unpaid'`, `status = 'approved'`, and date-range overlapping the selected month.
-
-2. **Compute `unpaidDaysByUser: Map<userId, number>`** — for each request, count the number of days that fall within `[monthStart, monthEnd]` (clip `start_date` / `end_date` to the month, inclusive day count).
-
-3. **Update `monthlyContribByUser`** — subtract unpaid days from `effectiveDays` (clamped at 0):
-   ```
-   payableDays = max(0, effectiveDays - unpaidDaysByUser.get(userId))
-   contrib = monthly_salary * payableDays / daysInMonth
-   ```
-
-4. **UI hint** — under the Actual salary cell, when unpaid days > 0, show `− N unpaid day(s)` next to the existing "prorated from …" hint.
-
-Top card ("Actual salary pool") picks up the change automatically.
-
-Hourly comp is unaffected (already based on actual clocked hours).
+1. Add `totalProposedPool` memo alongside `totalConfiguredPool`.
+2. Change the top-cards grid from `md:grid-cols-4` to `md:grid-cols-5` (or keep 4 and wrap; I'll use 5 for a clean row on wide screens and it collapses on smaller).
+3. Insert a new `StatCard` for "Proposed salary pool" before the existing Actual card.
 
 ## Scope
 

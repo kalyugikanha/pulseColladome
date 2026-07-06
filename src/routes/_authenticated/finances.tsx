@@ -276,6 +276,17 @@ function FinancesPage() {
     [visibleProfiles, currentSalaryByUser],
   );
 
+  const totalProposedPool = useMemo(() => {
+    let sum = 0;
+    for (const p of visibleProfiles) {
+      const s = currentSalaryByUser.get(p.id);
+      if (!s) continue;
+      if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
+      else sum += Number(s.monthly_salary ?? 0);
+    }
+    return sum;
+  }, [visibleProfiles, currentSalaryByUser, userHoursThisMonth]);
+
   const totalConfiguredPool = useMemo(() => {
     let sum = 0;
     for (const p of visibleProfiles) {

@@ -301,6 +301,7 @@ function TimesheetPage() {
                         </TableHead>
                       ))}
                       <TableHead className="text-right sticky right-0 bg-card z-20 font-semibold">Total</TableHead>
+                      {canEdit && <TableHead className="text-right whitespace-nowrap">Edit</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>

@@ -117,14 +117,19 @@ function FinancesPage() {
         userTotalHours.set(row.user_id, (userTotalHours.get(row.user_id) ?? 0) + hrs);
       }
     }
-    // Salary-share allocation
+    // Allocation: hourly comp bills hours×rate directly; monthly comp uses salary-share.
     for (const [userId, projMap] of userHoursByProject) {
       const total = userTotalHours.get(userId) ?? 0;
       const salary = currentSalaryByUser.get(userId);
       if (!salary || total <= 0) continue;
       for (const [code, { hours, name }] of projMap) {
-        const share = hours / total;
-        const alloc = share * Number(salary.monthly_salary);
+        let alloc = 0;
+        if (salary.comp_type === "hourly") {
+          alloc = hours * Number(salary.hourly_rate ?? 0);
+        } else {
+          const share = hours / total;
+          alloc = share * Number(salary.monthly_salary ?? 0);
+        }
         const cur = result.get(code) ?? { code, name, burn: 0, hours: 0 };
         cur.burn += alloc;
         cur.hours += hours;

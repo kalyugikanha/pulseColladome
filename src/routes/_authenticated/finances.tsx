@@ -225,22 +225,12 @@ function FinancesPage() {
     let sum = 0;
     for (const p of visibleProfiles) {
       const s = currentSalaryByUser.get(p.id);
-      if (s) {
-        if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
-        else sum += monthlyContribByUser.get(p.id) ?? 0;
-      } else if (p.email) {
-        const g = grantByEmail.get(p.email.toLowerCase());
-        if (g?.comp_type === "hourly") sum += Number(g.default_hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
-        else sum += Number(g?.default_monthly_salary ?? 0);
-      }
-    }
-    for (const g of visiblePendingGrants) {
-      if (g.comp_type === "hourly") {
-        // no hours possible without a user id
-      } else sum += Number(g.default_monthly_salary ?? 0);
+      if (!s) continue;
+      if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
+      else sum += monthlyContribByUser.get(p.id) ?? 0;
     }
     return sum;
-  }, [visibleProfiles, visiblePendingGrants, currentSalaryByUser, monthlyContribByUser, grantByEmail, userHoursThisMonth]);
+  }, [visibleProfiles, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth]);
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {
@@ -272,7 +262,7 @@ function FinancesPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs logged`} />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="active salaries incl. pending" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="salaries table only" />
         <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${visibleProfiles.length + visiblePendingGrants.length} on roster`} />
         <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(visiblePendingGrants.length)} sub="invite sent, not registered" />
       </div>

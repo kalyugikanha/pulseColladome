@@ -292,7 +292,7 @@ function FinancesPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs logged`} />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="salaries table only" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Actual salary pool" value={inr(totalConfiguredPool)} sub="pro-rated for selected month" />
         <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${visibleProfiles.length + visiblePendingGrants.length} on roster`} />
         <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(visiblePendingGrants.length)} sub="invite sent, not registered" />
       </div>
@@ -301,7 +301,7 @@ function FinancesPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Salaries</CardTitle>
-            <CardDescription>Every invited employee — pending signups show their configured salary but need to register first.</CardDescription>
+            <CardDescription>Effective employees for {month}. Actual salary is pro-rated to the days the salary was in force this month.</CardDescription>
           </div>
           <SalaryDialog profiles={profiles ?? []} onSaved={() => qc.invalidateQueries({ queryKey: ["finances-salaries"] })} />
         </CardHeader>
@@ -313,19 +313,17 @@ function FinancesPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">Rate</TableHead>
                 <TableHead>Effective from</TableHead>
+                <TableHead className="text-right">Proposed salary</TableHead>
+                <TableHead className="text-right">Actual salary</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(profiles ?? []).filter((p) => {
-                if (deptSel.size === 0) return true;
-                return p.department ? deptSel.has(p.department) : deptSel.has(UNASSIGNED);
-              }).map((p) => {
+              {visibleProfiles.map((p) => {
                 const s = currentSalaryByUser.get(p.id);
                 const grant = p.email ? grantByEmail.get(p.email.toLowerCase()) : undefined;
                 const effType: "monthly" | "hourly" = s?.comp_type ?? grant?.comp_type ?? "monthly";
-                const rateNode = s
+                const proposedNode = s
                   ? (s.comp_type === "hourly"
                       ? <span>{inr(Number(s.hourly_rate ?? 0))}<span className="text-[10px] text-muted-foreground">/hr</span></span>
                       : inr(Number(s.monthly_salary ?? 0)))
@@ -337,6 +335,24 @@ function FinancesPage() {
                         {" "}<span className="text-[10px]">(from invite)</span>
                       </span>
                     : <span className="text-muted-foreground">Not set</span>;
+
+                let actualNode: React.ReactNode = <span className="text-muted-foreground">—</span>;
+                if (s) {
+                  const actual = s.comp_type === "hourly"
+                    ? (userHoursThisMonth.get(p.id) ?? 0) * Number(s.hourly_rate ?? 0)
+                    : (monthlyContribByUser.get(p.id) ?? 0);
+                  const effDate = new Date(s.effective_from);
+                  const startedMidMonth = s.comp_type === "monthly" && effDate >= monthStart && effDate <= monthEnd;
+                  actualNode = (
+                    <div className="flex flex-col items-end">
+                      <span>{inr(actual)}</span>
+                      {startedMidMonth && (
+                        <span className="text-[10px] text-muted-foreground">prorated from {s.effective_from}</span>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
@@ -345,23 +361,25 @@ function FinancesPage() {
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] capitalize">{effType}</Badge>
                     </TableCell>
-                    <TableCell className="text-right">{rateNode}</TableCell>
-                    <TableCell>{s?.effective_from ?? "—"}</TableCell>
+                    <TableCell>{s?.effective_from ?? (p.joined_on ? <span className="text-muted-foreground text-xs">joined {p.joined_on}</span> : "—")}</TableCell>
+                    <TableCell className="text-right">{proposedNode}</TableCell>
+                    <TableCell className="text-right">{actualNode}</TableCell>
                   </TableRow>
                 );
               })}
-              {pendingGrants.map((g) => (
+              {visiblePendingGrants.map((g) => (
                 <TableRow key={g.email} className="opacity-70">
                   <TableCell className="font-medium">{nameFromEmail(g.email)}</TableCell>
                   <TableCell className="text-muted-foreground">{g.email}</TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Pending signup</Badge></TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px] capitalize">{g.comp_type ?? "monthly"}</Badge></TableCell>
+                  <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
                   <TableCell className="text-right">
                     {g.comp_type === "hourly"
                       ? (g.default_hourly_rate != null ? <>{inr(Number(g.default_hourly_rate))}<span className="text-[10px] text-muted-foreground">/hr</span></> : <span className="text-muted-foreground">Not set</span>)
                       : (g.default_monthly_salary != null ? inr(Number(g.default_monthly_salary)) : <span className="text-muted-foreground">Not set</span>)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
+                  <TableCell className="text-right text-muted-foreground">—</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -12,16 +12,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ExternalLink, Plus } from "lucide-react";
+import { ExternalLink, Plus, Workflow } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
+import { StageEditor } from "@/components/tasks/stage-editor";
 import { TaxonomyPicker, AssetLinksEditor, useTaxonomy, type TaxonomyValue } from "@/components/taxonomy-picker";
 import {
   createTaskFull, listUserPresets, bumpUserPreset, listRolePresets,
 } from "@/lib/tasks-plus.functions";
 import { listAwaitingMyReview, setReviewer as setReviewerFn } from "@/lib/tasks-workflow.functions";
+import { setTaskStages, type StageInput } from "@/lib/tasks-stages.functions";
 
 export const Route = createFileRoute("/_authenticated/tasks")({ component: TasksPage });
 
@@ -67,6 +70,8 @@ function TasksPage() {
   const [tax_, setTax] = useState<TaxonomyValue>({ domainId: null, departmentId: null, taskTypeIds: [] });
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [multiStage, setMultiStage] = useState(false);
+  const [stages, setStages] = useState<StageInput[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,7 +85,7 @@ function TasksPage() {
     queryKey: ["my-tasks", me?.id], enabled: !!me,
     queryFn: async () => (await supabase
       .from("tasks")
-      .select("*, project:projects(id,name,client_name), task_types:task_task_types(task_type:taxonomy_task_types(id,name))")
+      .select("*, project:projects(id,name,client_name), task_types:task_task_types(task_type:taxonomy_task_types(id,name)), current_stage:task_stages!tasks_current_stage_fkey(id,name,kind,status,owner:profiles!task_stages_owner_id_fkey(id,full_name))")
       .or(`assignee_id.eq.${me!.id},reviewer_id.eq.${me!.id}`)
       .order("due_date", { ascending: true, nullsFirst: false })).data ?? [],
   });
@@ -155,14 +160,22 @@ function TasksPage() {
     setTProject(""); setTTitle(""); setTDesc(""); setTDue(""); setTPri("medium");
     setTAssignee(me?.id ?? ""); setTReviewer("");
     setTax({ domainId: null, departmentId: null, taskTypeIds: [] }); setLinks([]);
+    setMultiStage(false); setStages([]);
   }
 
   const setReviewerSrv = useServerFn(setReviewerFn);
+  const setStagesSrv = useServerFn(setTaskStages);
 
   async function submit() {
     if (!tTitle.trim()) return toast.error("Title required");
     if (!tProject) return toast.error("Project required");
-    const assigneeId = tAssignee || me!.id;
+    if (multiStage) {
+      if (stages.length === 0) return toast.error("Add at least one workflow stage.");
+      for (const s of stages) {
+        if (!s.name.trim() || !s.owner_id) return toast.error("Fill in every stage name and owner.");
+      }
+    }
+    const assigneeId = multiStage ? (stages[0].owner_id) : (tAssignee || me!.id);
     try {
       const task = await createFn({ data: {
         projectId: tProject, title: tTitle.trim(), description: tDesc.trim(),
@@ -170,8 +183,11 @@ function TasksPage() {
         assetLinks: links.filter((l) => l.url.trim()),
         domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds,
       }});
-      if (tReviewer && task?.id) {
+      if (tReviewer && task?.id && !multiStage) {
         await setReviewerSrv({ data: { taskId: task.id, reviewerId: tReviewer } });
+      }
+      if (multiStage && task?.id) {
+        await setStagesSrv({ data: { taskId: task.id, stages } });
       }
       // bump preset
       await bumpFn({ data: { domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeId: tax_.taskTypeIds[0] ?? null } });
@@ -181,6 +197,7 @@ function TasksPage() {
       qc.invalidateQueries();
     } catch (e) { toast.error((e as Error).message); }
   }
+
 
   const grouped: Record<string, typeof tasks> = {};
   (tasks ?? []).forEach((t) => {
@@ -231,6 +248,7 @@ function TasksPage() {
                 const types = (t.task_types as { task_type: { id: string; name: string } | null }[] | null)?.map((x) => x.task_type).filter(Boolean) ?? [];
                 const linkArr = (t.asset_links as { label: string; url: string }[] | null) ?? [];
                 const pct = (t as { completion_percent?: number }).completion_percent ?? 0;
+                const stage = (t as { current_stage?: { name: string; kind: string; status: string; owner: { full_name: string | null } | null } | null }).current_stage;
                 return (
                   <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3 hover:border-primary/40 cursor-pointer"
                     onClick={() => setOpenTaskId(t.id)}>
@@ -239,6 +257,12 @@ function TasksPage() {
                         <span className="text-sm font-medium">{t.title}</span>
                         <Badge variant="outline" className="capitalize">{t.priority}</Badge>
                         {types.map((tt) => <Badge key={tt!.id} variant="secondary">{tt!.name}</Badge>)}
+                        {stage && (
+                          <Badge variant="outline" className="text-[10px] gap-1 border-primary/40 text-primary">
+                            <Workflow className="h-3 w-3" />
+                            {stage.name}{stage.owner?.full_name ? ` · ${stage.owner.full_name}` : ""}
+                          </Badge>
+                        )}
                       </div>
                       {t.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>}
                       <div className="flex flex-wrap gap-2 mt-1 items-center">
@@ -290,6 +314,21 @@ function TasksPage() {
             )}
 
             {canAssignOthers && (
+              <div className="rounded-md border border-border/60 p-3 flex items-start gap-3">
+                <Workflow className="h-4 w-4 mt-0.5 text-primary" />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Multi-stage workflow</Label>
+                    <Switch checked={multiStage} onCheckedChange={setMultiStage} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Route this task through several owners in sequence — with approve / send-back handoffs.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {canAssignOthers && !multiStage && (
               <div className="space-y-1">
                 <Label>Assign to</Label>
                 <Select value={tAssignee} onValueChange={setTAssignee}>
@@ -307,7 +346,7 @@ function TasksPage() {
               </div>
             )}
 
-            {canAssignOthers && (
+            {canAssignOthers && !multiStage && (
               <div className="space-y-1">
                 <Label>Reviewer (optional)</Label>
                 <Select value={tReviewer || "none"} onValueChange={(v) => setTReviewer(v === "none" ? "" : v)}>
@@ -322,6 +361,16 @@ function TasksPage() {
                 <p className="text-xs text-muted-foreground">When the assignee marks done, the task moves to review.</p>
               </div>
             )}
+
+            {canAssignOthers && multiStage && (
+              <StageEditor
+                people={(assignees ?? []).map((u) => ({ id: u.id, full_name: u.full_name, email: null }))}
+                value={stages}
+                onChange={setStages}
+              />
+            )}
+
+
 
 
             <div className="space-y-1">

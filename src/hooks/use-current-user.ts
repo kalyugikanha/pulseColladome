@@ -65,7 +65,7 @@ export function useCurrentUser() {
       let vIsSuper = isSuperAdmin;
       let vIsFinance = realFinance;
       let vIsHr = realIsHrAdmin;
-      let vCanManageProjects = realAdmin || !!roles?.some((r) => r.role === "project_manager");
+      let vCanManageProjects = realAdmin || realIsHrAdmin || realHeadOf.length > 0 || !!roles?.some((r) => r.role === "project_manager");
       let vHeadOf = realHeadOf;
       let vReportIds = realReportIds;
 

@@ -234,7 +234,8 @@ function FinancesPage() {
                 <TableHead>Employee</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Monthly salary</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="text-right">Rate</TableHead>
                 <TableHead>Effective from</TableHead>
               </TableRow>
             </TableHeader>
@@ -245,17 +246,28 @@ function FinancesPage() {
               }).map((p) => {
                 const s = currentSalaryByUser.get(p.id);
                 const grant = p.email ? grantByEmail.get(p.email.toLowerCase()) : undefined;
-                const grantSalary = grant?.default_monthly_salary != null ? Number(grant.default_monthly_salary) : null;
+                const effType: "monthly" | "hourly" = s?.comp_type ?? grant?.comp_type ?? "monthly";
+                const rateNode = s
+                  ? (s.comp_type === "hourly"
+                      ? <span>{inr(Number(s.hourly_rate ?? 0))}<span className="text-[10px] text-muted-foreground">/hr</span></span>
+                      : inr(Number(s.monthly_salary ?? 0)))
+                  : grant && (grant.comp_type === "hourly" ? grant.default_hourly_rate != null : grant.default_monthly_salary != null)
+                    ? <span className="text-muted-foreground">
+                        {grant.comp_type === "hourly"
+                          ? <>{inr(Number(grant.default_hourly_rate))}<span className="text-[10px]">/hr</span></>
+                          : inr(Number(grant.default_monthly_salary))}
+                        {" "}<span className="text-[10px]">(from invite)</span>
+                      </span>
+                    : <span className="text-muted-foreground">Not set</span>;
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.email}</TableCell>
                     <TableCell><Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/40">Active</Badge></TableCell>
-                    <TableCell className="text-right">
-                      {s ? inr(Number(s.monthly_salary))
-                        : grantSalary != null ? <span className="text-muted-foreground">{inr(grantSalary)} <span className="text-[10px]">(from invite)</span></span>
-                        : <span className="text-muted-foreground">Not set</span>}
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] capitalize">{effType}</Badge>
                     </TableCell>
+                    <TableCell className="text-right">{rateNode}</TableCell>
                     <TableCell>{s?.effective_from ?? "—"}</TableCell>
                   </TableRow>
                 );
@@ -265,8 +277,11 @@ function FinancesPage() {
                   <TableCell className="font-medium">{nameFromEmail(g.email)}</TableCell>
                   <TableCell className="text-muted-foreground">{g.email}</TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Pending signup</Badge></TableCell>
+                  <TableCell><Badge variant="outline" className="text-[10px] capitalize">{g.comp_type ?? "monthly"}</Badge></TableCell>
                   <TableCell className="text-right">
-                    {g.default_monthly_salary != null ? inr(Number(g.default_monthly_salary)) : <span className="text-muted-foreground">Not set</span>}
+                    {g.comp_type === "hourly"
+                      ? (g.default_hourly_rate != null ? <>{inr(Number(g.default_hourly_rate))}<span className="text-[10px] text-muted-foreground">/hr</span></> : <span className="text-muted-foreground">Not set</span>)
+                      : (g.default_monthly_salary != null ? inr(Number(g.default_monthly_salary)) : <span className="text-muted-foreground">Not set</span>)}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
                 </TableRow>

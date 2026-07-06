@@ -98,17 +98,58 @@ function ProjectBurnPage() {
   });
 
 
-  const salaryByUser = useMemo(() => {
-    const map = new Map<string, number>();
+  // Latest effective raw monthly salary per user as of selected month.
+  const rawSalaryByUser = useMemo(() => {
+    const map = new Map<string, { monthly_salary: number; effective_from: string }>();
     if (!salaries) return map;
     const [y, m] = month.split("-").map(Number);
     const cutoff = new Date(Date.UTC(y, m, 0));
     for (const s of salaries) {
       if (new Date(s.effective_from) > cutoff) continue;
-      if (!map.has(s.user_id)) map.set(s.user_id, Number(s.monthly_salary));
+      if (!map.has(s.user_id)) map.set(s.user_id, { monthly_salary: Number(s.monthly_salary), effective_from: s.effective_from });
     }
     return map;
   }, [salaries, month]);
+
+  // Approved unpaid leave days per user overlapping the selected month.
+  const unpaidDaysByUser = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!unpaidLeaves) return map;
+    const [y, m] = month.split("-").map(Number);
+    const mStart = Date.UTC(y, m - 1, 1);
+    const mEnd = Date.UTC(y, m, 0);
+    const DAY = 86400000;
+    for (const lr of unpaidLeaves) {
+      const s = Date.parse(lr.start_date);
+      const e = Date.parse(lr.end_date);
+      if (isNaN(s) || isNaN(e)) continue;
+      const from = Math.max(s, mStart);
+      const to = Math.min(e, mEnd);
+      if (to < from) continue;
+      const days = Math.round((to - from) / DAY) + 1;
+      map.set(lr.user_id, (map.get(lr.user_id) ?? 0) + days);
+    }
+    return map;
+  }, [unpaidLeaves, month]);
+
+  // Pro-rated actual monthly salary per user (matches /finances).
+  const salaryByUser = useMemo(() => {
+    const map = new Map<string, number>();
+    const [y, m] = month.split("-").map(Number);
+    const daysInMo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const monthStart = new Date(Date.UTC(y, m - 1, 1));
+    for (const [uid, s] of rawSalaryByUser) {
+      const eff = new Date(s.effective_from);
+      const startDay = eff > monthStart ? eff.getUTCDate() : 1;
+      const effectiveDays = daysInMo - startDay + 1;
+      const payableDays = Math.max(0, effectiveDays - (unpaidDaysByUser.get(uid) ?? 0));
+      if (payableDays <= 0) continue;
+      const contrib = s.monthly_salary * payableDays / daysInMo;
+      if (contrib > 0) map.set(uid, contrib);
+    }
+    return map;
+  }, [rawSalaryByUser, unpaidDaysByUser, month]);
+
 
   const nameById = useMemo(() => {
     const m = new Map<string, string>();

@@ -11,7 +11,19 @@ export type OnboardingDocType =
   | "graduation"
   | "masters"
   | "resume"
-  | "profile_picture";
+  | "profile_picture"
+  | "follow_facebook"
+  | "follow_instagram"
+  | "follow_twitter"
+  | "follow_linkedin"
+  | "follow_youtube"
+  | "follow_pinterest"
+  | "follow_whatsapp"
+  | "review_google_jaipur"
+  | "review_google_hyderabad"
+  | "review_glassdoor"
+  | "review_ambitionbox"
+  | "linkedin_employment";
 
 const REQUIRED_PROFILE_FIELDS = [
   "full_name","email","personal_email","phone","permanent_address","date_of_birth",
@@ -26,6 +38,10 @@ const REQUIRED_BANK_FIELDS = [
 const REQUIRED_DOCS: OnboardingDocType[] = [
   "offer_letter","aadhar","pan","cancelled_cheque",
   "marksheet_10","marksheet_12","graduation","resume","profile_picture",
+  "follow_facebook","follow_instagram","follow_twitter","follow_linkedin",
+  "follow_youtube","follow_pinterest","follow_whatsapp",
+  "review_google_jaipur","review_google_hyderabad","review_glassdoor","review_ambitionbox",
+  "linkedin_employment",
 ];
 
 type ProfilePatch = {
@@ -48,6 +64,7 @@ type ProfilePatch = {
   standup_time?: string | null;
   social_follows_confirmed_at?: string | null;
   reviews_confirmed_at?: string | null;
+  hobbies?: string | null;
 };
 
 
@@ -161,7 +178,6 @@ export const completeMyOnboarding = createServerFn({ method: "POST" })
         const v = bb[f];
         if (v === null || v === undefined || String(v).trim() === "") missing.push(`bank.${f}`);
       }
-      // Format validation
       const ifsc = String(bb.ifsc_code ?? "").toUpperCase();
       if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) missing.push("bank.ifsc_code (invalid format)");
       const pan = String(bb.pan_number ?? "").toUpperCase();
@@ -170,14 +186,20 @@ export const completeMyOnboarding = createServerFn({ method: "POST" })
     const uploaded = new Set((docs ?? []).map((d) => d.doc_type as OnboardingDocType));
     for (const d of REQUIRED_DOCS) if (!uploaded.has(d)) missing.push(`document.${d}`);
 
-    if (!p.social_follows_confirmed_at) missing.push("confirm.follow_social_channels");
-    if (!p.reviews_confirmed_at) missing.push("confirm.leave_reviews");
-
     if (missing.length) return { ok: false as const, missing };
 
+    const now = new Date().toISOString();
     const { error } = await context.supabase
       .from("profiles")
-      .update({ onboarding_completed: true, onboarding_completed_at: new Date().toISOString() })
+      .update({
+        onboarding_completed: true,
+        onboarding_completed_at: now,
+        onboarding_submitted_at: now,
+        onboarding_rejected_at: null,
+        onboarding_rejection_reason: null,
+        social_follows_confirmed_at: now,
+        reviews_confirmed_at: now,
+      })
       .eq("id", uid);
     if (error) throw new Error(error.message);
     return { ok: true as const };

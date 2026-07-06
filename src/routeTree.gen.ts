@@ -23,6 +23,7 @@ import { Route as AuthenticatedResourcesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/punch'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProjectBurnRouteImport } from './routes/_authenticated/project-burn'
+import { Route as AuthenticatedOnboardingPendingRouteImport } from './routes/_authenticated/onboarding-pending'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMyTimesheetRouteImport } from './routes/_authenticated/my-timesheet'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
@@ -36,6 +37,7 @@ import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
 import { Route as ApiAssistantTranscribeRouteImport } from './routes/api/assistant/transcribe'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
+import { Route as AuthenticatedHrOnboardingRouteImport } from './routes/_authenticated/hr.onboarding'
 import { Route as AuthenticatedHrLeaveRouteImport } from './routes/_authenticated/hr.leave'
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
@@ -112,6 +114,12 @@ const AuthenticatedProjectBurnRoute =
     path: '/project-burn',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedOnboardingPendingRoute =
+  AuthenticatedOnboardingPendingRouteImport.update({
+    id: '/onboarding-pending',
+    path: '/onboarding-pending',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -179,6 +187,12 @@ const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   path: '/api/assistant/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedHrOnboardingRoute =
+  AuthenticatedHrOnboardingRouteImport.update({
+    id: '/hr/onboarding',
+    path: '/hr/onboarding',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedHrLeaveRoute = AuthenticatedHrLeaveRouteImport.update({
   id: '/hr/leave',
   path: '/hr/leave',
@@ -212,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/onboarding-pending': typeof AuthenticatedOnboardingPendingRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
@@ -223,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/vendors': typeof AuthenticatedVendorsRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
+  '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
@@ -243,6 +259,7 @@ export interface FileRoutesByTo {
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/onboarding-pending': typeof AuthenticatedOnboardingPendingRoute
   '/project-burn': typeof AuthenticatedProjectBurnRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
@@ -254,6 +271,7 @@ export interface FileRoutesByTo {
   '/vendors': typeof AuthenticatedVendorsRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
+  '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
@@ -276,6 +294,7 @@ export interface FileRoutesById {
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/onboarding-pending': typeof AuthenticatedOnboardingPendingRoute
   '/_authenticated/project-burn': typeof AuthenticatedProjectBurnRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/punch': typeof AuthenticatedPunchRoute
@@ -287,6 +306,7 @@ export interface FileRoutesById {
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
   '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
+  '/_authenticated/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
@@ -309,6 +329,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/my-timesheet'
     | '/onboarding'
+    | '/onboarding-pending'
     | '/project-burn'
     | '/projects'
     | '/punch'
@@ -320,6 +341,7 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/admin/taxonomy'
     | '/hr/leave'
+    | '/hr/onboarding'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
     | '/api/public/google/callback'
@@ -340,6 +362,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/my-timesheet'
     | '/onboarding'
+    | '/onboarding-pending'
     | '/project-burn'
     | '/projects'
     | '/punch'
@@ -351,6 +374,7 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/admin/taxonomy'
     | '/hr/leave'
+    | '/hr/onboarding'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
     | '/api/public/google/callback'
@@ -372,6 +396,7 @@ export interface FileRouteTypes {
     | '/_authenticated/meetings'
     | '/_authenticated/my-timesheet'
     | '/_authenticated/onboarding'
+    | '/_authenticated/onboarding-pending'
     | '/_authenticated/project-burn'
     | '/_authenticated/projects'
     | '/_authenticated/punch'
@@ -383,6 +408,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vendors'
     | '/_authenticated/admin/taxonomy'
     | '/_authenticated/hr/leave'
+    | '/_authenticated/hr/onboarding'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
     | '/api/public/google/callback'
@@ -499,6 +525,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectBurnRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/onboarding-pending': {
+      id: '/_authenticated/onboarding-pending'
+      path: '/onboarding-pending'
+      fullPath: '/onboarding-pending'
+      preLoaderRoute: typeof AuthenticatedOnboardingPendingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/onboarding': {
       id: '/_authenticated/onboarding'
       path: '/onboarding'
@@ -590,6 +623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/hr/onboarding': {
+      id: '/_authenticated/hr/onboarding'
+      path: '/hr/onboarding'
+      fullPath: '/hr/onboarding'
+      preLoaderRoute: typeof AuthenticatedHrOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/hr/leave': {
       id: '/_authenticated/hr/leave'
       path: '/hr/leave'
@@ -626,6 +666,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedMyTimesheetRoute: typeof AuthenticatedMyTimesheetRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedOnboardingPendingRoute: typeof AuthenticatedOnboardingPendingRoute
   AuthenticatedProjectBurnRoute: typeof AuthenticatedProjectBurnRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedPunchRoute: typeof AuthenticatedPunchRoute
@@ -637,6 +678,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRoute
   AuthenticatedAdminTaxonomyRoute: typeof AuthenticatedAdminTaxonomyRoute
   AuthenticatedHrLeaveRoute: typeof AuthenticatedHrLeaveRoute
+  AuthenticatedHrOnboardingRoute: typeof AuthenticatedHrOnboardingRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -651,6 +693,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedMyTimesheetRoute: AuthenticatedMyTimesheetRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedOnboardingPendingRoute: AuthenticatedOnboardingPendingRoute,
   AuthenticatedProjectBurnRoute: AuthenticatedProjectBurnRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedPunchRoute: AuthenticatedPunchRoute,
@@ -662,6 +705,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVendorsRoute: AuthenticatedVendorsRoute,
   AuthenticatedAdminTaxonomyRoute: AuthenticatedAdminTaxonomyRoute,
   AuthenticatedHrLeaveRoute: AuthenticatedHrLeaveRoute,
+  AuthenticatedHrOnboardingRoute: AuthenticatedHrOnboardingRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

@@ -21,6 +21,10 @@ export type CurrentUser = {
   mustChangePassword: boolean;
   onboardingCompleted: boolean;
   onboardingRequired: boolean;
+  onboardingSubmittedAt: string | null;
+  onboardingApprovedAt: string | null;
+  onboardingRejectedAt: string | null;
+  onboardingRejectionReason: string | null;
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
   realIsHrAdmin: boolean;
@@ -36,7 +40,7 @@ export function useCurrentUser() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       const [{ data: profile }, { data: roles }, { data: sa }, { data: headRows }, { data: reportRows }] = await Promise.all([
-        supabase.from("profiles").select("full_name, email, must_change_password, onboarding_completed, onboarding_required").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("full_name, email, must_change_password, onboarding_completed, onboarding_required, onboarding_submitted_at, onboarding_approved_at, onboarding_rejected_at, onboarding_rejection_reason").eq("id", user.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase.from("super_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
         supabase.from("department_heads").select("department").eq("user_id", user.id),
@@ -107,6 +111,10 @@ export function useCurrentUser() {
         mustChangePassword: !!(profile as { must_change_password?: boolean } | null)?.must_change_password,
         onboardingCompleted: !!(profile as { onboarding_completed?: boolean } | null)?.onboarding_completed,
         onboardingRequired: (profile as { onboarding_required?: boolean } | null)?.onboarding_required !== false,
+        onboardingSubmittedAt: (profile as { onboarding_submitted_at?: string | null } | null)?.onboarding_submitted_at ?? null,
+        onboardingApprovedAt: (profile as { onboarding_approved_at?: string | null } | null)?.onboarding_approved_at ?? null,
+        onboardingRejectedAt: (profile as { onboarding_rejected_at?: string | null } | null)?.onboarding_rejected_at ?? null,
+        onboardingRejectionReason: (profile as { onboarding_rejection_reason?: string | null } | null)?.onboarding_rejection_reason ?? null,
         viewingAs,
         realIsSuperAdmin: isSuperAdmin,
         realIsHrAdmin,

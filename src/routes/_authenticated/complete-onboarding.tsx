@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,15 +16,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star } from "lucide-react";
+import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star, Linkedin } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/complete-onboarding")({
   component: CompleteOnboardingPage,
 });
 
-type DocSpec = { key: OnboardingDocType; label: string; required: boolean; accept: string };
+type DocSpec = { key: OnboardingDocType; label: string; required: boolean; accept: string; link?: string };
 
 const DOCS: DocSpec[] = [
   { key: "profile_picture", label: "Profile picture", required: true, accept: "image/*" },
@@ -39,22 +38,30 @@ const DOCS: DocSpec[] = [
   { key: "resume", label: "Updated resume", required: true, accept: ".pdf,.doc,.docx" },
 ];
 
-const FOLLOW_LINKS = [
-  { key: "facebook", label: "Facebook", url: "https://www.facebook.com/socialcolladome/" },
-  { key: "instagram", label: "Instagram", url: "https://www.instagram.com/socialcolladome" },
-  { key: "twitter", label: "X (Twitter)", url: "https://x.com/SocialColladome" },
-  { key: "linkedin", label: "LinkedIn", url: "https://www.linkedin.com/company/colladome/" },
-  { key: "youtube", label: "YouTube", url: "https://www.youtube.com/channel/UCYXQcDiCeW6QVr5oBHWs0uQ" },
-  { key: "pinterest", label: "Pinterest", url: "https://in.pinterest.com/SocialColladome/" },
-  { key: "whatsapp", label: "WhatsApp channel", url: "https://whatsapp.com/channel/0029VaCRgsEBA1etwQIXHy2C" },
-] as const;
+const FOLLOW_PROOFS: DocSpec[] = [
+  { key: "follow_facebook",  label: "Facebook — followed",       required: true, accept: "image/*", link: "https://www.facebook.com/socialcolladome/" },
+  { key: "follow_instagram", label: "Instagram — followed",      required: true, accept: "image/*", link: "https://www.instagram.com/socialcolladome" },
+  { key: "follow_twitter",   label: "X (Twitter) — followed",    required: true, accept: "image/*", link: "https://x.com/SocialColladome" },
+  { key: "follow_linkedin",  label: "LinkedIn page — followed",  required: true, accept: "image/*", link: "https://www.linkedin.com/company/colladome/" },
+  { key: "follow_youtube",   label: "YouTube — subscribed",      required: true, accept: "image/*", link: "https://www.youtube.com/channel/UCYXQcDiCeW6QVr5oBHWs0uQ" },
+  { key: "follow_pinterest", label: "Pinterest — followed",      required: true, accept: "image/*", link: "https://in.pinterest.com/SocialColladome/" },
+  { key: "follow_whatsapp",  label: "WhatsApp channel — joined", required: true, accept: "image/*", link: "https://whatsapp.com/channel/0029VaCRgsEBA1etwQIXHy2C" },
+];
 
-const REVIEW_LINKS = [
-  { key: "google_jaipur", label: "Google Review — Jaipur office", url: "https://g.page/r/CWFNs919eeVQEBM/review" },
-  { key: "google_hyderabad", label: "Google Review — Hyderabad office", url: "https://www.google.com/search?q=Colladome+Hyderabad+review" },
-  { key: "glassdoor", label: "Glassdoor Review", url: "https://www.glassdoor.co.in/Reviews/Colladome-Reviews-E5488688.htm" },
-  { key: "ambitionbox", label: "AmbitionBox Review", url: "https://www.ambitionbox.com/reviews/colladome-reviews" },
-] as const;
+const REVIEW_PROOFS: DocSpec[] = [
+  { key: "review_google_jaipur",    label: "Google Review — Jaipur office",    required: true, accept: "image/*", link: "https://g.page/r/CWFNs919eeVQEBM/review" },
+  { key: "review_google_hyderabad", label: "Google Review — Hyderabad office", required: true, accept: "image/*", link: "https://www.google.com/search?q=Colladome+Hyderabad+review" },
+  { key: "review_glassdoor",        label: "Glassdoor Review",                 required: true, accept: "image/*", link: "https://www.glassdoor.co.in/Reviews/Colladome-Reviews-E5488688.htm" },
+  { key: "review_ambitionbox",      label: "AmbitionBox Review",               required: true, accept: "image/*", link: "https://www.ambitionbox.com/reviews/colladome-reviews" },
+];
+
+const LINKEDIN_EMPLOYMENT: DocSpec = {
+  key: "linkedin_employment",
+  label: "LinkedIn profile — shows \"Works at Colladome\"",
+  required: true,
+  accept: "image/*",
+  link: "https://www.linkedin.com/in/me/edit/topcard/",
+};
 
 function CompleteOnboardingPage() {
   const router = useRouter();
@@ -69,7 +76,6 @@ function CompleteOnboardingPage() {
     queryFn: () => getOnboarding(),
   });
 
-  // Personal
   const [fullName, setFullName] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -83,19 +89,15 @@ function CompleteOnboardingPage() {
   const [twitter, setTwitter] = useState("");
   const [youtube, setYoutube] = useState("");
   const [pinterest, setPinterest] = useState("");
-  // Work
   const [department, setDepartment] = useState("");
   const [dayStart, setDayStart] = useState("");
   const [standup, setStandup] = useState("");
-  // Bank
+  const [hobbies, setHobbies] = useState("");
   const [holder, setHolder] = useState("");
   const [account, setAccount] = useState("");
   const [branch, setBranch] = useState("");
   const [ifsc, setIfsc] = useState("");
   const [pan, setPan] = useState("");
-  // Follow & Review confirmations (local state, submitted as timestamps)
-  const [follows, setFollows] = useState<Record<string, boolean>>({});
-  const [reviews, setReviews] = useState<Record<string, boolean>>({});
 
   const [uploading, setUploading] = useState<OnboardingDocType | null>(null);
   const [saving, setSaving] = useState(false);
@@ -120,12 +122,7 @@ function CompleteOnboardingPage() {
     setDepartment(p.department ?? "");
     setDayStart(p.day_start_time ?? "");
     setStandup(p.standup_time ?? "");
-    if (p.social_follows_confirmed_at) {
-      setFollows(Object.fromEntries(FOLLOW_LINKS.map((l) => [l.key, true])));
-    }
-    if (p.reviews_confirmed_at) {
-      setReviews(Object.fromEntries(REVIEW_LINKS.map((l) => [l.key, true])));
-    }
+    setHobbies(p.hobbies ?? "");
     const b = (data.bank ?? {}) as Record<string, string | null>;
     setHolder(b.account_holder_name ?? "");
     setAccount(b.account_number ?? "");
@@ -135,11 +132,15 @@ function CompleteOnboardingPage() {
   }, [data]);
 
   const uploaded = new Set((data?.documents ?? []).map((d) => d.doc_type));
+  const profileAny = (data?.profile ?? {}) as Record<string, unknown>;
+  const submittedAt = profileAny.onboarding_submitted_at as string | null | undefined;
+  const approvedAt = profileAny.onboarding_approved_at as string | null | undefined;
+  const rejectedAt = profileAny.onboarding_rejected_at as string | null | undefined;
+  const rejectionReason = profileAny.onboarding_rejection_reason as string | null | undefined;
+  const isApproved = !!approvedAt;
+  const isPendingReview = !!submittedAt && !isApproved;
 
-  const allFollowed = useMemo(() => FOLLOW_LINKS.every((l) => follows[l.key]), [follows]);
-  const allReviewed = useMemo(() => REVIEW_LINKS.every((l) => reviews[l.key]), [reviews]);
-
-  async function saveDraft(extra?: { social_follows_confirmed_at?: string | null; reviews_confirmed_at?: string | null }) {
+  async function saveDraft() {
     setSaving(true);
     try {
       await saveOnboarding({ data: {
@@ -160,7 +161,7 @@ function CompleteOnboardingPage() {
           department: department.trim() || null,
           day_start_time: dayStart || null,
           standup_time: standup || null,
-          ...(extra ?? {}),
+          hobbies: hobbies.trim() || null,
         },
         bank: {
           account_holder_name: holder.trim(),
@@ -202,27 +203,24 @@ function CompleteOnboardingPage() {
   }
 
   async function submit() {
-    const isCompleted = !!(data?.profile as { onboarding_completed?: boolean } | null)?.onboarding_completed;
-    if (isCompleted) {
+    if (isApproved) {
       await saveDraft();
       qc.invalidateQueries({ queryKey: ["current-user"] });
       qc.invalidateQueries({ queryKey: ["my-onboarding"] });
       return;
     }
-    if (!allFollowed) { toast.error("Please follow all our social channels and tick each box"); return; }
-    if (!allReviewed) { toast.error("Please leave a review on each platform and tick each box"); return; }
     setSubmitting(true);
     try {
-      const now = new Date().toISOString();
-      await saveDraft({ social_follows_confirmed_at: now, reviews_confirmed_at: now });
+      await saveDraft();
       const res = await finalize();
       if (!res.ok) {
         toast.error(`Please complete: ${res.missing.slice(0, 3).join(", ")}${res.missing.length > 3 ? "…" : ""}`);
         return;
       }
-      toast.success("Onboarding complete — welcome aboard!");
+      toast.success("Submitted — waiting for HR approval");
       qc.invalidateQueries({ queryKey: ["current-user"] });
-      router.navigate({ to: "/dashboard", replace: true });
+      qc.invalidateQueries({ queryKey: ["my-onboarding"] });
+      router.navigate({ to: "/onboarding-pending", replace: true });
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Submission failed");
     } finally {
@@ -234,20 +232,31 @@ function CompleteOnboardingPage() {
     return <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading…</div>;
   }
 
-  const alreadyCompleted = !!(data?.profile as { onboarding_completed?: boolean } | null)?.onboarding_completed;
-
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <header>
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-          <ClipboardCheck className="h-6 w-6 text-primary" /> {alreadyCompleted ? "My profile" : "Complete your onboarding"}
+          <ClipboardCheck className="h-6 w-6 text-primary" /> {isApproved ? "My profile" : "Complete your onboarding"}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {alreadyCompleted
+          {isApproved
             ? "Update your details, documents, and social links anytime."
-            : "Fill in your details, upload the required documents, then follow & review Colladome. Access to the tool unlocks once everything is submitted."}
+            : "Fill in your details, upload every document and screenshot proof, then submit for HR approval. Portal access unlocks once HR approves."}
         </p>
       </header>
+
+      {isPendingReview && (
+        <div className="rounded-md border border-amber-400/40 bg-amber-500/10 p-3 text-sm">
+          Your submission is waiting for HR approval. You can still edit and re-upload if needed.
+        </div>
+      )}
+      {rejectedAt && !isApproved && !isPendingReview && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+          <div className="font-medium">HR sent your submission back.</div>
+          {rejectionReason && <div className="mt-1 text-muted-foreground whitespace-pre-wrap">Reason: {rejectionReason}</div>}
+          <div className="mt-1 text-muted-foreground">Please fix the items below and submit again.</div>
+        </div>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="font-display text-lg">Personal details</CardTitle></CardHeader>
@@ -266,6 +275,9 @@ function CompleteOnboardingPage() {
           <Field label="YouTube channel (optional)"><Input value={youtube} onChange={(e) => setYoutube(e.target.value)} placeholder="https://youtube.com/…" /></Field>
           <Field label="Pinterest profile (optional)" className="md:col-span-2"><Input value={pinterest} onChange={(e) => setPinterest(e.target.value)} placeholder="https://pinterest.com/…" /></Field>
           <Field label="Permanent address *" className="md:col-span-2"><Textarea rows={3} value={address} onChange={(e) => setAddress(e.target.value)} /></Field>
+          <Field label="About you — hobbies, interests, fun facts (used for your welcome post)" className="md:col-span-2">
+            <Textarea rows={3} value={hobbies} onChange={(e) => setHobbies(e.target.value)} placeholder="e.g. I love hiking on weekends, board games, and photography." />
+          </Field>
         </CardContent>
       </Card>
 
@@ -296,80 +308,55 @@ function CompleteOnboardingPage() {
           <CardDescription>Upload each file (PDF or image, max 10 MB). You can replace a file by re-uploading it.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          {DOCS.map((doc) => {
-            const isUp = uploaded.has(doc.key);
-            const isBusy = uploading === doc.key;
-            return (
-              <div key={doc.key} className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2">
-                <div className="flex items-center gap-2 text-sm">
-                  {isUp ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Upload className="h-4 w-4 text-muted-foreground" />}
-                  <span>{doc.label}</span>
-                  {!doc.required && <Badge variant="outline" className="text-[10px]">Optional</Badge>}
-                  {isUp && <Badge variant="outline" className="text-[10px] text-green-600 border-green-600/40">Uploaded</Badge>}
-                </div>
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept={doc.accept}
-                    className="hidden"
-                    disabled={isBusy}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) uploadDoc(doc, f);
-                      e.currentTarget.value = "";
-                    }}
-                  />
-                  <Button asChild size="sm" variant="outline" disabled={isBusy}>
-                    <span>{isBusy ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading…</> : isUp ? "Replace" : "Upload"}</span>
-                  </Button>
-                </label>
-              </div>
-            );
-          })}
+          {DOCS.map((doc) => (
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+          ))}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle className="font-display text-lg flex items-center gap-2">
-            <Heart className="h-5 w-5 text-primary" /> Follow &amp; review Colladome
+            <Heart className="h-5 w-5 text-primary" /> Follow Colladome — upload screenshot proof
           </CardTitle>
           <CardDescription>
-            Open each link, complete the action, then tick the box. All items are mandatory to finish onboarding.
+            Open each link, follow / subscribe / join, then upload a screenshot showing you're following. All items are required.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <section className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Follow our channels</div>
-            {FOLLOW_LINKS.map((l) => (
-              <ConfirmRow
-                key={l.key}
-                label={l.label}
-                url={l.url}
-                checked={!!follows[l.key]}
-                onChange={(v) => setFollows((s) => ({ ...s, [l.key]: v }))}
-                cta="Open & follow"
-              />
-            ))}
-          </section>
-          <section className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-              <Star className="h-3.5 w-3.5" /> Leave a review
-            </div>
-            {REVIEW_LINKS.map((l) => (
-              <ConfirmRow
-                key={l.key}
-                label={l.label}
-                url={l.url}
-                checked={!!reviews[l.key]}
-                onChange={(v) => setReviews((s) => ({ ...s, [l.key]: v }))}
-                cta="Open & review"
-              />
-            ))}
-          </section>
-          {(!allFollowed || !allReviewed) && !alreadyCompleted && (
-            <p className="text-xs text-muted-foreground">Tick every box above to enable the Complete onboarding button.</p>
-          )}
+        <CardContent className="space-y-2">
+          {FOLLOW_PROOFS.map((doc) => (
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            <Star className="h-5 w-5 text-primary" /> Leave a review — upload screenshot proof
+          </CardTitle>
+          <CardDescription>
+            Open each platform, leave an honest review, then upload a screenshot of your published review. All items are required.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {REVIEW_PROOFS.map((doc) => (
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            <Linkedin className="h-5 w-5 text-primary" /> Update your LinkedIn employment
+          </CardTitle>
+          <CardDescription>
+            Add Colladome as your current employer on LinkedIn, then upload a screenshot of your LinkedIn profile showing "Works at Colladome".
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <UploadRow spec={LINKEDIN_EMPLOYMENT} uploaded={uploaded.has(LINKEDIN_EMPLOYMENT.key)} busy={uploading === LINKEDIN_EMPLOYMENT.key} onUpload={(f) => uploadDoc(LINKEDIN_EMPLOYMENT, f)} />
         </CardContent>
       </Card>
 
@@ -377,26 +364,48 @@ function CompleteOnboardingPage() {
         <Button variant="outline" onClick={() => saveDraft()} disabled={saving || submitting}>
           {saving ? "Saving…" : "Save progress"}
         </Button>
-        <Button className="gradient-primary" onClick={submit} disabled={submitting || (!alreadyCompleted && (!allFollowed || !allReviewed))}>
-          {submitting ? "Submitting…" : alreadyCompleted ? "Save changes" : "Complete onboarding"}
+        <Button className="gradient-primary" onClick={submit} disabled={submitting}>
+          {submitting ? "Submitting…" : isApproved ? "Save changes" : isPendingReview ? "Re-submit for HR approval" : "Submit for HR approval"}
         </Button>
       </div>
     </div>
   );
 }
 
-function ConfirmRow({ label, url, checked, onChange, cta }: { label: string; url: string; checked: boolean; onChange: (v: boolean) => void; cta: string }) {
+function UploadRow({ spec, uploaded, busy, onUpload }: { spec: DocSpec; uploaded: boolean; busy: boolean; onUpload: (f: File) => void }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2">
       <div className="flex items-center gap-2 text-sm min-w-0">
-        <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} id={`confirm-${label}`} />
-        <label htmlFor={`confirm-${label}`} className="truncate cursor-pointer">{label}</label>
+        {uploaded ? <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" /> : <Upload className="h-4 w-4 text-muted-foreground shrink-0" />}
+        <span className="truncate">{spec.label}</span>
+        {!spec.required && <Badge variant="outline" className="text-[10px]">Optional</Badge>}
+        {uploaded && <Badge variant="outline" className="text-[10px] text-green-600 border-green-600/40">Uploaded</Badge>}
       </div>
-      <Button asChild size="sm" variant="outline">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1">
-          {cta} <ExternalLink className="h-3 w-3" />
-        </a>
-      </Button>
+      <div className="flex items-center gap-2 shrink-0">
+        {spec.link && (
+          <Button asChild size="sm" variant="ghost">
+            <a href={spec.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1">
+              Open <ExternalLink className="h-3 w-3" />
+            </a>
+          </Button>
+        )}
+        <label className="cursor-pointer">
+          <input
+            type="file"
+            accept={spec.accept}
+            className="hidden"
+            disabled={busy}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUpload(f);
+              e.currentTarget.value = "";
+            }}
+          />
+          <Button asChild size="sm" variant="outline" disabled={busy}>
+            <span>{busy ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading…</> : uploaded ? "Replace" : "Upload"}</span>
+          </Button>
+        </label>
+      </div>
     </div>
   );
 }

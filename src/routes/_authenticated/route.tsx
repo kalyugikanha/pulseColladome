@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } fr
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard } from "lucide-react";
+import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard, ClipboardCheck } from "lucide-react";
 import { TopBar } from "@/components/top-bar";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AssistantDock } from "@/components/assistant/AssistantDock";
@@ -141,6 +141,11 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith("/hr/onboarding")}>
+                        <Link to="/hr/onboarding"><ClipboardCheck /><span>Onboarding approvals</span></Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/onboarding")}>
                         <Link to="/onboarding"><UserPlus /><span>Onboarding</span></Link>
                       </SidebarMenuButton>
@@ -211,8 +216,17 @@ function AuthenticatedLayout() {
       router.navigate({ to: "/change-password", replace: true });
       return;
     }
-    if (!user.mustChangePassword && !user.isSuperAdmin && user.onboardingRequired && !user.onboardingCompleted && pathname !== "/complete-onboarding" && pathname !== "/change-password") {
-      router.navigate({ to: "/complete-onboarding", replace: true });
+    const bypassOnboarding = user.isSuperAdmin || user.isHrAdmin;
+    if (!user.mustChangePassword && !bypassOnboarding && user.onboardingRequired && !user.onboardingApprovedAt) {
+      if (!user.onboardingSubmittedAt) {
+        if (pathname !== "/complete-onboarding" && pathname !== "/change-password") {
+          router.navigate({ to: "/complete-onboarding", replace: true });
+        }
+      } else {
+        if (pathname !== "/onboarding-pending" && pathname !== "/complete-onboarding" && pathname !== "/change-password") {
+          router.navigate({ to: "/onboarding-pending", replace: true });
+        }
+      }
     }
   }, [user, pathname, router]);
 

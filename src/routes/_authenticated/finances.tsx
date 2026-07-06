@@ -84,6 +84,25 @@ function FinancesPage() {
     },
   });
 
+  const { data: unpaidLeaves } = useQuery({
+    queryKey: ["finances-unpaid-leaves", month],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("leave_requests")
+        .select("user_id, start_date, end_date, leave_type, status")
+        .eq("leave_type", "unpaid")
+        .eq("status", "approved")
+        .lte("start_date", end)
+        .gte("end_date", start);
+      if (error) throw error;
+      return (data ?? []) as Array<{ user_id: string; start_date: string; end_date: string }>;
+    },
+  });
+
   // Latest effective salary per user as of selected month (used by burn + salary table)
   const currentSalaryByUser = useMemo(() => {
     const map = new Map<string, Salary>();
@@ -101,6 +120,28 @@ function FinancesPage() {
   // Pro-rated monthly contribution per user for the selected month.
   // Walks each day of the month and picks whichever salary was in force that day.
   // Hourly comp is skipped here — it's billed as hours×rate elsewhere.
+  // Approved unpaid leave days per user that fall within the selected month.
+  const unpaidDaysByUser = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!unpaidLeaves) return map;
+    const [y, m] = month.split("-").map(Number);
+    const mStart = Date.UTC(y, m - 1, 1);
+    const mEnd = Date.UTC(y, m, 0);
+    const DAY = 86400000;
+    for (const lr of unpaidLeaves) {
+      const s = Date.parse(lr.start_date);
+      const e = Date.parse(lr.end_date);
+      if (isNaN(s) || isNaN(e)) continue;
+      const from = Math.max(s, mStart);
+      const to = Math.min(e, mEnd);
+      if (to < from) continue;
+      const days = Math.round((to - from) / DAY) + 1;
+      map.set(lr.user_id, (map.get(lr.user_id) ?? 0) + days);
+    }
+    return map;
+  }, [unpaidLeaves, month]);
+
+  // Pro-rated monthly contribution per user for the selected month.
   const monthlyContribByUser = useMemo(() => {
     const map = new Map<string, number>();
     const [y, m] = month.split("-").map(Number);
@@ -112,12 +153,13 @@ function FinancesPage() {
       const eff = new Date(s.effective_from);
       const startDay = eff > monthStart ? eff.getUTCDate() : 1;
       const effectiveDays = daysInMonth - startDay + 1;
-      if (effectiveDays <= 0) continue;
-      const contrib = Number(s.monthly_salary ?? 0) * effectiveDays / daysInMonth;
+      const payableDays = Math.max(0, effectiveDays - (unpaidDaysByUser.get(userId) ?? 0));
+      if (payableDays <= 0) continue;
+      const contrib = Number(s.monthly_salary ?? 0) * payableDays / daysInMonth;
       if (contrib > 0) map.set(userId, contrib);
     }
     return map;
-  }, [currentSalaryByUser, month]);
+  }, [currentSalaryByUser, unpaidDaysByUser, month]);
 
   // Compute per-project burn using salary-share allocation
   const burnByProject = useMemo(() => {
@@ -326,11 +368,15 @@ function FinancesPage() {
                     : (monthlyContribByUser.get(p.id) ?? 0);
                   const effDate = new Date(s.effective_from);
                   const startedMidMonth = s.comp_type === "monthly" && effDate >= monthStart && effDate <= monthEnd;
+                  const unpaid = unpaidDaysByUser.get(p.id) ?? 0;
                   actualNode = (
                     <div className="flex flex-col items-end">
                       <span>{inr(actual)}</span>
                       {startedMidMonth && (
                         <span className="text-[10px] text-muted-foreground">prorated from {s.effective_from}</span>
+                      )}
+                      {unpaid > 0 && s.comp_type === "monthly" && (
+                        <span className="text-[10px] text-muted-foreground">− {unpaid} unpaid day{unpaid === 1 ? "" : "s"}</span>
                       )}
                     </div>
                   );

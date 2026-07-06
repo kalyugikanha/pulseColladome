@@ -1,30 +1,29 @@
-## Problem
+## Goal
 
-For Manvi (and Trisha), the salary is ₹5,000/month effective **2026-06-15**, but the June "Actual salary" shows the full ₹5,000 instead of the expected ~half.
+Subtract approved **unpaid** leave days that fall inside the selected month from each user's effective working days, so the "Actual salary" reflects the deduction.
 
-## Root cause
+Example: Anjali on 3 unpaid days in June → `actual = monthly_salary × (effectiveDays − 3) / daysInMonth`.
 
-`monthlyContribByUser` in `src/routes/_authenticated/finances.tsx` walks every day of the month and, for each day, picks whichever salary row was active that day. If the user has an **earlier salary row** (e.g. a previous ₹5,000 record effective before June), days 1–14 are paid from the old row and days 15–30 from the new one — so the month total still adds up to ₹5,000. The "prorated from 2026-06-15" hint is shown based only on the newest row's date, hiding the fact that the earlier row is filling in the pre-15 days.
+## Implementation
 
-The top card ("Actual salary pool") uses the same map and inherits the same bug.
+In `src/routes/_authenticated/finances.tsx`:
 
-## Fix
+1. **Fetch approved unpaid leaves** for the selected month with a new `useQuery` on `leave_requests` filtered by `leave_type = 'unpaid'`, `status = 'approved'`, and date-range overlapping the selected month.
 
-Change the proration so it uses **only the currently-effective salary** (the newest row with `effective_from ≤ monthEnd`), prorated across the days it actually covers within the selected month:
+2. **Compute `unpaidDaysByUser: Map<userId, number>`** — for each request, count the number of days that fall within `[monthStart, monthEnd]` (clip `start_date` / `end_date` to the month, inclusive day count).
 
-```text
-effectiveDays = daysInMonth - max(0, day_of_month(effective_from) - 1)   // if effective_from is in this month
-             = daysInMonth                                                // if effective_from is before this month
-actual = monthly_salary * effectiveDays / daysInMonth
-```
+3. **Update `monthlyContribByUser`** — subtract unpaid days from `effectiveDays` (clamped at 0):
+   ```
+   payableDays = max(0, effectiveDays - unpaidDaysByUser.get(userId))
+   contrib = monthly_salary * payableDays / daysInMonth
+   ```
 
-For Manvi in June: `5000 * 16 / 30 ≈ ₹2,666.67`. If she had no earlier row this already matched; with an earlier row it now correctly ignores it.
+4. **UI hint** — under the Actual salary cell, when unpaid days > 0, show `− N unpaid day(s)` next to the existing "prorated from …" hint.
 
-Hourly comp is unchanged (hours × rate).
+Top card ("Actual salary pool") picks up the change automatically.
+
+Hourly comp is unaffected (already based on actual clocked hours).
 
 ## Scope
 
-Single file:
-- `src/routes/_authenticated/finances.tsx` — rewrite the `monthlyContribByUser` memo to use only `currentSalaryByUser.get(userId)` and prorate from its `effective_from`. Everything downstream (Salaries table "Actual salary" cell, "Actual salary pool" top card) picks up the fix automatically.
-
-No schema, server-fn, or UI-structure changes.
+Single file: `src/routes/_authenticated/finances.tsx`. No schema or server-fn changes.

@@ -1,17 +1,29 @@
-## Plan
+## Goal
+Confirm that Aakash (`akash@colladome.in`, role `project_manager`) can actually create and modify projects against the live database — not just see the UI under super-admin view-as.
 
-1. **Fix backend table access for projects**
-   - Add the missing database access grants for `projects` so signed-in users can reach it through the app.
-   - Keep the existing row-level rules intact: only project managers, HR admins, admins, and department heads can create/edit projects.
+## Approach
+We can't log in as Aakash from the sandbox (Google SSO only), so verify at two layers:
 
-2. **Verify Aakash’s permission path**
-   - Confirm `akash@colladome.in` still has the `project_manager` role.
-   - Confirm the project-management rule recognizes that role after the database access fix.
+### 1. Database layer (simulated as Aakash)
+Using psql with RLS as the `authenticated` role and Aakash's `auth.uid()`:
 
-3. **Validate in the app**
-   - Check that the Projects page can show the project actions for a user whose `canManageProjects` flag is true.
-   - Ensure the existing project search remains unchanged.
+```sql
+SET LOCAL role authenticated;
+SET LOCAL "request.jwt.claims" TO '{"sub":"<aakash-uuid>","role":"authenticated"}';
+SELECT private.can_manage_projects(auth.uid());   -- expect true
+INSERT INTO public.projects (name, code, created_by) VALUES ('RLS smoke test', 'RLS-TEST', auth.uid()) RETURNING id;
+UPDATE public.projects SET description = 'edited by aakash' WHERE code = 'RLS-TEST';
+DELETE FROM public.projects WHERE code = 'RLS-TEST';
+```
+Pass = INSERT/UPDATE/DELETE all succeed. Fail = capture the exact `permission denied` / RLS error.
 
-## Technical details
+### 2. Frontend layer
+- Confirm `useCurrentUser` returns `canManageProjects: true` for Aakash's session (visible via the "New Project" button + row action icons on `/projects`).
+- Since the developer is currently on a super-admin session using view-as, the New Project dialog and Edit row buttons should already be visible on `/projects`. That confirms the UI path but not the DB path (queries still run as the super-admin).
 
-The current blocker is not his role: Aakash has `project_manager`. The issue is that the `projects` table currently has no explicit Data API grants, so the app can be blocked before the row-level project-manager policy can allow create/edit. I’ll add the missing grants via a database migration only; no UI change is needed unless validation reveals a separate frontend issue.
+### 3. Report back
+- If DB step passes: tell the user Aakash is fully unblocked; ask him to hard-refresh / sign out & back in to clear any stale session.
+- If DB step fails: capture the error, then propose a targeted fix (likely a missing GRANT or a policy tweak on `projects` or the `private.*` helpers).
+
+## Out of scope
+No code or migration changes in this step — this is verification only. Any fix will be proposed as a follow-up plan based on what the check returns.

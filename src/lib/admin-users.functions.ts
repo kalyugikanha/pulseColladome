@@ -81,7 +81,15 @@ async function ensureProfileForAuthUser(supabaseAdmin: any, authUserId: string, 
   };
 
   if (existing) {
-    const { error } = await supabaseAdmin.from("profiles").update(profilePayload).eq("id", authUserId);
+    const { error } = await supabaseAdmin.from("profiles").update({
+      full_name: sourceProfile.full_name ?? profilePayload.full_name,
+      email: sourceProfile.email,
+      department: sourceProfile.department ?? null,
+      is_placeholder: false,
+      is_active: true,
+      deactivated_at: null,
+      deactivated_by: null,
+    }).eq("id", authUserId);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await supabaseAdmin.from("profiles").insert(profilePayload);

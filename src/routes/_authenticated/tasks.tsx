@@ -143,17 +143,21 @@ function TasksPage() {
   }, [presets, tax]);
 
   async function updateStatus(id: string, status: string) {
-    const { error } = await supabase.from("tasks").update({ status: status as "todo"|"in_progress"|"done" }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Task updated");
-    qc.invalidateQueries();
+    try {
+      const { setTaskStatus } = await import("@/lib/tasks-workflow.functions");
+      await setTaskStatus({ data: { taskId: id, status: status as "todo"|"in_progress"|"review"|"done" } });
+      toast.success("Task updated");
+      qc.invalidateQueries();
+    } catch (e) { toast.error((e as Error).message); }
   }
 
   function resetForm() {
     setTProject(""); setTTitle(""); setTDesc(""); setTDue(""); setTPri("medium");
-    setTAssignee(me?.id ?? "");
+    setTAssignee(me?.id ?? ""); setTReviewer("");
     setTax({ domainId: null, departmentId: null, taskTypeIds: [] }); setLinks([]);
   }
+
+  const setReviewerSrv = useServerFn(setReviewerFn);
 
   async function submit() {
     if (!tTitle.trim()) return toast.error("Title required");

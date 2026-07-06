@@ -25,8 +25,8 @@ import { listAwaitingMyReview, setReviewer as setReviewerFn } from "@/lib/tasks-
 
 export const Route = createFileRoute("/_authenticated/tasks")({ component: TasksPage });
 
-const STATUS: Array<"todo" | "in_progress" | "done"> = ["todo", "in_progress", "done"];
-const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In Progress", done: "Done" };
+const STATUS: Array<"todo" | "in_progress" | "review" | "done"> = ["todo", "in_progress", "review", "done"];
+const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In Progress", review: "In Review", done: "Done" };
 
 function TasksPage() {
   const { data: me } = useCurrentUser();

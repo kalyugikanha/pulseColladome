@@ -1,29 +1,39 @@
-## Problem
+## Goal
 
-When a super admin / HR admin logs a leave for another employee (e.g. Hemanth Sridhar), two things go wrong:
+Make today's leave visible on two surfaces:
 
-1. The leave sometimes lands as **pending** — the "Pre-approved" checkbox is optional and easy to miss.
-2. Even when it is inserted as **approved**, the employee's balance is **not deducted** — `leave_balances.used` stays at 0.
+1. **HR → Leave management → Day view** — show approved + pending leave for the picked date, deduped per person (Hemanth's 6–7 July leave will appear).
+2. **Attendance → Today** — show who's on approved leave today, and mark them as "On leave" instead of "Absent".
 
-Root cause of #2: the `trg_leave_status_change` trigger is defined `AFTER UPDATE` only, so it never fires for rows inserted directly as `approved`. Confirmed on Hemanth: two approved rows exist, but casual balance still shows `used=0, allocated=5`.
+## Changes
 
-## Fix
+### 1. HR Day view (`src/routes/_authenticated/hr.leave.tsx` → `DayView`)
 
-### 1. Database trigger + backfill (migration)
+- Restrict the query to visible statuses: `.in("status", ["approved", "pending"])` so cancelled/rejected rows don't inflate the counts.
+- Dedupe by `user_id`: if a person has multiple overlapping rows (e.g. an earlier `pending` + later `approved`), keep the approved one.
+- Sort cards inside each type by employee name.
+- Header stays "On leave on {date}" with counts `total · approved · pending`.
 
-- Drop and recreate `trg_leave_status_change` as `AFTER INSERT OR UPDATE`.
-- Update `handle_leave_status_change()` so the INSERT branch (`TG_OP='INSERT'` / no OLD) deducts when the new row is `approved`, and the UPDATE branch keeps existing add/subtract logic.
-- One-time backfill: for each `leave_balances` row, set `used` = sum of `days` from `leave_requests` where `status='approved'` for that user+type (bounded to `>= 0`). This corrects Hemanth's row and any other historically approved rows that missed the deduction.
+### 2. Attendance Today (`src/routes/_authenticated/attendance.tsx` → `AttendancePage`)
 
-### 2. HR "Log leave" dialog (`src/routes/_authenticated/hr.leave.tsx`)
+- Extend the main `useQuery` to also fetch today's approved leaves for scoped users:
+  ```
+  supabase.from("leave_requests")
+    .select("user_id, leave_type, start_date, end_date, reason")
+    .eq("status", "approved")
+    .lte("start_date", today).gte("end_date", today)
+  ```
+  (Scoped by `deptScope` / `userScope` via a follow-up in-memory filter using the already-fetched people list.)
+- Build `onLeaveById = Map<user_id, leaveRow>`.
+- In the Today card:
+  - Add a top banner: "On leave today: {names, joined with •}" (hidden when empty).
+  - For each row, if `onLeaveById.has(p.id)`, render a distinct **"On leave · {type}"** badge (amber) in place of Absent/Signed off. Punch info line is replaced with "On approved leave — {start}–{end}".
+- Include `today` and a stable leave key in `queryKey` so it invalidates alongside attendance.
 
-- Remove the "Mark as pre-approved" checkbox and the `preApproved` state.
-- Always insert with `status='approved'`, `admin_comment='Logged by HR/Super Admin'`, `decided_at=now()`.
-- Toast copy: "Leave logged and approved — balance updated".
+### 3. Cache invalidation
 
-No other surfaces change; the regular employee request flow still goes through pending → approved.
+- `LogLeaveDialog.onSaved` already calls `qc.invalidateQueries()`, which will refresh both Day view and Attendance automatically after logging a leave.
 
-## Verification
+## Out of scope
 
-- Log a fresh leave for a test employee → row is `approved`, `leave_balances.used` increases by `days` immediately.
-- Re-check Hemanth: casual `used` reflects previously approved days after backfill.
+- Dashboard tile / calendar module — not requested; can be added later if needed.

@@ -172,7 +172,21 @@ function AccessPage() {
           <CardDescription>Creates accounts for the full Colladome roster (temp password <code className="px-1 rounded bg-muted">Test@123</code>) and syncs roles, monthly salaries, and departments. Safe to re-run — existing users are updated, not duplicated.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button className="gradient-primary" onClick={runProvisioning} disabled={provisioning}>{provisioning ? "Provisioning…" : "Run provisioning"}</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button className="gradient-primary" onClick={runProvisioning} disabled={provisioning}>{provisioning ? "Provisioning…" : "Run provisioning"}</Button>
+            <Button variant="outline" onClick={runSyncMissing} disabled={syncing}>{syncing ? "Syncing…" : "Sync missing accounts"}</Button>
+          </div>
+          {syncResult && (
+            <div className="text-sm space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline">Synced: {syncResult.synced.length}</Badge>
+                <Badge variant="outline">Already OK: {syncResult.alreadyOk.length}</Badge>
+                <Badge variant={syncResult.errors.length ? "destructive" : "outline"}>Errors: {syncResult.errors.length}</Badge>
+              </div>
+              {syncResult.synced.length > 0 && <details open><summary className="cursor-pointer text-muted-foreground">Synced ({syncResult.synced.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.synced.map((e) => <li key={e}>{e}</li>)}</ul></details>}
+              {syncResult.errors.length > 0 && <details open><summary className="cursor-pointer text-destructive">Errors</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.errors.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span>: {e.message}</li>)}</ul></details>}
+            </div>
+          )}
           {provisionResult && (
             <div className="text-sm space-y-2">
               <div className="flex flex-wrap gap-2">

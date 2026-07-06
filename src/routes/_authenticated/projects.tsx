@@ -234,6 +234,8 @@ function ProjectsPage() {
           </Card>
         ))}
       </div>
+        </>);
+      })()}
 
       <Dialog open={!!logFor} onOpenChange={(o) => !o && setLogFor(null)}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">

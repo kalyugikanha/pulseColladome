@@ -408,6 +408,7 @@ function FinancesPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Effective from</TableHead>
+                <TableHead className="text-right">Logged hours</TableHead>
                 <TableHead className="text-right">Proposed salary</TableHead>
                 <TableHead className="text-right">Actual salary</TableHead>
               </TableRow>
@@ -460,6 +461,7 @@ function FinancesPage() {
                       <Badge variant="outline" className="text-[10px] capitalize">{effType}</Badge>
                     </TableCell>
                     <TableCell>{s?.effective_from ?? (p.joined_on ? <span className="text-muted-foreground text-xs">joined {p.joined_on}</span> : "—")}</TableCell>
+                    <TableCell className="text-right tabular-nums">{(userHoursThisMonth.get(p.id) ?? 0).toFixed(1)}</TableCell>
                     <TableCell className="text-right">{proposedNode}</TableCell>
                     <TableCell className="text-right">{actualNode}</TableCell>
                   </TableRow>
@@ -472,6 +474,7 @@ function FinancesPage() {
                   <TableCell><Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Pending signup</Badge></TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px] capitalize">{g.comp_type ?? "monthly"}</Badge></TableCell>
                   <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
+                  <TableCell className="text-right text-muted-foreground">—</TableCell>
                   <TableCell className="text-right">
                     {g.comp_type === "hourly"
                       ? (g.default_hourly_rate != null ? <>{inr(Number(g.default_hourly_rate))}<span className="text-[10px] text-muted-foreground">/hr</span></> : <span className="text-muted-foreground">Not set</span>)
@@ -525,15 +528,20 @@ function FinancesPage() {
                       <TableCell className="text-right font-medium text-muted-foreground">{inr(totalUnallocated)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((totalUnallocated / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
                     </TableRow>
-                    {unallocatedRows.map((r) => (
-                      <TableRow key={`unallocated-${r.userId}`} className="bg-muted/20">
-                        <TableCell className="pl-8 text-sm text-muted-foreground">{r.name}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">—</TableCell>
-                        <TableCell className="text-right text-muted-foreground">0.0</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{inr(r.amount)}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((r.amount / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
-                      </TableRow>
-                    ))}
+                    {unallocatedRows.map((r) => {
+                      const loggedHrs = userHoursThisMonth.get(r.userId) ?? 0;
+                      return (
+                        <TableRow key={`unallocated-${r.userId}`} className="bg-muted/20">
+                          <TableCell className="pl-8 text-sm text-muted-foreground">{r.name}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {loggedHrs > 0 ? `${loggedHrs.toFixed(1)} hrs logged (no project code)` : "no hours logged"}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground tabular-nums">{loggedHrs.toFixed(1)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{inr(r.amount)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((r.amount / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </>
                 )}
               </TableBody>

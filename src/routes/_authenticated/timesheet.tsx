@@ -333,6 +333,15 @@ function TimesheetPage() {
                             );
                           })}
                           <TableCell className="text-right sticky right-0 bg-card z-10 font-semibold">{(rowTotals.get(u.id) ?? 0).toFixed(1)}</TableCell>
+                          {canEdit && (
+                            <TableCell className="text-right">
+                              <EditDayPopover
+                                rangeStart={startIso}
+                                rangeEnd={endIso}
+                                onPick={(d) => setEditor({ userId: u.id, userName: name, date: d })}
+                              />
+                            </TableCell>
+                          )}
                         </TableRow>
                       );
                     })}
@@ -340,6 +349,7 @@ function TimesheetPage() {
                       <TableCell className="sticky left-0 bg-card z-10 font-semibold">Total</TableCell>
                       {filteredProjects.map((p) => <TableCell key={p.code} className="text-right font-semibold">{(colTotals.get(p.code) ?? 0).toFixed(1)}</TableCell>)}
                       <TableCell className="text-right sticky right-0 bg-card z-10 font-bold">{grandTotal.toFixed(1)}</TableCell>
+                      {canEdit && <TableCell />}
                     </TableRow>
                   </TableBody>
                 </Table>

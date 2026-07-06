@@ -1,93 +1,80 @@
-# Multi-Stage Sequential Workflow for Tasks
+## Why Kanishka can't see her created templates
 
-Kanishka's request: one task ID flows through multiple owner-specific stages (Scriptwriting → Graphic → Review → PDF → Review → Client share → Client feedback → Posting → Live link). Currently a task has a single assignee, single reviewer, and flat status — this plan adds a first-class "stages" concept while keeping the existing task shell intact.
+`listTaskTemplates` embeds the assignee profile using
+`assignee:profiles!task_templates_default_assignee_id_fkey(...)`, but that
+FK actually points at `auth.users`, not `public.profiles`. PostgREST can't
+resolve the embed, returns an error, and the handler silently swallows it
+with `const { data } = await ...; return data ?? []` — so the page always
+receives `[]` and shows "No templates yet", even though the row exists and
+RLS allows Kanishka (department head + created_by) to read it.
 
-## Data model (new migration)
+Verified in the DB:
+- Template row exists: `Oswal Reels`, `created_by = Kanishka`.
+- `task_templates_default_assignee_id_fkey` → `auth.users(id)`.
+- Elsewhere we use `tasks_assignee_profile_fkey` on `tasks` that correctly
+  points to `profiles(id)` — this template embed was never wired the same way.
 
-New table `public.task_stages`:
-- `task_id` (FK tasks, cascade)
-- `position` (int, 1-based order)
-- `name` (text, e.g. "Scriptwriting", "Graphic preparation", "Client share")
-- `kind` (enum: `work` | `internal_review` | `client_review`) — controls approve/reject routing
-- `owner_id` (FK profiles) — who does this stage
-- `reviewer_id` (FK profiles, nullable) — for review stages
-- `status` (enum: `pending` | `active` | `in_review` | `changes_requested` | `done` | `skipped`)
-- `started_at`, `completed_at`, `decision_note` (text)
-- unique `(task_id, position)`
+## Why the "field no longer available" toast fires (Anjali's Create task)
 
-New table `public.task_stage_events` (audit trail per stage):
-- `stage_id`, `actor_id`, `kind` (`started` | `submitted` | `approved` | `rejected` | `reassigned` | `commented`), `from_status`, `to_status`, `note`, `created_at`
+That toast is the `taskCreateError` mapping of Postgres `23503` (foreign-key
+violation) from `create_task_full`. All the referenced taxonomy rows in the
+screenshot do exist, so the failing FK is most likely one of the newer ones
+added to `public.tasks` — `tasks_assignee_profile_fkey` (assignee must exist
+in `profiles`) or `tasks_reviewer_id_fkey` (reviewer must exist in
+`profiles`) — for an account whose `profiles` row wasn't created. Because
+the current error handler collapses every 23503 into the same generic
+message, we can't see which constraint tripped.
 
-Add to `public.tasks`:
-- `current_stage_id uuid` (nullable, FK task_stages)
-- `is_multi_stage boolean default false`
+## Fix plan
 
-RLS/GRANTs following project pattern:
-- Stage read: reuse `private.can_view_task(task_id)` + include stage `owner_id` / `reviewer_id` as viewers.
-- Stage write: owner can submit their own stage; reviewer can approve/reject a review stage; task creator / admin / project manager / department head can edit stage list and reassign.
-- All wired via `private.*` security-definer helpers (same style as existing task RLS).
+### 1. Templates list embed (root cause of Kanishka's issue)
 
-## Backend server functions (`src/lib/tasks-stages.functions.ts`)
+Migration:
+- Add `task_templates_default_assignee_profile_fkey`:
+  `FOREIGN KEY (default_assignee_id) REFERENCES public.profiles(id) ON DELETE SET NULL`.
+- Add `task_templates_created_by_profile_fkey` (same shape) so we can embed
+  the creator too if needed.
 
-All use `requireSupabaseAuth` and route through an RPC for atomicity:
+`src/lib/tasks-plus.functions.ts` — `listTaskTemplates`:
+- Change embed hint to
+  `assignee:profiles!task_templates_default_assignee_profile_fkey(...)`.
+- Stop swallowing errors: destructure `{ data, error }`, and on `error`
+  `throw new Error(error.message)` so future embed/RLS problems surface in
+  the toast instead of silently emptying the page.
 
-- `listTaskStages({ taskId })` — ordered stages + owner/reviewer profiles + latest event.
-- `setTaskStages({ taskId, stages: [{ name, kind, owner_id, reviewer_id? }] })` — replaces the stage list; only allowed while task hasn't started or by managers. Sets `is_multi_stage=true`, `current_stage_id` = first stage, first stage `active`.
-- `submitStage({ stageId, note? })` — owner marks their stage complete.
-  - If next stage is a review stage → current stage becomes `in_review`, no advance yet.
-  - Else → current `done`, advance `current_stage_id` to next stage (`active`), notify next owner.
-- `decideStage({ stageId, decision: "approve" | "reject", note? })` — reviewer only.
-  - approve: current `done` → advance to next stage; notify next owner. If no next → task `status='done'`.
-  - reject: current `changes_requested`; jump back to the previous non-review stage, set it `active`, notify its owner with `note` copied into task_stage_events + a task comment tagged "Rejected at <stage>".
-- `reassignStage({ stageId, ownerId })` — manager/creator only; logs event, notifies new owner.
-- `insertStageTemplate({ taskId, templateKey })` — optional helper for the OS0012 preset template (Scriptwriting → … → Live link).
+### 2. Task creation error diagnostics + auto-heal
 
-The single mutating RPC `public.advance_task_stage(_stage_id, _action, _note)` performs the state transition + event insert + task.current_stage_id update + notification in one transaction to avoid partial states (same pattern used for `create_task_full`).
+`src/lib/tasks-plus.functions.ts` — `taskCreateError`:
+- When code is `23503`, inspect `error.details` / `error.message` for the
+  constraint name and return a specific message:
+  - `tasks_assignee_profile_fkey` → "Selected assignee has no profile yet.
+    Ask an admin to sync them, then try again."
+  - `tasks_reviewer_id_fkey` → same wording for reviewer.
+  - `tasks_project_id_fkey` → "This project no longer exists. Refresh and
+    pick another."
+  - `task_task_types_task_type_id_fkey` → "One of the selected task types
+    was deleted. Reselect and try again."
+  - fallback keeps the current generic string.
 
-## UI
+`create_task_full` RPC migration (self-heal for the profile FK case):
+- Before inserting the task, `INSERT ... ON CONFLICT DO NOTHING` into
+  `public.profiles(id, full_name, email)` using data from `auth.users` for
+  both `_assignee_id` and the reviewer path so any authenticated user with a
+  valid `auth.users` row automatically gets a matching `profiles` row and
+  the FK cannot fail. This is the same pattern we use for other create RPCs.
 
-### 1. Task detail sheet (`src/components/tasks/task-detail-sheet.tsx`)
-New "Workflow" section shown when `is_multi_stage`:
-- Vertical stepper listing stages in order with owner avatar, kind badge (Work / Internal review / Client review), status pill.
-- Current stage highlighted; past stages collapsed with decision note.
-- Buttons contextual to viewer:
-  - Owner of active stage → "Mark stage complete" (+ optional note).
-  - Reviewer of in_review stage → "Approve" / "Send back with comments" (comment required for reject; auto-added to comments thread and shown on the previous owner's task card).
-  - Manager/creator → "Edit stages" (opens editor), "Reassign owner" per stage.
-- Full stage history rendered inline (who did what, when, feedback).
+### 3. Verify
 
-### 2. Stage editor dialog
-- Add / remove / reorder (drag) rows.
-- Each row: name (free text or preset), kind, owner (profile picker), reviewer (only when kind is review).
-- "Load template: OS0012 content pipeline" button seeds Kanishka's 9-step flow.
-- Save calls `setTaskStages`.
+- Reload Task Templates as Kanishka → "Oswal Reels" appears with assignee
+  chip populated.
+- Anjali creates a fresh task with reviewer = Kanishka → succeeds; if any
+  FK still fails, the toast now names the field.
 
-### 3. Task creation (`src/routes/_authenticated/tasks.tsx`)
-- New "Multi-stage workflow" toggle in the create dialog. When on:
-  - Assignee picker is replaced by the stage editor (first stage owner defaults to the current assignee).
-  - After task RPC succeeds, immediately call `setTaskStages`.
-- When off, existing single-assignee flow is unchanged.
+## Files touched
 
-### 4. Task list / My Tasks
-- Show a small "Stage: <name> · <owner>" chip on cards where `is_multi_stage`.
-- "My Tasks" filter includes any task whose *current active stage owner* is me, so a rejected item automatically reappears in the previous owner's list (satisfies the "goes back to Anjali with comments" requirement).
-- "Awaiting my review" already covers reviewers via the current stage's reviewer_id — extend the existing `listAwaitingMyReview` fn to include stage reviews.
+- new migration: add profile FKs on `task_templates`, patch
+  `create_task_full` to backfill missing profile rows.
+- `src/lib/tasks-plus.functions.ts` — fix embed hint, throw on list error,
+  richer `taskCreateError` mapping.
 
-### 5. Notifications
-Reuse `public.notifications`; new `kind` values: `stage_assigned`, `stage_review_requested`, `stage_approved`, `stage_rejected`. Body includes stage name and note.
-
-## Error handling
-Map RPC errors (`42501` → "You don't have permission for this stage action", `P0001` custom → surface message verbatim) via the existing `taskCreateError` helper, extended to `stageActionError`.
-
-## Verification
-1. As admin, create task "OS0012" with multi-stage toggle → load OS0012 template → save.
-2. As scriptwriter → submit stage 1 → task moves to Anjali.
-3. As Anjali → submit → task enters review, appears in Kanishka's "Awaiting my review".
-4. Kanishka rejects with note → task returns to Anjali's My Tasks with the note visible on the card + in stage history.
-5. Kanishka approves → task advances to Sandhya (PDF).
-6. Continue through to Live link; final approval sets task `status='done'` and records full audit trail.
-
-## Technical notes
-- Keep `tasks.assignee_id` in sync with the current active stage's `owner_id` (trigger on `task_stages` status change) so all existing views ("My Tasks", assignee filters, RLS) keep working without rewrites.
-- Existing single-stage tasks stay untouched (`is_multi_stage=false`, no rows in `task_stages`).
-- Presets stored as a constant in `src/lib/task-stage-templates.ts`; can be moved into a DB table later if HR wants to manage them in-app.
+No UI/component changes required.

@@ -117,9 +117,11 @@ type TaskInput = {
   taskTypeIds: string[];
 };
 
-function taskCreateError(error: { message?: string; code?: string } | Error): Error {
+function taskCreateError(error: { message?: string; code?: string; details?: string } | Error): Error {
   const message = error.message ?? "Task could not be created";
   const code = "code" in error ? error.code : undefined;
+  const details = "details" in error ? (error.details ?? "") : "";
+  const blob = `${message} ${details}`;
 
   if (
     code === "42501" ||
@@ -128,6 +130,24 @@ function taskCreateError(error: { message?: string; code?: string } | Error): Er
     return new Error("You don't have permission to assign this task/type combination.");
   }
   if (code === "23503" || /foreign key/i.test(message)) {
+    if (/tasks_assignee(_profile)?_fkey/.test(blob)) {
+      return new Error("Selected assignee has no profile yet. Ask an admin to sync them, then try again.");
+    }
+    if (/tasks_reviewer_id_fkey/.test(blob)) {
+      return new Error("Selected reviewer has no profile yet. Ask an admin to sync them, then try again.");
+    }
+    if (/tasks_project_id_fkey/.test(blob)) {
+      return new Error("This project no longer exists. Refresh and pick another.");
+    }
+    if (/task_task_types_task_type_id_fkey/.test(blob)) {
+      return new Error("One of the selected task types was deleted. Reselect and try again.");
+    }
+    if (/tasks_domain_id_fkey/.test(blob)) {
+      return new Error("The selected domain was removed. Pick another.");
+    }
+    if (/tasks_department_id_fkey/.test(blob)) {
+      return new Error("The selected department was removed. Pick another.");
+    }
     return new Error("One of the selected task fields is no longer available. Please reselect project, assignee, and task type.");
   }
   if (code === "23514" || /required|check/i.test(message)) {
@@ -262,17 +282,18 @@ type TemplateInput = {
 export const listTaskTemplates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data } = await context.supabase
+    const { data, error } = await context.supabase
       .from("task_templates")
       .select(`
         *,
-        assignee:profiles!task_templates_default_assignee_id_fkey(id, full_name, department),
+        assignee:profiles!task_templates_default_assignee_profile_fkey(id, full_name, department),
         project:projects(id, name),
         domain:taxonomy_domains(id, name),
         department:taxonomy_departments(id, name),
         task_types:task_template_task_types(task_type:taxonomy_task_types(id, name))
       `)
       .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
     return data ?? [];
   });
 

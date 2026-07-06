@@ -415,6 +415,16 @@ function TimesheetPage() {
                   <span className="font-mono text-xs mr-2">{drill.code}</span>{drill.name} — {drill.entries.reduce((s, e) => s + e.hours, 0).toFixed(1)} hrs
                 </SheetDescription>
               </SheetHeader>
+              {canEdit && (
+                <div className="mt-4 flex justify-end">
+                  <EditDayPopover
+                    rangeStart={startIso}
+                    rangeEnd={endIso}
+                    label="Add / edit another day"
+                    onPick={(d) => { setEditor({ userId: drill.userId, userName: drill.user, date: d }); setDrill(null); }}
+                  />
+                </div>
+              )}
               <div className="mt-4">
                 <Table>
                   <TableHeader><TableRow>

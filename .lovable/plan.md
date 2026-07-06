@@ -1,29 +1,36 @@
-## Diagnosis
-Kanishka's Google account exists in `auth.users` (provider `google`, last sign-in Jul 4) — the account itself is fine. The failure is in the client OAuth flow in `src/routes/auth.tsx`. Two smells that together explain "click Google → return to sign-in screen, no error":
+## Goal
+Support two compensation types per employee in Finances: **fixed monthly salary** (current behavior) or **hourly rate card** (e.g. Arpit @ ₹400/hr). Admin can pick the type when setting comp, and monthly cost + project burn compute correctly for both.
 
-1. **`extraParams: { hd: "*" }`** restricts the Google chooser to *any Google Workspace* account and rejects personal Gmail. If Kanishka's `kanishka@colladome.in` isn't backed by a Workspace tenant that Google's `hd` filter recognises for her session (secondary domain, alias, or SSO artefact), Google closes the flow silently. `enforce_colladome_email()` in the DB already blocks non-Colladome domains, so `hd` is redundant defence at the cost of false negatives.
-2. **`redirect_uri: window.location.origin`** returns her to `/` (landing page). Landing page keeps its "Sign in" nav until a `useEffect` hydrates the session; if she taps it before that, she goes to `/auth`, which flashes as "same sign-in screen again" until `beforeLoad` finishes and forwards to `/dashboard`. Not itself the bug, but it turns any hiccup above into "nothing happened".
+## Schema change (single migration)
+Extend `public.salaries`:
+- `comp_type text NOT NULL DEFAULT 'monthly'` with CHECK in `('monthly','hourly')`
+- `hourly_rate numeric(12,2)` (nullable)
+- Drop the existing `monthly_salary >= 0` NOT NULL requirement — make `monthly_salary` nullable
+- Add row-level CHECK: if `comp_type='monthly'` then `monthly_salary` required; if `hourly` then `hourly_rate` required
 
-## Fix (frontend only)
-File: `src/routes/auth.tsx`
+(existing RLS/grants unchanged)
 
-- Drop `hd: "*"`. Keep `prompt: "select_account"`. Domain enforcement stays with the DB trigger, whose error message already surfaces via the existing `/colladome/i` toast.
-- Send OAuth to a dedicated public callback route so the return path always resolves the session before deciding where to go.
+## Finances page changes (`src/routes/_authenticated/finances.tsx`)
 
-New file: `src/routes/auth.callback.tsx` (public, no auth guard)
+**SalaryDialog** — add a "Compensation type" radio (Monthly / Hourly). Show either "Monthly salary (INR)" or "Hourly rate (INR/hr)" input accordingly. Insert row with appropriate fields.
 
-- On mount, `await supabase.auth.getSession()` with a short retry (up to ~2s) to cover the tiny race after the broker sets tokens.
-- If session present → `navigate({ to: "/dashboard", replace: true })`.
-- If still no session after retry → `navigate({ to: "/auth", replace: true })` with a toast "Sign-in didn't complete — please try again."
-- Renders a minimal "Signing you in…" spinner card.
+**Salaries table** — replace "Monthly salary" column with two:
+- `Type` (badge: Monthly / Hourly)
+- `Rate` (₹X/month or ₹Y/hr)
 
-Update `handleGoogle` to pass `redirect_uri: \`${window.location.origin}/auth/callback\``.
+**Burn calculation** — update `burnByProject`:
+- For monthly-comp users: current salary-share allocation (unchanged).
+- For hourly-comp users: `burn = hours_on_project × hourly_rate` (direct, no share math).
 
-## Verification
-1. In the preview (iframe popup flow) sign in with a Colladome Google account → land on `/dashboard`.
-2. On the published URL, full-page redirect → returns to `/auth/callback` → forwards to `/dashboard`.
-3. Ask Kanishka to retry on `https://colladome-pulse.lovable.app`; if she still hits the screen with no message, capture the browser console at that moment — that will tell us whether Google returned `error=access_denied` or the session simply never landed.
+**Configured pool stat** — for hourly users, contribute `hourly_rate × hours_logged_this_month` (or omit from "pool" since it's variable; label clarified).
+
+## Roster seeding
+Update `TEAM_ROSTER` in `src/lib/admin-users.functions.ts` so Arpit (`arpit@colladome.in`) gets `comp_type: 'hourly'`, `hourly_rate: 400`. `bulkProvisionTeam` writes those fields into `role_grants` + `salaries`. Extend `role_grants` similarly (add `comp_type`, `hourly_rate` cols) so invited-but-unregistered hourly users display correctly.
+
+## Files
+- new migration: extend `salaries` + `role_grants`
+- `src/routes/_authenticated/finances.tsx` — dialog, table, burn math
+- `src/lib/admin-users.functions.ts` — TEAM_ROSTER + upserts
 
 ## Out of scope
-- No auth provider config changes; managed Google OAuth handled by Lovable is left as-is.
-- No changes to the DB email-domain trigger.
+Timesheet approval flow, invoicing, retroactive rate history UI (rows are already time-versioned via `effective_from`).

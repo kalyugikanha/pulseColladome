@@ -5,13 +5,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useHolidays, weeklyOffLabel } from "@/hooks/use-holidays";
-import { createTeamCalendarBooking, listTeamCalendarEvents, syncMyGoogleCalendar } from "@/lib/google-calendar.functions";
+import { createTeamCalendarBooking, findAvailableSlots, listTeamCalendarEvents, syncMyGoogleCalendar } from "@/lib/google-calendar.functions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,7 +25,9 @@ import {
 import {
   ChevronLeft, ChevronRight, PartyPopper, Search, Cake, Trophy,
   CalendarClock, Filter, Settings2, X, RefreshCw, Plus, Link as LinkIcon, AlertCircle,
+  CalendarIcon, Users, ArrowLeft, ArrowRight, Check,
 } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/calendar")({
   component: CalendarPage,

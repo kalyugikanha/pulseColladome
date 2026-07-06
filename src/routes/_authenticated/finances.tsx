@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
 });
 
-type Profile = { id: string; full_name: string | null; email: string | null; department: string | null; is_active: boolean | null };
+type Profile = { id: string; full_name: string | null; email: string | null; department: string | null; is_active: boolean | null; joined_on: string | null };
 type Salary = { id: string; user_id: string; monthly_salary: number | null; hourly_rate: number | null; comp_type: "monthly" | "hourly"; currency: string; effective_from: string };
 type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly"; department: string | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
@@ -40,7 +40,7 @@ function FinancesPage() {
     queryKey: ["finances-profiles"],
     enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department, is_active").order("full_name");
+      const { data, error } = await supabase.from("profiles").select("id, full_name, email, department, is_active, joined_on").order("full_name");
       if (error) throw error;
       return (data ?? []) as Profile[];
     },
@@ -203,18 +203,48 @@ function FinancesPage() {
   }, [grants]);
   const nameFromEmail = (e: string) => e.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-  // Active + department-filtered roster used by the top-line stats
+  // Selected month bounds (UTC).
+  const [monthStart, monthEnd] = useMemo(() => {
+    const [y, m] = month.split("-").map(Number);
+    return [new Date(Date.UTC(y, m - 1, 1)), new Date(Date.UTC(y, m, 0))];
+  }, [month]);
+  const todayMonthKey = monthKey(new Date());
+
+  // Earliest "effective" date per user: min salaries.effective_from, else joined_on.
+  const earliestEffectiveByUser = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of salaries ?? []) {
+      const prev = map.get(s.user_id);
+      if (!prev || s.effective_from < prev) map.set(s.user_id, s.effective_from);
+    }
+    for (const p of profiles ?? []) {
+      if (map.has(p.id)) continue;
+      if (p.joined_on) map.set(p.id, p.joined_on);
+    }
+    return map;
+  }, [salaries, profiles]);
+
+  const isProfileEffectiveInMonth = (p: Profile) => {
+    const earliest = earliestEffectiveByUser.get(p.id);
+    if (!earliest) return false;
+    return new Date(earliest) <= monthEnd;
+  };
+
+  // Active + department-filtered + effective-in-month roster
   const visibleProfiles = useMemo(() => {
     return (profiles ?? []).filter((p) => {
       if (p.is_active === false) return false;
-      if (deptSel.size === 0) return true;
-      return deptSel.has(p.department ?? UNASSIGNED);
+      if (deptSel.size > 0 && !deptSel.has(p.department ?? UNASSIGNED)) return false;
+      return isProfileEffectiveInMonth(p);
     });
-  }, [profiles, deptSel]);
+  }, [profiles, deptSel, earliestEffectiveByUser, monthEnd]);
+
   const visiblePendingGrants = useMemo(() => {
+    // Grants have no join date; only show pending invites for the current/future months.
+    if (month < todayMonthKey) return [];
     if (deptSel.size === 0) return pendingGrants;
     return pendingGrants.filter((g) => deptSel.has(g.department ?? UNASSIGNED));
-  }, [pendingGrants, deptSel]);
+  }, [pendingGrants, deptSel, month, todayMonthKey]);
 
   const usersWithSalary = useMemo(
     () => visibleProfiles.filter((p) => currentSalaryByUser.has(p.id)).length,
@@ -262,7 +292,7 @@ function FinancesPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs logged`} />
-        <StatCard icon={<Wallet className="h-4 w-4" />} label="Configured pool" value={inr(totalConfiguredPool)} sub="salaries table only" />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Actual salary pool" value={inr(totalConfiguredPool)} sub="pro-rated for selected month" />
         <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${visibleProfiles.length + visiblePendingGrants.length} on roster`} />
         <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(visiblePendingGrants.length)} sub="invite sent, not registered" />
       </div>
@@ -271,7 +301,7 @@ function FinancesPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Salaries</CardTitle>
-            <CardDescription>Every invited employee — pending signups show their configured salary but need to register first.</CardDescription>
+            <CardDescription>Effective employees for {month}. Actual salary is pro-rated to the days the salary was in force this month.</CardDescription>
           </div>
           <SalaryDialog profiles={profiles ?? []} onSaved={() => qc.invalidateQueries({ queryKey: ["finances-salaries"] })} />
         </CardHeader>
@@ -283,19 +313,17 @@ function FinancesPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">Rate</TableHead>
                 <TableHead>Effective from</TableHead>
+                <TableHead className="text-right">Proposed salary</TableHead>
+                <TableHead className="text-right">Actual salary</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(profiles ?? []).filter((p) => {
-                if (deptSel.size === 0) return true;
-                return p.department ? deptSel.has(p.department) : deptSel.has(UNASSIGNED);
-              }).map((p) => {
+              {visibleProfiles.map((p) => {
                 const s = currentSalaryByUser.get(p.id);
                 const grant = p.email ? grantByEmail.get(p.email.toLowerCase()) : undefined;
                 const effType: "monthly" | "hourly" = s?.comp_type ?? grant?.comp_type ?? "monthly";
-                const rateNode = s
+                const proposedNode = s
                   ? (s.comp_type === "hourly"
                       ? <span>{inr(Number(s.hourly_rate ?? 0))}<span className="text-[10px] text-muted-foreground">/hr</span></span>
                       : inr(Number(s.monthly_salary ?? 0)))
@@ -307,6 +335,24 @@ function FinancesPage() {
                         {" "}<span className="text-[10px]">(from invite)</span>
                       </span>
                     : <span className="text-muted-foreground">Not set</span>;
+
+                let actualNode: React.ReactNode = <span className="text-muted-foreground">—</span>;
+                if (s) {
+                  const actual = s.comp_type === "hourly"
+                    ? (userHoursThisMonth.get(p.id) ?? 0) * Number(s.hourly_rate ?? 0)
+                    : (monthlyContribByUser.get(p.id) ?? 0);
+                  const effDate = new Date(s.effective_from);
+                  const startedMidMonth = s.comp_type === "monthly" && effDate >= monthStart && effDate <= monthEnd;
+                  actualNode = (
+                    <div className="flex flex-col items-end">
+                      <span>{inr(actual)}</span>
+                      {startedMidMonth && (
+                        <span className="text-[10px] text-muted-foreground">prorated from {s.effective_from}</span>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
@@ -315,23 +361,25 @@ function FinancesPage() {
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] capitalize">{effType}</Badge>
                     </TableCell>
-                    <TableCell className="text-right">{rateNode}</TableCell>
-                    <TableCell>{s?.effective_from ?? "—"}</TableCell>
+                    <TableCell>{s?.effective_from ?? (p.joined_on ? <span className="text-muted-foreground text-xs">joined {p.joined_on}</span> : "—")}</TableCell>
+                    <TableCell className="text-right">{proposedNode}</TableCell>
+                    <TableCell className="text-right">{actualNode}</TableCell>
                   </TableRow>
                 );
               })}
-              {pendingGrants.map((g) => (
+              {visiblePendingGrants.map((g) => (
                 <TableRow key={g.email} className="opacity-70">
                   <TableCell className="font-medium">{nameFromEmail(g.email)}</TableCell>
                   <TableCell className="text-muted-foreground">{g.email}</TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Pending signup</Badge></TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px] capitalize">{g.comp_type ?? "monthly"}</Badge></TableCell>
+                  <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
                   <TableCell className="text-right">
                     {g.comp_type === "hourly"
                       ? (g.default_hourly_rate != null ? <>{inr(Number(g.default_hourly_rate))}<span className="text-[10px] text-muted-foreground">/hr</span></> : <span className="text-muted-foreground">Not set</span>)
                       : (g.default_monthly_salary != null ? inr(Number(g.default_monthly_salary)) : <span className="text-muted-foreground">Not set</span>)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">On first login</TableCell>
+                  <TableCell className="text-right text-muted-foreground">—</TableCell>
                 </TableRow>
               ))}
             </TableBody>

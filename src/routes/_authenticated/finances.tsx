@@ -203,18 +203,48 @@ function FinancesPage() {
   }, [grants]);
   const nameFromEmail = (e: string) => e.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-  // Active + department-filtered roster used by the top-line stats
+  // Selected month bounds (UTC).
+  const [monthStart, monthEnd] = useMemo(() => {
+    const [y, m] = month.split("-").map(Number);
+    return [new Date(Date.UTC(y, m - 1, 1)), new Date(Date.UTC(y, m, 0))];
+  }, [month]);
+  const todayMonthKey = monthKey(new Date());
+
+  // Earliest "effective" date per user: min salaries.effective_from, else joined_on.
+  const earliestEffectiveByUser = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of salaries ?? []) {
+      const prev = map.get(s.user_id);
+      if (!prev || s.effective_from < prev) map.set(s.user_id, s.effective_from);
+    }
+    for (const p of profiles ?? []) {
+      if (map.has(p.id)) continue;
+      if (p.joined_on) map.set(p.id, p.joined_on);
+    }
+    return map;
+  }, [salaries, profiles]);
+
+  const isProfileEffectiveInMonth = (p: Profile) => {
+    const earliest = earliestEffectiveByUser.get(p.id);
+    if (!earliest) return false;
+    return new Date(earliest) <= monthEnd;
+  };
+
+  // Active + department-filtered + effective-in-month roster
   const visibleProfiles = useMemo(() => {
     return (profiles ?? []).filter((p) => {
       if (p.is_active === false) return false;
-      if (deptSel.size === 0) return true;
-      return deptSel.has(p.department ?? UNASSIGNED);
+      if (deptSel.size > 0 && !deptSel.has(p.department ?? UNASSIGNED)) return false;
+      return isProfileEffectiveInMonth(p);
     });
-  }, [profiles, deptSel]);
+  }, [profiles, deptSel, earliestEffectiveByUser, monthEnd]);
+
   const visiblePendingGrants = useMemo(() => {
+    // Grants have no join date; only show pending invites for the current/future months.
+    if (month < todayMonthKey) return [];
     if (deptSel.size === 0) return pendingGrants;
     return pendingGrants.filter((g) => deptSel.has(g.department ?? UNASSIGNED));
-  }, [pendingGrants, deptSel]);
+  }, [pendingGrants, deptSel, month, todayMonthKey]);
 
   const usersWithSalary = useMemo(
     () => visibleProfiles.filter((p) => currentSalaryByUser.has(p.id)).length,

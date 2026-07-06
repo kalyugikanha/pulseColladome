@@ -382,12 +382,13 @@ function FinancesPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-        <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total burn" value={inr(totalBurn)} sub={totalUnallocated > 0 ? `${totalHours.toFixed(1)} hrs · ${inr(totalUnallocated)} unallocated` : `${totalHours.toFixed(1)} hrs logged`} />
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Project allocated burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} project hrs`} />
+        <StatCard icon={<Wallet className="h-4 w-4" />} label="Unallocated salary" value={inr(totalUnallocated)} sub={totalUnallocated > 0 ? "salary with no project hours" : "fully allocated"} />
+        <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Total salary burn" value={inr(totalBurn + totalUnallocated)} sub="allocated + unallocated" />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Proposed salary pool" value={inr(totalProposedPool)} sub="full configured amount" />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Actual salary pool" value={inr(totalConfiguredPool)} sub="pro-rated + unpaid leave" />
         <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${visibleProfiles.length + visiblePendingGrants.length} on roster`} />
-        <StatCard icon={<UserPlus className="h-4 w-4" />} label="Pending signups" value={String(visiblePendingGrants.length)} sub="invite sent, not registered" />
       </div>
 
       <Card>
@@ -500,7 +501,7 @@ function FinancesPage() {
                   <TableHead>Code</TableHead>
                   <TableHead className="text-right">Hours</TableHead>
                   <TableHead className="text-right">Burn</TableHead>
-                  <TableHead className="text-right">% of total</TableHead>
+                  <TableHead className="text-right">% of salary burn</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -510,19 +511,30 @@ function FinancesPage() {
                     <TableCell className="font-mono text-xs">{r.code}</TableCell>
                     <TableCell className="text-right">{r.hours.toFixed(1)}</TableCell>
                     <TableCell className="text-right">{inr(r.burn)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{totalBurn > 0 ? ((r.burn / totalBurn) * 100).toFixed(1) : "0"}%</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((r.burn / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
                   </TableRow>
                 ))}
                 {totalUnallocated > 0 && (
-                  <TableRow className="bg-muted/30">
-                    <TableCell className="font-medium text-muted-foreground italic" title={unallocatedRows.map((r) => `${r.name}: ${inr(r.amount)}`).join("\n")}>
-                      Unallocated (no project hours)
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">—</TableCell>
-                    <TableCell className="text-right text-muted-foreground">0.0</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{inr(totalUnallocated)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((totalUnallocated / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
-                  </TableRow>
+                  <>
+                    <TableRow className="bg-muted/40">
+                      <TableCell className="font-medium text-muted-foreground italic">
+                        Unallocated salary
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">no project hours</TableCell>
+                      <TableCell className="text-right text-muted-foreground">0.0</TableCell>
+                      <TableCell className="text-right font-medium text-muted-foreground">{inr(totalUnallocated)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((totalUnallocated / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
+                    </TableRow>
+                    {unallocatedRows.map((r) => (
+                      <TableRow key={`unallocated-${r.userId}`} className="bg-muted/20">
+                        <TableCell className="pl-8 text-sm text-muted-foreground">{r.name}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">—</TableCell>
+                        <TableCell className="text-right text-muted-foreground">0.0</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{inr(r.amount)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{totalConfiguredPool > 0 ? ((r.amount / totalConfiguredPool) * 100).toFixed(1) : "0"}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </>
                 )}
               </TableBody>
             </Table>

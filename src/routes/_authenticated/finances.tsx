@@ -336,6 +336,24 @@ function FinancesPage() {
     return sum;
   }, [visibleProfiles, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth]);
 
+  // Unallocated: actual salary that couldn't be attributed to any project (typically zero project hours).
+  const unallocatedRows = useMemo(() => {
+    const rows: Array<{ userId: string; name: string; amount: number }> = [];
+    for (const p of visibleProfiles) {
+      const s = currentSalaryByUser.get(p.id);
+      if (!s) continue;
+      const actual = s.comp_type === "hourly"
+        ? Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0)
+        : (monthlyContribByUser.get(p.id) ?? 0);
+      const allocated = allocatedByUser.get(p.id) ?? 0;
+      const gap = actual - allocated;
+      if (gap > 0.5) rows.push({ userId: p.id, name: p.full_name || p.email || "—", amount: gap });
+    }
+    return rows.sort((a, b) => b.amount - a.amount);
+  }, [visibleProfiles, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth, allocatedByUser]);
+  const totalUnallocated = useMemo(() => unallocatedRows.reduce((s, r) => s + r.amount, 0), [unallocatedRows]);
+
+
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!me?.isFinanceAdmin) {
     throw redirect({ to: "/dashboard" });

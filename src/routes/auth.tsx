@@ -21,8 +21,20 @@ function AuthPage() {
 
   async function handleGoogle() {
     setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) { toast.error(result.error.message || "Google sign-in failed"); setLoading(false); return; }
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+      extraParams: { hd: "*", prompt: "select_account" },
+    });
+    if (result.error) {
+      const msg = result.error.message || "Google sign-in failed";
+      toast.error(
+        /colladome/i.test(msg)
+          ? "Only @colladome.com or @colladome.in Google accounts are allowed. Please contact HR."
+          : msg
+      );
+      setLoading(false);
+      return;
+    }
     if (result.redirected) return;
     router.navigate({ to: "/dashboard", replace: true });
   }

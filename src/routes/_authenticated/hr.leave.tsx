@@ -510,11 +510,8 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
             <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
           </div>
           <div className="space-y-1"><Label>Reason / note</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional context" /></div>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox checked={preApproved} onCheckedChange={(v) => setPreApproved(v === true)} />
-            <span>Mark as pre-approved (updates balance immediately)</span>
-          </label>
-          <p className="text-xs text-muted-foreground">Past dates are allowed — useful for logging leaves that already happened.</p>
+          <p className="text-xs text-muted-foreground">Leave is auto-approved and deducted from the employee's balance. Past dates are allowed.</p>
+
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>

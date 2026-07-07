@@ -202,12 +202,18 @@ function MyTimesheetPage() {
                     <TableCell>
                       {r.approved
                         ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><Lock className="h-3 w-3" /> Approved</Badge>
-                        : <Badge variant="outline">Pending</Badge>}
+                        : r.pending
+                          ? <Badge variant="outline" className="text-amber-700 border-amber-500/60">Awaiting approval</Badge>
+                          : <Badge variant="outline">Pending</Badge>}
                     </TableCell>
                     <TableCell>
-                      <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditor({ date: r.date })}>
-                        <Pencil className="h-3 w-3 mr-1" /> {r.approved ? "View" : "Edit"}
-                      </Button>
+                      {r.taskId ? (
+                        <span className="text-xs text-muted-foreground">via task</span>
+                      ) : (
+                        <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditor({ date: r.date })}>
+                          <Pencil className="h-3 w-3 mr-1" /> {r.approved ? "View" : "Edit"}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

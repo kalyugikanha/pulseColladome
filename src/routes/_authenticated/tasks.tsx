@@ -465,7 +465,7 @@ function TasksPage() {
 
             <TaxonomyPicker value={tax_} onChange={setTax} />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1"><Label>Due date</Label>
                 <Input type="date" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
               <div className="space-y-1"><Label>Priority</Label>
@@ -477,6 +477,15 @@ function TasksPage() {
                     <SelectItem value="high">High</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Estimated hours</Label>
+                <Input
+                  type="number" min={0} step={0.25}
+                  value={tEstimate}
+                  onChange={(e) => setTEstimate(e.target.value)}
+                  placeholder="e.g. 4"
+                />
               </div>
             </div>
 

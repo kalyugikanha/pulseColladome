@@ -35,13 +35,18 @@ import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_authenticated/complete-onboarding'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedBdRouteImport } from './routes/_authenticated/bd'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
+import { Route as AuthenticatedBdIndexRouteImport } from './routes/_authenticated/bd.index'
 import { Route as ApiAssistantTranscribeRouteImport } from './routes/api/assistant/transcribe'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as AuthenticatedHrOnboardingRouteImport } from './routes/_authenticated/hr.onboarding'
 import { Route as AuthenticatedHrLeaveRouteImport } from './routes/_authenticated/hr.leave'
+import { Route as AuthenticatedBdReportsRouteImport } from './routes/_authenticated/bd.reports'
+import { Route as AuthenticatedBdRecurringRouteImport } from './routes/_authenticated/bd.recurring'
+import { Route as AuthenticatedBdActivityTypesRouteImport } from './routes/_authenticated/bd.activity-types'
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
 
@@ -181,6 +186,11 @@ const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBdRoute = AuthenticatedBdRouteImport.update({
+  id: '/bd',
+  path: '/bd',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
@@ -195,6 +205,11 @@ const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
   id: '/access',
   path: '/access',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedBdIndexRoute = AuthenticatedBdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedBdRoute,
 } as any)
 const ApiAssistantTranscribeRoute = ApiAssistantTranscribeRouteImport.update({
   id: '/api/assistant/transcribe',
@@ -217,6 +232,23 @@ const AuthenticatedHrLeaveRoute = AuthenticatedHrLeaveRouteImport.update({
   path: '/hr/leave',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBdReportsRoute = AuthenticatedBdReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedBdRoute,
+} as any)
+const AuthenticatedBdRecurringRoute =
+  AuthenticatedBdRecurringRouteImport.update({
+    id: '/recurring',
+    path: '/recurring',
+    getParentRoute: () => AuthenticatedBdRoute,
+  } as any)
+const AuthenticatedBdActivityTypesRoute =
+  AuthenticatedBdActivityTypesRouteImport.update({
+    id: '/activity-types',
+    path: '/activity-types',
+    getParentRoute: () => AuthenticatedBdRoute,
+  } as any)
 const AuthenticatedAdminTaxonomyRoute =
   AuthenticatedAdminTaxonomyRouteImport.update({
     id: '/admin/taxonomy',
@@ -237,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/access': typeof AuthenticatedAccessRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
+  '/bd': typeof AuthenticatedBdRouteWithChildren
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -259,10 +292,14 @@ export interface FileRoutesByFullPath {
   '/vendors': typeof AuthenticatedVendorsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
+  '/bd/recurring': typeof AuthenticatedBdRecurringRoute
+  '/bd/reports': typeof AuthenticatedBdReportsRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
+  '/bd/': typeof AuthenticatedBdIndexRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -295,10 +332,14 @@ export interface FileRoutesByTo {
   '/vendors': typeof AuthenticatedVendorsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
+  '/bd/recurring': typeof AuthenticatedBdRecurringRoute
+  '/bd/reports': typeof AuthenticatedBdReportsRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
+  '/bd': typeof AuthenticatedBdIndexRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesById {
@@ -311,6 +352,7 @@ export interface FileRoutesById {
   '/_authenticated/access': typeof AuthenticatedAccessRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
+  '/_authenticated/bd': typeof AuthenticatedBdRouteWithChildren
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -333,10 +375,14 @@ export interface FileRoutesById {
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
+  '/_authenticated/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
+  '/_authenticated/bd/recurring': typeof AuthenticatedBdRecurringRoute
+  '/_authenticated/bd/reports': typeof AuthenticatedBdReportsRoute
   '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/_authenticated/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/assistant/transcribe': typeof ApiAssistantTranscribeRoute
+  '/_authenticated/bd/': typeof AuthenticatedBdIndexRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRouteTypes {
@@ -349,6 +395,7 @@ export interface FileRouteTypes {
     | '/access'
     | '/analytics'
     | '/attendance'
+    | '/bd'
     | '/calendar'
     | '/complete-onboarding'
     | '/dashboard'
@@ -371,10 +418,14 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/auth/callback'
     | '/admin/taxonomy'
+    | '/bd/activity-types'
+    | '/bd/recurring'
+    | '/bd/reports'
     | '/hr/leave'
     | '/hr/onboarding'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
+    | '/bd/'
     | '/api/public/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -407,10 +458,14 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/auth/callback'
     | '/admin/taxonomy'
+    | '/bd/activity-types'
+    | '/bd/recurring'
+    | '/bd/reports'
     | '/hr/leave'
     | '/hr/onboarding'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
+    | '/bd'
     | '/api/public/google/callback'
   id:
     | '__root__'
@@ -422,6 +477,7 @@ export interface FileRouteTypes {
     | '/_authenticated/access'
     | '/_authenticated/analytics'
     | '/_authenticated/attendance'
+    | '/_authenticated/bd'
     | '/_authenticated/calendar'
     | '/_authenticated/complete-onboarding'
     | '/_authenticated/dashboard'
@@ -444,10 +500,14 @@ export interface FileRouteTypes {
     | '/_authenticated/vendors'
     | '/auth/callback'
     | '/_authenticated/admin/taxonomy'
+    | '/_authenticated/bd/activity-types'
+    | '/_authenticated/bd/recurring'
+    | '/_authenticated/bd/reports'
     | '/_authenticated/hr/leave'
     | '/_authenticated/hr/onboarding'
     | '/api/assistant/chat'
     | '/api/assistant/transcribe'
+    | '/_authenticated/bd/'
     | '/api/public/google/callback'
   fileRoutesById: FileRoutesById
 }
@@ -646,6 +706,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/bd': {
+      id: '/_authenticated/bd'
+      path: '/bd'
+      fullPath: '/bd'
+      preLoaderRoute: typeof AuthenticatedBdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/attendance': {
       id: '/_authenticated/attendance'
       path: '/attendance'
@@ -666,6 +733,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/access'
       preLoaderRoute: typeof AuthenticatedAccessRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/bd/': {
+      id: '/_authenticated/bd/'
+      path: '/'
+      fullPath: '/bd/'
+      preLoaderRoute: typeof AuthenticatedBdIndexRouteImport
+      parentRoute: typeof AuthenticatedBdRoute
     }
     '/api/assistant/transcribe': {
       id: '/api/assistant/transcribe'
@@ -695,6 +769,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHrLeaveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/bd/reports': {
+      id: '/_authenticated/bd/reports'
+      path: '/reports'
+      fullPath: '/bd/reports'
+      preLoaderRoute: typeof AuthenticatedBdReportsRouteImport
+      parentRoute: typeof AuthenticatedBdRoute
+    }
+    '/_authenticated/bd/recurring': {
+      id: '/_authenticated/bd/recurring'
+      path: '/recurring'
+      fullPath: '/bd/recurring'
+      preLoaderRoute: typeof AuthenticatedBdRecurringRouteImport
+      parentRoute: typeof AuthenticatedBdRoute
+    }
+    '/_authenticated/bd/activity-types': {
+      id: '/_authenticated/bd/activity-types'
+      path: '/activity-types'
+      fullPath: '/bd/activity-types'
+      preLoaderRoute: typeof AuthenticatedBdActivityTypesRouteImport
+      parentRoute: typeof AuthenticatedBdRoute
+    }
     '/_authenticated/admin/taxonomy': {
       id: '/_authenticated/admin/taxonomy'
       path: '/admin/taxonomy'
@@ -712,10 +807,29 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedBdRouteChildren {
+  AuthenticatedBdActivityTypesRoute: typeof AuthenticatedBdActivityTypesRoute
+  AuthenticatedBdRecurringRoute: typeof AuthenticatedBdRecurringRoute
+  AuthenticatedBdReportsRoute: typeof AuthenticatedBdReportsRoute
+  AuthenticatedBdIndexRoute: typeof AuthenticatedBdIndexRoute
+}
+
+const AuthenticatedBdRouteChildren: AuthenticatedBdRouteChildren = {
+  AuthenticatedBdActivityTypesRoute: AuthenticatedBdActivityTypesRoute,
+  AuthenticatedBdRecurringRoute: AuthenticatedBdRecurringRoute,
+  AuthenticatedBdReportsRoute: AuthenticatedBdReportsRoute,
+  AuthenticatedBdIndexRoute: AuthenticatedBdIndexRoute,
+}
+
+const AuthenticatedBdRouteWithChildren = AuthenticatedBdRoute._addFileChildren(
+  AuthenticatedBdRouteChildren,
+)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccessRoute: typeof AuthenticatedAccessRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
+  AuthenticatedBdRoute: typeof AuthenticatedBdRouteWithChildren
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedCompleteOnboardingRoute: typeof AuthenticatedCompleteOnboardingRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -745,6 +859,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccessRoute: AuthenticatedAccessRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
+  AuthenticatedBdRoute: AuthenticatedBdRouteWithChildren,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedCompleteOnboardingRoute: AuthenticatedCompleteOnboardingRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,

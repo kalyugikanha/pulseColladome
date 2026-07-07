@@ -174,16 +174,19 @@ function RecurringDialog({
   const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [active, setActive] = useState(true);
 
-  // Initialize when opening
-  useState(() => {}); // no-op
-  if (open && editing && title === "" && assignee === "" && typeId === "") {
-    setTitle(editing.title);
-    setAssignee(editing.assignee_id);
-    setTypeId(editing.activity_type_id);
-    setFreq(editing.frequency);
-    setWeekdays(editing.weekdays);
-    setActive(editing.is_active);
-  }
+  useEffect(() => {
+    if (!open) return;
+    if (editing) {
+      setTitle(editing.title);
+      setAssignee(editing.assignee_id);
+      setTypeId(editing.activity_type_id);
+      setFreq(editing.frequency);
+      setWeekdays(editing.weekdays);
+      setActive(editing.is_active);
+    } else {
+      setTitle(""); setAssignee(""); setTypeId(""); setFreq("daily"); setWeekdays([1, 2, 3, 4, 5]); setActive(true);
+    }
+  }, [open, editing]);
 
   function reset() {
     setTitle(""); setAssignee(""); setTypeId(""); setFreq("daily"); setWeekdays([1, 2, 3, 4, 5]); setActive(true);

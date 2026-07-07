@@ -541,7 +541,7 @@ export function TimesheetPage() {
                 </TableHeader>
                 <TableBody>
                   {pendingHours.map((r) => {
-                    const date = r.completion_date ?? r.created_at.slice(0, 10);
+                    const date = activityWorkDate(r);
                     const proj = r.task?.project;
                     const logged = Number(r.hours ?? 0);
                     return (

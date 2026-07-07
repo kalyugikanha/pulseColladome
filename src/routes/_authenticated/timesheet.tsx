@@ -30,7 +30,7 @@ export const Route = createFileRoute("/_authenticated/timesheet")({
 });
 
 type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
-type Task = { project_code?: string; project_name?: string; hours?: number; comments?: string };
+type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string };
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
 

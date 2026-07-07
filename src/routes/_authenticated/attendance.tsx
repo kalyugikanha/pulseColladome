@@ -461,3 +461,33 @@ function AttendancePage() {
     </div>
   );
 }
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+  caption,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  caption?: string;
+  tone?: "amber" | "green" | "red";
+}) {
+  const toneClass =
+    tone === "amber" ? "text-amber-600 dark:text-amber-300"
+    : tone === "green" ? "text-emerald-600 dark:text-emerald-300"
+    : tone === "red" ? "text-red-600 dark:text-red-300"
+    : "text-foreground";
+  return (
+    <div className="rounded-lg border border-border/60 p-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className={toneClass}>{icon}</span>
+        <span>{label}</span>
+      </div>
+      <div className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</div>
+      {caption && <div className="text-xs text-muted-foreground mt-0.5">{caption}</div>}
+    </div>
+  );
+}

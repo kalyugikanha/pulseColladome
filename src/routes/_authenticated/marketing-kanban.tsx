@@ -722,6 +722,8 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
             <div className="space-y-1"><Label>Internal deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
             <div className="space-y-1"><Label>Scheduled post date</Label><Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} /></div>
           </div>
+          <div className="space-y-1"><Label>Estimated hours</Label><Input type="number" min={0} step={0.25} placeholder="e.g. 4" value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} /></div>
+          </div>
           <div className="space-y-1"><Label>Project</Label>
             <Select value={projectId} onValueChange={setProjectId}>
               <SelectTrigger><SelectValue placeholder="Pick project" /></SelectTrigger>

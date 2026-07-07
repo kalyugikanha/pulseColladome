@@ -8,12 +8,14 @@ function BDLayout() {
   const { data: me } = useCurrentUser();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAdmin = !!(me?.isAdmin || me?.isSuperAdmin);
+  const isManager = isAdmin || !!me?.isReportingManager;
 
-  const tabs: Array<{ to: string; label: string; admin?: boolean }> = [
-    { to: "/bd", label: "My Day" },
-    { to: "/bd/recurring", label: "Recurring items", admin: true },
-    { to: "/bd/activity-types", label: "Activity types", admin: true },
-    { to: "/bd/reports", label: "Reports", admin: true },
+  const tabs: Array<{ to: string; label: string; show: boolean }> = [
+    { to: "/bd", label: "My Day", show: true },
+    { to: "/bd/team", label: "Team", show: isManager },
+    { to: "/bd/recurring", label: "Recurring items", show: isManager },
+    { to: "/bd/reports", label: "Reports", show: isManager },
+    { to: "/bd/activity-types", label: "Activity types", show: isAdmin },
   ];
 
   return (

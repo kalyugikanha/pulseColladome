@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Plus, FolderKanban, Clock, Pencil, Wallet, Search } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 
 export const Route = createFileRoute("/_authenticated/projects")({
   component: ProjectsPage,

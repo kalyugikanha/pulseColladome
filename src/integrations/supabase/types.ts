@@ -42,11 +42,13 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          approved_hours: number | null
           created_at: string
           daily_note: string | null
           date: string
           id: string
           last_edited_by: string | null
+          logged_hours: number | null
           next_actions: string | null
           punch_in_time: string | null
           punch_out_time: string | null
@@ -58,11 +60,13 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_hours?: number | null
           created_at?: string
           daily_note?: string | null
           date: string
           id?: string
           last_edited_by?: string | null
+          logged_hours?: number | null
           next_actions?: string | null
           punch_in_time?: string | null
           punch_out_time?: string | null
@@ -74,11 +78,13 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          approved_hours?: number | null
           created_at?: string
           daily_note?: string | null
           date?: string
           id?: string
           last_edited_by?: string | null
+          logged_hours?: number | null
           next_actions?: string | null
           punch_in_time?: string | null
           punch_out_time?: string | null
@@ -1019,6 +1025,7 @@ export type Database = {
           approval_status: string
           approved_at: string | null
           approved_by: string | null
+          approved_hours: number | null
           attendance_log_id: string | null
           completion_date: string | null
           created_at: string
@@ -1036,6 +1043,7 @@ export type Database = {
           approval_status?: string
           approved_at?: string | null
           approved_by?: string | null
+          approved_hours?: number | null
           attendance_log_id?: string | null
           completion_date?: string | null
           created_at?: string
@@ -1053,6 +1061,7 @@ export type Database = {
           approval_status?: string
           approved_at?: string | null
           approved_by?: string | null
+          approved_hours?: number | null
           attendance_log_id?: string | null
           completion_date?: string | null
           created_at?: string

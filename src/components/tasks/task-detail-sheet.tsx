@@ -78,7 +78,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const [refLabel, setRefLabel] = useState("");
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
-
+  const [markDoneOpen, setMarkDoneOpen] = useState(false);
 
 
   useEffect(() => {

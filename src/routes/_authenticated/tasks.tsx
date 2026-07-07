@@ -140,12 +140,12 @@ function TasksPage() {
         .eq("approval_status", "pending")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []).filter((r: any) => r.task?.created_by === me!.id) as Array<{
+      return ((data ?? []) as unknown as Array<{
         id: string; task_id: string; actor_id: string | null; hours: number | null;
         note: string | null; completion_date: string | null; created_at: string;
         task: { id: string; title: string; created_by: string; estimated_hours: number | null; project: { name: string | null } | null };
         actor: { id: string; full_name: string | null; email: string | null } | null;
-      }>;
+      }>).filter((r) => r.task?.created_by === me!.id);
     },
   });
 

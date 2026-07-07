@@ -63,6 +63,8 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   const [assignee, setAssignee] = useState<string>(defaultAssigneeId ?? "");
   const [wfMode, setWfMode] = useState(false);
   const [wfTemplateId, setWfTemplateId] = useState<string>("");
+  const [repeat, setRepeat] = useState<"none" | "daily" | "weekly">("none");
+  const [repeatDays, setRepeatDays] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { if (open) { setAssignee(defaultAssigneeId ?? ""); } }, [open, defaultAssigneeId]);
@@ -96,9 +98,18 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     queryFn: () => listWf(),
   });
 
+  function toggleDay(d: number) {
+    setRepeatDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d); else next.add(d);
+      return next;
+    });
+  }
+
   async function submit() {
     if (!title.trim()) return toast.error("Title required");
     if (!projectId) return toast.error("Project required");
+    if (repeat === "weekly" && repeatDays.size === 0) return toast.error("Pick at least one weekday");
     setBusy(true);
     try {
       if (wfMode && wfTemplateId) {
@@ -113,16 +124,21 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           dueDate: due || null, priority: pri,
           assigneeId: assignee || defaultAssigneeId!, assetLinks: [],
           domainId: null, departmentId: null, taskTypeIds: [],
+          recurrence: repeat === "none"
+            ? null
+            : { freq: repeat, days: repeat === "weekly" ? Array.from(repeatDays).sort() : [] },
         }});
       }
-      toast.success("Task created");
+      toast.success(repeat === "none" ? "Task created" : "Recurring task saved");
       setTitle(""); setDesc(""); setDue(""); setProjectId(""); setWfTemplateId(""); setWfMode(false);
+      setRepeat("none"); setRepeatDays(new Set());
       onCreated?.();
       onClose();
     } catch (e) {
       toast.error((e as Error).message);
     } finally { setBusy(false); }
   }
+
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>

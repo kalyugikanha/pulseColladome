@@ -65,7 +65,7 @@ function TasksPage() {
   const effectiveScope: Scope = scope === "all" && !canAll ? (canDept ? "dept" : "mine") : scope === "dept" && !canDept ? "mine" : scope;
 
   const setSearch = (patch: Partial<{ view: View; scope: Scope; dept: string }>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+    navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }), replace: true });
   };
 
   const fetcherArgs = useMemo(() => {

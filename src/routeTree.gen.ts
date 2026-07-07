@@ -29,6 +29,7 @@ import { Route as AuthenticatedOnboardingPendingRouteImport } from './routes/_au
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMyTimesheetRouteImport } from './routes/_authenticated/my-timesheet'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
+import { Route as AuthenticatedMarketingKanbanRouteImport } from './routes/_authenticated/marketing-kanban'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
@@ -156,6 +157,12 @@ const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
   path: '/meetings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMarketingKanbanRoute =
+  AuthenticatedMarketingKanbanRouteImport.update({
+    id: '/marketing-kanban',
+    path: '/marketing-kanban',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedLeaveRoute = AuthenticatedLeaveRouteImport.update({
   id: '/leave',
   path: '/leave',
@@ -282,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
+  '/marketing-kanban': typeof AuthenticatedMarketingKanbanRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -323,6 +331,7 @@ export interface FileRoutesByTo {
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
+  '/marketing-kanban': typeof AuthenticatedMarketingKanbanRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -367,6 +376,7 @@ export interface FileRoutesById {
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
+  '/_authenticated/marketing-kanban': typeof AuthenticatedMarketingKanbanRoute
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
@@ -411,6 +421,7 @@ export interface FileRouteTypes {
     | '/directory'
     | '/finances'
     | '/leave'
+    | '/marketing-kanban'
     | '/meetings'
     | '/my-timesheet'
     | '/onboarding'
@@ -452,6 +463,7 @@ export interface FileRouteTypes {
     | '/directory'
     | '/finances'
     | '/leave'
+    | '/marketing-kanban'
     | '/meetings'
     | '/my-timesheet'
     | '/onboarding'
@@ -495,6 +507,7 @@ export interface FileRouteTypes {
     | '/_authenticated/directory'
     | '/_authenticated/finances'
     | '/_authenticated/leave'
+    | '/_authenticated/marketing-kanban'
     | '/_authenticated/meetings'
     | '/_authenticated/my-timesheet'
     | '/_authenticated/onboarding'
@@ -674,6 +687,13 @@ declare module '@tanstack/react-router' {
       path: '/meetings'
       fullPath: '/meetings'
       preLoaderRoute: typeof AuthenticatedMeetingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/marketing-kanban': {
+      id: '/_authenticated/marketing-kanban'
+      path: '/marketing-kanban'
+      fullPath: '/marketing-kanban'
+      preLoaderRoute: typeof AuthenticatedMarketingKanbanRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/leave': {
@@ -857,6 +877,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
+  AuthenticatedMarketingKanbanRoute: typeof AuthenticatedMarketingKanbanRoute
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedMyTimesheetRoute: typeof AuthenticatedMyTimesheetRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
@@ -887,6 +908,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
+  AuthenticatedMarketingKanbanRoute: AuthenticatedMarketingKanbanRoute,
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedMyTimesheetRoute: AuthenticatedMyTimesheetRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,

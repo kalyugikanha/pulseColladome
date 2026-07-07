@@ -230,7 +230,11 @@ function DayView({ empMap, onChanged }: { empMap: Map<string, Employee>; onChang
                         </div>
                         {r.reason && <div className="text-xs mt-1 text-muted-foreground line-clamp-2">{r.reason}</div>}
                       </div>
-                      <Badge variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "secondary"} className="capitalize shrink-0">{r.status}</Badge>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "secondary"} className="capitalize">{r.status}</Badge>
+                        <EditLeaveDialog row={r} employee={p} onChanged={onChanged} />
+                        <DeleteLeaveButton row={r} onChanged={onChanged} />
+                      </div>
                     </div>
                   );
                 })}

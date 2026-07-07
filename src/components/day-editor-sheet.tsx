@@ -48,11 +48,13 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
     queryKey: ["day-editor-user-tasks", userId],
     enabled: open && !!userId,
     queryFn: async () => {
-      // Tasks where this person is assignee, reviewer, or creator.
+      // Only tasks assigned to this person. Hours must be logged against
+      // work you actually own — creating a task for someone else does not
+      // let you log time against it.
       const { data } = await supabase
         .from("tasks")
         .select("id, title, project_id, status")
-        .or(`assignee_id.eq.${userId},reviewer_id.eq.${userId},created_by.eq.${userId}`)
+        .eq("assignee_id", userId)
         .order("created_at", { ascending: false })
         .limit(500);
       return (data ?? []) as UserTask[];

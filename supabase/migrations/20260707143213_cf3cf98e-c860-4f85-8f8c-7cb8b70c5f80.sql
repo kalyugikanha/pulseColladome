@@ -1,0 +1,1 @@
+UPDATE public.tasks SET status = 'review', review_state = 'pending_review' WHERE id = 'efecb934-e17d-448b-8110-689358c034dc';

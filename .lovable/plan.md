@@ -1,53 +1,52 @@
-## Three changes
+Three fixes across the tasks list, My Timesheet, and the day editor. All UI/logic; no schema changes.
 
-### 1. Task Overview — Edit / Duplicate / Delete per row
+## 1. My Tasks list — marking a marketing task "Done" must open the MarkDone dialog
 
-In `src/routes/_authenticated/tasks-overview.tsx`:
-- Add an **Actions** column with a kebab menu (DropdownMenu) exposing **Edit**, **Duplicate**, **Delete**.
-- **Edit** opens the existing `TaskDetailSheet` (same one used elsewhere) which already supports edit.
-- **Duplicate** inserts a new task with the same title (`+ " (copy)"`), description, project, priority, due_date, department_id, domain_id, assignee, and asset_links; status resets to `todo`; created_by = me. Uses the existing `create_task_full` RPC to keep taxonomy handling consistent.
-- **Delete** shows a confirm dialog, then deletes the task (RLS restricts to admins / creator / project managers — same rules as the detail sheet). Invalidate `["tasks-overview", …]` on success.
-- Permission gate on the menu: only render Edit/Delete when `me.isAdmin || me.isSuperAdmin || me.canManageProjects || row.created_by === me.id`. Duplicate is allowed for anyone who can view.
+**File:** `src/routes/_authenticated/tasks.tsx`
 
-### 2. Punch-out task picker — assignee-only, searchable, "request a task" fallback
+Right now the row's status `<Select>` calls `updateStatus(id, "done")`, which just flips `tasks.status`. For marketing tasks this bypasses actual‑hours capture and the "who does this go to next?" hand‑off. We'll intercept "done" for marketing tasks.
 
-In `src/routes/_authenticated/punch.tsx`:
-- The task list is already filtered to `assignee_id = user` and non-done. Keep that.
-- Replace the plain `<Select>` in each row with a **searchable combobox** (`Command` + `Popover` from shadcn/ui) that filters by task title and project code as the user types.
-- Under the combobox, add a small link **"Can't find your task? Request one from your manager"** which opens a `RequestTaskDialog`:
-  - Fields: **Title** (required), **Project** (optional dropdown from the projects list), **Note** (optional).
-  - Submits to a new SECURITY DEFINER RPC `request_task_from_manager(_title, _project_id, _note)` that:
-    - Resolves the recipient: caller's `reporting_manager_id`; if null, first `department_heads.user_id` for the caller's department; if still none, first `admin` in `user_roles`.
-    - Inserts a `notifications` row with `kind='task_request'`, `body='<caller name> needs a task: "<title>"<note>'`, `user_id=recipient`. Task_id stays null.
-  - On success: toast "Request sent" and close.
-- The existing `requireTask` guard stays, so Marketing / BD users still can't punch out until they pick a real task — the request flow is just a shortcut to unblock creation.
+- Extract the `MarkDoneDialog` from `marketing-kanban.tsx` into a shared component `src/components/tasks/mark-done-dialog.tsx` (props: `task`, `onClose`, `onConfirm({ hours, note, nextAssigneeId? })`). Keep the existing kanban usage; just import from the new location.
+- In `tasks.tsx`, when the user picks "Done":
+  - If the task has `marketing_stage` set (i.e. it lives on the marketing board), open `MarkDoneDialog` instead of calling `updateStatus`. The dialog collects **actual hours** (required) and an optional handoff assignee (defaults to the task's `created_by` / requester).
+  - On confirm, reuse the same write path as the kanban's `commitMove(task, "posted", nextAssigneeId, { hours, note, pendingApproval: true })` — meaning: update `tasks` with `marketing_stage='posted'`, `status='review'`, `assignee_id=nextAssigneeId`; insert `task_activity` with `approval_status='pending'`, `hours`, `completion_date=today`; notify the creator. Extract this into `src/lib/marketing-close.ts` so both the kanban and the list share one implementation.
+  - For non‑marketing tasks, keep the current `setTaskStatus` behavior.
+- The dialog should show the current assignee and the task creator, defaulting the "hand off to" field to the creator so the reviewer/approver can pick it up.
 
-### 3. Notification tray in top bar
+## 2. Kanban‑logged hours must appear in My Timesheet
 
-New component `src/components/notifications-bell.tsx`:
-- Bell icon button in `top-bar.tsx` (left of the "Live" indicator), with an unread-count badge.
-- Popover shows the latest ~20 notifications for `auth.uid()`, unread first. Each row: kind icon + body + relative time; clicking a row marks it read (updates `read_at`) and, if `task_id` is set, opens `TaskDetailSheet` for that task. Task-request rows navigate to `/tasks` so the manager can create it.
-- **"Mark all read"** button clears unread `read_at`.
-- Subscribes to realtime inserts on `public.notifications` filtered by `user_id=eq.<me>` for instant updates (channel torn down on unmount per Realtime rules). Polling fallback: `refetchOnWindowFocus`.
+**File:** `src/routes/_authenticated/my-timesheet.tsx`
 
-### Database
+`my-timesheet` reads only `attendance_logs.tasks`. Hours logged through the kanban's MarkDone go to `task_activity.hours` (with `approval_status` in `pending|approved|auto`) and never surface here. `tasks.tsx` already merges both sources for its progress bars — we mirror that.
 
-Single migration:
-1. `ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;` (guarded so it's a no-op if already added).
-2. Create `public.request_task_from_manager(_title text, _project_id uuid default null, _note text default null) returns uuid` — SECURITY DEFINER, `SET search_path = public`. Resolves recipient as described and inserts the notification. Grants EXECUTE to `authenticated`.
-3. No changes to existing RLS on `notifications` (the RPC bypasses INSERT restrictions safely, and only for the caller's own manager chain).
+- Add a second query alongside `my-ts-logs` that pulls from `task_activity` where `actor_id = me.id`, `completion_date` between `startIso` and `endIso` (fallback to `created_at::date` when `completion_date` is null), `approval_status <> 'rejected'`, and `hours is not null`. Join `task:tasks(id, title, project:projects(id, code, name))`.
+- Merge those rows into the flattened `rows` array with:
+  - `date` = `completion_date` (or activity `created_at` date)
+  - `code`/`name` from the joined project
+  - `hours` from `task_activity.hours`
+  - `comments` from `note`
+  - Status badge: `approved` when `approval_status='approved'|'auto'`, otherwise a new **"Awaiting approval"** badge.
+- The row's Edit button for these activity rows should open the task detail sheet (read‑only for hours — actual approval happens in the creator's "Hours awaiting your approval" card on `/tasks`). Do not open the day editor for these rows, since they aren't part of `attendance_logs`.
+- Update totals so `totalHours` and `uniqueDays` include activity hours.
 
-### Out of scope
+## 3. My Timesheet must only allow logging against tasks assigned to me
 
-- Email or push delivery for notifications (in-app only).
-- A dedicated `task_requests` table — reusing `notifications` with `kind='task_request'` keeps the surface small; the manager creates the actual task from `/tasks`.
-- Changing the request routing logic per department beyond the resolution above.
+**File:** `src/components/day-editor-sheet.tsx`
 
-### Files touched
+Today `userTasks` is queried with `assignee_id.eq OR reviewer_id.eq OR created_by.eq`. That means a user who created a task for someone else can still log time against it from their own timesheet.
 
-- `supabase/migrations/…sql` (new)
-- `src/routes/_authenticated/tasks-overview.tsx` — actions column + duplicate/delete handlers
-- `src/routes/_authenticated/punch.tsx` — searchable task combobox + RequestTaskDialog
-- `src/components/notifications-bell.tsx` (new)
-- `src/components/top-bar.tsx` — mount the bell
-- `src/lib/tasks-plus.functions.ts` — small `duplicateTask` server fn wrapping `create_task_full`
+- Tighten the query to `assignee_id.eq.${userId}` only (drop `reviewer_id` and `created_by`).
+- Also filter out `status='done'` tasks older than ~30 days so the picker stays short.
+- Keep the existing "Pick a task for every row" save guard.
+- Update the info banner text to: *"You can only log hours against tasks assigned to you. If the task you worked on isn't here, ask your manager to assign it — or use the "Request a task" flow on Punch."*
+- Legacy rows already saved with `task_id` that no longer match the filter continue to render via the existing `legacyTaskMissing` branch, so historical data isn't broken.
+
+## Files touched
+- `src/routes/_authenticated/tasks.tsx` — intercept "Done" for marketing tasks.
+- `src/routes/_authenticated/marketing-kanban.tsx` — swap inline `MarkDoneDialog` for the shared component and call the shared close helper.
+- `src/routes/_authenticated/my-timesheet.tsx` — merge `task_activity` hours; add "Awaiting approval" badge.
+- `src/components/day-editor-sheet.tsx` — restrict task picker to assignee only; update copy.
+- `src/components/tasks/mark-done-dialog.tsx` — new, extracted from kanban.
+- `src/lib/marketing-close.ts` — new shared helper for the "close a marketing task" write path.
+
+No migrations, no RLS changes.

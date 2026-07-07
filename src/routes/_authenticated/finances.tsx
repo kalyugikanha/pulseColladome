@@ -583,6 +583,41 @@ function FinancesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Task-logged hours — {month}</CardTitle>
+          <CardDescription>Hours captured on task stage moves (from Kanban) grouped by the task's project. Additive view — does not affect salary-share burn above.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {taskHoursByProject.size === 0 ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">No task-logged hours this month yet.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead className="text-right">People</TableHead>
+                  <TableHead className="text-right">Hours</TableHead>
+                  <TableHead className="text-right">Log entries</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from(taskHoursByProject.values()).sort((a, b) => b.hours - a.hours).map((r) => (
+                  <TableRow key={r.code}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="font-mono text-xs">{r.code}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.users.size}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.hours.toFixed(1)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.entries}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

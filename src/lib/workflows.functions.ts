@@ -22,6 +22,7 @@ export type WorkflowStageInput = {
   branch_options: WorkflowBranchOption[];
   branch_target_map: Record<string, number>;
   next_stage_position: number | null;
+  project_id: string | null;
 };
 
 /** List all templates + stages. */

@@ -138,9 +138,10 @@ function MarketingKanbanPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("task_activity" as any)
-        .select("task_id, hours")
+        .select("task_id, hours, approval_status")
         .in("task_id", taskIds)
-        .not("hours", "is", null);
+        .not("hours", "is", null)
+        .neq("approval_status", "rejected");
       if (error) throw error;
       const m = new Map<string, number>();
       (data ?? []).forEach((r: any) => {

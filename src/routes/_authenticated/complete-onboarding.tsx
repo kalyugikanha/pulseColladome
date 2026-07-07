@@ -269,6 +269,33 @@ function CompleteOnboardingPage() {
         </p>
       </header>
 
+      <Card>
+        <CardContent className="p-4 flex items-center gap-4">
+          <div
+            className="relative h-16 w-16 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold"
+            style={{ background: `conic-gradient(hsl(var(--primary)) ${completionPct * 3.6}deg, hsl(var(--muted)) 0deg)` }}
+          >
+            <div className="absolute inset-1 rounded-full bg-background flex items-center justify-center">
+              {completionPct}%
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium">Profile completion</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {filledProfile}/{Object.keys(profileFieldValues).length} personal · {filledBank}/{Object.keys(bankFieldValues).length} bank · {filledDocs}/{requiredDocKeys.length} documents
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              {isApproved
+                ? "HR has approved your onboarding — keep this up to date."
+                : completionPct >= 100
+                  ? "All set. Submit for HR approval."
+                  : "Complete every section to unlock the Submit button."}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+
       {isPendingReview && (
         <div className="rounded-md border border-amber-400/40 bg-amber-500/10 p-3 text-sm">
           Your submission is waiting for HR approval. You can still edit and re-upload if needed.

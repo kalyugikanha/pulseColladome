@@ -142,9 +142,11 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
   const [isActive, setIsActive] = useState(initial.is_active);
   const [stages, setStages] = useState<WorkflowStageInput[]>(initial.stages);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
+  const [projects, setProjects] = useState<Array<{ id: string; code: string; name: string }>>([]);
   useEffect(() => { setName(initial.name); setStages(initial.stages); }, [initial]);
   useEffect(() => {
     supabase.from("profiles").select("id, full_name, email").order("full_name").then(({ data }) => setPeople((data ?? []) as typeof people));
+    supabase.from("projects").select("id, code, name").eq("status", "active").order("code").then(({ data }) => setProjects((data ?? []) as typeof projects));
   }, []);
 
 

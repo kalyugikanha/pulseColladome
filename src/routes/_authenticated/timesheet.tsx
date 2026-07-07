@@ -30,9 +30,14 @@ export const Route = createFileRoute("/_authenticated/timesheet")({
 });
 
 type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
-type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string };
+type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string; source?: "log" | "activity" };
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
+type ActivityRow = {
+  id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
+  note: string | null; completion_date: string | null; created_at: string; approval_status: string;
+  task: { id: string; title: string | null; project: { id: string; code: string | null; name: string | null } | null } | null;
+};
 
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

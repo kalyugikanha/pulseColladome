@@ -137,11 +137,6 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                         <Link to="/vendors"><Handshake /><span>Vendors</span></Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/access")}>
-                        <Link to="/access"><Shield /><span>Access &amp; Roles</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                   </>
                 )}
               </SidebarMenu>

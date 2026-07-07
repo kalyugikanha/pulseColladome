@@ -5,7 +5,7 @@ import { impersonationMiddleware } from "./impersonation.middleware";
 
 /** =========== Taxonomy read ============== */
 export const listTaxonomy = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const [domains, departments, types] = await Promise.all([
@@ -22,7 +22,7 @@ export const listTaxonomy = createServerFn({ method: "GET" })
 
 /** =========== Create custom task type ============== */
 export const createCustomTaskType = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { name: string; departmentId: string | null }) => d)
   .handler(async ({ data, context }) => {
     const name = data.name.trim();
@@ -75,7 +75,7 @@ function taskCreateError(error: { message?: string; code?: string; details?: str
 }
 
 export const createTaskFull = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: TaskInput) => d)
   .handler(async ({ data, context }) => {
     const title = data.title.trim();
@@ -122,7 +122,7 @@ export const createTaskFull = createServerFn({ method: "POST" })
 
 /** Materialize today's occurrences for every recurring template (idempotent). */
 export const generateRecurringOccurrences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .handler(async ({ context }) => {
     const { error } = await context.supabase.rpc("generate_recurring_task_occurrences" as never);
     if (error) throw error;
@@ -131,7 +131,7 @@ export const generateRecurringOccurrences = createServerFn({ method: "POST" })
 
 
 export const duplicateTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -161,7 +161,7 @@ export const duplicateTask = createServerFn({ method: "POST" })
   });
 
 export const deleteTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("tasks").delete().eq("id", data.id);
@@ -170,7 +170,7 @@ export const deleteTask = createServerFn({ method: "POST" })
   });
 
 export const requestTaskFromManager = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { title: string; projectId?: string | null; note?: string | null }) => d)
   .handler(async ({ data, context }) => {
     const { data: id, error } = await context.supabase.rpc("request_task_from_manager", {
@@ -183,7 +183,7 @@ export const requestTaskFromManager = createServerFn({ method: "POST" })
   });
 
 export const updateTaskFull = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: Partial<TaskInput> & { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -215,7 +215,7 @@ export const updateTaskFull = createServerFn({ method: "POST" })
 
 /** =========== Admin taxonomy CRUD ============== */
 export const upsertDomain = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id?: string; name: string; active?: boolean; sort?: number }) => d)
   .handler(async ({ data, context }) => {
     const payload = { name: data.name.trim(), active: data.active ?? true, sort: data.sort ?? 0 };
@@ -230,7 +230,7 @@ export const upsertDomain = createServerFn({ method: "POST" })
   });
 
 export const deleteDomain = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("taxonomy_domains").delete().eq("id", data.id);
@@ -239,7 +239,7 @@ export const deleteDomain = createServerFn({ method: "POST" })
   });
 
 export const upsertDepartment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id?: string; domainId: string; name: string; active?: boolean; sort?: number }) => d)
   .handler(async ({ data, context }) => {
     const payload = { domain_id: data.domainId, name: data.name.trim(), active: data.active ?? true, sort: data.sort ?? 0 };
@@ -254,7 +254,7 @@ export const upsertDepartment = createServerFn({ method: "POST" })
   });
 
 export const deleteDepartment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("taxonomy_departments").delete().eq("id", data.id);
@@ -263,7 +263,7 @@ export const deleteDepartment = createServerFn({ method: "POST" })
   });
 
 export const upsertTaskType = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id?: string; departmentId: string | null; name: string; active?: boolean }) => d)
   .handler(async ({ data, context }) => {
     const payload = { department_id: data.departmentId, name: data.name.trim(), active: data.active ?? true };
@@ -279,7 +279,7 @@ export const upsertTaskType = createServerFn({ method: "POST" })
   });
 
 export const deleteTaskType = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("taxonomy_task_types").delete().eq("id", data.id);

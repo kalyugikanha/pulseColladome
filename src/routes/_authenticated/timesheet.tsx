@@ -116,6 +116,24 @@ export function TimesheetPage() {
     queryFn: async () => (await supabase.from("projects").select("code, name").order("code")).data as Project[] ?? [],
   });
 
+  // Kanban-logged task hours (task_activity) for the visible team on the selected day.
+  const { data: activityRows } = useQuery({
+    queryKey: ["ts-activity", dateIso, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
+    queryFn: async () => {
+      let q = supabase
+        .from("task_activity" as never)
+        .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
+        .not("hours", "is", null)
+        .neq("approval_status", "rejected")
+        .gte("completion_date", dateIso).lt("completion_date", nextDayIso);
+      if (hasScope) q = q.in("actor_id", visibleUserIds);
+      const { data, error } = await q;
+      if (error) throw error;
+      return ((data ?? []) as unknown as ActivityRow[]);
+    },
+  });
+
   // Direct reports of the current user — they can approve their reports' task-hour logs.
   const directReportIds = me?.directReportIds ?? [];
   const { data: pendingHours, refetch: refetchPending } = useQuery({

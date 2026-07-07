@@ -264,8 +264,19 @@ function TasksPage() {
     }).filter((x) => x.label);
   }, [presets, tax]);
 
+  const [markDone, setMarkDone] = useState<{ id: string; title: string; marketing_stage: string | null; assignee_id: string | null; created_by: string | null } | null>(null);
+
   async function updateStatus(id: string, status: string) {
     try {
+      // Marketing tasks going to "done" must go through the Mark Done flow so
+      // actual hours + handoff are captured and reviewed.
+      if (status === "done") {
+        const t = (tasks ?? []).find((x) => x.id === id) as any;
+        if (t?.marketing_stage) {
+          setMarkDone({ id: t.id, title: t.title, marketing_stage: t.marketing_stage, assignee_id: t.assignee_id, created_by: t.created_by });
+          return;
+        }
+      }
       const { setTaskStatus } = await import("@/lib/tasks-workflow.functions");
       await setTaskStatus({ data: { taskId: id, status: status as "todo"|"in_progress"|"review"|"done" } });
       toast.success("Task updated");

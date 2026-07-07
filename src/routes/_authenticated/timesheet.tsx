@@ -185,10 +185,8 @@ export function TimesheetPage() {
       if (error) throw error;
       toast.success(decide === "approved" ? "Approved" : "Rejected");
       await refetchPending();
-      await refetchApproved();
       qc.invalidateQueries({ queryKey: ["ts-activity"] });
       qc.invalidateQueries({ queryKey: ["ts-logs"] });
-      qc.invalidateQueries({ queryKey: ["ts-approved-task-hours"] });
       qc.invalidateQueries({ queryKey: ["my-ts-activity"] });
       qc.invalidateQueries({ queryKey: ["my-performance"] });
       qc.invalidateQueries({ queryKey: ["pb-activity"] });

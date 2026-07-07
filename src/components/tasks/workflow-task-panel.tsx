@@ -207,9 +207,9 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Assign next stage to *</Label>
+                <Label className="text-xs">Assign next stage to (optional)</Label>
                 <Select value={nextAssignee} onValueChange={setNextAssignee}>
-                  <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Use stage default" /></SelectTrigger>
                   <SelectContent className="max-h-72">
                     {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
                   </SelectContent>
@@ -222,7 +222,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="gradient-primary" onClick={submit}
-            disabled={busy || (hasBranches && (!branchKey || !nextAssignee))}
+            disabled={busy || (hasBranches && !branchKey)}
           >Close stage</Button>
         </DialogFooter>
       </DialogContent>
@@ -282,9 +282,9 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Assign next stage to *</Label>
+                <Label className="text-xs">Assign next stage to (optional)</Label>
                 <Select value={nextAssignee} onValueChange={setNextAssignee}>
-                  <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Use stage default" /></SelectTrigger>
                   <SelectContent className="max-h-72">
                     {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
                   </SelectContent>
@@ -295,7 +295,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" onClick={submit} disabled={busy || (hasBranches && (!branchKey || !nextAssignee))}>
+          <Button className="gradient-primary" onClick={submit} disabled={busy || (hasBranches && !branchKey)}>
             {action === "approve" ? "Approve" : action === "request_changes" ? "Send back" : "Post"}
           </Button>
         </DialogFooter>

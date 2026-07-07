@@ -3,18 +3,21 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import {
   listWorkflowTemplates, saveWorkflowTemplate, deleteWorkflowTemplate,
   type WorkflowStageInput, type WorkflowRequiredField, type WorkflowBranchOption,
 } from "@/lib/workflows.functions";
+
 
 export const Route = createFileRoute("/_authenticated/workflows")({ component: WorkflowsAdmin });
 
@@ -98,7 +101,12 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
   const [department, setDepartment] = useState(initial.department);
   const [isActive, setIsActive] = useState(initial.is_active);
   const [stages, setStages] = useState<WorkflowStageInput[]>(initial.stages);
+  const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
   useEffect(() => { setName(initial.name); setStages(initial.stages); }, [initial]);
+  useEffect(() => {
+    supabase.from("profiles").select("id, full_name, email").order("full_name").then(({ data }) => setPeople((data ?? []) as typeof people));
+  }, []);
+
 
   function addStage() {
     const pos = stages.length + 1;
@@ -145,6 +153,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
           </div>
           {stages.map((s, i) => (
             <StageEditor key={i} stage={s} index={i} totalStages={stages.length} allStages={stages}
+              people={people}
               onChange={(patch) => updateStage(i, patch)}
               onMoveUp={() => moveStage(i, -1)} onMoveDown={() => moveStage(i, 1)}
               onRemove={() => removeStage(i)} />
@@ -155,8 +164,9 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
   );
 }
 
-function StageEditor({ stage, index, totalStages, allStages, onChange, onMoveUp, onMoveDown, onRemove }: {
+function StageEditor({ stage, index, totalStages, allStages, people, onChange, onMoveUp, onMoveDown, onRemove }: {
   stage: WorkflowStageInput; index: number; totalStages: number; allStages: WorkflowStageInput[];
+  people: Array<{ id: string; full_name: string | null; email: string | null }>;
   onChange: (patch: Partial<WorkflowStageInput>) => void;
   onMoveUp: () => void; onMoveDown: () => void; onRemove: () => void;
 }) {
@@ -199,6 +209,21 @@ function StageEditor({ stage, index, totalStages, allStages, onChange, onMoveUp,
         <div className="flex-1 space-y-2">
           <Input value={stage.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Stage name" />
           <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={stage.requires_review} onChange={(e) => onChange({ requires_review: e.target.checked })} /> Requires review before Done</label>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Default assignee (optional)</Label>
+            <Select
+              value={stage.default_assignee_id ?? "__none__"}
+              onValueChange={(v) => onChange({ default_assignee_id: v === "__none__" ? null : v })}
+            >
+              <SelectTrigger className="h-8"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="__none__">Unassigned</SelectItem>
+                {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">

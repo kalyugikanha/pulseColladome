@@ -146,8 +146,9 @@ export const startWorkflow = createServerFn({ method: "POST" })
     if (instErr) throw instErr;
     const instanceId = (inst as unknown as { id: string }).id;
 
+    const firstStageProjectId = first.project_id ?? data.projectId;
     const { data: task, error: taskErr } = await supabase.rpc("create_task_full", {
-      _project_id: data.projectId,
+      _project_id: firstStageProjectId,
       _title: data.title.trim(),
       _description: data.description ?? undefined,
       _due_date: data.dueDate ?? undefined,

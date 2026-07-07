@@ -196,6 +196,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
           {stages.map((s, i) => (
             <StageEditor key={i} stage={s} index={i} totalStages={stages.length} allStages={stages}
               people={people}
+              projects={projects}
               onChange={(patch) => updateStage(i, patch)}
               onMoveUp={() => moveStage(i, -1)} onMoveDown={() => moveStage(i, 1)}
               onRemove={() => removeStage(i)} />
@@ -206,9 +207,10 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
   );
 }
 
-function StageEditor({ stage, index, totalStages, allStages, people, onChange, onMoveUp, onMoveDown, onRemove }: {
+function StageEditor({ stage, index, totalStages, allStages, people, projects, onChange, onMoveUp, onMoveDown, onRemove }: {
   stage: WorkflowStageInput; index: number; totalStages: number; allStages: WorkflowStageInput[];
   people: Array<{ id: string; full_name: string | null; email: string | null }>;
+  projects: Array<{ id: string; code: string; name: string }>;
   onChange: (patch: Partial<WorkflowStageInput>) => void;
   onMoveUp: () => void; onMoveDown: () => void; onRemove: () => void;
 }) {

@@ -10,9 +10,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Check, X } from "lucide-react";
+import { Check, X, CalendarIcon, Download, Users, Palmtree, LogIn, UserX } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/attendance")({

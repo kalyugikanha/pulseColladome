@@ -719,14 +719,10 @@ function EmployeeBlock({
                 <TableCell>
                   <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { comments: v })} placeholder="Optional" />
                 </TableCell>
-                {i === 0 && (
-                  <TableCell rowSpan={rowspan} className="align-top">
-                    {row.approved
-                      ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
-                      : <Badge variant="outline">Pending</Badge>}
-                    {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
-                  </TableCell>
-                )}
+                <TableCell>
+                  {taskStatusBadge(row, t)}
+                  {locked && !isActivity && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 justify-end">
                     {!isActivity && (
@@ -755,7 +751,7 @@ function EmployeeBlock({
           <TableCell className="text-right">
             <Input type="number" min={0} step={0.25} value={addHrs} onChange={(e) => setAddHrs(e.target.value)} className="h-8 text-right font-mono" placeholder="0" />
           </TableCell>
-          <TableCell colSpan={2}>
+          <TableCell colSpan={3}>
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => {
                 const h = Number(addHrs);
@@ -770,16 +766,34 @@ function EmployeeBlock({
       )}
       {mayEdit && row.tasks.length > 0 && !addOpen && (
         <TableRow>
-          <TableCell colSpan={3}>
+          <TableCell colSpan={5}>
             <Button size="sm" variant="ghost" className="h-7 text-muted-foreground" onClick={() => setAddOpen(true)}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Add project
             </Button>
           </TableCell>
-          <TableCell />
         </TableRow>
       )}
     </>
   );
+}
+
+function taskStatusBadge(row: { approved: boolean }, task?: Task) {
+  if (task?.source === "activity") {
+    const approved = task.approval_status === "approved" || task.approval_status === "auto";
+    if (approved) {
+      const partial = task.logged_hours != null && task.approved_hours != null && task.approved_hours < task.logged_hours;
+      return (
+        <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300">
+          <CheckCircle2 className="h-3 w-3" /> {partial ? `${task.approved_hours}/${task.logged_hours}h` : "Approved"}
+        </Badge>
+      );
+    }
+    return <Badge variant="outline">Pending</Badge>;
+  }
+
+  return row.approved
+    ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
+    : <Badge variant="outline">Pending</Badge>;
 }
 
 function RowMenu({ canApprove, approved, onToggleApproval, onOpenFull }: { canApprove: boolean; approved: boolean; onToggleApproval: () => void; onOpenFull: () => void }) {

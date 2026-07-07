@@ -1,33 +1,19 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useFirstLoginWelcome(userId: string | null | undefined) {
+export function useFirstLoginWelcome(_userId: string | null | undefined) {
   const [show, setShow] = useState(false);
-  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    if (!userId || checked) return;
     const host = typeof window !== "undefined" ? window.location.hostname : "";
     if (host !== "colladome-pulse.lovable.app") return;
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("welcomed_at")
-        .eq("id", userId)
-        .maybeSingle();
-      if (cancelled) return;
-      setChecked(true);
-      if (data && data.welcomed_at == null) setShow(true);
-    })();
-    return () => { cancelled = true; };
-  }, [userId, checked]);
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") setShow(true);
+    });
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
 
-  async function dismiss() {
-    setShow(false);
-    if (!userId) return;
-    await supabase.from("profiles").update({ welcomed_at: new Date().toISOString() }).eq("id", userId);
-  }
+  function dismiss() { setShow(false); }
 
   return { show, dismiss };
 }

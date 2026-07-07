@@ -20,6 +20,7 @@ import {
   DndContext, PointerSensor, useSensor, useSensors, useDroppable, useDraggable,
   type DragEndEvent, type DragStartEvent, DragOverlay,
 } from "@dnd-kit/core";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 
 export const Route = createFileRoute("/_authenticated/marketing-kanban")({
   component: MarketingKanbanPage,
@@ -65,6 +66,7 @@ function MarketingKanbanPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [crossOpen, setCrossOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   const isMarketingHead = !!me?.headOfDepartments.some((d) => d.toLowerCase() === "marketing");
   const canAssignAny = !!me && (me.isAdmin || me.isSuperAdmin || isMarketingHead);
@@ -133,13 +135,6 @@ function MarketingKanbanPage() {
     if (!overId) return;
     const t = (tasks ?? []).find((x) => x.id === e.active.id);
     if (!t || t.marketing_stage === overId) return;
-    // Posted is terminal
-    if (t.marketing_stage === "posted") { toast.error("Posted cards are locked."); return; }
-    // Review column exit must use Approve / Send Back buttons
-    if (t.marketing_stage === "review" && overId !== "review") {
-      toast.error("Use Approve or Send Back on Review cards.");
-      return;
-    }
     setPending({ task: t, toStage: overId });
   }
 
@@ -217,6 +212,7 @@ function MarketingKanbanPage() {
               roster={roster ?? []} canAssignAny={canAssignAny}
               onSendBack={(t) => setSendBack(t)}
               onApprove={(t) => setPending({ task: t, toStage: "posting" })}
+              onOpen={(t) => setOpenTaskId(t.id)}
             />
           ))}
         </div>
@@ -253,17 +249,20 @@ function MarketingKanbanPage() {
         onCreated={() => qc.invalidateQueries({ queryKey: ["mkt-kanban"] })}
       />
       <ClientsDialog open={clientsOpen} onClose={() => setClientsOpen(false)} />
+      <TaskDetailSheet taskId={openTaskId} onClose={() => { setOpenTaskId(null); qc.invalidateQueries({ queryKey: ["mkt-kanban"] }); }} />
     </div>
   );
 }
 
-function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onApprove }: {
+function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onApprove, onOpen }: {
   stage: Stage; label: string; cards: KanbanTask[];
   roster: { id: string; full_name: string | null; email: string | null }[];
   canAssignAny: boolean;
   onSendBack: (t: KanbanTask) => void;
   onApprove: (t: KanbanTask) => void;
+  onOpen: (t: KanbanTask) => void;
 }) {
+  void roster; void canAssignAny;
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   return (
     <div ref={setNodeRef}
@@ -274,7 +273,7 @@ function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onAppro
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto max-h-[70vh] pr-1">
         {cards.map((t) => (
-          <DraggableCard key={t.id} task={t}>
+          <DraggableCard key={t.id} task={t} onOpen={() => onOpen(t)}>
             <KanbanCardView task={t} />
             {stage === "review" && (
               <div className="mt-2 flex gap-1" onPointerDown={(e) => e.stopPropagation()}>
@@ -296,10 +295,11 @@ function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onAppro
   );
 }
 
-function DraggableCard({ task, children }: { task: KanbanTask; children: React.ReactNode }) {
+function DraggableCard({ task, children, onOpen }: { task: KanbanTask; children: React.ReactNode; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
+      onClick={onOpen}
       className={`rounded-md border border-border/60 bg-card p-2 shadow-sm ${isDragging ? "opacity-40" : ""} cursor-grab active:cursor-grabbing`}>
       {children}
     </div>

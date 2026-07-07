@@ -527,45 +527,32 @@ export function TimesheetPage() {
             {!pendingHours || pendingHours.length === 0 ? (
               <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending. Nice.</div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Task / Project</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Logged</TableHead>
-                    <TableHead className="text-right w-[110px]">Approve</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead className="w-[180px] text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingHours.map((r) => {
-                    const date = activityWorkDate(r);
-                    const proj = r.task?.project;
-                    const logged = Number(r.hours ?? 0);
-                    return (
-                      <PendingRow
-                        key={r.id}
-                        id={r.id}
-                        name={r.actor?.full_name ?? r.actor?.email ?? "—"}
-                        title={r.task?.title ?? "Task"}
-                        projCode={proj?.code ?? null}
-                        projName={proj?.name ?? null}
-                        date={date}
-                        logged={logged}
-                        note={r.note}
-                        onDecide={decidePending}
-                      />
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
+              <div className="grid gap-3 lg:grid-cols-2">
+                {pendingHours.map((r) => {
+                  const date = activityWorkDate(r);
+                  const proj = r.task?.project;
+                  const logged = Number(r.hours ?? 0);
+                  return (
+                    <PendingCard
+                      key={r.id}
+                      id={r.id}
+                      name={r.actor?.full_name ?? r.actor?.email ?? "—"}
+                      title={r.task?.title ?? "Task"}
+                      projCode={proj?.code ?? null}
+                      projName={proj?.name ?? null}
+                      date={date}
+                      logged={logged}
+                      note={r.note}
+                      onDecide={decidePending}
+                    />
+                  );
+                })}
+              </div>
             )}
           </CardContent>
         </Card>
       )}
+
 
 
       <Card>
@@ -592,10 +579,10 @@ export function TimesheetPage() {
                   <TableRow>
                     <TableHead className="min-w-[220px]">Employee</TableHead>
                     <TableHead className="min-w-[240px]">Project</TableHead>
-                    <TableHead className="w-[110px] text-right">Hours</TableHead>
-                    <TableHead className="min-w-[200px]">Notes</TableHead>
-                    <TableHead className="w-[120px]">Status</TableHead>
-                    <TableHead className="w-[60px]" />
+                    <TableHead className="w-[120px] text-right tabular-nums">Hours</TableHead>
+                    <TableHead className="min-w-[180px]">Notes</TableHead>
+                    <TableHead className="w-[110px]">Status</TableHead>
+                    <TableHead className="w-[52px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -615,10 +602,13 @@ export function TimesheetPage() {
                   ))}
                   <TableRow className="border-t-2 bg-muted/30">
                     <TableCell className="font-semibold">Day total</TableCell>
-                    <TableCell />
-                    <TableCell className="text-right font-bold font-mono">{dayTotal.toFixed(1)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      Approved {dayApprovedTotal.toFixed(1)} / Logged {dayTotal.toFixed(1)}
+                    </TableCell>
+                    <TableCell className="text-right text-lg font-bold tabular-nums">{dayTotal.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-0.5">h</span></TableCell>
                     <TableCell colSpan={3} />
                   </TableRow>
+
                 </TableBody>
               </Table>
             </div>
@@ -699,7 +689,11 @@ function EmployeeBlock({
                   <TableCell rowSpan={rowspan} className="align-top border-r">
                     <div className="font-medium">{name}</div>
                     {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
-                    <div className="mt-2 text-xs font-mono">Total: <span className="font-bold">{row.total.toFixed(1)}</span></div>
+                    <div className="mt-2 inline-flex items-baseline gap-1 rounded-md bg-muted/60 px-2 py-1 text-sm tabular-nums">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</span>
+                      <span className="font-bold">{row.total.toFixed(1)}</span>
+                      <span className="text-[10px] text-muted-foreground">h</span>
+                    </div>
                   </TableCell>
                 )}
                 <TableCell>
@@ -828,7 +822,7 @@ function InlineNumber({ value, disabled, onCommit }: { value: number; disabled?:
       onChange={(e) => setV(e.target.value)}
       onBlur={() => { const n = Number(v); if (!isNaN(n) && n !== value) onCommit(n); }}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      className="h-8 text-right font-mono"
+      className="h-9 text-right text-base font-semibold tabular-nums"
     />
   );
 }
@@ -847,7 +841,7 @@ function InlineText({ value, disabled, onCommit, placeholder }: { value: string;
   );
 }
 
-function PendingRow({
+function PendingCard({
   id, name, title, projCode, projName, date, logged, note, onDecide,
 }: {
   id: string; name: string; title: string;
@@ -856,45 +850,77 @@ function PendingRow({
   onDecide: (id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) => void;
 }) {
   const [approve, setApprove] = useState<string>(String(logged));
+  const [busy, setBusy] = useState(false);
   const approveNum = Number(approve);
   const valid = !Number.isNaN(approveNum) && approveNum >= 0 && approveNum <= logged;
   const reduced = valid && approveNum < logged;
+
+  async function act(decision: "approved" | "rejected") {
+    if (decision === "rejected") {
+      const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
+      setBusy(true);
+      try { await onDecide(id, "rejected", reason || undefined); } finally { setBusy(false); }
+      return;
+    }
+    if (!valid) return;
+    setBusy(true);
+    try { await onDecide(id, "approved", undefined, approveNum); } finally { setBusy(false); }
+  }
+
   return (
-    <TableRow>
-      <TableCell className="text-sm">{name}</TableCell>
-      <TableCell className="text-sm">
-        <div>{title}</div>
-        {projCode && <div className="text-[10px] text-muted-foreground font-mono">{projCode} · {projName}</div>}
-      </TableCell>
-      <TableCell className="text-xs">{format(new Date(date + "T00:00:00"), "d MMM")}</TableCell>
-      <TableCell className="text-right font-mono">{logged.toFixed(2)}</TableCell>
-      <TableCell className="text-right">
-        <Input
-          type="number" min={0} max={logged} step={0.25}
-          value={approve}
-          onChange={(e) => setApprove(e.target.value)}
-          className={`h-8 text-right font-mono ${!valid ? "border-destructive/60" : reduced ? "border-amber-500/60" : ""}`}
-        />
-        {reduced && <div className="text-[10px] text-amber-700 mt-0.5">Approving {approveNum} of {logged}</div>}
-      </TableCell>
-      <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">{note ?? ""}</TableCell>
-      <TableCell className="text-right">
-        <div className="flex items-center gap-1 justify-end">
-          <Button size="sm" variant="outline" className="h-7"
-            disabled={!valid}
-            onClick={() => onDecide(id, "approved", undefined, approveNum)}>
-            <Check className="h-3.5 w-3.5 mr-1" /> Approve
-          </Button>
-          <Button size="sm" variant="ghost" className="h-7 text-destructive"
-            onClick={() => {
-              const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
-              onDecide(id, "rejected", reason || undefined);
-            }}>
-            <X className="h-3.5 w-3.5 mr-1" /> Reject
-          </Button>
+    <div className="rounded-lg border border-border/60 bg-card p-4 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">{name}</div>
+          <div className="text-sm truncate mt-0.5">{title}</div>
+          {projCode && (
+            <div className="text-[11px] text-muted-foreground font-mono truncate">
+              {projCode} · {projName}
+            </div>
+          )}
         </div>
-      </TableCell>
-    </TableRow>
+        <Badge variant="outline" className="shrink-0 whitespace-nowrap">
+          {format(new Date(date + "T00:00:00"), "d MMM")}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 rounded-md bg-muted/40 px-3 py-2.5">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Logged</div>
+          <div className="text-2xl font-semibold tabular-nums leading-tight">
+            {logged.toFixed(2)}<span className="text-sm font-normal text-muted-foreground ml-0.5">h</span>
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Approve</div>
+          <div className="flex items-center gap-1">
+            <Input
+              type="number" min={0} max={logged} step={0.25}
+              value={approve}
+              onChange={(e) => setApprove(e.target.value)}
+              className={`h-9 w-20 text-right font-mono tabular-nums text-lg ${!valid ? "border-destructive/60" : reduced ? "border-amber-500/60" : ""}`}
+            />
+            <span className="text-sm text-muted-foreground">h</span>
+          </div>
+          {reduced && <div className="text-[10px] text-amber-700 mt-0.5">of {logged.toFixed(2)}</div>}
+        </div>
+      </div>
+
+      {note && (
+        <div className="text-xs text-muted-foreground border-l-2 border-border/60 pl-2">{note}</div>
+      )}
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
+          disabled={busy} onClick={() => act("rejected")}>
+          <X className="h-4 w-4 mr-1" /> Reject
+        </Button>
+        <Button size="sm" disabled={!valid || busy} onClick={() => act("approved")} className="gap-1">
+          <Check className="h-4 w-4" /> Approve {valid ? `${approveNum.toFixed(approveNum % 1 === 0 ? 0 : 2)}h` : ""}
+        </Button>
+      </div>
+    </div>
   );
 }
+
 

@@ -200,6 +200,7 @@ export const closeTask = createServerFn({ method: "POST" })
     if (tErr) throw tErr;
     const task = taskRow as unknown as {
       id: string; title: string; assignee_id: string | null; created_by: string;
+      reviewer_id: string | null;
       workflow_instance_id: string | null; stage_index: number | null;
       stage_snapshot: WorkflowStageInput | null; project_id: string;
     };
@@ -231,18 +232,29 @@ export const closeTask = createServerFn({ method: "POST" })
 
     // Stage requires a review? Move to review, do NOT spawn next stage yet.
     if (stage?.requires_review) {
-      await supabase.from("tasks").update({ status: "review" } as never).eq("id", task.id);
-      // Notify reviewer = instance.started_by
-      if (task.workflow_instance_id) {
+      // Reviewer default = ORIGINAL CREATOR of the workflow's root task.
+      // Only apply as a default — do NOT overwrite an explicitly-set reviewer.
+      let reviewer: string | null = task.reviewer_id ?? null;
+      if (!reviewer && task.workflow_instance_id) {
         const { data: inst } = await supabase.from("workflow_instances" as never)
-          .select("started_by").eq("id", task.workflow_instance_id).single();
-        const reviewer = (inst as unknown as { started_by: string } | null)?.started_by;
-        if (reviewer && reviewer !== actingUserId) {
-          await supabase.from("notifications").insert({
-            user_id: reviewer, kind: "review_requested", task_id: task.id,
-            body: `"${task.title}" is ready for your review.`,
-          });
+          .select("started_by, root_task_id").eq("id", task.workflow_instance_id).single();
+        const instRow = inst as unknown as { started_by: string; root_task_id: string | null } | null;
+        if (instRow?.root_task_id) {
+          const { data: root } = await supabase.from("tasks").select("created_by").eq("id", instRow.root_task_id).single();
+          reviewer = (root as unknown as { created_by: string } | null)?.created_by ?? instRow.started_by ?? null;
+        } else {
+          reviewer = instRow?.started_by ?? null;
         }
+        if (reviewer) {
+          await supabase.from("tasks").update({ reviewer_id: reviewer } as never).eq("id", task.id);
+        }
+      }
+      await supabase.from("tasks").update({ status: "review" } as never).eq("id", task.id);
+      if (reviewer && reviewer !== actingUserId) {
+        await supabase.from("notifications").insert({
+          user_id: reviewer, kind: "review_requested", task_id: task.id,
+          body: `"${task.title}" is ready for your review.`,
+        });
       }
       return { ok: true, status: "review" };
     }

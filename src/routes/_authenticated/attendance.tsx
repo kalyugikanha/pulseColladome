@@ -30,6 +30,9 @@ function AttendancePage() {
   const today = format(new Date(), "yyyy-MM-dd");
   const [commentFor, setCommentFor] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [overviewDate, setOverviewDate] = useState<Date>(new Date());
+  const [overviewSearch, setOverviewSearch] = useState("");
+  const overviewDateStr = format(overviewDate, "yyyy-MM-dd");
 
   const canView = !!me && (me.isAdmin || me.isDepartmentHead || me.isReportingManager);
   const { deptScope, userScope } = useVisibilityScope(me);

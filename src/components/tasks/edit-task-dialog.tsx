@@ -66,6 +66,9 @@ export function EditTaskDialog({
     setEstimate(task.estimated_hours == null ? "" : String(task.estimated_hours));
   }, [open, task?.id]);
 
+  const updateFn = useServerFn(updateTaskFields);
+  const { viewAsUserId } = useViewAs();
+
   async function submit() {
     if (!task) return;
     if (!title.trim()) return toast.error("Title required");
@@ -76,24 +79,31 @@ export function EditTaskDialog({
       setSaving(false);
       return toast.error("Estimated hours must be a positive number.");
     }
-    const patch: Record<string, unknown> = {
-      title: title.trim(),
-      description: desc.trim() || null,
-      priority,
-      due_date: deadline || null,
-      scheduled_post_date: postDate || null,
-      client_brand: client.trim() || null,
-      project_id: projectId,
-      assignee_id: assignee || null,
-      asset_links: links.filter((l) => l.url.trim()),
-      estimated_hours: estNum,
-    };
-    const { error } = await supabase.from("tasks").update(patch as never).eq("id", task.id);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Task updated");
-    onSaved();
-    onClose();
+    try {
+      await updateFn({ data: {
+        taskId: task.id,
+        patch: {
+          title: title.trim(),
+          description: desc.trim() || null,
+          priority,
+          due_date: deadline || null,
+          scheduled_post_date: postDate || null,
+          client_brand: client.trim() || null,
+          project_id: projectId,
+          assignee_id: assignee || null,
+          asset_links: links.filter((l) => l.url.trim()),
+          estimated_hours: estNum,
+        },
+        viewAsUserId,
+      }});
+      toast.success("Task updated");
+      onSaved();
+      onClose();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (

@@ -822,7 +822,7 @@ function InlineNumber({ value, disabled, onCommit }: { value: number; disabled?:
       onChange={(e) => setV(e.target.value)}
       onBlur={() => { const n = Number(v); if (!isNaN(n) && n !== value) onCommit(n); }}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      className="h-8 text-right font-mono"
+      className="h-9 text-right text-base font-semibold tabular-nums"
     />
   );
 }

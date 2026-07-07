@@ -475,20 +475,33 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                       text: <span className="text-muted-foreground">started watching</span>,
                     });
                   }
+                  const nameFor = (id: string | null) => {
+                    if (!id) return "Unassigned";
+                    const p = (peopleAll ?? []).find((x) => x.id === id);
+                    return p?.full_name ?? p?.email ?? "Someone";
+                  };
                   for (const a of (detail?.activity ?? [])) {
                     const aa = a as { id: string; kind: string; actor: { full_name?: string } | null; from_value: string | null; to_value: string | null; note: string | null; created_at: string; hours: number | string | null };
-                    entries.push({
-                      key: `a-${aa.id}`, at: new Date(aa.created_at),
-                      actor: aa.actor?.full_name ?? "System",
-                      icon: <HistoryIcon className="h-3 w-3" />,
-                      text: (
+                    let text: React.ReactNode;
+                    if (aa.kind === "assignee_changed") {
+                      text = aa.from_value
+                        ? <span><span className="text-muted-foreground">reassigned from </span><span className="font-medium">{nameFor(aa.from_value)}</span><span className="text-muted-foreground"> to </span><span className="font-medium">{nameFor(aa.to_value)}</span></span>
+                        : <span><span className="text-muted-foreground">assigned to </span><span className="font-medium">{nameFor(aa.to_value)}</span></span>;
+                    } else {
+                      text = (
                         <span>
                           <span className="text-muted-foreground">{aa.kind.replace(/_/g, " ")}</span>
                           {aa.from_value != null && aa.to_value != null && <span className="text-muted-foreground"> · {aa.from_value} → {aa.to_value}</span>}
                           {aa.hours != null && <span className="text-muted-foreground"> · {Number(aa.hours)}h</span>}
                           {aa.note && <span> · {aa.note}</span>}
                         </span>
-                      ),
+                      );
+                    }
+                    entries.push({
+                      key: `a-${aa.id}`, at: new Date(aa.created_at),
+                      actor: aa.actor?.full_name ?? "System",
+                      icon: <HistoryIcon className="h-3 w-3" />,
+                      text,
                     });
                   }
 

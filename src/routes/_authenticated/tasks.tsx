@@ -348,6 +348,41 @@ function TasksPage() {
         })}
       </div>
 
+      {(pendingHours?.length ?? 0) > 0 && (
+        <Card className="border-amber-500/60">
+          <CardHeader>
+            <CardTitle className="font-display text-base">Hours awaiting your approval</CardTitle>
+            <p className="text-xs text-muted-foreground">Tasks you created that are done — approve the logged hours or send them back.</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {pendingHours!.map((r) => {
+              const est = r.task.estimated_hours != null ? Number(r.task.estimated_hours) : null;
+              const actual = r.hours != null ? Number(r.hours) : 0;
+              const over = est != null && actual > est;
+              return (
+                <div key={r.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+                  <button className="flex-1 min-w-0 text-left" onClick={() => setOpenTaskId(r.task_id)}>
+                    <div className="text-sm font-medium">{r.task.title}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {r.task.project?.name ?? "—"} · by {r.actor?.full_name ?? r.actor?.email ?? "—"}
+                    </div>
+                    {r.note && <div className="text-xs mt-1 italic">"{r.note}"</div>}
+                  </button>
+                  <div className={`text-sm font-medium ${over ? "text-destructive" : ""}`}>
+                    {actual}h{est != null ? ` / est ${est}h` : ""}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => rejectHours(r.id)}>Send back</Button>
+                    <Button size="sm" className="gradient-primary" onClick={() => approveHours(r.id)}>Approve</Button>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+
       {(awaiting?.length ?? 0) > 0 && (
         <Card className="border-primary/50">
           <CardHeader><CardTitle className="font-display text-base">Awaiting my review</CardTitle></CardHeader>

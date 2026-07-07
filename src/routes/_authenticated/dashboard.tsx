@@ -91,7 +91,9 @@ function Dashboard() {
       punch_in_time: new Date().toISOString(),
     });
     if (error) {
-      toast.error(error.message.includes("duplicate") ? "You are already punched in." : error.message);
+      const isDup = error.code === "23505" || /duplicate|unique/i.test(error.message);
+      toast.error(isDup ? "You are already punched in — refreshing…" : error.message);
+      await qc.invalidateQueries({ queryKey: ["dashboard"] });
       setPunchingIn(false);
       return;
     }

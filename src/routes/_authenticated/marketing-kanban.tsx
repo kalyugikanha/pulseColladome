@@ -135,13 +135,6 @@ function MarketingKanbanPage() {
     if (!overId) return;
     const t = (tasks ?? []).find((x) => x.id === e.active.id);
     if (!t || t.marketing_stage === overId) return;
-    // Posted is terminal
-    if (t.marketing_stage === "posted") { toast.error("Posted cards are locked."); return; }
-    // Review column exit must use Approve / Send Back buttons
-    if (t.marketing_stage === "review" && overId !== "review") {
-      toast.error("Use Approve or Send Back on Review cards.");
-      return;
-    }
     setPending({ task: t, toStage: overId });
   }
 

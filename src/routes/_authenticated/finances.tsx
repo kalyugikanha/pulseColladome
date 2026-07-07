@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Wallet, IndianRupee, Users, UserPlus, Loader2 } from "lucide-react";
+import { Wallet, IndianRupee, Users, UserPlus, Loader2, Flame } from "lucide-react";
 import { provisionPendingUsers } from "@/lib/admin-users.functions";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 

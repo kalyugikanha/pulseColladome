@@ -44,7 +44,7 @@ function WorkflowsAdmin() {
         </div>
         <Button className="gradient-primary" onClick={() => setEditing({
           name: "", description: "", department: "", is_active: true,
-          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {} }],
+          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null }],
         })}><Plus className="h-4 w-4 mr-1" /> New template</Button>
       </header>
 
@@ -61,6 +61,7 @@ function WorkflowsAdmin() {
               required_fields: s.required_fields as WorkflowRequiredField[],
               branch_options: s.branch_options as WorkflowBranchOption[],
               branch_target_map: s.branch_target_map as Record<string, number>,
+              next_stage_position: (s as { next_stage_position?: number | null }).next_stage_position ?? null,
             })),
           })}>
             <CardHeader className="pb-2">
@@ -91,6 +92,7 @@ function WorkflowsAdmin() {
                             required_fields: s.required_fields as WorkflowRequiredField[],
                             branch_options: s.branch_options as WorkflowBranchOption[],
                             branch_target_map: s.branch_target_map as Record<string, number>,
+                            next_stage_position: (s as { next_stage_position?: number | null }).next_stage_position ?? null,
                           })),
                         }});
                         toast.success("Template duplicated");
@@ -146,7 +148,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
 
   function addStage() {
     const pos = stages.length + 1;
-    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {} }]);
+    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null }]);
   }
   function moveStage(idx: number, dir: -1 | 1) {
     const target = idx + dir;
@@ -308,7 +310,21 @@ function StageEditor({ stage, index, totalStages, allStages, people, onChange, o
                 <button onClick={() => removeBranch(b.key)}><Trash2 className="h-3 w-3 text-muted-foreground" /></button>
               </div>
             ))}
-            {stage.branch_options.length === 0 && <p className="text-[11px] text-muted-foreground">No branches — auto-moves to next stage.</p>}
+            {stage.branch_options.length === 0 && (
+              <div className="flex items-center gap-2 pt-1">
+                <Label className="text-[11px] text-muted-foreground shrink-0">Next stage</Label>
+                <select
+                  className="h-8 text-sm rounded border border-input px-2 flex-1"
+                  value={stage.next_stage_position == null ? "__auto__" : String(stage.next_stage_position)}
+                  onChange={(e) => onChange({ next_stage_position: e.target.value === "__auto__" ? null : Number(e.target.value) })}
+                >
+                  <option value="__auto__">Auto (next in order)</option>
+                  {allStages.filter((s) => s.position !== stage.position).map((s) => (
+                    <option key={s.position} value={s.position}>→ #{s.position} {s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-1">

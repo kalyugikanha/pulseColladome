@@ -20,6 +20,7 @@ export type WorkflowStageInput = {
   required_fields: WorkflowRequiredField[];
   branch_options: WorkflowBranchOption[];
   branch_target_map: Record<string, number>;
+  next_stage_position: number | null;
 };
 
 /** List all templates + stages. */
@@ -93,6 +94,7 @@ export const saveWorkflowTemplate = createServerFn({ method: "POST" })
         required_fields: s.required_fields,
         branch_options: s.branch_options,
         branch_target_map: s.branch_target_map,
+        next_stage_position: s.next_stage_position,
       })) as never
     );
     return { id };
@@ -377,6 +379,8 @@ async function spawnNextStage(
   if (stage.branch_options.length > 0) {
     if (!branchKey) return; // caller must pick — no auto next
     nextPos = stage.branch_target_map[branchKey] ?? null;
+  } else if (stage.next_stage_position != null) {
+    nextPos = stage.next_stage_position;
   } else {
     const later = stages.find((s) => s.position > stage.position);
     nextPos = later?.position ?? null;

@@ -310,7 +310,7 @@ function CompleteOnboardingPage() {
     }
     setSubmitting(true);
     try {
-      await saveDraft();
+      await saveDraft(true);
       const res = await finalize();
       if (!res.ok) {
         toast.error(`Please complete: ${res.missing.slice(0, 3).join(", ")}${res.missing.length > 3 ? "…" : ""}`);

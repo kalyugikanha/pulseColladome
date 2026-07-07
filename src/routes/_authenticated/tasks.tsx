@@ -192,7 +192,7 @@ function TasksPage() {
 
   function resetForm() {
     setTProject(""); setTTitle(""); setTDesc(""); setTDue(""); setTPri("medium");
-    setTAssignee(me?.id ?? ""); setTReviewer("");
+    setTAssignee(me?.id ?? ""); setTReviewer(""); setTEstimate("");
     setTax({ domainId: null, departmentId: null, taskTypeIds: [] }); setLinks([]);
     setMultiStage(false); setStages([]);
   }
@@ -209,6 +209,10 @@ function TasksPage() {
         if (!s.name.trim() || !s.owner_id) return toast.error("Fill in every stage name and owner.");
       }
     }
+    const estHours = tEstimate.trim() === "" ? null : Number(tEstimate);
+    if (estHours !== null && (!Number.isFinite(estHours) || estHours < 0)) {
+      return toast.error("Estimated hours must be a positive number.");
+    }
     const assigneeId = multiStage ? (stages[0].owner_id) : (tAssignee || me!.id);
     try {
       const task = await createFn({ data: {
@@ -216,6 +220,7 @@ function TasksPage() {
         dueDate: tDue || null, priority: tPri, assigneeId,
         assetLinks: links.filter((l) => l.url.trim()),
         domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds,
+        estimatedHours: estHours,
       }});
       if (tReviewer && task?.id && !multiStage) {
         await setReviewerSrv({ data: { taskId: task.id, reviewerId: tReviewer } });
@@ -232,9 +237,20 @@ function TasksPage() {
     } catch (e) { toast.error((e as Error).message); }
   }
 
+  function toggleStatus(s: "todo" | "in_progress" | "review" | "done") {
+    setStatusFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s); else next.add(s);
+      return next;
+    });
+  }
+
+  const filteredTasks = (tasks ?? []).filter((t) =>
+    statusFilter.has((t.status as "todo" | "in_progress" | "review" | "done")),
+  );
 
   const grouped: Record<string, typeof tasks> = {};
-  (tasks ?? []).forEach((t) => {
+  filteredTasks.forEach((t) => {
     const key = (t.project as { name?: string } | null)?.name ?? "Unassigned";
     (grouped[key] ??= []).push(t);
   });

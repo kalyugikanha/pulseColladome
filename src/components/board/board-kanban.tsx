@@ -149,6 +149,11 @@ function CardBody({ card }: { card: BoardCard }) {
           {card.assignee.full_name ?? card.assignee.email}
         </div>
       )}
+      {card.creator && (
+        <div className="text-[10px] text-muted-foreground/80 mt-0.5">
+          Assigned by {(card.creator.full_name ?? card.creator.email ?? "").split(" ")[0] || "—"}
+        </div>
+      )}
     </>
   );
 }

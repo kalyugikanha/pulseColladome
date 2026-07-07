@@ -7,6 +7,7 @@ import { useViewAs } from "@/hooks/use-view-as";
 import { useHolidays, nextHoliday } from "@/hooks/use-holidays";
 import { CalendarClock, Eye } from "lucide-react";
 import { differenceInCalendarDays, format } from "date-fns";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 type Row = { id: string; label: string; sub?: string; pending?: boolean };
 

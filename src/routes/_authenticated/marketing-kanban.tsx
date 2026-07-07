@@ -253,13 +253,15 @@ function MarketingKanbanPage() {
   );
 }
 
-function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onApprove }: {
+function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onApprove, onOpen }: {
   stage: Stage; label: string; cards: KanbanTask[];
   roster: { id: string; full_name: string | null; email: string | null }[];
   canAssignAny: boolean;
   onSendBack: (t: KanbanTask) => void;
   onApprove: (t: KanbanTask) => void;
+  onOpen: (t: KanbanTask) => void;
 }) {
+  void roster; void canAssignAny;
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   return (
     <div ref={setNodeRef}
@@ -270,7 +272,7 @@ function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onAppro
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto max-h-[70vh] pr-1">
         {cards.map((t) => (
-          <DraggableCard key={t.id} task={t}>
+          <DraggableCard key={t.id} task={t} onOpen={() => onOpen(t)}>
             <KanbanCardView task={t} />
             {stage === "review" && (
               <div className="mt-2 flex gap-1" onPointerDown={(e) => e.stopPropagation()}>
@@ -292,10 +294,11 @@ function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onAppro
   );
 }
 
-function DraggableCard({ task, children }: { task: KanbanTask; children: React.ReactNode }) {
+function DraggableCard({ task, children, onOpen }: { task: KanbanTask; children: React.ReactNode; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
+      onClick={onOpen}
       className={`rounded-md border border-border/60 bg-card p-2 shadow-sm ${isDragging ? "opacity-40" : ""} cursor-grab active:cursor-grabbing`}>
       {children}
     </div>

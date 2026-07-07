@@ -168,6 +168,8 @@ function AuthenticatedLayout() {
   const { data: user, isLoading } = useCurrentUser();
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const welcome = useFirstLoginWelcome(user?.realId);
+
 
   useEffect(() => {
     if (!user) return;
@@ -207,6 +209,7 @@ function AuthenticatedLayout() {
           <main className="flex-1 p-4 md:p-8 max-w-[1400px] w-full mx-auto"><Outlet /></main>
         </div>
         <AssistantDock />
+        {welcome.show && <WelcomeOverlay name={user.fullName} onDismiss={welcome.dismiss} />}
       </div>
     </SidebarProvider>
   );

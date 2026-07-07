@@ -156,7 +156,7 @@ export const duplicateTask = createServerFn({ method: "POST" })
       _description: src.description ?? undefined,
       _due_date: src.due_date ?? undefined,
       _priority: src.priority,
-      _assignee_id: src.assignee_id ?? context.userId,
+      _assignee_id: src.assignee_id ?? context.actingUserId,
       _asset_links: [],
       _domain_id: src.domain_id ?? undefined,
       _department_id: src.department_id ?? undefined,
@@ -164,7 +164,12 @@ export const duplicateTask = createServerFn({ method: "POST" })
       _estimated_hours: src.estimated_hours ?? undefined,
     });
     if (error) throw taskCreateError(error);
+    const newId = (task as unknown as { id: string } | null)?.id;
+    if (newId && context.isImpersonating && context.actingUserId !== context.userId) {
+      await supabase.from("tasks").update({ created_by: context.actingUserId } as never).eq("id", newId);
+    }
     return task;
+
   });
 
 export const deleteTask = createServerFn({ method: "POST" })

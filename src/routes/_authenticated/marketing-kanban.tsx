@@ -71,7 +71,7 @@ function MarketingKanbanPage() {
   const navigate = useNavigate({ from: "/_authenticated/marketing-kanban" });
   const assigneeFilter = search.assignee ?? "all";
   const setAssignee = (v: string) =>
-    navigate({ search: (prev) => ({ ...prev, assignee: v === "all" ? undefined : v }) });
+    navigate({ search: (prev: { assignee?: string }) => ({ ...prev, assignee: v === "all" ? undefined : v }) });
 
   const [newOpen, setNewOpen] = useState(false);
   const [crossOpen, setCrossOpen] = useState(false);

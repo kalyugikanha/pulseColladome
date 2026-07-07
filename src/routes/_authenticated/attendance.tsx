@@ -268,7 +268,9 @@ function AttendancePage() {
                         </TableCell>
                       </TableRow>
                     )}
-                    {overviewRows.map(({ p, a, open, leave, status }) => (
+                    {overviewRows.map(({ p, a, open, leave, status }) => {
+                      const punchInTime = open?.punch_in_time ?? a?.punch_in_time ?? null;
+                      return (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.full_name ?? p.email}</TableCell>
                         <TableCell className="text-muted-foreground">{p.department ?? "—"}</TableCell>
@@ -286,7 +288,7 @@ function AttendancePage() {
                           )}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
-                          {open?.punch_in_time || a?.punch_in_time ? format(new Date(open?.punch_in_time ?? a!.punch_in_time), "HH:mm") : "—"}
+                          {punchInTime ? format(new Date(punchInTime), "HH:mm") : "—"}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {a?.punch_out_time ? format(new Date(a.punch_out_time), "HH:mm") : "—"}
@@ -295,7 +297,8 @@ function AttendancePage() {
                           {a?.total_hours ? `${Number(a.total_hours).toFixed(2)}h` : "—"}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

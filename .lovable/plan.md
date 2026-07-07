@@ -1,54 +1,38 @@
-## Goal
-Redesign the Team Timesheet so nothing overflows and hour figures are the first thing you read. Two panels get reworked: the "Task hours awaiting approval" table and the day-breakdown table.
+## Seed Deepak Patel and Sweksha Jadon
 
-## Problems today
-- Pending panel is a 7-column table (Employee · Task · Date · Logged · Approve input · Note · Action). At ~1180px the Action column can't fit "Approve" + "Reject" labels so the button text clips into the cell edge.
-- Hour values render as plain 8px-cell `font-mono` in small columns — visually indistinguishable from the surrounding text.
-- Day-breakdown table has 6 columns with rowspan employee cells; on mid widths Project + Notes squeeze the Hours cell.
-- Filter bar wraps aggressively and pushes the tables down.
+Create placeholder profiles + role_grants so both employees are pre-provisioned. On their first Google sign-in, the existing `handle_new_user` trigger merges the placeholder into their real auth account.
 
-## Redesign — Pending panel (card list, not table)
-Replace the `<Table>` with a responsive card list, one card per pending entry:
+### Data source
 
-```text
-┌───────────────────────────────────────────────────────────────┐
-│ Kanishka Sharma                            [3 Jul, Fri]  ⋯    │
-│ Fix onboarding banner                                          │
-│ SG-042 · Sacred Groves                                         │
-│                                                                │
-│  Logged           Approve                                      │
-│  2.00 h           [ 2.00 ] h                                   │
-│                                                                │
-│  Note: "Handoff from Ravi, needs QA"                           │
-│                                                                │
-│                           [ Reject ]  [ ✓ Approve 2h ]         │
-└───────────────────────────────────────────────────────────────┘
-```
+Row-by-row from the pasted table for `deepak@colladome.in` (Designing) and `sweksha@colladome.in` (Human Resources).
 
-- Hours use `text-2xl font-semibold tabular-nums` so Logged and Approve values dominate the card.
-- Approve button label absorbs the value: `Approve 2.0h` — no separate cryptic column.
-- Reject stays as a ghost/destructive text button; when the card is < 480px both buttons collapse to icon+tooltip.
-- Amber inline warning when approving less than logged remains, right under the input.
-- Cards flow one-per-row up to `md`, then two-column grid from `lg` up so the panel keeps scanning quickly on wide screens.
+### What gets seeded now (insert tool)
 
-## Redesign — Day breakdown table
-Keep the table (it's the right shape) but tighten the columns and give hours real presence:
+**`role_grants`** — one row each:
+- Deepak: role `employee`, department `Designing`
+- Sweksha: role `employee`, department `Human Resources`
+- No super-admin, no salary override (not provided).
 
-- Merge Project + Notes into a single left-heavy cell (Project on line 1, Notes muted on line 2). That removes one column.
-- New column order: Employee · Project & Notes · Hours · Status · ⋯
-- Hours cell: `text-lg font-semibold tabular-nums`, right-aligned, subtle right border so the number reads as a data column.
-- Employee cell (rowspan): name, dept, and a bold `Total: 6.5h` chip using the same numeric treatment.
-- Status pills stay but move to a fixed 96px column with icon-only variants when the label would clip.
-- Row action `⋯` moves out of the last cell into an absolute-positioned button on hover for cleaner rows on wide screens; still tappable on touch.
-- Day total footer row uses the same big numeric style, plus a right-aligned "Approved X.X / Logged Y.Y" ratio.
+**`profiles`** (placeholder rows, `is_placeholder = true`, random UUID, `email` set so the trigger picks them up):
+- `full_name`, `email`, `department`
+- `date_of_birth` (Deepak 2001-09-17, Sweksha 2003-03-21)
+- `marriage_anniversary` NULL (blank in sheet)
+- `phone`, `permanent_address`
+- `linkedin_url`, `github_url`
+- `profile_picture_url` (Drive link)
+- `day_start_time` 09:00 for both; `standup_time` 09:00 (Deepak) / 10:00 (Sweksha)
+- `onboarding_required = true` so they finish onboarding themselves after sign-in
 
-## Filter bar polish
-- Group the day navigator (◀ [date] ▶ Today) into a single pill so it doesn't fight the filters for space.
-- Filter chips (Department / Employee / Projects) collapse into a single "Filters" dropdown below `md`, keeping the header to one line on narrow screens.
-- Export CSV stays on the right, icon-only under `md`.
+### What is NOT seeded
 
-## No behaviour changes
-Approval logic, visibility scopes, queries, and CSV export stay exactly as today — this is a presentation rework of `TimesheetPage`, `PendingRow`, and `EmployeeBlock` only.
+- **`employee_bank_details`** and **`employee_documents`** — both FK to `auth.users(id)`; neither user has signed in yet, so the DB rejects the insert. Bank fields (account holder, account no., branch, IFSC, PAN) and document links (resume, offer letter, Aadhar, PAN, cheque, marksheets, degrees) are staged in the plan below — I'll insert them automatically the first time either user signs in via a small follow-up (either a one-time backfill script triggered from the HR admin UI, or added to `handle_new_user`). Flag if you'd prefer a different approach.
 
-## Files touched
-- `src/routes/_authenticated/timesheet.tsx` — swap Pending table for card grid, restructure day table columns, tighten header/filter bar, apply tabular-nums numeric style throughout.
+Staged bank data:
+- Deepak: Deepak Patel · 87760100020015 · ANAND NAGAR JABALPUR · BARB0DBAJAP · PAN GVBPP5558Q
+- Sweksha: Shwekasha Jadoun · 40466172369 · BUS STAND, ABU ROAD · SBIN0031520 · PAN DGLPJ7515K (note: sheet's "PAN Card" column for Sweksha reads `DGLPJ7515K` — this is a valid PAN pattern, using as-is)
+
+Staged document links (Google Drive URLs stored in `storage_path` as text): resume, profile_picture, offer_letter, aadhar, pan, cancelled_cheque, marksheet_10, marksheet_12, graduation. Deepak also has a masters cert; Sweksha does not.
+
+### Verification
+
+After the migration, query `profiles` + `role_grants` for both emails and confirm they show up on the HR Admin employee list.

@@ -88,6 +88,7 @@ export const saveWorkflowTemplate = createServerFn({ method: "POST" })
         name: s.name.trim() || `Stage ${s.position}`,
         requires_review: s.requires_review,
         default_assignee_id: s.default_assignee_id,
+        default_reviewer_id: s.default_reviewer_id,
         default_due_offset_days: s.default_due_offset_days,
         required_fields: s.required_fields,
         branch_options: s.branch_options,

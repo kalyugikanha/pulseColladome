@@ -25,6 +25,7 @@ import {
   toggleWatcher, addDependency, removeDependency,
 } from "@/lib/tasks-workflow.functions";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useViewAs } from "@/hooks/use-view-as";
 
 type Props = { taskId: string | null; onClose: () => void };
 

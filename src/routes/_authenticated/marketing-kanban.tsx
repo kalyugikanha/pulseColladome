@@ -68,7 +68,14 @@ function MarketingKanbanPage() {
   const [clientsOpen, setClientsOpen] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
+  const { data: myDept } = useQuery({
+    queryKey: ["my-dept", me?.realId], enabled: !!me?.realId, staleTime: 5 * 60_000,
+    queryFn: async () => (await supabase.from("profiles").select("department").eq("id", me!.realId).maybeSingle()).data?.department ?? null,
+  });
   const isMarketingHead = !!me?.headOfDepartments.some((d) => d.toLowerCase() === "marketing");
+  const isMarketingMember = !!me && (
+    (myDept ?? "").toLowerCase() === "marketing" || isMarketingHead || me.isAdmin || me.isSuperAdmin
+  );
   const canAssignAny = !!me && (me.isAdmin || me.isSuperAdmin || isMarketingHead);
 
   // Roster: profiles whose reporting_manager is the Marketing head, plus the head.

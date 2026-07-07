@@ -66,8 +66,14 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
   }, [taskId]);
 
   const stage = task?.stage_snapshot;
-  const isAssignee = task?.assignee_id === me?.id;
-  const isReviewer = task?.status === "review" && instance?.started_by === me?.id;
+  const actingUserId = me?.id ?? null;
+  const isAssignee = task?.assignee_id === actingUserId;
+  // Reviewer is whoever is assigned as task.reviewer_id, resolved against the
+  // impersonation-aware acting user. Allow both "review" and "done" so a task
+  // that got approved but stuck (no next stage spawned) can still be acted on.
+  const isReviewer =
+    !!task && !!actingUserId && task.reviewer_id === actingUserId &&
+    (task.status === "review" || task.status === "done");
 
   if (!task || !task.workflow_instance_id || !stage || !instance) return null;
 

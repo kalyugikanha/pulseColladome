@@ -138,9 +138,10 @@ function MarketingKanbanPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("task_activity" as any)
-        .select("task_id, hours")
+        .select("task_id, hours, approval_status")
         .in("task_id", taskIds)
-        .not("hours", "is", null);
+        .not("hours", "is", null)
+        .neq("approval_status", "rejected");
       if (error) throw error;
       const m = new Map<string, number>();
       (data ?? []).forEach((r: any) => {
@@ -166,6 +167,7 @@ function MarketingKanbanPage() {
   }, [filteredTasks]);
 
   const [pending, setPending] = useState<{ task: KanbanTask; toStage: Stage } | null>(null);
+  const [markDone, setMarkDone] = useState<KanbanTask | null>(null);
   const [sendBack, setSendBack] = useState<KanbanTask | null>(null);
   const [dragging, setDragging] = useState<KanbanTask | null>(null);
 
@@ -183,6 +185,7 @@ function MarketingKanbanPage() {
     if (!overId) return;
     const t = (tasks ?? []).find((x) => x.id === e.active.id);
     if (!t || t.marketing_stage === overId) return;
+    if (overId === "posted") { setMarkDone(t); return; }
     setPending({ task: t, toStage: overId });
   }
 
@@ -190,17 +193,30 @@ function MarketingKanbanPage() {
     task: KanbanTask,
     toStage: Stage,
     newAssigneeId: string,
-    opts: { hours: number; note?: string; kind?: string },
+    opts: { hours: number; note?: string; kind?: string; pendingApproval?: boolean },
   ) {
     if (!isMarketingMember) { toast.error("Only the Marketing team can move cards."); return; }
     const fromStage = task.marketing_stage;
     const patch: any = { marketing_stage: toStage, assignee_id: newAssigneeId };
-    // Map to the generic status so other views stay coherent.
-    patch.status = toStage === "posted" ? "done" : toStage === "review" ? "review" : toStage === "script_writing" ? "todo" : "in_progress";
+    // Posted while hours are pending approval → keep task in "review" (awaiting hour approval).
+    // Only flip to 'done' once creator approves the logged hours.
+    if (toStage === "posted") {
+      patch.status = opts.pendingApproval ? "review" : "done";
+    } else if (toStage === "script_writing") {
+      patch.status = "todo";
+    } else if (toStage === "review") {
+      patch.status = "review";
+    } else {
+      patch.status = "in_progress";
+    }
     const { error } = await supabase.from("tasks").update(patch).eq("id", task.id);
     if (error) { toast.error(error.message); return; }
 
     // Activity log with hours
+    const todayStr = (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })();
     try {
       await supabase.from("task_activity" as any).insert({
         task_id: task.id,
@@ -210,6 +226,8 @@ function MarketingKanbanPage() {
         to_value: toStage,
         note: opts.note ?? null,
         hours: opts.hours,
+        approval_status: opts.pendingApproval ? "pending" : "auto",
+        completion_date: opts.pendingApproval ? todayStr : null,
       } as any);
     } catch { /* ignore */ }
 
@@ -225,20 +243,35 @@ function MarketingKanbanPage() {
       });
     }
 
-    // Cross-department final-column notify
-    if (toStage === "posted" && task.requester_id && task.requester_id !== me!.realId) {
+    // Cross-department final-column notify (only when truly done — not pending)
+    if (toStage === "posted" && !opts.pendingApproval && task.requester_id && task.requester_id !== me!.realId) {
       await supabase.from("notifications").insert({
         user_id: task.requester_id, kind: "crossover_completed", task_id: task.id,
         body: `Your request "${task.title}" was completed by Marketing.`,
       });
     }
 
-    // Also log these hours to the mover's timesheet for today so project-burn stays honest.
-    let tsMsg = "";
-    if (opts.hours > 0 && task.project_id) {
+    // Notify creator when hours need approval
+    if (opts.pendingApproval) {
+      // Look up created_by (not in KanbanTask shape) — fetch just this field.
       try {
-        const today = new Date();
-        const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        const { data: creatorRow } = await supabase.from("tasks").select("created_by").eq("id", task.id).maybeSingle();
+        const creatorId = (creatorRow as { created_by: string | null } | null)?.created_by ?? null;
+        if (creatorId && creatorId !== me!.realId) {
+          await supabase.from("notifications").insert({
+            user_id: creatorId, kind: "task_hours_pending", task_id: task.id,
+            body: `${me!.fullName ?? "Someone"} logged ${opts.hours}h to close "${task.title}". Approve in My Tasks.`,
+          });
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Sync mover's timesheet ONLY for auto-approved (intermediate) stage moves.
+    // Posted (pending approval) hours land in the timesheet only after the creator approves.
+    let tsMsg = "";
+    if (!opts.pendingApproval && opts.hours > 0 && task.project_id) {
+      try {
+        const dateStr = todayStr;
         const { data: existing } = await supabase
           .from("attendance_logs")
           .select("id, tasks, approved_at")
@@ -274,12 +307,16 @@ function MarketingKanbanPage() {
       }
     }
 
-    toast.success(`Card moved · ${opts.hours}h logged${tsMsg}`);
+    const successMsg = opts.pendingApproval
+      ? `Marked done · ${opts.hours}h sent to creator for approval`
+      : `Card moved · ${opts.hours}h logged${tsMsg}`;
+    toast.success(successMsg);
     qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
     qc.invalidateQueries({ queryKey: ["mkt-burn"] });
     qc.invalidateQueries({ queryKey: ["my-ts-logs"] });
     qc.invalidateQueries({ queryKey: ["ts-logs"] });
     qc.invalidateQueries({ queryKey: ["pb-logs"] });
+    qc.invalidateQueries({ queryKey: ["pending-hour-approvals"] });
     refetch();
   }
 
@@ -362,6 +399,16 @@ function MarketingKanbanPage() {
           if (!pending) return;
           await commitMove(pending.task, pending.toStage, assigneeId, { hours, note });
           setPending(null);
+        }}
+      />
+      <MarkDoneDialog
+        task={markDone} onClose={() => setMarkDone(null)}
+        onConfirm={async ({ hours, note }) => {
+          if (!markDone) return;
+          await commitMove(markDone, "posted", markDone.assignee_id ?? me!.realId, {
+            hours, note, kind: "task_completed", pendingApproval: true,
+          });
+          setMarkDone(null);
         }}
       />
       <SendBackDialog
@@ -492,6 +539,48 @@ function KanbanCardView({ task, dragging, burnHours }: { task: KanbanTask; dragg
     </div>
   );
 }
+function MarkDoneDialog({ task, onClose, onConfirm }: {
+  task: KanbanTask | null; onClose: () => void;
+  onConfirm: (v: { hours: number; note?: string }) => void;
+}) {
+  const [hours, setHours] = useState<string>("");
+  const [note, setNote] = useState<string>("");
+  useEffect(() => { setHours(""); setNote(""); }, [task]);
+  const hoursNum = Number(hours);
+  const valid = hours !== "" && !Number.isNaN(hoursNum) && hoursNum > 0;
+  return (
+    <Dialog open={!!task} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle className="font-display">Mark done — log actual hours</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            {task?.title}
+          </div>
+          <div className="space-y-1">
+            <Label>Actual hours spent on this task</Label>
+            <Input type="number" min={0} step={0.25} value={hours}
+              onChange={(e) => setHours(e.target.value)} placeholder="e.g. 3.5" autoFocus />
+          </div>
+          <div className="space-y-1">
+            <Label>Note for the creator (optional)</Label>
+            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything they should know before approving?" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            The task creator will review these hours. They only land in your timesheet once approved.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button className="gradient-primary" disabled={!valid}
+            onClick={() => onConfirm({ hours: hoursNum, note: note || undefined })}>
+            Send for approval
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function ReassignDialog({ state, onClose, roster, onConfirm }: {
   state: { task: KanbanTask; toStage: Stage } | null;

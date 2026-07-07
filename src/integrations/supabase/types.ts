@@ -1048,34 +1048,52 @@ export type Database = {
       task_activity: {
         Row: {
           actor_id: string | null
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
+          attendance_log_id: string | null
+          completion_date: string | null
           created_at: string
           from_value: string | null
           hours: number | null
           id: string
           kind: string
           note: string | null
+          rejected_reason: string | null
           task_id: string
           to_value: string | null
         }
         Insert: {
           actor_id?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          attendance_log_id?: string | null
+          completion_date?: string | null
           created_at?: string
           from_value?: string | null
           hours?: number | null
           id?: string
           kind: string
           note?: string | null
+          rejected_reason?: string | null
           task_id: string
           to_value?: string | null
         }
         Update: {
           actor_id?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          attendance_log_id?: string | null
+          completion_date?: string | null
           created_at?: string
           from_value?: string | null
           hours?: number | null
           id?: string
           kind?: string
           note?: string | null
+          rejected_reason?: string | null
           task_id?: string
           to_value?: string | null
         }
@@ -1083,6 +1101,13 @@ export type Database = {
           {
             foreignKeyName: "task_activity_actor_id_fkey"
             columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_activity_approved_by_fkey"
+            columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

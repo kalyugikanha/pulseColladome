@@ -10,9 +10,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Check, X } from "lucide-react";
+import { Check, X, CalendarIcon, Download, Users, Plane, LogIn, UserX } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
@@ -25,6 +30,9 @@ function AttendancePage() {
   const today = format(new Date(), "yyyy-MM-dd");
   const [commentFor, setCommentFor] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [overviewDate, setOverviewDate] = useState<Date>(new Date());
+  const [overviewSearch, setOverviewSearch] = useState("");
+  const overviewDateStr = format(overviewDate, "yyyy-MM-dd");
 
   const canView = !!me && (me.isAdmin || me.isDepartmentHead || me.isReportingManager);
   const { deptScope, userScope } = useVisibilityScope(me);
@@ -73,6 +81,25 @@ function AttendancePage() {
     },
   });
 
+  const { data: overview } = useQuery({
+    queryKey: ["attendance-overview", overviewDateStr, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
+    enabled: canView,
+    queryFn: async () => {
+      let peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
+      if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
+      if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
+      const [people, att, leaves] = await Promise.all([
+        peopleQ,
+        supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", overviewDateStr),
+        supabase.from("leave_requests")
+          .select("user_id, leave_type, start_date, end_date")
+          .eq("status", "approved")
+          .lte("start_date", overviewDateStr)
+          .gte("end_date", overviewDateStr),
+      ]);
+      return { people: people.data ?? [], att: att.data ?? [], leaves: leaves.data ?? [] };
+    },
+  });
 
   if (me && !canView) {
     throw redirect({ to: "/dashboard" });
@@ -81,6 +108,65 @@ function AttendancePage() {
   const sortedPeople = useMemo(() => {
     return (data?.people ?? []).slice().sort((a, b) => (a.full_name ?? a.email ?? "").localeCompare(b.full_name ?? b.email ?? ""));
   }, [data]);
+
+  const overviewRows = useMemo(() => {
+    const attById = new Map((overview?.att ?? []).map((a) => [a.user_id, a]));
+    const leaveById = new Map((overview?.leaves ?? []).map((l) => [l.user_id, l]));
+    const rows = (overview?.people ?? []).map((p) => {
+      const a = attById.get(p.id);
+      const leave = leaveById.get(p.id);
+      const status: "leave" | "in" | "out" | "absent" = leave
+        ? "leave"
+        : a?.punch_in_time && !a.punch_out_time ? "in"
+        : a?.punch_out_time ? "out" : "absent";
+      return { p, a, leave, status };
+    });
+    const order = { leave: 0, absent: 1, in: 2, out: 3 } as const;
+    rows.sort((x, y) => {
+      const s = order[x.status] - order[y.status];
+      if (s !== 0) return s;
+      return (x.p.full_name ?? x.p.email ?? "").localeCompare(y.p.full_name ?? y.p.email ?? "");
+    });
+    const q = overviewSearch.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => (r.p.full_name ?? "").toLowerCase().includes(q) || (r.p.email ?? "").toLowerCase().includes(q));
+  }, [overview, overviewSearch]);
+
+  const counts = useMemo(() => {
+    const total = overview?.people.length ?? 0;
+    const onLeave = overviewRows.filter((r) => r.status === "leave").length;
+    const punched = overviewRows.filter((r) => r.status === "in" || r.status === "out").length;
+    const notPunched = Math.max(0, total - onLeave - punched);
+    return { total, onLeave, punched, notPunched };
+  }, [overview, overviewRows]);
+
+  function exportOverviewCsv() {
+    const header = ["Employee", "Email", "Department", "Status", "Punch in", "Punch out", "Hours"];
+    const lines = [header.join(",")];
+    for (const r of overviewRows) {
+      const statusLabel = r.status === "leave"
+        ? `On leave (${r.leave?.leave_type ?? ""})`
+        : r.status === "in" ? "Punched in"
+        : r.status === "out" ? "Punched out" : "Absent";
+      const cells = [
+        r.p.full_name ?? "",
+        r.p.email ?? "",
+        r.p.department ?? "",
+        statusLabel,
+        r.a?.punch_in_time ? format(new Date(r.a.punch_in_time), "HH:mm") : "",
+        r.a?.punch_out_time ? format(new Date(r.a.punch_out_time), "HH:mm") : "",
+        r.a?.total_hours ? Number(r.a.total_hours).toFixed(2) : "",
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`);
+      lines.push(cells.join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `attendance-${overviewDateStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function decide(id: string, status: "approved" | "rejected", adminComment?: string) {
     const { error } = await supabase
@@ -101,8 +187,9 @@ function AttendancePage() {
         <p className="text-muted-foreground text-sm mt-1">Today's punches, hours, and leave approvals.</p>
       </header>
 
-      <Tabs defaultValue="today">
+      <Tabs defaultValue="overview">
         <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="today">Today</TabsTrigger>
           <TabsTrigger value="leave">
             Leave approvals
@@ -111,6 +198,108 @@ function AttendancePage() {
             ) : null}
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+              <div>
+                <CardTitle className="font-display">Attendance overview</CardTitle>
+                <CardDescription>Pick any date to see who's in, on leave, or missing.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(overviewDate, "EEE, d MMM yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={overviewDate}
+                      onSelect={(d) => d && setOverviewDate(d)}
+                      disabled={(d) => d > new Date()}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button variant="outline" size="sm" onClick={exportOverviewCsv} disabled={overviewRows.length === 0}>
+                  <Download className="h-4 w-4 mr-1" /> Export CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <SummaryCard icon={<Users className="h-4 w-4" />} label="Total employees" value={counts.total} caption="in your scope" />
+                <SummaryCard icon={<Plane className="h-4 w-4" />} label="On leave" value={counts.onLeave} caption={`of ${counts.total}`} tone="amber" />
+                <SummaryCard icon={<LogIn className="h-4 w-4" />} label="Punched in" value={counts.punched} caption={`of ${counts.total}`} tone="green" />
+                <SummaryCard icon={<UserX className="h-4 w-4" />} label="Not punched in" value={counts.notPunched} caption="excluding leave" tone="red" />
+              </div>
+
+              <Input
+                placeholder="Search employee…"
+                value={overviewSearch}
+                onChange={(e) => setOverviewSearch(e.target.value)}
+                className="max-w-xs"
+              />
+
+              <div className="rounded-lg border border-border/60 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Punch in</TableHead>
+                      <TableHead>Punch out</TableHead>
+                      <TableHead className="text-right">Hours</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {overviewRows.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
+                          No employees to show.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {overviewRows.map(({ p, a, leave, status }) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.full_name ?? p.email}</TableCell>
+                        <TableCell className="text-muted-foreground">{p.department ?? "—"}</TableCell>
+                        <TableCell>
+                          {status === "leave" ? (
+                            <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 capitalize">
+                              On leave · {leave!.leave_type}
+                            </Badge>
+                          ) : status === "in" ? (
+                            <Badge className="gradient-primary">Punched in</Badge>
+                          ) : status === "out" ? (
+                            <Badge variant="secondary">Punched out</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-red-600 border-red-500/40">Not punched in</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {a?.punch_in_time ? format(new Date(a.punch_in_time), "HH:mm") : "—"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {a?.punch_out_time ? format(new Date(a.punch_out_time), "HH:mm") : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {a?.total_hours ? `${Number(a.total_hours).toFixed(2)}h` : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         <TabsContent value="today" className="mt-4">
           <Card>
@@ -269,6 +458,36 @@ function AttendancePage() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+  caption,
+  tone,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  caption?: string;
+  tone?: "amber" | "green" | "red";
+}) {
+  const toneClass =
+    tone === "amber" ? "text-amber-600 dark:text-amber-300"
+    : tone === "green" ? "text-emerald-600 dark:text-emerald-300"
+    : tone === "red" ? "text-red-600 dark:text-red-300"
+    : "text-foreground";
+  return (
+    <div className="rounded-lg border border-border/60 p-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className={toneClass}>{icon}</span>
+        <span>{label}</span>
+      </div>
+      <div className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</div>
+      {caption && <div className="text-xs text-muted-foreground mt-0.5">{caption}</div>}
     </div>
   );
 }

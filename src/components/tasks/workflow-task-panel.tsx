@@ -236,9 +236,11 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
 }) {
   const review = useServerFn(reviewTask);
   const { viewAsUserId } = useViewAs();
+  const { data: me } = useCurrentUser();
   const [body, setBody] = useState("");
   const [branchKey, setBranchKey] = useState("");
   const [nextAssignee, setNextAssignee] = useState("");
+  const [rating, setRating] = useState<number>(0);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
   const [busy, setBusy] = useState(false);
 
@@ -247,6 +249,8 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
   }, []);
 
   const hasBranches = stage.branch_options.length > 0 && action === "approve";
+  const actingUserId = viewAsUserId ?? me?.id ?? null;
+  const canRate = action === "approve" && !!task.assignee_id && !!actingUserId && task.assignee_id !== actingUserId;
 
   async function submit() {
     setBusy(true);
@@ -256,6 +260,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
         body: body.trim() || null,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
+        rating: canRate && rating > 0 ? rating : null,
         viewAsUserId,
       }});
       toast.success(action === "approve" ? "Approved" : action === "request_changes" ? "Sent back" : "Comment added");
@@ -270,6 +275,29 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
         <DialogHeader><DialogTitle>{action === "approve" ? "Approve" : action === "request_changes" ? "Request changes" : "Add review comment"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <Textarea placeholder="Message to the assignee" rows={3} value={body} onChange={(e) => setBody(e.target.value)} />
+          {canRate && (
+            <div className="space-y-1">
+              <Label className="text-xs">Rate this work (optional)</Label>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setRating(rating === n ? 0 : n)}
+                    className="p-1"
+                    aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                  >
+                    <Star className={`h-5 w-5 ${n <= rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                  </button>
+                ))}
+                {rating > 0 && (
+                  <button type="button" onClick={() => setRating(0)} className="ml-2 text-xs text-muted-foreground hover:text-foreground">
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {hasBranches && (
             <>
               <div className="space-y-1">
@@ -303,6 +331,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
     </Dialog>
   );
 }
+
 
 function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: () => void; onDone: () => void | Promise<void> }) {
   const log = useServerFn(logTaskTime);

@@ -1,30 +1,23 @@
 ## Goal
-Add a dedicated **Approved task hours** panel on the team timesheet, mirroring the "Task hours awaiting your approval" panel but for entries that have already been approved. Right now approved rows only fold into the employee day-breakdown card, and the user wants a standalone panel with project / hours / notes / approver / date.
+Approved task hours should appear inside the existing **day-breakdown card** on Team Timesheet using the same visibility rules as the Pending panel. Remove the separate "Approved task hours" panel added previously — it's redundant.
 
-## Where
-`src/routes/_authenticated/timesheet.tsx`, rendered directly below the pending approvals card and above the day-breakdown card. Same visibility rule as the pending card (`pendingEnabled` — managers see their direct reports; admins/PMs/super admins see the visible scope).
+## Why the just-approved row isn't visible today
+- Kanishka's approved rows have `completion_date = 2026-07-07`, but the selected day is **8 July 2026**. Selecting 7 July shows them in the day-breakdown table (activity rows are already merged).
+- Additionally, a non-admin manager viewing team-timesheet without any dept/user scope selected wouldn't see direct-report activity, because the `ts-profiles` + `ts-activity` queries only scope by dept/user filters — unlike the Pending panel which falls back to `directReportIds`.
 
-## Data
-New query `["ts-approved-task-hours", …]` against `task_activity`:
-- Select: `id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approved_at, approved_by, kind, task:tasks(id, title, project(code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email), approver:profiles!task_activity_approved_by_fkey(id, full_name, email)`
-- Filters: `approval_status in ('approved','auto')`, `hours not null`, `completion_date` in the currently-selected day (same date window used by `activityRows`).
-- Scope: same `pendingActorIds` logic used by the pending query (managers → direct reports; admins → visible scope).
-- Order by `approved_at desc nulls last, created_at desc`.
+## Changes (frontend only, `src/routes/_authenticated/timesheet.tsx`)
 
-Invalidate this key wherever `["ts-activity"]` is already invalidated (inside `decidePending` and any other approve/reject spots) so newly-approved rows appear immediately.
+1. **Remove the "Approved task hours" panel** (approx. lines ~540–620) and its `ts-approved-task-hours` query + `refetchApproved` call.
 
-## UI
-Card titled "Approved task hours" with a count badge. Table columns:
-- Employee
-- Task / Project (title with project code · name subtext)
-- Date (completion date)
-- Approved hrs (bold; show logged in muted subtext if different)
-- Note
-- Approved by / when (approver name + relative time)
+2. **Align day-breakdown scope with Pending panel permissions:**
+   - Compute `mergedVisibleIds` = union of `visibleUserIds` (dept/user scope) and `pendingActorIds` (direct reports for managers, all for admins).
+   - `ts-profiles`: when no scope selected but user is a manager, fetch profiles for their direct reports so those employees render as rows.
+   - `ts-activity`: filter by `mergedVisibleIds` when set, so approved/pending activity for direct reports loads even without an explicit dept/user filter.
+   - Leave existing `logs` query as-is (attendance logs remain scoped to profiles list — same behavior).
 
-Empty state: "No approved task hours for this day."
+3. **Invalidations in `decidePending`:** drop the `ts-approved-task-hours` invalidation; keep `ts-activity`, `ts-logs`, and the personal keys so the day-breakdown card refreshes when Approve is clicked.
 
-## Out of scope
-- No change to the employee day-breakdown card (approved hours continue to merge into it as today).
-- No change to approval mutation logic or reviewer defaulting.
-- No cross-day view — panel stays scoped to the selected date, matching the rest of the page.
+## Result
+- Approving a task's hours immediately shows a new row in the day-breakdown card for that employee under the corresponding `completion_date`, with Project, Approved hrs, Notes, and Approved status — matching the existing "activity" row rendering.
+- Managers see direct-report approvals without needing to select a dept/user filter.
+- No separate approved-hours panel; single source of truth.

@@ -71,14 +71,25 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     queryKey: ["projects-list-lite"],
     queryFn: async () => (await supabase.from("projects").select("id, name").order("name")).data ?? [],
   });
+  const [assigneeFilter, setAssigneeFilter] = useState("");
   const { data: people } = useQuery({
-    queryKey: ["people-lite", defaultDepartment],
+    queryKey: ["people-lite-all"],
     queryFn: async () => {
-      let q = supabase.from("profiles").select("id, full_name, email, department").order("full_name");
-      if (defaultDepartment) q = q.eq("department", defaultDepartment);
-      const { data } = await q;
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, department")
+        .order("full_name");
       return data ?? [];
     },
+  });
+  const filteredPeople = (people ?? []).filter((p) => {
+    if (!assigneeFilter.trim()) return true;
+    const q = assigneeFilter.toLowerCase();
+    return (
+      (p.full_name ?? "").toLowerCase().includes(q) ||
+      (p.email ?? "").toLowerCase().includes(q) ||
+      (p.department ?? "").toLowerCase().includes(q)
+    );
   });
   const { data: templates } = useQuery({
     queryKey: ["workflow-templates"], enabled: open,

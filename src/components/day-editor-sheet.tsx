@@ -17,6 +17,7 @@ type Task = {
   task_id?: string;
   task_title?: string;
   hours?: number;
+  approved_hours?: number;
   comments?: string;
 };
 type Project = { id: string; code: string; name: string };

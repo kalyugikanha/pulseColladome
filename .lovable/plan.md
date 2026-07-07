@@ -1,82 +1,49 @@
-## Marketing Kanban — details, comments, and access rules
+## Root cause — trigger bug, not OAuth / proxy
 
-### 1. Card detail + comments
-- Clicking a card opens the existing `TaskDetailSheet` (`src/components/tasks/task-detail-sheet.tsx`), which already renders the full task view with the comments section, subtasks, activity, watchers, and dependencies.
-- Wire it in `marketing-kanban.tsx`:
-  - Add `const [openTaskId, setOpenTaskId] = useState<string | null>(null);`
-  - Render `<TaskDetailSheet taskId={openTaskId} onClose={() => { setOpenTaskId(null); qc.invalidateQueries({ queryKey: ["mkt-kanban"] }); }} />`.
-  - On the card body, add `onClick={() => setOpenTaskId(t.id)}` (with `stopPropagation` around drag/link elements — the existing asset-link and Approve/Send-back buttons already stop propagation).
+Juhi has **no `auth.users` row** (never signed in successfully) but she already has a `public.profiles` row seeded ahead of time:
 
-### 2. Moves — anyone, any bucket → any bucket
-- Remove the two restrictions in `onDragEnd`:
-  - `if (t.marketing_stage === "posted") …` (Posted lock) — delete.
-  - `if (t.marketing_stage === "review" && overId !== "review") …` (Review exit lock) — delete.
-- Keep the reassign popup on every move (per your choice) and keep the Approve / Send-back buttons on Review cards as convenience shortcuts.
-- Keep the current `patch.status` mapping so board moves stay coherent with the generic task views.
-
-### 3. Access: Marketing kanban visible to everyone; BD tasks BD-only
-Two RLS changes on `public.tasks` (single migration):
-
-**a. Open marketing kanban rows to all authenticated users.** Add a SELECT policy so any signed-in user can read tasks that live on the marketing board:
-
-```sql
-CREATE POLICY "tasks: marketing kanban read all" ON public.tasks
-  FOR SELECT TO authenticated
-  USING (marketing_stage IS NOT NULL);
+```
+id      = 11111111-0000-0000-0000-000000000007
+email   = juhi@colladome.com
 ```
 
-This lets non-Marketing folks see the board and open card details, without widening access to unrelated task rows.
+`public.profiles` has a unique index `profiles_email_lower_unique` on `lower(email)`.
 
-**b. Restrict Business Development tasks to the BD team.** BD = tasks whose `department_id` matches the `Business Development` row in `taxonomy_departments`. Add a helper + gate every existing task SELECT policy so BD rows are only visible to BD team members, BD head, super/HR admins, and project managers.
+When she signs in with Google for the first time, the `handle_new_user()` trigger (fires on `INSERT INTO auth.users`) runs the "placeholder retarget" branch:
 
-Approach:
+1. `INSERT INTO public.profiles(id, …, email, …) VALUES (NEW.id, …, 'juhi@colladome.com', …)` ← **fails** on `profiles_email_lower_unique` because the placeholder row with the same lowercased email still exists.
+2. Trigger raises → Supabase aborts the auth signup → the OAuth callback returns
+   `#error=server_error&error_description=failed+to+sign+in+with+vendor`.
 
-```sql
--- Helper: is the given user on the BD team?
-CREATE OR REPLACE FUNCTION private.is_bd_team(_uid uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.profiles p
-    WHERE p.id = _uid AND lower(p.department) = 'business development'
-  )
-  OR EXISTS (
-    SELECT 1 FROM public.department_heads dh
-    WHERE dh.user_id = _uid AND lower(dh.department) = 'business development'
-  );
-$$;
+That's the exact error Juhi is seeing. 4 profiles in the DB are in this same "seeded placeholder, never signed in" state — all will hit the same failure on their first login.
 
--- Helper: is this task a BD task?
-CREATE OR REPLACE FUNCTION private.is_bd_task(_task_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.tasks t
-    JOIN public.taxonomy_departments d ON d.id = t.department_id
-    WHERE t.id = _task_id AND lower(d.name) = 'business development'
-  );
-$$;
-```
+The published-URL fetch-proxy story doesn't apply here (this is `error_description=failed+to+sign+in+with+vendor` from the auth server itself, not a network failure in the browser).
 
-Then guard the existing SELECT policies (`tasks: read involved or manager`, `tasks: reviewer read`, `tasks: reporting manager read`, `tasks: dept head read`, and the new `tasks: marketing kanban read all`) by ANDing:
+## Fix — one migration, `handle_new_user()` update
+
+Patch the placeholder branch to remove the email-collision before the insert. Because `profiles_email_lower_unique` is a partial index `WHERE email IS NOT NULL`, nulling the placeholder's email removes it from the index without dropping the row (we still need the row so FK retargeting can find children).
+
+New order inside the `ph.id IS NOT NULL AND ph.id <> NEW.id` branch:
 
 ```sql
-AND (
-  NOT private.is_bd_task(id)
-  OR private.is_bd_team(auth.uid())
-  OR private.is_admin(auth.uid())
-  OR private.is_super_admin(auth.uid())
-  OR private.is_hr_admin(auth.uid())
-  OR private.can_manage_projects(auth.uid())
-)
+-- 0) Free the unique-lower(email) index slot held by the placeholder.
+UPDATE public.profiles SET email = NULL WHERE id = ph.id;
+
+-- 1) Insert the new profile row with the real auth uid.
+INSERT INTO public.profiles (id, …, email, …) VALUES (NEW.id, …, NEW.email, …);
+
+-- 2) Retarget all FKs from ph.id → NEW.id (unchanged, existing UPDATEs).
+-- 3) DELETE FROM public.profiles WHERE id = ph.id;
 ```
 
-Each affected policy is dropped and recreated with the BD guard appended. Manage/write policies stay as-is (creators/managers already control writes).
+Everything else in the function stays as-is (role grants, salaries, leave balances, manager back-fill).
 
-### 4. Verify
-- As a non-Marketing user (e.g., Design/Ops): open `/marketing-kanban`, cards load, card click opens detail + comments, drag between any columns works.
-- As Marketing head/admin: same, plus reassign dialog + approve/send-back still work.
-- Create a BD-department task via `/tasks` → confirm it is invisible to a non-BD user, visible to a BD member.
-- Confirm existing Marketing kanban BD-related requests (if any were created through cross-department flow into BD) are hidden from non-BD viewers.
+## Verify
 
-### Files touched
-- `src/routes/_authenticated/marketing-kanban.tsx` — add detail-sheet wiring, remove two move restrictions.
-- New migration `supabase/migrations/…_marketing_kanban_access.sql` — helpers + policy rewrites.
+- After migration, ask Juhi to try Google sign-in again on the published URL. She should land in the app, `auth.users` gets her row, `profiles` gets her real uid, placeholder row is gone.
+- Spot-check one other placeholder user via `SELECT id, email, is_placeholder FROM public.profiles p LEFT JOIN auth.users u ON u.id = p.id WHERE u.id IS NULL;` — the row should disappear after that user's first successful sign-in.
+- No code changes on the frontend; no OAuth reconfig needed.
+
+## Files touched
+
+- New migration `supabase/migrations/…_fix_handle_new_user_email_collision.sql` — `CREATE OR REPLACE FUNCTION public.handle_new_user()` with the extra `UPDATE … SET email = NULL` at the top of the placeholder branch.

@@ -498,6 +498,32 @@ function TasksPage() {
 
       <TaskDetailSheet taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
 
+      <MarkDoneDialog
+        task={markDone ? { id: markDone.id, title: markDone.title, assigneeId: markDone.assignee_id, creatorId: markDone.created_by } : null}
+        onClose={() => setMarkDone(null)}
+        roster={(assignees ?? []).map((a) => ({ id: a.id, full_name: a.full_name, email: null }))}
+        defaultHandoffId={markDone?.created_by ?? null}
+        onConfirm={async ({ hours, note, handoffId }) => {
+          if (!markDone || !me) return;
+          try {
+            await closeMarketingTask({
+              taskId: markDone.id,
+              title: markDone.title,
+              fromStage: markDone.marketing_stage,
+              currentAssigneeId: markDone.assignee_id,
+              requesterId: markDone.created_by,
+              actorId: me.id,
+              hours, note,
+              nextAssigneeId: handoffId ?? markDone.created_by ?? markDone.assignee_id,
+            });
+            toast.success("Sent for approval");
+            setMarkDone(null);
+            qc.invalidateQueries();
+          } catch (e) { toast.error((e as Error).message); }
+        }}
+      />
+
+
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

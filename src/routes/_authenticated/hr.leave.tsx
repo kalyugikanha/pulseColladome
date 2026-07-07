@@ -19,7 +19,7 @@ import { format, differenceInCalendarDays, startOfMonth, endOfMonth, eachDayOfIn
 import { logLeaveForEmployee } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/_authenticated/hr/leave")({
-  component: HrLeavePage,
+  beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "leaves" } }); },
 });
 
 const TYPES = [
@@ -46,7 +46,7 @@ type LeaveRow = {
 
 type Employee = { id: string; full_name: string | null; email: string | null; department: string | null };
 
-function HrLeavePage() {
+export function HrLeavePage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
 

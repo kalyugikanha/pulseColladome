@@ -15,12 +15,12 @@ import { toast } from "sonner";
 import { Shield, Trash2, UserPlus, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/access")({
-  component: AccessPage,
+  beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "access" } }); },
 });
 
 type GrantRole = "admin" | "employee" | "project_manager";
 
-function AccessPage() {
+export function AccessPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const createUserFn = useServerFn(createTeamUser);

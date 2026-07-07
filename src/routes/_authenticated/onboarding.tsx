@@ -19,7 +19,7 @@ import { DepartmentSelect } from "@/components/department-select";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
-  component: OnboardingPage,
+  beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "onboarding" } }); },
 });
 
 type EmploymentType = "full_time" | "intern" | "contract" | "consultant";
@@ -45,7 +45,7 @@ const EMPLOYMENT_LABEL: Record<EmploymentType, string> = {
   consultant: "Consultant",
 };
 
-function OnboardingPage() {
+export function OnboardingPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const createUserFn = useServerFn(createTeamUser);

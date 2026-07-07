@@ -24,7 +24,7 @@ import { format } from "date-fns";
 import { ClipboardCheck, ExternalLink, Loader2, Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/hr/onboarding")({
-  component: HrOnboardingPage,
+  beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "approvals" } }); },
 });
 
 type SubmissionRow = {
@@ -66,7 +66,7 @@ const DOC_LABELS: Record<OnboardingDocType, string> = {
   linkedin_employment: "LinkedIn 'Works at Colladome' proof",
 };
 
-function HrOnboardingPage() {
+export function HrOnboardingPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const listFn = useServerFn(listOnboardingSubmissions);

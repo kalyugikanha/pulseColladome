@@ -303,7 +303,7 @@ function CompleteOnboardingPage() {
 
   async function submit() {
     if (isApproved) {
-      await saveDraft();
+      await saveDraft(true);
       qc.invalidateQueries({ queryKey: ["current-user"] });
       qc.invalidateQueries({ queryKey: ["my-onboarding"] });
       return;

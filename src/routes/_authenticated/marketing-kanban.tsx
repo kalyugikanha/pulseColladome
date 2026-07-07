@@ -133,11 +133,13 @@ function MarketingKanbanPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   function onDragStart(e: DragStartEvent) {
+    if (!isMarketingMember) return;
     const t = (tasks ?? []).find((x) => x.id === e.active.id);
     if (t) setDragging(t);
   }
   function onDragEnd(e: DragEndEvent) {
     setDragging(null);
+    if (!isMarketingMember) return;
     const overId = e.over?.id as Stage | undefined;
     if (!overId) return;
     const t = (tasks ?? []).find((x) => x.id === e.active.id);
@@ -146,6 +148,7 @@ function MarketingKanbanPage() {
   }
 
   async function commitMove(task: KanbanTask, toStage: Stage, newAssigneeId: string, note?: string) {
+    if (!isMarketingMember) { toast.error("Only the Marketing team can move cards."); return; }
     const fromStage = task.marketing_stage;
     const patch: any = { marketing_stage: toStage, assignee_id: newAssigneeId };
     // Map to the generic status so other views stay coherent.

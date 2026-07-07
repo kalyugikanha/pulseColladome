@@ -422,6 +422,13 @@ async function spawnNextStage(
     reviewer_id: nextStage.default_reviewer_id ?? null,
   } as never).eq("id", newTaskId);
   await supabase.from("workflow_instances" as never).update({ current_stage_position: nextStage.position } as never).eq("id", task.workflow_instance_id);
+  // Log the initial stage assignment so history shows the handoff.
+  if (assignee) {
+    await supabase.from("task_activity" as never).insert({
+      task_id: newTaskId, actor_id: actorId, kind: "assignee_changed",
+      from_value: null, to_value: assignee,
+    } as never);
+  }
   if (assignee && assignee !== actorId) {
     await supabase.from("notifications").insert({
       user_id: assignee, kind: "task_assigned", task_id: newTaskId,

@@ -1,16 +1,20 @@
-## Grant HR admins full attendance visibility
+## Restore Data-API GRANTs on attendance tables
 
-Currently the attendance page only shows the "everyone" admin view to `admin` / `super_admin`. HR admins (like Shradhdha) fall back to the manager scope and only see their reporting tree.
+Both `public.attendance_logs` and `public.punch_sessions` currently have no GRANTs to `authenticated` / `service_role`, so PostgREST rejects every request — including punch-in inserts — with a permission error. RLS is fine; only the grants are missing.
 
-### Changes
+### Migration
 
-1. **`src/hooks/use-visibility-scope.ts`** — include `isHrAdmin` in the check that returns the org-wide scope, so HR admins get every user id (same as admins).
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.punch_sessions TO authenticated;
+GRANT ALL ON public.punch_sessions TO service_role;
 
-2. **`src/routes/_authenticated/attendance.tsx`** — add `isHrAdmin` to the `canView` gate and to the condition that renders the "All employees" admin tab/toggle, so HR admins see the same admin UI as admins.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_logs TO authenticated;
+GRANT ALL ON public.attendance_logs TO service_role;
+```
 
-3. **RLS check** — the existing `attendance_logs` admin-read policy already covers HR admins via `private.is_hr_admin(auth.uid())` (verified in the earlier migration). No DB change needed; if the read policy is admin-only, add an HR-admin SELECT policy on `attendance_logs` and `punch_sessions` in a new migration.
+No `anon` grants — both tables are auth-scoped.
 
-### Verification
+### Verify
 
-- Sign in as Shradhdha → `/attendance` shows the admin/all-employees view with every employee row.
-- Managers (Kanishka, Akash, Juhi) still see only their reporting tree — unchanged.
+- Re-query `information_schema.role_table_grants` to confirm the rows exist.
+- Have a signed-in user hit Punch In → row appears in `punch_sessions` and `attendance_logs`.

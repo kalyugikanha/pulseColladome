@@ -203,7 +203,11 @@ function MyTimesheetPage() {
       <Card>
         <CardHeader>
           <CardTitle>{label}</CardTitle>
-          <CardDescription>{totalHours.toFixed(1)} hrs across {uniqueDays} day{uniqueDays === 1 ? "" : "s"}</CardDescription>
+          <CardDescription>
+            Logged {totalHours.toFixed(1)} hrs · Approved {totalApproved.toFixed(1)} hrs
+            {totalApproved < totalHours && ` · Gap ${(totalHours - totalApproved).toFixed(1)} hrs`}
+            {" "}across {uniqueDays} day{uniqueDays === 1 ? "" : "s"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {filteredRows.length === 0 ? (
@@ -213,36 +217,45 @@ function MyTimesheetPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead><TableHead>Project</TableHead>
-                  <TableHead className="text-right">Hours</TableHead>
+                  <TableHead className="text-right">Logged</TableHead>
+                  <TableHead className="text-right">Approved</TableHead>
                   <TableHead>Comments</TableHead><TableHead>Status</TableHead>
                   <TableHead className="w-[80px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.map((r, i) => (
-                  <TableRow key={`${r.date}-${r.code}-${i}`}>
-                    <TableCell className="text-xs">{format(new Date(r.date + "T00:00:00"), "d MMM")}</TableCell>
-                    <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>
-                    <TableCell className="text-right font-mono">{r.hours.toFixed(1)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.comments ?? ""}</TableCell>
-                    <TableCell>
-                      {r.approved
-                        ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><Lock className="h-3 w-3" /> Approved</Badge>
-                        : r.pending
-                          ? <Badge variant="outline" className="text-amber-700 border-amber-500/60">Awaiting approval</Badge>
-                          : <Badge variant="outline">Pending</Badge>}
-                    </TableCell>
-                    <TableCell>
-                      {r.taskId ? (
-                        <span className="text-xs text-muted-foreground">via task</span>
-                      ) : (
-                        <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditor({ date: r.date })}>
-                          <Pencil className="h-3 w-3 mr-1" /> {r.approved ? "View" : "Edit"}
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredRows.map((r, i) => {
+                  const reduced = r.approvedHours != null && r.approvedHours < r.hours;
+                  return (
+                    <TableRow key={`${r.date}-${r.code}-${i}`}>
+                      <TableCell className="text-xs">{format(new Date(r.date + "T00:00:00"), "d MMM")}</TableCell>
+                      <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>
+                      <TableCell className="text-right font-mono">{r.hours.toFixed(1)}</TableCell>
+                      <TableCell className={`text-right font-mono ${reduced ? "text-amber-700" : ""}`}>
+                        {r.approvedHours != null ? r.approvedHours.toFixed(1) : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{r.comments ?? ""}</TableCell>
+                      <TableCell>
+                        {r.approved
+                          ? (reduced
+                              ? <Badge variant="secondary" className="gap-1 text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300" title={`Approved ${r.approvedHours!.toFixed(1)} of ${r.hours.toFixed(1)} logged`}><Lock className="h-3 w-3" /> Approved (reduced)</Badge>
+                              : <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><Lock className="h-3 w-3" /> Approved</Badge>)
+                          : r.pending
+                            ? <Badge variant="outline" className="text-amber-700 border-amber-500/60">Awaiting approval</Badge>
+                            : <Badge variant="outline">Pending</Badge>}
+                      </TableCell>
+                      <TableCell>
+                        {r.taskId ? (
+                          <span className="text-xs text-muted-foreground">via task</span>
+                        ) : (
+                          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditor({ date: r.date })}>
+                            <Pencil className="h-3 w-3 mr-1" /> {r.approved ? "View" : "Edit"}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

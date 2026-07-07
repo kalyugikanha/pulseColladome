@@ -128,13 +128,40 @@ function MarketingKanbanPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Burn totals per task from task_activity.hours
+  const taskIds = useMemo(() => (tasks ?? []).map((t) => t.id), [tasks]);
+  const { data: burnMap } = useQuery({
+    queryKey: ["mkt-burn", taskIds.join(",")],
+    enabled: taskIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_activity" as any)
+        .select("task_id, hours")
+        .in("task_id", taskIds)
+        .not("hours", "is", null);
+      if (error) throw error;
+      const m = new Map<string, number>();
+      (data ?? []).forEach((r: any) => {
+        if (r.hours == null) return;
+        m.set(r.task_id, (m.get(r.task_id) ?? 0) + Number(r.hours));
+      });
+      return m;
+    },
+  });
+
+  const filteredTasks = useMemo(() => {
+    if (assigneeFilter === "all") return tasks ?? [];
+    if (assigneeFilter === "unassigned") return (tasks ?? []).filter((t) => !t.assignee_id);
+    return (tasks ?? []).filter((t) => t.assignee_id === assigneeFilter);
+  }, [tasks, assigneeFilter]);
+
   const byCol = useMemo(() => {
     const m: Record<Stage, KanbanTask[]> = {
       script_writing: [], script_wip: [], design: [], review: [], posting: [], posted: [],
     };
-    (tasks ?? []).forEach((t) => { if (t.marketing_stage) m[t.marketing_stage].push(t); });
+    filteredTasks.forEach((t) => { if (t.marketing_stage) m[t.marketing_stage].push(t); });
     return m;
-  }, [tasks]);
+  }, [filteredTasks]);
 
   const [pending, setPending] = useState<{ task: KanbanTask; toStage: Stage } | null>(null);
   const [sendBack, setSendBack] = useState<KanbanTask | null>(null);
@@ -157,7 +184,12 @@ function MarketingKanbanPage() {
     setPending({ task: t, toStage: overId });
   }
 
-  async function commitMove(task: KanbanTask, toStage: Stage, newAssigneeId: string, note?: string) {
+  async function commitMove(
+    task: KanbanTask,
+    toStage: Stage,
+    newAssigneeId: string,
+    opts: { hours: number; note?: string; kind?: string },
+  ) {
     if (!isMarketingMember) { toast.error("Only the Marketing team can move cards."); return; }
     const fromStage = task.marketing_stage;
     const patch: any = { marketing_stage: toStage, assignee_id: newAssigneeId };
@@ -166,18 +198,21 @@ function MarketingKanbanPage() {
     const { error } = await supabase.from("tasks").update(patch).eq("id", task.id);
     if (error) { toast.error(error.message); return; }
 
-    // Activity log (best-effort)
+    // Activity log with hours
     try {
       await supabase.from("task_activity" as any).insert({
         task_id: task.id,
         actor_id: me!.realId,
-        kind: "marketing_stage_moved",
-        payload: { from: fromStage, to: toStage, from_assignee: task.assignee_id, to_assignee: newAssigneeId, note: note ?? null },
+        kind: opts.kind ?? "marketing_stage_moved",
+        from_value: fromStage,
+        to_value: toStage,
+        note: opts.note ?? null,
+        hours: opts.hours,
       } as any);
     } catch { /* ignore */ }
 
-    if (note && note.trim()) {
-      await supabase.from("task_comments").insert({ task_id: task.id, author_id: me!.realId, body: note.trim() });
+    if (opts.note && opts.note.trim()) {
+      await supabase.from("task_comments").insert({ task_id: task.id, author_id: me!.realId, body: opts.note.trim() });
     }
 
     // Notify new assignee on reassignment
@@ -196,8 +231,9 @@ function MarketingKanbanPage() {
       });
     }
 
-    toast.success("Card moved");
+    toast.success(`Card moved · ${opts.hours}h logged`);
     qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
+    qc.invalidateQueries({ queryKey: ["mkt-burn"] });
     refetch();
   }
 

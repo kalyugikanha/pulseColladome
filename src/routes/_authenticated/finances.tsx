@@ -84,6 +84,24 @@ function FinancesPage() {
     },
   });
 
+  const { data: taskLoggedHours } = useQuery({
+    queryKey: ["finances-task-hours", month],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const startIso = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+      const endIso = new Date(Date.UTC(y, m, 1)).toISOString();
+      const { data, error } = await supabase
+        .from("task_activity" as any)
+        .select("actor_id, hours, created_at, task:tasks(id, title, project:projects(id, code, name))")
+        .not("hours", "is", null)
+        .gte("created_at", startIso)
+        .lt("created_at", endIso);
+      if (error) throw error;
+      return (data ?? []) as Array<{ actor_id: string; hours: number | string | null; task: { id: string; title: string; project: { id: string; code: string; name: string } | null } | null }>;
+    },
+  });
+
   const { data: unpaidLeaves } = useQuery({
     queryKey: ["finances-unpaid-leaves", month],
     enabled: !!me?.isFinanceAdmin,

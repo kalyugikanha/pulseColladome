@@ -627,6 +627,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
   const [client, setClient] = useState<string>("");
   const [clientOther, setClientOther] = useState("");
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
+  const [estimatedHours, setEstimatedHours] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const { data: clients } = useQuery({

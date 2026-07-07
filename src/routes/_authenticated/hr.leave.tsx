@@ -14,9 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CalendarRange, Plus, Check, X } from "lucide-react";
+import { CalendarRange, Plus, Check, X, Pencil, Trash2 } from "lucide-react";
 import { format, differenceInCalendarDays, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
-import { logLeaveForEmployee } from "@/lib/admin-users.functions";
+import { logLeaveForEmployee, updateLeaveForEmployee, deleteLeaveForEmployee } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/_authenticated/hr/leave")({
   beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "leaves" } }); },

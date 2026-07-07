@@ -260,8 +260,16 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
             <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
               <div>
-                <div className="text-xs text-muted-foreground mb-1">Assignee</div>
+                <div className="text-xs text-muted-foreground mb-1">Assigned to</div>
                 <div>{(task.assignee as { full_name?: string } | null)?.full_name ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Assigned by</div>
+                <div>{(() => {
+                  const cb = (task as { created_by?: string | null }).created_by;
+                  const p = (peopleAll ?? []).find((x) => x.id === cb);
+                  return p?.full_name ?? p?.email ?? "—";
+                })()}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Reviewer</div>

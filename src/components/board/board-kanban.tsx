@@ -28,6 +28,8 @@ export type BoardCard = {
   due_date: string | null;
   assignee_id: string | null;
   assignee: { id: string; full_name: string | null; email: string | null } | null;
+  created_by: string | null;
+  creator: { id: string; full_name: string | null; email: string | null } | null;
   project_id: string | null;
   project: { id: string; name: string } | null;
   workflow_instance_id: string | null;
@@ -147,6 +149,11 @@ function CardBody({ card }: { card: BoardCard }) {
           {card.assignee.full_name ?? card.assignee.email}
         </div>
       )}
+      {card.creator && (
+        <div className="text-[10px] text-muted-foreground/80 mt-0.5">
+          Assigned by {(card.creator.full_name ?? card.creator.email ?? "").split(" ")[0] || "—"}
+        </div>
+      )}
     </>
   );
 }
@@ -178,7 +185,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
   // Materialize today's recurring occurrences (idempotent, safe to call every load).
   try { await supabase.rpc("generate_recurring_task_occurrences" as never); } catch { /* noop */ }
   let q = supabase.from("tasks").select(`
-    id, title, status, priority, due_date, assignee_id, project_id,
+    id, title, status, priority, due_date, assignee_id, project_id, created_by,
     workflow_instance_id, stage_index, stage_snapshot,
     assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
     project:projects(id, name)
@@ -186,7 +193,15 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
     .order("due_date", { ascending: true, nullsFirst: false });
   if (filter.assigneeId) q = q.eq("assignee_id", filter.assigneeId);
   const { data } = await q;
-  let rows = ((data ?? []) as unknown as Array<Omit<BoardCard, "workflow_template" | "workflow_total_stages"> & { assignee: BoardCard["assignee"] & { department?: string | null } }>);
+  let rows = ((data ?? []) as unknown as Array<Omit<BoardCard, "workflow_template" | "workflow_total_stages" | "creator"> & { assignee: BoardCard["assignee"] & { department?: string | null } }>);
+
+  // Load creator profiles
+  const creatorIds = Array.from(new Set(rows.map((r) => r.created_by).filter(Boolean) as string[]));
+  const creatorMap = new Map<string, { id: string; full_name: string | null; email: string | null }>();
+  if (creatorIds.length) {
+    const { data: creators } = await supabase.from("profiles").select("id, full_name, email").in("id", creatorIds);
+    for (const c of (creators ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>) creatorMap.set(c.id, c);
+  }
 
 
   // Load workflow templates for any that reference one
@@ -227,6 +242,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
     const wf = r.workflow_instance_id ? wfMap.get(r.workflow_instance_id) : null;
     return {
       ...r,
+      creator: r.created_by ? creatorMap.get(r.created_by) ?? null : null,
       workflow_template: wf
         ? { id: wf.templateId, name: wf.templateName, department: wf.templateDepartment }
         : null,

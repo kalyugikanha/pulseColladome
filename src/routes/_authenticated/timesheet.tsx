@@ -295,15 +295,21 @@ export function TimesheetPage() {
         const proj = a.task?.project;
         const code = proj?.code?.trim() || "—";
         const name = proj?.name || a.task?.title || "Task";
-        const hrs = Number(a.hours) || 0;
+        const logged = Number(a.hours) || 0;
         const approved = a.approval_status === "approved" || a.approval_status === "auto";
+        const approvedHrs = Number(a.approved_hours ?? logged) || 0;
+        const shownHrs = approved ? approvedHrs : logged;
+        const baseComment = a.note ?? a.task?.title ?? undefined;
+        const partial = approved && approvedHrs < logged;
         return {
           project_code: code,
           project_name: name,
-          hours: hrs,
-          approved_hours: approved ? Number(a.approved_hours ?? hrs) : undefined,
-          comments: a.note ?? a.task?.title ?? undefined,
+          hours: shownHrs,
+          logged_hours: logged,
+          approved_hours: approved ? approvedHrs : undefined,
+          comments: partial ? `${baseComment ?? "Task hours"} · approved ${approvedHrs}/${logged}h` : baseComment,
           source: "activity" as const,
+          approval_status: a.approval_status,
         };
       });
       let tasks: Task[] = [...logTasks, ...actTasks];

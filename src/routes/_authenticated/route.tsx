@@ -23,19 +23,17 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-type EmployeeItem = { title: string; url: string; icon: typeof LayoutDashboard; marketingOnly?: boolean };
+type EmployeeItem = { title: string; url: string; icon: typeof LayoutDashboard };
 const employeeItems: EmployeeItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Punch In/Out", url: "/punch", icon: Clock },
   { title: "My Tasks", url: "/tasks", icon: ListChecks },
-  { title: "Marketing Kanban", url: "/marketing-kanban", icon: Megaphone, marketingOnly: true },
   { title: "My Timesheet", url: "/my-timesheet", icon: TableProperties },
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Leave", url: "/leave", icon: CalendarRange },
   { title: "Team Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
   { title: "My Performance", url: "/performance", icon: Star },
-  { title: "Business Development", url: "/bd", icon: Briefcase },
 ];
 
 function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; userId: string; fullName: string | null; email: string | null }) {

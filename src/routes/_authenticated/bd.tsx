@@ -8,12 +8,14 @@ function BDLayout() {
   const { data: me } = useCurrentUser();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAdmin = !!(me?.isAdmin || me?.isSuperAdmin);
+  const isManager = isAdmin || !!me?.isReportingManager;
 
-  const tabs: Array<{ to: string; label: string; admin?: boolean }> = [
-    { to: "/bd", label: "My Day" },
-    { to: "/bd/recurring", label: "Recurring items", admin: true },
-    { to: "/bd/activity-types", label: "Activity types", admin: true },
-    { to: "/bd/reports", label: "Reports", admin: true },
+  const tabs: Array<{ to: string; label: string; show: boolean }> = [
+    { to: "/bd", label: "My Day", show: true },
+    { to: "/bd/team", label: "Team", show: isManager },
+    { to: "/bd/recurring", label: "Recurring items", show: isManager },
+    { to: "/bd/reports", label: "Reports", show: isManager },
+    { to: "/bd/activity-types", label: "Activity types", show: isAdmin },
   ];
 
   return (
@@ -23,7 +25,7 @@ function BDLayout() {
         <p className="text-sm text-muted-foreground">Daily activity checklist and BD reporting.</p>
       </div>
       <div className="flex gap-1 border-b border-border overflow-x-auto">
-        {tabs.filter((t) => !t.admin || isAdmin).map((t) => {
+        {tabs.filter((t) => t.show).map((t) => {
           const active = t.to === "/bd" ? pathname === "/bd" : pathname.startsWith(t.to);
           return (
             <Link

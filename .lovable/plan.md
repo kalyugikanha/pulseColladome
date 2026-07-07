@@ -1,46 +1,75 @@
 ## Goal
 
-Give super admins and managers a dead-simple, date-selectable attendance overview inside the existing `/attendance` page — no new tables, no schema changes.
+Let managers (not just admins) run BD for their reporting tree — create recurring items, assign one-off ad-hoc tasks, view/edit their team's daily logs, and see team reports. Reporting depth = full tree (you → Juhi → Sarita/Riyanji).
 
-## Where it goes
+## Reporting tree helpers (DB)
 
-Add a third tab **"Overview"** to `src/routes/_authenticated/attendance.tsx` alongside the existing "Today" and "Leave" tabs. Default landing tab for admins/managers becomes **Overview**; regular scope logic (`deptScope` / `userScope`) is reused so managers only see their reports and admins see everyone.
+Add security-definer helpers in `private` schema (reuse existing `profiles.reporting_manager_id`):
 
-## UI
+- `private.bd_report_ids(_manager uuid) returns setof uuid` — recursive CTE walking `profiles.reporting_manager_id` down from `_manager`, returning the full subtree (excluding the manager themselves).
+- `private.can_manage_bd_user(_actor uuid, _target uuid) returns boolean` — true if `_actor` is admin/super-admin, OR `_target` is in `bd_report_ids(_actor)`, OR `_actor = _target` (self).
+- `private.bd_visible_user_ids(_actor uuid) returns setof uuid` — admins/super-admins → all active profiles; managers → self + full subtree; regular employees → self only.
 
-**Date picker** (shadcn DatePicker, `pointer-events-auto`) at the top — defaults to today, any past date allowed, future dates disabled.
+These make RLS trivial and are reused by every BD screen.
 
-**Summary cards** (4 cards, bullet-style, responsive grid) for the selected date:
-- 👥 **Total employees** — count of active profiles in scope
-- 🌴 **On leave** — count with an approved leave covering that date
-- ✅ **Punched in** — count with an `attendance_logs` row (punch_in_time set) for that date
-- ❌ **Not punched in** — total − on-leave − punched-in
+## RLS updates
 
-Each card shows the number + a one-line caption (e.g. "3 of 24 employees").
+- `bd_recurring_items`: replace admin-only policies with `USING/WITH CHECK (private.can_manage_bd_user(auth.uid(), assignee_id))` for INSERT/UPDATE/DELETE; SELECT allowed when the row's assignee is in `bd_visible_user_ids(auth.uid())` (so managers see team templates + their own).
+- `bd_activity_logs`: SELECT when `user_id in bd_visible_user_ids`; INSERT/UPDATE/DELETE when `can_manage_bd_user`. Keeps employees on own rows, opens managers to their subtree, admins keep full.
+- `bd_activity_types`: unchanged (admin-managed lookup).
 
-**Employee table** below the cards:
+## Server functions (`src/lib/bd.functions.ts`)
 
-| Employee | Department | Status | Punch in | Punch out | Hours |
+Extend / add:
 
-Status badge: `On leave (type)` · `Punched in` · `Punched out` · `Absent`. Rows sortable by status (leave → absent → in → out) so gaps surface first. A search box filters by name. Empty punch-out shows "—".
+- `listBdVisibleUsers()` — returns `{id, full_name, email, department}[]` for the actor's scope (drives user pickers, filters, reports).
+- `listBdRecurringItems({ assigneeId? })` — scoped by RLS; supports filtering to one teammate.
+- `upsertBdRecurringItem(...)`, `deleteBdRecurringItem(id)` — already exist; now callable by managers because RLS allows it.
+- `assignBdOneOffTask({ assignee_id, log_date, title, activity_type_id, hours_estimate?, description? })` — new. Inserts a `bd_activity_logs` row for the given date/user with `status = 'pending'` and `recurring_item_id = null`, marked `assigned_by = auth.uid()` (new column). Enforces `can_manage_bd_user`.
+- `listBdLogsForUser({ user_id, date })`, `listBdLogsForRange({ user_ids?, from, to })` — scoped reads for team views and reports.
+- `updateBdLog(...)`, `rollForwardBdPending(...)` — allow managers to edit/close their team's logs (RLS enforces).
 
-**Export**: small "Export CSV" button (client-side, same columns as the table) for the selected date.
+## Schema tweaks
 
-## Data (all client-side supabase reads, matches existing pattern)
+- `bd_activity_logs`: add `assigned_by uuid null references profiles(id)` and `title text null` (one-off tasks need a title; recurring rows keep title from template). Backfill nothing.
+- Migration adds the three `private` helpers, replaces RLS policies as above.
 
-One React Query keyed by `["attendance-overview", date, scope]`:
-- `profiles` in scope where `is_active = true` (name, department, id)
-- `attendance_logs` where `date = <selected>` and `user_id in scope`
-- `leave_requests` where `status = 'approved'` and `start_date <= <selected> <= end_date` and `user_id in scope`
+## UI changes
 
-Join in-memory to build the rows and card counts. No new server functions, no migration.
+Sidebar item stays "Business Development". Existing tabs adjusted:
 
-## Access
+1. **My Day** (`bd/index.tsx`) — unchanged for the logged-in user; still shows their own auto-generated recurring items + any one-off tasks a manager pushed onto that date.
 
-- Regular employees: Overview tab hidden (they keep seeing Today + Leave as today).
-- Managers: see only their reporting scope (reuse existing `deptScope` / `userScope`).
-- Admins / super admins: see everyone.
+2. **Team** (new, `bd/team.tsx`, visible to anyone with reports OR admins) —
+   - Date picker (defaults today).
+   - Left column: teammate list from `listBdVisibleUsers()` minus self, grouped by direct reports vs indirect (small subtitle). Click a teammate → right panel loads their log for that date.
+   - Right panel: read-only preview of their pending / done items + a **"Mark done" / "Edit hours" / "Add note"** inline actions (RLS-allowed) + **"+ Assign one-off task"** button → dialog with title, activity type, optional hours estimate → calls `assignBdOneOffTask`.
+   - "Roll pending forward" button for that teammate/date.
+
+3. **Recurring items** (`bd/recurring.tsx`) — opens to admins as today; now also opens to any manager. Add a "For teammate" dropdown at top (defaults to self) sourced from `listBdVisibleUsers()`. All CRUD scoped by that selection; RLS backstops.
+
+4. **Reports** (`bd/reports.tsx`) — visible to admins AND managers. Data auto-scoped to `bd_visible_user_ids`. Filters unchanged (date range, activity type, member multi-select). Admins still see everyone.
+
+5. **Activity types** (`bd/activity-types.tsx`) — remains admin-only.
+
+## Access summary
+
+| Role | My Day | Team | Recurring items | Reports | Activity types |
+|---|---|---|---|---|---|
+| Employee (no reports) | ✅ self | — | ✅ self only | — | — |
+| Manager (has reports) | ✅ self | ✅ subtree | ✅ self + subtree | ✅ subtree | — |
+| Admin / super admin | ✅ self | ✅ everyone | ✅ everyone | ✅ everyone | ✅ |
+
+Tab visibility is driven by `me.hasReports` (derived client-side from `listBdVisibleUsers().length > 1`) and existing `isAdmin` / `isSuperAdmin` flags.
 
 ## Files touched
 
-- `src/routes/_authenticated/attendance.tsx` — add Overview tab, date state, query, cards, table, CSV export. No other files.
+- Migration: new `private` helpers, altered RLS on `bd_recurring_items` + `bd_activity_logs`, new columns on `bd_activity_logs`.
+- `src/lib/bd.functions.ts` — extend with new fns, adjust existing ones to drop admin-only guards (RLS enforces).
+- `src/routes/_authenticated/bd.tsx` — add "Team" tab, gate visibility on `hasReports || isAdmin`.
+- `src/routes/_authenticated/bd.team.tsx` — new route.
+- `src/routes/_authenticated/bd.recurring.tsx` — add teammate dropdown, drop admin-only gate.
+- `src/routes/_authenticated/bd.reports.tsx` — drop admin-only gate; keep filters.
+- `src/routes/_authenticated/bd.index.tsx` — render one-off assigned tasks alongside recurring items (small "assigned by X" tag).
+
+No changes to Marketing / tasks module.

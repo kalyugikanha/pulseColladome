@@ -100,6 +100,7 @@ export type Database = {
       bd_activity_logs: {
         Row: {
           activity_type_id: string
+          assigned_by: string | null
           carried_forward_to: string | null
           created_at: string
           description: string
@@ -109,11 +110,13 @@ export type Database = {
           media_url: string | null
           recurring_item_id: string | null
           status: Database["public"]["Enums"]["bd_log_status"]
+          title: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           activity_type_id: string
+          assigned_by?: string | null
           carried_forward_to?: string | null
           created_at?: string
           description?: string
@@ -123,11 +126,13 @@ export type Database = {
           media_url?: string | null
           recurring_item_id?: string | null
           status?: Database["public"]["Enums"]["bd_log_status"]
+          title?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           activity_type_id?: string
+          assigned_by?: string | null
           carried_forward_to?: string | null
           created_at?: string
           description?: string
@@ -137,6 +142,7 @@ export type Database = {
           media_url?: string | null
           recurring_item_id?: string | null
           status?: Database["public"]["Enums"]["bd_log_status"]
+          title?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -146,6 +152,13 @@ export type Database = {
             columns: ["activity_type_id"]
             isOneToOne: false
             referencedRelation: "bd_activity_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bd_activity_logs_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2140,6 +2153,17 @@ export type Database = {
           _stage_id: string
         }
         Returns: Json
+      }
+      bd_list_visible_users: {
+        Args: never
+        Returns: {
+          department: string
+          email: string
+          full_name: string
+          id: string
+          is_direct_report: boolean
+          reporting_manager_id: string
+        }[]
       }
       can_view_task: { Args: { _task_id: string }; Returns: boolean }
       create_task_full: {

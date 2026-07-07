@@ -44,6 +44,7 @@ import { Route as ApiAssistantTranscribeRouteImport } from './routes/api/assista
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as AuthenticatedHrOnboardingRouteImport } from './routes/_authenticated/hr.onboarding'
 import { Route as AuthenticatedHrLeaveRouteImport } from './routes/_authenticated/hr.leave'
+import { Route as AuthenticatedBdTeamRouteImport } from './routes/_authenticated/bd.team'
 import { Route as AuthenticatedBdReportsRouteImport } from './routes/_authenticated/bd.reports'
 import { Route as AuthenticatedBdRecurringRouteImport } from './routes/_authenticated/bd.recurring'
 import { Route as AuthenticatedBdActivityTypesRouteImport } from './routes/_authenticated/bd.activity-types'
@@ -232,6 +233,11 @@ const AuthenticatedHrLeaveRoute = AuthenticatedHrLeaveRouteImport.update({
   path: '/hr/leave',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBdTeamRoute = AuthenticatedBdTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => AuthenticatedBdRoute,
+} as any)
 const AuthenticatedBdReportsRoute = AuthenticatedBdReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -295,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
   '/bd/recurring': typeof AuthenticatedBdRecurringRoute
   '/bd/reports': typeof AuthenticatedBdReportsRoute
+  '/bd/team': typeof AuthenticatedBdTeamRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -335,6 +342,7 @@ export interface FileRoutesByTo {
   '/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
   '/bd/recurring': typeof AuthenticatedBdRecurringRoute
   '/bd/reports': typeof AuthenticatedBdReportsRoute
+  '/bd/team': typeof AuthenticatedBdTeamRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -378,6 +386,7 @@ export interface FileRoutesById {
   '/_authenticated/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
   '/_authenticated/bd/recurring': typeof AuthenticatedBdRecurringRoute
   '/_authenticated/bd/reports': typeof AuthenticatedBdReportsRoute
+  '/_authenticated/bd/team': typeof AuthenticatedBdTeamRoute
   '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/_authenticated/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -421,6 +430,7 @@ export interface FileRouteTypes {
     | '/bd/activity-types'
     | '/bd/recurring'
     | '/bd/reports'
+    | '/bd/team'
     | '/hr/leave'
     | '/hr/onboarding'
     | '/api/assistant/chat'
@@ -461,6 +471,7 @@ export interface FileRouteTypes {
     | '/bd/activity-types'
     | '/bd/recurring'
     | '/bd/reports'
+    | '/bd/team'
     | '/hr/leave'
     | '/hr/onboarding'
     | '/api/assistant/chat'
@@ -503,6 +514,7 @@ export interface FileRouteTypes {
     | '/_authenticated/bd/activity-types'
     | '/_authenticated/bd/recurring'
     | '/_authenticated/bd/reports'
+    | '/_authenticated/bd/team'
     | '/_authenticated/hr/leave'
     | '/_authenticated/hr/onboarding'
     | '/api/assistant/chat'
@@ -769,6 +781,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHrLeaveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/bd/team': {
+      id: '/_authenticated/bd/team'
+      path: '/team'
+      fullPath: '/bd/team'
+      preLoaderRoute: typeof AuthenticatedBdTeamRouteImport
+      parentRoute: typeof AuthenticatedBdRoute
+    }
     '/_authenticated/bd/reports': {
       id: '/_authenticated/bd/reports'
       path: '/reports'
@@ -811,6 +830,7 @@ interface AuthenticatedBdRouteChildren {
   AuthenticatedBdActivityTypesRoute: typeof AuthenticatedBdActivityTypesRoute
   AuthenticatedBdRecurringRoute: typeof AuthenticatedBdRecurringRoute
   AuthenticatedBdReportsRoute: typeof AuthenticatedBdReportsRoute
+  AuthenticatedBdTeamRoute: typeof AuthenticatedBdTeamRoute
   AuthenticatedBdIndexRoute: typeof AuthenticatedBdIndexRoute
 }
 
@@ -818,6 +838,7 @@ const AuthenticatedBdRouteChildren: AuthenticatedBdRouteChildren = {
   AuthenticatedBdActivityTypesRoute: AuthenticatedBdActivityTypesRoute,
   AuthenticatedBdRecurringRoute: AuthenticatedBdRecurringRoute,
   AuthenticatedBdReportsRoute: AuthenticatedBdReportsRoute,
+  AuthenticatedBdTeamRoute: AuthenticatedBdTeamRoute,
   AuthenticatedBdIndexRoute: AuthenticatedBdIndexRoute,
 }
 

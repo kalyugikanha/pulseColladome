@@ -25,14 +25,14 @@ type LogRow = {
 
 function BDReportsPage() {
   const { data: me } = useCurrentUser();
-  const isAdmin = !!(me?.isAdmin || me?.isSuperAdmin);
+  const isManager = !!(me?.isAdmin || me?.isSuperAdmin || me?.isReportingManager);
   const today = new Date();
   const [from, setFrom] = useState(format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd"));
   const [to, setTo] = useState(format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd"));
 
   const { data: logs } = useQuery({
     queryKey: ["bd-report-logs", from, to],
-    enabled: isAdmin,
+    enabled: isManager,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bd_activity_logs")
@@ -44,17 +44,18 @@ function BDReportsPage() {
   });
 
   const { data: profiles } = useQuery({
-    queryKey: ["bd-profiles-all"],
-    enabled: isAdmin,
+    queryKey: ["bd-visible-users"],
+    enabled: isManager,
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name, email");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).rpc("bd_list_visible_users");
       return (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>;
     },
   });
 
   const { data: types } = useQuery({
     queryKey: ["bd-types"],
-    enabled: isAdmin,
+    enabled: isManager,
     queryFn: async () => {
       const { data } = await supabase.from("bd_activity_types").select("*").order("sort_order");
       return (data ?? []) as Array<{ id: string; name: string }>;
@@ -131,7 +132,7 @@ function BDReportsPage() {
     setTo(format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd"));
   }
 
-  if (!isAdmin) return <p className="text-sm text-muted-foreground">Admins only.</p>;
+  if (!isManager) return <p className="text-sm text-muted-foreground">Managers only.</p>;
 
   return (
     <div className="space-y-6">

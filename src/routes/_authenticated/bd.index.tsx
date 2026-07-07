@@ -28,6 +28,8 @@ type Log = {
   status: "pending" | "done" | "carried_forward";
   carried_forward_to: string | null;
   media_url: string | null;
+  assigned_by: string | null;
+  title: string | null;
 };
 
 type Recurring = {
@@ -211,7 +213,7 @@ function BDDayPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Extra activities</CardTitle>
+          <CardTitle className="text-base">Extra & assigned activities</CardTitle>
           <AddAdHoc types={types ?? []} onAdd={async (input) => {
             if (!me) return;
             const { error } = await supabase.from("bd_activity_logs").insert({
@@ -230,12 +232,14 @@ function BDDayPage() {
           {adHocLogs.length === 0 && <p className="text-sm text-muted-foreground">No extra activities logged.</p>}
           {adHocLogs.map((l) => {
             const type = typeById.get(l.activity_type_id);
+            const displayTitle = l.title || l.description || "(no description)";
             return (
               <LogRow
                 key={l.id}
                 log={l}
-                title={l.description || "(no description)"}
+                title={displayTitle}
                 typeName={type?.name}
+                assigned={!!l.assigned_by}
                 onChange={(p) => updateLog(l.id, p)}
                 onDelete={() => deleteLog(l.id)}
                 onUpload={(f) => uploadMedia(l.id, f)}
@@ -253,6 +257,7 @@ function LogRow({
   log,
   title,
   typeName,
+  assigned,
   onChange,
   onDelete,
   onUpload,
@@ -261,6 +266,7 @@ function LogRow({
   log: Log;
   title: string;
   typeName?: string;
+  assigned?: boolean;
   onChange: (patch: Partial<Log>) => void;
   onDelete: () => void;
   onUpload: (f: File) => void;
@@ -287,6 +293,7 @@ function LogRow({
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-sm font-medium ${done ? "line-through text-muted-foreground" : ""}`}>{title}</span>
           {typeName && <Badge variant="secondary" className="text-[10px]">{typeName}</Badge>}
+          {assigned && <Badge className="text-[10px] bg-primary/15 text-primary border border-primary/30">Assigned to you</Badge>}
           {carried && <Badge variant="outline" className="text-[10px]">Carried → {log.carried_forward_to}</Badge>}
         </div>
         {!adHoc && (

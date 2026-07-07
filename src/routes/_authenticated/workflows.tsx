@@ -44,7 +44,7 @@ function WorkflowsAdmin() {
         </div>
         <Button className="gradient-primary" onClick={() => setEditing({
           name: "", description: "", department: "", is_active: true,
-          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {} }],
+          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {} }],
         })}><Plus className="h-4 w-4 mr-1" /> New template</Button>
       </header>
 

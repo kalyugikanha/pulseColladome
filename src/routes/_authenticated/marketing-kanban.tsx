@@ -451,30 +451,51 @@ function ReassignDialog({ state, onClose, roster, onConfirm }: {
   state: { task: KanbanTask; toStage: Stage } | null;
   onClose: () => void;
   roster: { id: string; full_name: string | null; email: string | null }[];
-  onConfirm: (assigneeId: string) => void;
+  onConfirm: (v: { assigneeId: string; hours: number; note?: string }) => void;
 }) {
   const [aid, setAid] = useState<string>("");
-  useEffect(() => { setAid(state?.task.assignee_id ?? ""); }, [state]);
+  const [hours, setHours] = useState<string>("");
+  const [note, setNote] = useState<string>("");
+  useEffect(() => {
+    setAid(state?.task.assignee_id ?? "");
+    setHours(""); setNote("");
+  }, [state]);
   const label = state ? COLUMNS.find((c) => c.key === state.toStage)?.label : "";
+  const hoursNum = Number(hours);
+  const valid = !!aid && hours !== "" && !Number.isNaN(hoursNum) && hoursNum >= 0;
   return (
     <Dialog open={!!state} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle className="font-display">Move to {label}</DialogTitle></DialogHeader>
-        <div className="space-y-2">
-          <Label>Assign to</Label>
-          <Select value={aid} onValueChange={setAid}>
-            <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
-            <SelectContent>
-              {roster.map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">Reassignment is prompted every move — keep the same person or change it.</p>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Assign to</Label>
+            <Select value={aid} onValueChange={setAid}>
+              <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
+              <SelectContent>
+                {roster.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Hours spent on this stage</Label>
+            <Input type="number" min={0} step={0.25} value={hours}
+              onChange={(e) => setHours(e.target.value)} placeholder="e.g. 1.5" />
+          </div>
+          <div className="space-y-1">
+            <Label>Note (optional)</Label>
+            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything worth logging?" />
+          </div>
+          <p className="text-xs text-muted-foreground">Every move records hours to keep task burn accurate.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" disabled={!aid} onClick={() => onConfirm(aid)}>Confirm move</Button>
+          <Button className="gradient-primary" disabled={!valid}
+            onClick={() => onConfirm({ assigneeId: aid, hours: hoursNum, note: note || undefined })}>
+            Confirm move
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -484,15 +505,18 @@ function ReassignDialog({ state, onClose, roster, onConfirm }: {
 function SendBackDialog({ task, onClose, roster, onConfirm }: {
   task: KanbanTask | null; onClose: () => void;
   roster: { id: string; full_name: string | null; email: string | null }[];
-  onConfirm: (v: { toStage: Stage; assigneeId: string; note?: string }) => void;
+  onConfirm: (v: { toStage: Stage; assigneeId: string; note?: string; hours: number }) => void;
 }) {
   const [stage, setStage] = useState<Stage>("script_writing");
   const [aid, setAid] = useState<string>("");
   const [note, setNote] = useState("");
+  const [hours, setHours] = useState<string>("");
   useEffect(() => {
-    setStage("script_writing"); setNote("");
+    setStage("script_writing"); setNote(""); setHours("");
     setAid(task?.assignee_id ?? "");
   }, [task]);
+  const hoursNum = Number(hours);
+  const valid = !!aid && hours !== "" && !Number.isNaN(hoursNum) && hoursNum >= 0;
   return (
     <Dialog open={!!task} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
@@ -521,14 +545,19 @@ function SendBackDialog({ task, onClose, roster, onConfirm }: {
             </Select>
           </div>
           <div className="space-y-1">
+            <Label>Review hours (time you spent reviewing)</Label>
+            <Input type="number" min={0} step={0.25} value={hours}
+              onChange={(e) => setHours(e.target.value)} placeholder="e.g. 0.5" />
+          </div>
+          <div className="space-y-1">
             <Label>Comment (optional)</Label>
             <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What needs changing?" />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" disabled={!aid}
-            onClick={() => onConfirm({ toStage: stage, assigneeId: aid, note })}>
+          <Button className="gradient-primary" disabled={!valid}
+            onClick={() => onConfirm({ toStage: stage, assigneeId: aid, note, hours: hoursNum })}>
             Send back
           </Button>
         </DialogFooter>

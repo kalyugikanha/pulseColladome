@@ -117,8 +117,14 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
         task_id: r.task_id || undefined,
         task_title: r.task_title || (r.task_id ? taskById.get(r.task_id)?.title : undefined),
         hours: Number(r.hours) || 0,
+        approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
+          ? Number(r.approved_hours) : undefined,
         comments: r.comments?.trim() || undefined,
       }));
+  }
+
+  function sumApproved(cleaned: Task[]): number {
+    return cleaned.reduce((s, r) => s + (r.approved_hours ?? r.hours ?? 0), 0);
   }
 
   async function save() {
@@ -135,16 +141,24 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
       const { data: userRes } = await supabase.auth.getUser();
       const myId = userRes.user?.id ?? null;
 
+      const basePayload: Record<string, unknown> = {
+        tasks: cleaned,
+        total_hours: totalHrs,
+        logged_hours: totalHrs,
+        last_edited_by: myId,
+      };
+      if (isApproved) basePayload.approved_hours = sumApproved(cleaned);
+
       if (log?.id) {
         const { error } = await supabase
           .from("attendance_logs")
-          .update({ tasks: cleaned, total_hours: totalHrs, last_edited_by: myId })
+          .update(basePayload as never)
           .eq("id", log.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("attendance_logs")
-          .insert({ user_id: userId, date, tasks: cleaned, total_hours: totalHrs, last_edited_by: myId });
+          .insert({ user_id: userId, date, ...basePayload } as never);
         if (error) throw error;
       }
       toast.success("Saved");
@@ -176,17 +190,31 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
           return;
         }
         const cleaned = cleanRows();
+        // Default approved = logged for any row the approver didn't override
+        const withApproved = cleaned.map((r) => ({ ...r, approved_hours: r.approved_hours ?? r.hours ?? 0 }));
         const totalHrs = cleaned.reduce((s, r) => s + (r.hours ?? 0), 0);
+        const approvedTotal = sumApproved(withApproved);
         const { error } = await supabase.from("attendance_logs").insert({
-          user_id: userId, date, tasks: cleaned, total_hours: totalHrs,
+          user_id: userId, date, tasks: withApproved, total_hours: totalHrs,
+          logged_hours: totalHrs, approved_hours: approvedTotal,
           approved_at: new Date().toISOString(), approved_by: myId, last_edited_by: myId,
-        });
+        } as never);
         if (error) throw error;
       } else if (isApproved) {
-        const { error } = await supabase.from("attendance_logs").update({ approved_at: null, approved_by: null }).eq("id", log.id);
+        const { error } = await supabase.from("attendance_logs")
+          .update({ approved_at: null, approved_by: null, approved_hours: null } as never)
+          .eq("id", log.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("attendance_logs").update({ approved_at: new Date().toISOString(), approved_by: myId }).eq("id", log.id);
+        const cleaned = cleanRows();
+        const withApproved = cleaned.map((r) => ({ ...r, approved_hours: r.approved_hours ?? r.hours ?? 0 }));
+        const totalHrs = cleaned.reduce((s, r) => s + (r.hours ?? 0), 0);
+        const approvedTotal = sumApproved(withApproved);
+        const { error } = await supabase.from("attendance_logs").update({
+          tasks: withApproved, total_hours: totalHrs, logged_hours: totalHrs,
+          approved_hours: approvedTotal,
+          approved_at: new Date().toISOString(), approved_by: myId,
+        } as never).eq("id", log.id);
         if (error) throw error;
       }
       toast.success(isApproved ? "Unapproved" : "Approved");

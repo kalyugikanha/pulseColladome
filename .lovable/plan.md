@@ -1,35 +1,54 @@
 ## Goal
-Enable Admin / HR Admin to fully modify any employee's leave from the HR Admin → Leaves module — not just approve/reject.
+Redesign the Team Timesheet so nothing overflows and hour figures are the first thing you read. Two panels get reworked: the "Task hours awaiting approval" table and the day-breakdown table.
 
-## Current state
-- `hr.leave.tsx` Requests tab lets admins Approve / Reject / flip status via a direct `supabase.from("leave_requests").update(...)` call.
-- No way to edit dates, type, days, reason, or delete a leave.
-- Log-leave dialog only creates new approved leaves via `logLeaveForEmployee` server fn.
+## Problems today
+- Pending panel is a 7-column table (Employee · Task · Date · Logged · Approve input · Note · Action). At ~1180px the Action column can't fit "Approve" + "Reject" labels so the button text clips into the cell edge.
+- Hour values render as plain 8px-cell `font-mono` in small columns — visually indistinguishable from the surrounding text.
+- Day-breakdown table has 6 columns with rowspan employee cells; on mid widths Project + Notes squeeze the Hours cell.
+- Filter bar wraps aggressively and pushes the tables down.
 
-## Changes
+## Redesign — Pending panel (card list, not table)
+Replace the `<Table>` with a responsive card list, one card per pending entry:
 
-### 1. New server fns in `src/lib/admin-users.functions.ts`
-Both gated on `isSuper || hr_admin` (same guard used by `logLeaveForEmployee`) and executed via `supabaseAdmin` so balance triggers run with full privileges.
+```text
+┌───────────────────────────────────────────────────────────────┐
+│ Kanishka Sharma                            [3 Jul, Fri]  ⋯    │
+│ Fix onboarding banner                                          │
+│ SG-042 · Sacred Groves                                         │
+│                                                                │
+│  Logged           Approve                                      │
+│  2.00 h           [ 2.00 ] h                                   │
+│                                                                │
+│  Note: "Handoff from Ravi, needs QA"                           │
+│                                                                │
+│                           [ Reject ]  [ ✓ Approve 2h ]         │
+└───────────────────────────────────────────────────────────────┘
+```
 
-- `updateLeaveForEmployee({ id, leave_type?, start_date?, end_date?, days?, reason?, status?, admin_comment? })`
-  - Validates dates / days when supplied.
-  - Updates the row; sets `decided_by = context.userId`, `decided_at = now()` when status changes.
-  - Existing `handle_leave_status_change` trigger keeps `leave_balances.used` in sync automatically.
-- `deleteLeaveForEmployee({ id })`
-  - Deletes the row (trigger reverses balance if it was approved).
+- Hours use `text-2xl font-semibold tabular-nums` so Logged and Approve values dominate the card.
+- Approve button label absorbs the value: `Approve 2.0h` — no separate cryptic column.
+- Reject stays as a ghost/destructive text button; when the card is < 480px both buttons collapse to icon+tooltip.
+- Amber inline warning when approving less than logged remains, right under the input.
+- Cards flow one-per-row up to `md`, then two-column grid from `lg` up so the panel keeps scanning quickly on wide screens.
 
-### 2. HR Leaves UI — `src/routes/_authenticated/hr.leave.tsx`
-In `RequestsTable`, replace the current per-row action row with:
-- **Edit** button → opens an `EditLeaveDialog` prefilled with the row (employee shown read-only, editable: type, start, end, reason, status, admin comment; days auto-recomputed from dates).
-- Keep **Approve / Reject** quick actions for pending rows.
-- Add **Delete** button with a confirm.
-- All actions call the new server fns, then `qc.invalidateQueries()` so Day / Timeline / Requests all refresh.
+## Redesign — Day breakdown table
+Keep the table (it's the right shape) but tighten the columns and give hours real presence:
 
-Also add the same Edit / Delete affordance from the **Day view** row cards (small pencil / trash icon) so admins can act on today's leaves without switching tabs.
+- Merge Project + Notes into a single left-heavy cell (Project on line 1, Notes muted on line 2). That removes one column.
+- New column order: Employee · Project & Notes · Hours · Status · ⋯
+- Hours cell: `text-lg font-semibold tabular-nums`, right-aligned, subtle right border so the number reads as a data column.
+- Employee cell (rowspan): name, dept, and a bold `Total: 6.5h` chip using the same numeric treatment.
+- Status pills stay but move to a fixed 96px column with icon-only variants when the label would clip.
+- Row action `⋯` moves out of the last cell into an absolute-positioned button on hover for cleaner rows on wide screens; still tappable on touch.
+- Day total footer row uses the same big numeric style, plus a right-aligned "Approved X.X / Logged Y.Y" ratio.
 
-### 3. No schema changes
-`leave_requests` already has all needed columns and the balance trigger.
+## Filter bar polish
+- Group the day navigator (◀ [date] ▶ Today) into a single pill so it doesn't fight the filters for space.
+- Filter chips (Department / Employee / Projects) collapse into a single "Filters" dropdown below `md`, keeping the header to one line on narrow screens.
+- Export CSV stays on the right, icon-only under `md`.
+
+## No behaviour changes
+Approval logic, visibility scopes, queries, and CSV export stay exactly as today — this is a presentation rework of `TimesheetPage`, `PendingRow`, and `EmployeeBlock` only.
 
 ## Files touched
-- `src/lib/admin-users.functions.ts` — add two server fns.
-- `src/routes/_authenticated/hr.leave.tsx` — new `EditLeaveDialog`, wire Edit/Delete in Requests + Day view.
+- `src/routes/_authenticated/timesheet.tsx` — swap Pending table for card grid, restructure day table columns, tighten header/filter bar, apply tabular-nums numeric style throughout.

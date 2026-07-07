@@ -574,6 +574,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [assignee, setAssignee] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [deadline, setDeadline] = useState("");
   const [postDate, setPostDate] = useState("");
   const [priority, setPriority] = useState<"low"|"medium"|"high">("medium");
@@ -587,6 +588,11 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
     queryFn: async () => (await supabase.from("marketing_clients" as any).select("id,name").eq("active", true).order("name")).data ?? [],
   });
 
+  const { data: projects } = useQuery({
+    queryKey: ["projects-active"], enabled: open,
+    queryFn: async () => (await supabase.from("projects").select("id, code, name").eq("status", "active").order("name")).data ?? [],
+  });
+
   const { data: mktDeptId } = useQuery({
     queryKey: ["taxonomy-dept-id", DEPT], enabled: open,
     queryFn: async () => {
@@ -597,7 +603,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
 
   useEffect(() => {
     if (open) {
-      setTitle(""); setDesc(""); setAssignee(me?.realId ?? ""); setDeadline(""); setPostDate("");
+      setTitle(""); setDesc(""); setAssignee(me?.realId ?? ""); setProjectId(""); setDeadline(""); setPostDate("");
       setPriority("medium"); setClient(""); setClientOther(""); setLinks([]);
     }
   }, [open, me?.realId]);
@@ -605,6 +611,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
   async function submit() {
     if (!title.trim()) return toast.error("Title required");
     if (!assignee) return toast.error("Assignee required");
+    if (!projectId) return toast.error("Project required");
     setSaving(true);
     const brand = client === "__other__" ? clientOther.trim() || null : client || null;
     const payload: Record<string, unknown> = {
@@ -614,6 +621,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
       due_date: deadline || null,
       scheduled_post_date: postDate || null,
       client_brand: brand,
+      project_id: projectId,
       marketing_stage: "script_writing",
       status: "todo",
       assignee_id: assignee,
@@ -660,7 +668,17 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
             <div className="space-y-1"><Label>Internal deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
             <div className="space-y-1"><Label>Scheduled post date</Label><Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} /></div>
           </div>
-          <div className="space-y-1"><Label>Client / Brand</Label>
+          <div className="space-y-1"><Label>Project</Label>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger><SelectValue placeholder="Pick project" /></SelectTrigger>
+              <SelectContent>
+                {(projects ?? []).map((p: { id: string; code: string; name: string }) => (
+                  <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1"><Label>Client / Brand (optional)</Label>
             <Select value={client} onValueChange={setClient}>
               <SelectTrigger><SelectValue placeholder="Pick client" /></SelectTrigger>
               <SelectContent>
@@ -700,6 +718,7 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
   const [title, setTitle] = useState("");
   const [info, setInfo] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [projectId, setProjectId] = useState<string>("");
   const [references, setReferences] = useState<{ label: string; url: string }[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -708,9 +727,14 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
     (async () => {
       const { data } = await supabase.from("profiles").select("department").eq("id", me.realId).maybeSingle();
       setMyDept(data?.department ?? "");
-      setTitle(""); setInfo(""); setDeadline(""); setReferences([]);
+      setTitle(""); setInfo(""); setDeadline(""); setProjectId(""); setReferences([]);
     })();
   }, [open, me]);
+
+  const { data: projects } = useQuery({
+    queryKey: ["projects-active"], enabled: open,
+    queryFn: async () => (await supabase.from("projects").select("id, code, name").eq("status", "active").order("name")).data ?? [],
+  });
 
   const { data: mktDeptId } = useQuery({
     queryKey: ["taxonomy-dept-id", DEPT], enabled: open,
@@ -735,6 +759,7 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
 
   async function submit() {
     if (!title.trim()) return toast.error("Title required");
+    if (!projectId) return toast.error("Project required");
     if (!me?.realId) return;
     setSaving(true);
     const links = references.filter((l) => l.url.trim());
@@ -748,6 +773,7 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
       requester_id: me.realId,
       origin_department: myDept || "Unknown",
       marketing_stage: "script_writing",
+      project_id: projectId,
       asset_links: links,
     };
     if (mktDeptId) patch.department_id = mktDeptId;
@@ -790,6 +816,16 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
           </div>
           <div className="space-y-1"><Label>Deadline (optional)</Label>
             <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-48" />
+          </div>
+          <div className="space-y-1"><Label>Project</Label>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger><SelectValue placeholder="Pick project" /></SelectTrigger>
+              <SelectContent>
+                {(projects ?? []).map((p: { id: string; code: string; name: string }) => (
+                  <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label>References</Label>

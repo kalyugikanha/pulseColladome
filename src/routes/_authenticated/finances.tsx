@@ -84,6 +84,24 @@ function FinancesPage() {
     },
   });
 
+  const { data: taskLoggedHours } = useQuery({
+    queryKey: ["finances-task-hours", month],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const startIso = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+      const endIso = new Date(Date.UTC(y, m, 1)).toISOString();
+      const { data, error } = await supabase
+        .from("task_activity" as any)
+        .select("actor_id, hours, created_at, task:tasks(id, title, project:projects(id, code, name))")
+        .not("hours", "is", null)
+        .gte("created_at", startIso)
+        .lt("created_at", endIso);
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{ actor_id: string; hours: number | string | null; task: { id: string; title: string; project: { id: string; code: string; name: string } | null } | null }>;
+    },
+  });
+
   const { data: unpaidLeaves } = useQuery({
     queryKey: ["finances-unpaid-leaves", month],
     enabled: !!me?.isFinanceAdmin,
@@ -207,6 +225,22 @@ function FinancesPage() {
 
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
+
+  const taskHoursByProject = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; hours: number; users: Set<string>; entries: number }>();
+    for (const r of taskLoggedHours ?? []) {
+      const p = r.task?.project;
+      if (!p) continue;
+      const hrs = Number(r.hours) || 0;
+      if (hrs <= 0) continue;
+      const cur = map.get(p.code) ?? { code: p.code, name: p.name, hours: 0, users: new Set<string>(), entries: 0 };
+      cur.hours += hrs;
+      cur.entries += 1;
+      if (r.actor_id) cur.users.add(r.actor_id);
+      map.set(p.code, cur);
+    }
+    return map;
+  }, [taskLoggedHours]);
 
   const userHoursThisMonth = useMemo(() => {
     const m = new Map<string, number>();
@@ -544,6 +578,41 @@ function FinancesPage() {
                     })}
                   </>
                 )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Task-logged hours — {month}</CardTitle>
+          <CardDescription>Hours captured on task stage moves (from Kanban) grouped by the task's project. Additive view — does not affect salary-share burn above.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {taskHoursByProject.size === 0 ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">No task-logged hours this month yet.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead className="text-right">People</TableHead>
+                  <TableHead className="text-right">Hours</TableHead>
+                  <TableHead className="text-right">Log entries</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from(taskHoursByProject.values()).sort((a, b) => b.hours - a.hours).map((r) => (
+                  <TableRow key={r.code}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="font-mono text-xs">{r.code}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.users.size}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.hours.toFixed(1)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.entries}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}

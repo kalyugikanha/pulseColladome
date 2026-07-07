@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,10 +12,13 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, Workflow } from "lucide-react";
+import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, Workflow, MoreVertical, Pencil } from "lucide-react";
 import { TaskStagesPanel } from "./task-stages-panel";
+import { EditTaskDialog } from "./edit-task-dialog";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
   addSubtask, toggleSubtask, deleteSubtask, addComment, resolveComment,
@@ -60,6 +63,15 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const [reviewNote, setReviewNote] = useState("");
   const [depQuery, setDepQuery] = useState("");
   const [depOptions, setDepOptions] = useState<{ id: string; title: string }[]>([]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [myDept, setMyDept] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!me?.realId) { setMyDept(null); return; }
+    supabase.from("profiles").select("department").eq("id", me.realId).maybeSingle()
+      .then(({ data }) => setMyDept((data?.department as string | null) ?? null));
+  }, [me?.realId]);
 
   const task = detail?.task;
   const isAssignee = !!task && me?.id === task.assignee_id;
@@ -102,11 +114,42 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
   if (!taskId) return null;
 
+  const canEditDelete = !!task && !!me && (
+    me.isSuperAdmin || me.isAdmin ||
+    (task as { created_by?: string }).created_by === me.realId ||
+    (myDept ?? "").toLowerCase() === "marketing"
+  );
+
+  async function doDelete() {
+    if (!task) return;
+    const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Task deleted");
+    setDeleteOpen(false);
+    onClose();
+    await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
+    await qc.invalidateQueries({ queryKey: ["my-tasks"] });
+  }
+
   return (
     <Sheet open={!!taskId} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader className="mb-4">
-          <SheetTitle className="font-display pr-8">{task?.title ?? (isLoading ? "Loading…" : "Task")}</SheetTitle>
+          <div className="flex items-start justify-between gap-2 pr-8">
+            <SheetTitle className="font-display">{task?.title ?? (isLoading ? "Loading…" : "Task")}</SheetTitle>
+            {canEditDelete && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1"><MoreVertical className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </SheetHeader>
 
         {task && (
@@ -359,6 +402,41 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
             </Tabs>
           </>
         )}
+        <EditTaskDialog
+          open={editOpen}
+          task={task ? {
+            id: task.id,
+            title: task.title,
+            description: (task as { description?: string | null }).description ?? null,
+            priority: task.priority as "low"|"medium"|"high",
+            due_date: (task as { due_date?: string | null }).due_date ?? null,
+            scheduled_post_date: (task as { scheduled_post_date?: string | null }).scheduled_post_date ?? null,
+            client_brand: (task as { client_brand?: string | null }).client_brand ?? null,
+            project_id: (task as { project_id?: string | null }).project_id ?? null,
+            assignee_id: (task as { assignee_id?: string | null }).assignee_id ?? null,
+            asset_links: ((task as { asset_links?: { label: string; url: string }[] | null }).asset_links) ?? null,
+          } : null}
+          roster={(peopleAll ?? []).map((p) => ({ id: p.id, full_name: p.full_name ?? null, email: p.email ?? null }))}
+          onClose={() => setEditOpen(false)}
+          onSaved={async () => {
+            await refresh();
+            await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
+          }}
+        />
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently remove the task and its comments, checklist, activity, and stage history. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={doDelete}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

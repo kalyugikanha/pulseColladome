@@ -25,6 +25,8 @@ type Allocation = {
   project_id: string;
   project_code: string | null;
   project_name: string | null;
+  task_id?: string | null;
+  task_title?: string | null;
   hours: number;
   comments: string;
 };
@@ -43,7 +45,7 @@ type Session = {
   allocations: Allocation[] | null;
 };
 
-type Row = { projectId: string; hours: string; comments: string };
+type Row = { projectId: string; taskId: string; hours: string; comments: string };
 
 function PunchPage() {
   const { data: me } = useCurrentUser();
@@ -53,7 +55,7 @@ function PunchPage() {
   const today = format(new Date(), "yyyy-MM-dd");
   const punchUserId = me?.realId ?? me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [rows, setRows] = useState<Row[]>([{ projectId: "", hours: "", comments: "" }]);
+  const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "" }]);
   const [submitting, setSubmitting] = useState(false);
   const [punchingIn, setPunchingIn] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -79,6 +81,31 @@ function PunchPage() {
     queryKey: ["projects-for-log"],
     enabled: !!me,
     queryFn: async () => (await supabase.from("projects").select("id, code, name").order("code")).data ?? [],
+  });
+
+  const { data: myDept } = useQuery({
+    queryKey: ["my-dept-for-punch", punchUserId],
+    enabled: !!punchUserId,
+    queryFn: async () => (await supabase.from("profiles").select("department").eq("id", punchUserId!).maybeSingle()).data?.department ?? null,
+    staleTime: 5 * 60_000,
+  });
+  const requireTask = ((myDept ?? "").toLowerCase() === "marketing" || (myDept ?? "").toLowerCase() === "business development" || (myDept ?? "").toLowerCase() === "bd");
+
+  const { data: myTasks } = useQuery({
+    queryKey: ["my-open-tasks", punchUserId],
+    enabled: !!punchUserId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("tasks")
+        .select("id, title, status, project_id, project:projects(id, code, name)")
+        .eq("assignee_id", punchUserId!)
+        .neq("status", "done")
+        .not("project_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      return (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; project: { id: string; code: string; name: string } | null }>;
+    },
+    staleTime: 60_000,
   });
 
   const { data: history } = useQuery({
@@ -138,7 +165,7 @@ function PunchPage() {
   function openPunchOut() {
     if (!openSession) return;
     const suggested = Number((differenceInMinutes(new Date(), new Date(openSession.punch_in_time)) / 60).toFixed(2));
-    setRows([{ projectId: "", hours: suggested > 0 ? String(suggested) : "", comments: "" }]);
+    setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "" }]);
     setDialogOpen(true);
   }
 
@@ -146,7 +173,7 @@ function PunchPage() {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
   function addRow() {
-    setRows((prev) => [...prev, { projectId: "", hours: "", comments: "" }]);
+    setRows((prev) => [...prev, { projectId: "", taskId: "", hours: "", comments: "" }]);
   }
   function removeRow(idx: number) {
     setRows((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
@@ -154,18 +181,18 @@ function PunchPage() {
 
   async function submitPunchOut() {
     if (!openSession) return;
-    if (rows.length === 0) { toast.error("Add at least one project."); return; }
+    if (rows.length === 0) { toast.error("Add at least one entry."); return; }
     for (const [i, r] of rows.entries()) {
-      if (!r.projectId) { toast.error(`Row ${i + 1}: pick a project.`); return; }
+      if (requireTask && !r.taskId) { toast.error(`Row ${i + 1}: pick a task (required for your team).`); return; }
+      if (!r.taskId && !r.projectId) { toast.error(`Row ${i + 1}: pick a task or project.`); return; }
       const h = Number(r.hours);
       if (!Number.isFinite(h) || h <= 0) { toast.error(`Row ${i + 1}: enter hours (>0).`); return; }
       if (!r.comments.trim()) { toast.error(`Row ${i + 1}: add a comment.`); return; }
     }
-    const ids = rows.map((r) => r.projectId);
-    if (new Set(ids).size !== ids.length) { toast.error("Same project listed twice — merge them."); return; }
 
     const allocations = rows.map((r) => ({
       projectId: r.projectId,
+      taskId: r.taskId || null,
       hours: Number(Number(r.hours).toFixed(2)),
       comments: r.comments.trim(),
     }));
@@ -298,24 +325,53 @@ function PunchPage() {
 
           <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
             {rows.map((r, idx) => {
-              const used = new Set(rows.filter((_, i) => i !== idx).map((rr) => rr.projectId).filter(Boolean));
+              const pickedTask = r.taskId ? (myTasks ?? []).find((t) => t.id === r.taskId) : null;
               return (
                 <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-3 bg-muted/20">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wider text-muted-foreground">Project {idx + 1}</span>
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">Entry {idx + 1}</span>
                     {rows.length > 1 && (
                       <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(idx)} className="text-destructive h-7 px-2">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Task {requireTask && <span className="text-destructive">*</span>}</Label>
+                    <Select
+                      value={r.taskId || "__none__"}
+                      onValueChange={(v) => {
+                        if (v === "__none__") { updateRow(idx, { taskId: "" }); return; }
+                        const t = (myTasks ?? []).find((x) => x.id === v);
+                        updateRow(idx, { taskId: v, projectId: t?.project_id ?? "" });
+                      }}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Pick one of your open tasks" /></SelectTrigger>
+                      <SelectContent>
+                        {!requireTask && <SelectItem value="__none__">— No task —</SelectItem>}
+                        {(myTasks ?? []).map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.project?.code && <span className="font-mono text-xs mr-2">{t.project.code}</span>}
+                            {t.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {requireTask && !myTasks?.length && (
+                      <p className="text-[11px] text-warning">No open tasks assigned to you yet — ask your team lead to assign one before punching out.</p>
+                    )}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Project</Label>
-                      <Select value={r.projectId} onValueChange={(v) => updateRow(idx, { projectId: v })}>
+                      <Label className="text-xs">Project {requireTask && <span className="text-muted-foreground text-[11px]">(auto from task)</span>}</Label>
+                      <Select
+                        value={r.projectId}
+                        onValueChange={(v) => updateRow(idx, { projectId: v })}
+                        disabled={requireTask && !!pickedTask}
+                      >
                         <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
                         <SelectContent>
-                          {projects?.filter((p) => !used.has(p.id)).map((p) => (
+                          {projects?.map((p) => (
                             <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -328,7 +384,7 @@ function PunchPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">What did you work on?</Label>
-                    <Textarea rows={2} placeholder="Short comment on this project" value={r.comments} onChange={(e) => updateRow(idx, { comments: e.target.value })} />
+                    <Textarea rows={2} placeholder="Short comment on this entry" value={r.comments} onChange={(e) => updateRow(idx, { comments: e.target.value })} />
                   </div>
                 </div>
               );

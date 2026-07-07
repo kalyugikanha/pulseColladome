@@ -184,6 +184,8 @@ export function TimesheetPage() {
       if (error) throw error;
       toast.success(decide === "approved" ? "Approved" : "Rejected");
       await refetchPending();
+      qc.invalidateQueries({ queryKey: ["ts-activity"] });
+      qc.invalidateQueries({ queryKey: ["ts-logs"] });
       qc.invalidateQueries({ queryKey: ["my-ts-activity"] });
       qc.invalidateQueries({ queryKey: ["my-performance"] });
       qc.invalidateQueries({ queryKey: ["pb-activity"] });
@@ -191,6 +193,7 @@ export function TimesheetPage() {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
   }
+
 
   const projectByCode = useMemo(() => new Map((projectsAll ?? []).map((p) => [p.code, p])), [projectsAll]);
 

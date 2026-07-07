@@ -342,10 +342,11 @@ function MarketingKanbanPage() {
   );
 }
 
-function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onApprove, onOpen }: {
+function Column({ stage, label, cards, roster, canAssignAny, burnMap, onSendBack, onApprove, onOpen }: {
   stage: Stage; label: string; cards: KanbanTask[];
   roster: { id: string; full_name: string | null; email: string | null }[];
   canAssignAny: boolean;
+  burnMap?: Map<string, number>;
   onSendBack: (t: KanbanTask) => void;
   onApprove: (t: KanbanTask) => void;
   onOpen: (t: KanbanTask) => void;
@@ -362,7 +363,7 @@ function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onAppro
       <div className="flex-1 space-y-2 overflow-y-auto max-h-[70vh] pr-1">
         {cards.map((t) => (
           <DraggableCard key={t.id} task={t} onOpen={() => onOpen(t)}>
-            <KanbanCardView task={t} />
+            <KanbanCardView task={t} burnHours={burnMap?.get(t.id)} />
             {stage === "review" && (
               <div className="mt-2 flex gap-1" onPointerDown={(e) => e.stopPropagation()}>
                 <Button size="sm" variant="outline" className="h-7 text-xs flex-1"

@@ -24,7 +24,7 @@ import { format } from "date-fns";
 import { ClipboardCheck, ExternalLink, Loader2, Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/hr/onboarding")({
-  component: HrOnboardingPage,
+  beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "approvals" } }); },
 });
 
 type SubmissionRow = {

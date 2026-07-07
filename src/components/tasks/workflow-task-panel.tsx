@@ -149,12 +149,10 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
 function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
   const { viewAsUserId } = useViewAs();
-  const { data: me } = useCurrentUser();
   const [hours, setHours] = useState("");
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
   const [values, setValues] = useState<Record<string, string>>({});
-  const [rating, setRating] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
 

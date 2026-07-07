@@ -46,7 +46,6 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
     queryFn: async () => (await supabase.from("profiles").select("department").eq("id", userId).maybeSingle()).data?.department ?? null,
   });
   const deptLower = (myDept ?? "").toLowerCase();
-  void deptLower;
   const isBd = deptLower === "business development"
     || headOfDepartments.some((d) => d.toLowerCase() === "business development")
     || isAdmin || isSuperAdmin

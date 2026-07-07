@@ -1,29 +1,30 @@
 ## Plan
 
-1. **Wipe current punch data before the code fix**
-   - Delete all rows from `punch_sessions` and `attendance_logs` using a backend migration so production starts clean after deployment.
-   - Re-check counts after migration so both tables are empty.
+1. **Fix the backend permission error**
+   - Add a backend migration granting logged-in users permission to execute the reporting helper functions used by access rules:
+     - `private.is_in_reports_tree`
+     - related private role/reporting helpers already used in policies, so the same issue does not repeat on nearby pages.
+   - Keep the functions private and security-definer; this only allows the existing access rules to call them, it does not expose table data by itself.
 
-2. **Move punch-in/punch-out writes to server-side functions**
-   - Replace direct browser inserts/updates for punch sessions with authenticated server functions.
-   - Server function will always use the logged-in user's real backend identity, not UI/view-as state.
-   - On punch-in, if an open session already exists, return that session instead of throwing a duplicate error, so the UI can immediately switch to Punch Out.
-   - On punch-out, update only the current user’s open session and let the database sync attendance.
+2. **Restore Data API table grants for the affected tables**
+   - Add explicit logged-in-user access grants for:
+     - `punch_sessions`
+     - `attendance_logs`
+     - `leave_requests`
+   - Add service-role access grants for the same tables.
+   - Do not add anonymous access because these are employee attendance/leave records.
 
-3. **Harden dashboard and Punch In/Out page UI state**
-   - Dashboard and Punch page will refetch the latest session immediately after punch-in/out and on focus/mount.
-   - If the backend reports an existing open session, both screens will display “Punch out” instead of leaving the user stuck on “Punch in”.
-   - Remove client-side attendance rollup code from punch-out; the database trigger is already responsible for attendance sync.
+3. **Double-check policies stay restrictive**
+   - Keep existing row-level rules intact:
+     - users only see/manage their own punch/attendance rows,
+     - HR/admin see team-wide rows,
+     - reporting managers see rows in their reporting tree.
 
-4. **Fix HR attendance visibility consistency**
-   - Ensure Attendance queries read live open sessions as the source of “Punched in”.
-   - Add focus/mount refetch for Attendance overview so HR sees production users’ current status after deployments or tab refreshes.
+4. **Verify after migration**
+   - Confirm `authenticated` can execute `private.is_in_reports_tree`.
+   - Confirm the affected tables have explicit logged-in access grants.
+   - Run the backend linter and review any security warnings related to this fix.
 
-5. **Double-check backend safety**
-   - Confirm the punch sync trigger and one-open-session-per-user protection remain in place.
-   - Confirm access policies still allow users to manage only their own punch sessions while HR/admin/manager roles can view the appropriate team data.
-
-6. **Verify after implementation**
-   - Confirm both punch tables are empty after reset.
-   - Test the flow: Dashboard Punch In → button changes to Punch Out → Punch page shows active timer → Attendance overview shows Punched in.
-   - Test duplicate-click/reload behavior so a second click or fresh incognito tab does not create a stuck “already punched in but button says Punch in” state.
+5. **Production outcome**
+   - Kanishka and other reporting/HR users should stop seeing `permission denied for function is_in_reports_tree` when opening Attendance or punch-related views.
+   - Punch-in state should be able to load correctly instead of failing while checking team/reporting access.

@@ -131,7 +131,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
   async function doReview(decision: "approve" | "request_changes" | "reject") {
     try {
-      await reviewFn({ data: { taskId: taskId!, decision, note: reviewNote.trim() || undefined } });
+      await reviewFn({ data: { taskId: taskId!, decision, note: reviewNote.trim() || undefined, viewAsUserId } });
       setReviewNote("");
       toast.success("Review submitted");
       await refresh();

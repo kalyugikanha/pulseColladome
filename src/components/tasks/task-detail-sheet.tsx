@@ -299,56 +299,237 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
               </div>
             )}
 
-            <Tabs defaultValue="comments">
-              <TabsList className="w-full flex-wrap h-auto">
-                <TabsTrigger value="comments"><MessageSquare className="h-3.5 w-3.5 mr-1" />Comments</TabsTrigger>
-                <TabsTrigger value="checklist"><ListChecks className="h-3.5 w-3.5 mr-1" />Checklist</TabsTrigger>
-                <TabsTrigger value="deps"><GitBranch className="h-3.5 w-3.5 mr-1" />Dependencies</TabsTrigger>
-                <TabsTrigger value="refs"><LinkIcon className="h-3.5 w-3.5 mr-1" />References</TabsTrigger>
-                <TabsTrigger value="watchers"><Users className="h-3.5 w-3.5 mr-1" />Watchers</TabsTrigger>
-                <TabsTrigger value="history"><HistoryIcon className="h-3.5 w-3.5 mr-1" />History</TabsTrigger>
-              </TabsList>
+            <div className="space-y-3">
+              <div className="text-sm font-semibold">Activity</div>
 
+              {/* Inline affordances */}
+              <div className="rounded-md border border-border/60 p-2 space-y-2 bg-muted/20">
+                {/* Add checklist item */}
+                <div className="flex gap-2 items-center">
+                  <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Input placeholder="Add checklist item…" value={newSub} onChange={(e) => setNewSub(e.target.value)}
+                    onKeyDown={async (e) => { if (e.key === "Enter" && newSub.trim()) { await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } }); setNewSub(""); await refresh(); } }}
+                    className="h-8" />
+                  <Button size="sm" variant="outline" onClick={async () => { if (!newSub.trim()) return; await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } }); setNewSub(""); await refresh(); }}>Add</Button>
+                </div>
+                {(detail?.subtasks?.length ?? 0) > 0 && (
+                  <div className="pl-6 space-y-1">
+                    {(detail?.subtasks ?? []).map((s) => {
+                      const ss = s as { id: string; title: string; done: boolean };
+                      return (
+                        <div key={ss.id} className="flex items-center gap-2">
+                          <Checkbox checked={ss.done} onCheckedChange={async (v) => {
+                            await toggleSubFn({ data: { id: ss.id, done: !!v } });
+                            await refresh();
+                          }} />
+                          <span className={`text-xs flex-1 ${ss.done ? "line-through text-muted-foreground" : ""}`}>{ss.title}</span>
+                          <button className="text-muted-foreground hover:text-destructive" onClick={async () => {
+                            await delSubFn({ data: { id: ss.id } });
+                            await refresh();
+                          }}><Trash2 className="h-3 w-3" /></button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
+                {/* Add reference */}
+                <div className="flex gap-2 items-center">
+                  <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Input placeholder="Label" value={refLabel} onChange={(e) => setRefLabel(e.target.value)} className="h-8 w-32" />
+                  <Input placeholder="https://…" value={refUrl} onChange={(e) => setRefUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addReference(); }} className="h-8 flex-1" />
+                  <Button size="sm" variant="outline" onClick={addReference} disabled={refBusy}>Add</Button>
+                </div>
+                {assetLinks.length > 0 && (
+                  <div className="pl-6 flex flex-wrap gap-2">
+                    {assetLinks.map((r, i) => (
+                      <span key={`${r.url}-${i}`} className="inline-flex items-center gap-1 text-xs rounded-md border border-border/60 px-2 py-0.5">
+                        <a href={r.url} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                          {r.label || r.url}<ExternalLink className="h-3 w-3 opacity-60" />
+                        </a>
+                        <button onClick={() => removeReference(i)} aria-label="Remove reference"><Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
 
+                {/* Add dependency */}
+                <div className="flex gap-2 items-center">
+                  <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Input placeholder="Depend on task (search)…" value={depQuery} onChange={(e) => doSearchDeps(e.target.value)} className="h-8" />
+                </div>
+                {depOptions.length > 0 && (
+                  <div className="ml-6 border border-border/60 rounded-md max-h-40 overflow-y-auto">
+                    {depOptions.map((o) => (
+                      <button key={o.id} className="block w-full text-left px-2 py-1 text-xs hover:bg-accent"
+                        onClick={async () => {
+                          try {
+                            await addDepFn({ data: { taskId: taskId!, dependsOnTaskId: o.id } });
+                            setDepQuery(""); setDepOptions([]);
+                            await refresh();
+                          } catch (e) { toast.error((e as Error).message); }
+                        }}>{o.title}</button>
+                    ))}
+                  </div>
+                )}
+                {(detail?.dependencies?.length ?? 0) > 0 && (
+                  <div className="pl-6 space-y-1">
+                    {(detail?.dependencies ?? []).map((d) => {
+                      const dd = d as { id: string; dep: { id: string; title: string; status: string } | null };
+                      return (
+                        <div key={dd.id} className="flex items-center gap-2 text-xs">
+                          <Badge variant="outline" className="capitalize text-[10px]">{dd.dep?.status}</Badge>
+                          <span className="flex-1 truncate">{dd.dep?.title ?? "(deleted)"}</span>
+                          <button className="text-muted-foreground hover:text-destructive" onClick={async () => {
+                            await rmDepFn({ data: { id: dd.id } });
+                            await refresh();
+                          }}><Trash2 className="h-3 w-3" /></button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
+                {/* Watch toggle + current watchers */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button size="sm" variant="ghost" className="h-7 px-2" onClick={async () => {
+                    await watchFn({ data: { taskId: taskId!, watching: !isWatching } });
+                    toast.success(isWatching ? "Stopped watching" : "Watching");
+                    await refresh();
+                  }}>
+                    {isWatching ? <BellOff className="h-3.5 w-3.5 mr-1" /> : <Bell className="h-3.5 w-3.5 mr-1" />}
+                    {isWatching ? "Unwatch" : "Watch"}
+                  </Button>
+                  {(detail?.watchers?.length ?? 0) > 0 && (
+                    <>
+                      <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">
+                        {(detail?.watchers ?? []).map((w) => {
+                          const ww = w as { user: { full_name?: string; email?: string } | null };
+                          return ww.user?.full_name ?? ww.user?.email ?? "—";
+                        }).join(", ")}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
 
-              <TabsContent value="comments" className="space-y-3">
-                <div className="space-y-2">
-                  {(detail?.comments ?? []).map((c) => {
+              {/* Unified timeline */}
+              <div className="space-y-2">
+                {(() => {
+                  type Entry = { key: string; at: Date | null; actor: string; text: ReactNode; icon: ReactNode };
+                  const entries: Entry[] = [];
+
+                  for (const c of (detail?.comments ?? [])) {
                     const cc = c as { id: string; body: string; author: { full_name?: string } | null; created_at: string; resolved_at: string | null };
                     const attaches = (detail?.attachments ?? []).filter((a) => (a as { comment_id: string }).comment_id === cc.id);
-                    return (
-                      <div key={cc.id} className={`rounded-md border border-border/60 p-2 ${cc.resolved_at ? "opacity-60" : ""}`}>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-medium">{cc.author?.full_name ?? "Someone"}</span>
-                          <span className="text-muted-foreground">{format(new Date(cc.created_at), "MMM d, HH:mm")}</span>
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap mt-1">{cc.body}</p>
-                        {attaches.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {attaches.map((a) => {
-                              const aa = a as { id: string; url: string; label: string | null };
-                              return <a key={aa.id} href={aa.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1"><Paperclip className="h-3 w-3" />{aa.label || "attachment"}</a>;
-                            })}
-                          </div>
-                        )}
-                        <div className="mt-1">
-                          <button className="text-[11px] text-muted-foreground hover:text-foreground" onClick={async () => {
+                    entries.push({
+                      key: `c-${cc.id}`, at: new Date(cc.created_at),
+                      actor: cc.author?.full_name ?? "Someone",
+                      icon: <MessageSquare className="h-3 w-3" />,
+                      text: (
+                        <span className={cc.resolved_at ? "opacity-60" : ""}>
+                          <span className="text-muted-foreground">commented: </span>
+                          <span className="whitespace-pre-wrap">{cc.body}</span>
+                          {attaches.length > 0 && (
+                            <span className="ml-2 inline-flex flex-wrap gap-2">
+                              {attaches.map((a) => {
+                                const aa = a as { id: string; url: string; label: string | null };
+                                return <a key={aa.id} href={aa.url} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1"><Paperclip className="h-3 w-3" />{aa.label || "attachment"}</a>;
+                              })}
+                            </span>
+                          )}
+                          <button className="ml-2 text-[11px] text-muted-foreground hover:text-foreground" onClick={async () => {
                             await resolveCommentFn({ data: { commentId: cc.id, resolved: !cc.resolved_at } });
                             await refresh();
                           }}>{cc.resolved_at ? "Reopen" : "Resolve"}</button>
+                        </span>
+                      ),
+                    });
+                  }
+                  for (const s of (detail?.subtasks ?? [])) {
+                    const ss = s as { id: string; title: string; done: boolean; created_at?: string };
+                    entries.push({
+                      key: `s-${ss.id}`, at: ss.created_at ? new Date(ss.created_at) : null,
+                      actor: "",
+                      icon: <ListChecks className="h-3 w-3" />,
+                      text: <span><span className="text-muted-foreground">checklist item </span><span className="font-medium">"{ss.title}"</span>{ss.done ? " (done)" : ""}</span>,
+                    });
+                  }
+                  for (const d of (detail?.dependencies ?? [])) {
+                    const dd = d as { id: string; created_at?: string; dep: { title: string } | null };
+                    entries.push({
+                      key: `d-${dd.id}`, at: dd.created_at ? new Date(dd.created_at) : null,
+                      actor: "",
+                      icon: <GitBranch className="h-3 w-3" />,
+                      text: <span><span className="text-muted-foreground">dependency on </span><span className="font-medium">{dd.dep?.title ?? "(deleted)"}</span></span>,
+                    });
+                  }
+                  for (const w of (detail?.watchers ?? [])) {
+                    const ww = w as { id: string; created_at?: string; user: { full_name?: string; email?: string } | null };
+                    entries.push({
+                      key: `w-${ww.id}`, at: ww.created_at ? new Date(ww.created_at) : null,
+                      actor: ww.user?.full_name ?? ww.user?.email ?? "Someone",
+                      icon: <Users className="h-3 w-3" />,
+                      text: <span className="text-muted-foreground">started watching</span>,
+                    });
+                  }
+                  for (const a of (detail?.activity ?? [])) {
+                    const aa = a as { id: string; kind: string; actor: { full_name?: string } | null; from_value: string | null; to_value: string | null; note: string | null; created_at: string; hours: number | string | null };
+                    entries.push({
+                      key: `a-${aa.id}`, at: new Date(aa.created_at),
+                      actor: aa.actor?.full_name ?? "System",
+                      icon: <HistoryIcon className="h-3 w-3" />,
+                      text: (
+                        <span>
+                          <span className="text-muted-foreground">{aa.kind.replace(/_/g, " ")}</span>
+                          {aa.from_value != null && aa.to_value != null && <span className="text-muted-foreground"> · {aa.from_value} → {aa.to_value}</span>}
+                          {aa.hours != null && <span className="text-muted-foreground"> · {Number(aa.hours)}h</span>}
+                          {aa.note && <span> · {aa.note}</span>}
+                        </span>
+                      ),
+                    });
+                  }
+
+                  const sorted = entries.sort((x, y) => {
+                    const xt = x.at ? x.at.getTime() : 0;
+                    const yt = y.at ? y.at.getTime() : 0;
+                    return yt - xt;
+                  });
+
+                  const totalBurn = (detail?.activity ?? []).reduce((sum, a) => {
+                    const h = (a as { hours: number | string | null }).hours;
+                    return sum + (h == null ? 0 : Number(h));
+                  }, 0);
+
+                  return (
+                    <>
+                      {totalBurn > 0 && (
+                        <div className="text-xs font-medium border rounded-md p-2 bg-muted/30">Total burn: {totalBurn}h</div>
+                      )}
+                      {sorted.map((e) => (
+                        <div key={e.key} className="text-xs border-l-2 border-border pl-2 py-0.5 flex gap-2">
+                          <span className="text-muted-foreground mt-0.5">{e.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            {e.actor && <span className="font-medium">{e.actor} </span>}
+                            {e.text}
+                            {e.at && <span className="text-muted-foreground" title={format(e.at, "MMM d, yyyy HH:mm")}> · {formatDistanceToNow(e.at, { addSuffix: true })}</span>}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                  {(detail?.comments?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No comments yet.</p>}
-                </div>
+                      ))}
+                      {sorted.length === 0 && <p className="text-xs text-muted-foreground">No activity yet.</p>}
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Add comment box at bottom */}
+              <div className="space-y-2 pt-1">
                 <Textarea placeholder="Add a comment. Use @name to mention." rows={3} value={commentBody} onChange={(e) => setCommentBody(e.target.value)} />
                 <div className="flex justify-end">
                   <Button size="sm" onClick={async () => {
                     if (!commentBody.trim()) return;
-                    // parse @mentions by full name against peopleAll
                     const mentions: string[] = [];
                     const body = commentBody;
                     (peopleAll ?? []).forEach((p) => {
@@ -361,123 +542,8 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                     await refresh();
                   }}>Post</Button>
                 </div>
-              </TabsContent>
-
-              <TabsContent value="checklist" className="space-y-2">
-                {(detail?.subtasks ?? []).map((s) => {
-                  const ss = s as { id: string; title: string; done: boolean };
-                  return (
-                    <div key={ss.id} className="flex items-center gap-2">
-                      <Checkbox checked={ss.done} onCheckedChange={async (v) => {
-                        await toggleSubFn({ data: { id: ss.id, done: !!v } });
-                        await refresh();
-                      }} />
-                      <span className={`text-sm flex-1 ${ss.done ? "line-through text-muted-foreground" : ""}`}>{ss.title}</span>
-                      <button className="text-muted-foreground hover:text-destructive" onClick={async () => {
-                        await delSubFn({ data: { id: ss.id } });
-                        await refresh();
-                      }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </div>
-                  );
-                })}
-                <div className="flex gap-2">
-                  <Input placeholder="Add checklist item" value={newSub} onChange={(e) => setNewSub(e.target.value)}
-                    onKeyDown={async (e) => { if (e.key === "Enter" && newSub.trim()) { await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } }); setNewSub(""); await refresh(); } }} />
-                  <Button size="sm" onClick={async () => { if (!newSub.trim()) return; await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } }); setNewSub(""); await refresh(); }}>Add</Button>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="deps" className="space-y-2">
-                {(detail?.dependencies ?? []).map((d) => {
-                  const dd = d as { id: string; dep: { id: string; title: string; status: string } | null };
-                  return (
-                    <div key={dd.id} className="flex items-center gap-2 rounded-md border border-border/60 p-2 text-sm">
-                      <Badge variant="outline" className="capitalize">{dd.dep?.status}</Badge>
-                      <span className="flex-1 truncate">{dd.dep?.title ?? "(deleted)"}</span>
-                      <button className="text-muted-foreground hover:text-destructive" onClick={async () => {
-                        await rmDepFn({ data: { id: dd.id } });
-                        await refresh();
-                      }}><Trash2 className="h-3.5 w-3.5" /></button>
-                    </div>
-                  );
-                })}
-                <div>
-                  <Input placeholder="Search task to depend on…" value={depQuery} onChange={(e) => doSearchDeps(e.target.value)} />
-                  {depOptions.length > 0 && (
-                    <div className="mt-1 border border-border/60 rounded-md max-h-40 overflow-y-auto">
-                      {depOptions.map((o) => (
-                        <button key={o.id} className="block w-full text-left px-2 py-1 text-sm hover:bg-accent"
-                          onClick={async () => {
-                            try {
-                              await addDepFn({ data: { taskId: taskId!, dependsOnTaskId: o.id } });
-                              setDepQuery(""); setDepOptions([]);
-                              await refresh();
-                            } catch (e) { toast.error((e as Error).message); }
-                          }}>{o.title}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="refs" className="space-y-2">
-                {assetLinks.length === 0 && <p className="text-xs text-muted-foreground">No references yet.</p>}
-                {assetLinks.map((r, i) => (
-                  <div key={`${r.url}-${i}`} className="flex items-center gap-2 rounded-md border border-border/60 p-2 text-sm">
-                    <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <a href={r.url} target="_blank" rel="noreferrer" className="flex-1 truncate text-primary hover:underline inline-flex items-center gap-1">
-                      {r.label || r.url}
-                      <ExternalLink className="h-3 w-3 opacity-60" />
-                    </a>
-                    <button className="text-muted-foreground hover:text-destructive" onClick={() => removeReference(i)} aria-label="Remove reference">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-                <div className="flex gap-2 pt-1">
-                  <Input placeholder="Label (e.g. Storyboard)" value={refLabel} onChange={(e) => setRefLabel(e.target.value)} className="w-40" />
-                  <Input placeholder="https://…" value={refUrl} onChange={(e) => setRefUrl(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") addReference(); }} />
-                  <Button size="sm" onClick={addReference} disabled={refBusy}>Add</Button>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="watchers" className="space-y-1">
-
-                {(detail?.watchers ?? []).map((w) => {
-                  const ww = w as { id: string; user: { full_name?: string; email?: string } | null };
-                  return <div key={ww.id} className="text-sm">{ww.user?.full_name ?? ww.user?.email ?? "—"}</div>;
-                })}
-                {(detail?.watchers?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">Nobody is watching yet.</p>}
-              </TabsContent>
-
-              <TabsContent value="history" className="space-y-2">
-                {(() => {
-                  const acts = (detail?.activity ?? []) as Array<{ id: string; kind: string; actor: { full_name?: string } | null; from_value: string | null; to_value: string | null; note: string | null; created_at: string; hours: number | string | null }>;
-                  const totalBurn = acts.reduce((s, a) => s + (a.hours == null ? 0 : Number(a.hours)), 0);
-                  return (
-                    <>
-                      {totalBurn > 0 && (
-                        <div className="text-xs font-medium border rounded-md p-2 bg-muted/30">
-                          Total burn: {totalBurn}h
-                        </div>
-                      )}
-                      {acts.map((aa) => (
-                        <div key={aa.id} className="text-xs border-l-2 border-border pl-2 py-0.5">
-                          <span className="font-medium">{aa.actor?.full_name ?? "System"}</span>{" "}
-                          <span className="text-muted-foreground">{aa.kind.replace(/_/g, " ")}</span>
-                          {aa.from_value != null && aa.to_value != null && <span className="text-muted-foreground"> · {aa.from_value} → {aa.to_value}</span>}
-                          {aa.hours != null && <span className="text-muted-foreground"> · {Number(aa.hours)}h</span>}
-                          {aa.note && <span className="text-muted-foreground"> · {aa.note}</span>}
-                          <span className="text-muted-foreground"> · {format(new Date(aa.created_at), "MMM d HH:mm")}</span>
-                        </div>
-                      ))}
-                      {acts.length === 0 && <p className="text-xs text-muted-foreground">No activity yet.</p>}
-                    </>
-                  );
-                })()}
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
           </>
         )}
         <EditTaskDialog

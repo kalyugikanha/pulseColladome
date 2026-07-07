@@ -235,14 +235,8 @@ export const closeTask = createServerFn({ method: "POST" })
       await supabase.from("tasks").update({ required_fields_values: data.requiredFieldValues as never } as never).eq("id", task.id);
     }
 
-    async function maybeRecordRating(rateeId: string | null) {
-      const r = data.rating;
-      if (r == null || !Number.isFinite(r) || r < 1 || r > 5 || !rateeId) return;
-      await supabase.from("task_ratings" as never).insert({
-        task_id: task.id, ratee_id: rateeId, rater_id: actingUserId,
-        rating: Math.round(r),
-      } as never);
-    }
+    // Ratings are ONLY written by a distinct reviewer via reviewTask.
+    // Self-close never records a rating, even if rating is passed in.
 
     // Stage requires a review? Move to review, do NOT spawn next stage yet.
     if (stage?.requires_review) {

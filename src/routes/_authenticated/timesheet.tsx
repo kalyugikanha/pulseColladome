@@ -458,6 +458,62 @@ export function TimesheetPage() {
         </div>
       </header>
 
+      {pendingEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Task hours awaiting your approval
+              {pendingHours && pendingHours.length > 0 && (
+                <Badge variant="outline" className="ml-1">{pendingHours.length}</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>Hours logged on tasks by your team. Approve or reject each entry.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!pendingHours || pendingHours.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending. Nice.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Task / Project</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Logged</TableHead>
+                    <TableHead className="text-right w-[110px]">Approve</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="w-[180px] text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingHours.map((r) => {
+                    const date = r.completion_date ?? r.created_at.slice(0, 10);
+                    const proj = r.task?.project;
+                    const logged = Number(r.hours ?? 0);
+                    return (
+                      <PendingRow
+                        key={r.id}
+                        id={r.id}
+                        name={r.actor?.full_name ?? r.actor?.email ?? "—"}
+                        title={r.task?.title ?? "Task"}
+                        projCode={proj?.code ?? null}
+                        projName={proj?.name ?? null}
+                        date={date}
+                        logged={logged}
+                        note={r.note}
+                        onDecide={decidePending}
+                      />
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
@@ -515,61 +571,7 @@ export function TimesheetPage() {
         </CardContent>
       </Card>
 
-      {directReportIds.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              Task hours awaiting your approval
-              {pendingHours && pendingHours.length > 0 && (
-                <Badge variant="outline" className="ml-1">{pendingHours.length}</Badge>
-              )}
-            </CardTitle>
-            <CardDescription>Hours logged on tasks by people who report to you. Approve or reject each entry.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!pendingHours || pendingHours.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending. Nice.</div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Task / Project</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Logged</TableHead>
-                    <TableHead className="text-right w-[110px]">Approve</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead className="w-[180px] text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingHours.map((r) => {
-                    const date = r.completion_date ?? r.created_at.slice(0, 10);
-                    const proj = r.task?.project;
-                    const logged = Number(r.hours ?? 0);
-                    return (
-                      <PendingRow
-                        key={r.id}
-                        id={r.id}
-                        name={r.actor?.full_name ?? r.actor?.email ?? "—"}
-                        title={r.task?.title ?? "Task"}
-                        projCode={proj?.code ?? null}
-                        projName={proj?.name ?? null}
-                        date={date}
-                        logged={logged}
-                        note={r.note}
-                        onDecide={decidePending}
-                      />
-                    );
-                  })}
-                </TableBody>
-              </Table>
 
-            )}
-          </CardContent>
-        </Card>
-      )}
 
 
       {editor && (

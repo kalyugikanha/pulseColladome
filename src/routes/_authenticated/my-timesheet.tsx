@@ -64,9 +64,31 @@ function MyTimesheetPage() {
     },
   });
 
+  // Kanban-logged hours (task_activity rows this user actioned).
+  const { data: activityRows } = useQuery({
+    queryKey: ["my-ts-activity", me?.id, startIso, endIso],
+    enabled: !!me?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_activity" as any)
+        .select("id, task_id, hours, note, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
+        .eq("actor_id", me!.id)
+        .not("hours", "is", null)
+        .neq("approval_status", "rejected")
+        .gte("completion_date", startIso).lt("completion_date", endIso);
+      if (error) throw error;
+      return ((data ?? []) as unknown as Array<{
+        id: string; task_id: string; hours: number | null; note: string | null;
+        completion_date: string | null; created_at: string; approval_status: string;
+        task: { id: string; title: string | null; project: { id: string; code: string | null; name: string | null } | null } | null;
+      }>);
+    },
+  });
+
   // Flatten to (date, project, hours, comments)
-  const rows = useMemo(() => {
-    const out: Array<{ date: string; code: string; name: string; hours: number; comments?: string; approved: boolean }> = [];
+  type Row = { date: string; code: string; name: string; hours: number; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
+  const rows = useMemo<Row[]>(() => {
+    const out: Row[] = [];
     for (const l of logs ?? []) {
       for (const t of l.tasks ?? []) {
         const code = t.project_code?.trim(); const h = Number(t.hours) || 0;
@@ -74,8 +96,24 @@ function MyTimesheetPage() {
         out.push({ date: l.date, code, name: t.project_name || code, hours: h, comments: t.comments, approved: !!l.approved_at });
       }
     }
+    for (const a of activityRows ?? []) {
+      const h = Number(a.hours) || 0;
+      if (h <= 0) continue;
+      const date = a.completion_date ?? a.created_at.slice(0, 10);
+      const proj = a.task?.project;
+      const code = proj?.code?.trim() || "—";
+      const name = proj?.name || a.task?.title || "Task";
+      const approved = a.approval_status === "approved" || a.approval_status === "auto";
+      out.push({
+        date, code, name, hours: h,
+        comments: a.note ?? a.task?.title ?? undefined,
+        approved,
+        pending: !approved,
+        taskId: a.task_id,
+      });
+    }
     return out.sort((a, b) => b.date.localeCompare(a.date));
-  }, [logs]);
+  }, [logs, activityRows]);
 
   const totalHours = rows.reduce((s, r) => s + r.hours, 0);
   const uniqueDays = new Set(rows.map((r) => r.date)).size;

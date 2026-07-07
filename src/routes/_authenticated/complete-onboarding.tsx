@@ -486,7 +486,8 @@ function CompleteOnboardingPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-end gap-2 pb-8">
+      <div className="flex flex-wrap items-center justify-end gap-2 pb-8">
+        <AutoSaveStatusPill status={autoStatus} lastSavedAt={lastSavedAt} />
         <Button variant="outline" onClick={() => saveDraft()} disabled={saving || submitting}>
           {saving ? "Saving…" : "Save progress"}
         </Button>
@@ -494,6 +495,7 @@ function CompleteOnboardingPage() {
           {submitting ? "Submitting…" : isApproved ? "Save changes" : isPendingReview ? "Re-submit for HR approval" : "Submit for HR approval"}
         </Button>
       </div>
+
     </div>
   );
 }

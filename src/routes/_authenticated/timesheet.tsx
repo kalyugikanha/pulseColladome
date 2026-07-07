@@ -689,7 +689,11 @@ function EmployeeBlock({
                   <TableCell rowSpan={rowspan} className="align-top border-r">
                     <div className="font-medium">{name}</div>
                     {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
-                    <div className="mt-2 text-xs font-mono">Total: <span className="font-bold">{row.total.toFixed(1)}</span></div>
+                    <div className="mt-2 inline-flex items-baseline gap-1 rounded-md bg-muted/60 px-2 py-1 text-sm tabular-nums">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</span>
+                      <span className="font-bold">{row.total.toFixed(1)}</span>
+                      <span className="text-[10px] text-muted-foreground">h</span>
+                    </div>
                   </TableCell>
                 )}
                 <TableCell>

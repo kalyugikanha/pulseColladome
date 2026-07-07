@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star, Linkedin } from "lucide-react";
+import { DepartmentSelect } from "@/components/department-select";
 
 export const Route = createFileRoute("/_authenticated/complete-onboarding")({
   component: CompleteOnboardingPage,
@@ -410,7 +411,7 @@ function CompleteOnboardingPage() {
       <Card>
         <CardHeader><CardTitle className="font-display text-lg">Work preferences</CardTitle></CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
-          <Field label="Job department *"><Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Engineering, Design, …" /></Field>
+          <Field label="Job department *"><DepartmentSelect value={department} onChange={setDepartment} allowClear={false} /></Field>
           <Field label="Joining date"><Input type="date" value={data?.profile?.joined_on ?? ""} readOnly disabled /></Field>
           <Field label="When do you start your day? *"><Input type="time" value={dayStart} onChange={(e) => setDayStart(e.target.value)} /></Field>
           <Field label="Preferred standup time *"><Input type="time" value={standup} onChange={(e) => setStandup(e.target.value)} /></Field>

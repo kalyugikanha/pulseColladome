@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Save, ChevronUp, ChevronDown, Copy } from "lucide-react";
 import { toast } from "sonner";
 import {
   listWorkflowTemplates, saveWorkflowTemplate, deleteWorkflowTemplate,
@@ -62,9 +62,42 @@ function WorkflowsAdmin() {
             })),
           })}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center justify-between">
-                {t.name}
-                {t.department && <Badge variant="outline">{t.department}</Badge>}
+              <CardTitle className="text-base flex items-center justify-between gap-2">
+                <span className="truncate">{t.name}</span>
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {t.department && <Badge variant="outline">{t.department}</Badge>}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    title="Duplicate template"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        await save({ data: {
+                          name: `Copy of ${t.name}`,
+                          description: t.description ?? "",
+                          department: t.department ?? "",
+                          is_active: true,
+                          stages: t.stages.map((s) => ({
+                            position: s.position,
+                            name: s.name,
+                            requires_review: s.requires_review,
+                            default_assignee_id: s.default_assignee_id,
+                            default_due_offset_days: s.default_due_offset_days,
+                            required_fields: s.required_fields as WorkflowRequiredField[],
+                            branch_options: s.branch_options as WorkflowBranchOption[],
+                            branch_target_map: s.branch_target_map as Record<string, number>,
+                          })),
+                        }});
+                        toast.success("Template duplicated");
+                        await refresh();
+                      } catch (err) { toast.error((err as Error).message); }
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">

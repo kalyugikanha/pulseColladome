@@ -35,6 +35,7 @@ function MyTimesheetPage() {
   const [rangeFrom, setRangeFrom] = useState<Date>(() => startOfWeek(new Date()));
   const [rangeTo, setRangeTo] = useState<Date>(() => new Date());
   const [day, setDay] = useState<Date>(() => new Date());
+  const [projectFilter, setProjectFilter] = useState<string>("__all__");
   const [editor, setEditor] = useState<{ date: string } | null>(null);
 
   const { startIso, endIso, label } = useMemo(() => {
@@ -115,11 +116,22 @@ function MyTimesheetPage() {
     return out.sort((a, b) => b.date.localeCompare(a.date));
   }, [logs, activityRows]);
 
-  const totalHours = rows.reduce((s, r) => s + r.hours, 0);
-  const uniqueDays = new Set(rows.map((r) => r.date)).size;
+  const distinctProjects = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of rows) map.set(r.code, r.name);
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    if (projectFilter === "__all__") return rows;
+    return rows.filter((r) => r.code === projectFilter);
+  }, [rows, projectFilter]);
+
+  const totalHours = filteredRows.reduce((s, r) => s + r.hours, 0);
+  const uniqueDays = new Set(filteredRows.map((r) => r.date)).size;
 
   // Unique dates in period (for quick add / edit chips)
-  const dateList = useMemo(() => Array.from(new Set(rows.map((r) => r.date))), [rows]);
+  const dateList = useMemo(() => Array.from(new Set(filteredRows.map((r) => r.date))), [filteredRows]);
 
   if (isLoading || !me) return <div className="text-muted-foreground">Loading…</div>;
 
@@ -141,6 +153,15 @@ function MyTimesheetPage() {
               <SelectItem value="month">Month</SelectItem>
               <SelectItem value="range">Range</SelectItem>
               <SelectItem value="day">Day</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="All projects" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All projects</SelectItem>
+              {distinctProjects.map(([code, name]) => (
+                <SelectItem key={code} value={code}><span className="font-mono text-xs mr-1 text-muted-foreground">{code}</span>{name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           {view === "month" && (() => {
@@ -177,7 +198,7 @@ function MyTimesheetPage() {
           <CardDescription>{totalHours.toFixed(1)} hrs across {uniqueDays} day{uniqueDays === 1 ? "" : "s"}</CardDescription>
         </CardHeader>
         <CardContent>
-          {rows.length === 0 ? (
+          {filteredRows.length === 0 ? (
             <div className="text-sm text-muted-foreground py-10 text-center">No entries in this period. Log time on any task from its detail panel to see it here.</div>
           ) : (
             <Table>
@@ -190,7 +211,7 @@ function MyTimesheetPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r, i) => (
+                {filteredRows.map((r, i) => (
                   <TableRow key={`${r.date}-${r.code}-${i}`}>
                     <TableCell className="text-xs">{format(new Date(r.date + "T00:00:00"), "d MMM")}</TableCell>
                     <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>

@@ -157,6 +157,44 @@ export const setReviewer = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Update editable task fields; logs assignee_changed to task_activity when it changes. */
+export const updateTaskFields = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    taskId: string;
+    patch: {
+      title?: string;
+      description?: string | null;
+      priority?: "low" | "medium" | "high";
+      due_date?: string | null;
+      scheduled_post_date?: string | null;
+      client_brand?: string | null;
+      project_id?: string | null;
+      assignee_id?: string | null;
+      asset_links?: { label: string; url: string }[];
+      estimated_hours?: number | null;
+    };
+    viewAsUserId?: string | null;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const { data: prev } = await supabase.from("tasks").select("assignee_id, title").eq("id", data.taskId).maybeSingle();
+    if (!prev) throw new Error("Task not found");
+    const { error } = await supabase.from("tasks").update(data.patch as never).eq("id", data.taskId);
+    if (error) throw error;
+    const newAssignee = data.patch.assignee_id ?? null;
+    const oldAssignee = (prev as { assignee_id: string | null }).assignee_id ?? null;
+    if ("assignee_id" in data.patch && newAssignee !== oldAssignee) {
+      await logActivity(supabase, data.taskId, actingUserId, "assignee_changed", oldAssignee, newAssignee);
+      if (newAssignee && newAssignee !== actingUserId) {
+        await notify(supabase, newAssignee, "task_assigned", data.taskId, null,
+          `You were assigned to "${(prev as { title: string }).title}".`);
+      }
+    }
+    return { ok: true };
+  });
+
 /* ============ Completion percent ============ */
 export const setCompletionPercent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

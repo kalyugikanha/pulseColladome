@@ -235,14 +235,8 @@ export const closeTask = createServerFn({ method: "POST" })
       await supabase.from("tasks").update({ required_fields_values: data.requiredFieldValues as never } as never).eq("id", task.id);
     }
 
-    async function maybeRecordRating(rateeId: string | null) {
-      const r = data.rating;
-      if (r == null || !Number.isFinite(r) || r < 1 || r > 5 || !rateeId) return;
-      await supabase.from("task_ratings" as never).insert({
-        task_id: task.id, ratee_id: rateeId, rater_id: actingUserId,
-        rating: Math.round(r),
-      } as never);
-    }
+    // Ratings are ONLY written by a distinct reviewer via reviewTask.
+    // Self-close never records a rating, even if rating is passed in.
 
     // Stage requires a review? Move to review, do NOT spawn next stage yet.
     if (stage?.requires_review) {
@@ -271,7 +265,7 @@ export const closeTask = createServerFn({ method: "POST" })
       // If the assignee is also the reviewer (or no distinct reviewer resolved), auto-approve.
       if (!reviewer || reviewer === actingUserId) {
         await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
-        await maybeRecordRating(task.assignee_id);
+        // No rating on self-close.
         await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
         return { ok: true, status: "done" };
       }
@@ -285,7 +279,7 @@ export const closeTask = createServerFn({ method: "POST" })
 
     // Done + optional next stage
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
-    await maybeRecordRating(task.assignee_id);
+    // No rating on self-close.
     await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
     return { ok: true, status: "done" };
   });
@@ -428,6 +422,13 @@ async function spawnNextStage(
     reviewer_id: nextStage.default_reviewer_id ?? null,
   } as never).eq("id", newTaskId);
   await supabase.from("workflow_instances" as never).update({ current_stage_position: nextStage.position } as never).eq("id", task.workflow_instance_id);
+  // Log the initial stage assignment so history shows the handoff.
+  if (assignee) {
+    await supabase.from("task_activity" as never).insert({
+      task_id: newTaskId, actor_id: actorId, kind: "assignee_changed",
+      from_value: null, to_value: assignee,
+    } as never);
+  }
   if (assignee && assignee !== actorId) {
     await supabase.from("notifications").insert({
       user_id: assignee, kind: "task_assigned", task_id: newTaskId,

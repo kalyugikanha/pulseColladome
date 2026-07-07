@@ -23,7 +23,8 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-const employeeItems = [
+type EmployeeItem = { title: string; url: string; icon: typeof LayoutDashboard; marketingOnly?: boolean };
+const employeeItems: EmployeeItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Punch In/Out", url: "/punch", icon: Clock },
   { title: "My Tasks", url: "/tasks", icon: ListChecks },
@@ -35,7 +36,7 @@ const employeeItems = [
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
   { title: "My Performance", url: "/performance", icon: Star },
   { title: "Business Development", url: "/bd", icon: Briefcase },
-] as const;
+];
 
 function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

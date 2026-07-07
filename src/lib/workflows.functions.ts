@@ -265,7 +265,7 @@ export const closeTask = createServerFn({ method: "POST" })
       // If the assignee is also the reviewer (or no distinct reviewer resolved), auto-approve.
       if (!reviewer || reviewer === actingUserId) {
         await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
-        await maybeRecordRating(task.assignee_id);
+        // No rating on self-close.
         await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
         return { ok: true, status: "done" };
       }

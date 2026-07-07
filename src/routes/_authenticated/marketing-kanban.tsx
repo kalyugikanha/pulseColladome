@@ -20,6 +20,7 @@ import {
   DndContext, PointerSensor, useSensor, useSensors, useDroppable, useDraggable,
   type DragEndEvent, type DragStartEvent, DragOverlay,
 } from "@dnd-kit/core";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 
 export const Route = createFileRoute("/_authenticated/marketing-kanban")({
   component: MarketingKanbanPage,

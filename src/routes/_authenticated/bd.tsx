@@ -1,5 +1,8 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/bd")({ component: BDLayout });
@@ -9,6 +12,34 @@ function BDLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAdmin = !!(me?.isAdmin || me?.isSuperAdmin);
   const isManager = isAdmin || !!me?.isReportingManager;
+
+  const { data: myDept } = useQuery({
+    queryKey: ["my-dept", me?.realId],
+    enabled: !!me?.realId,
+    staleTime: 5 * 60_000,
+    queryFn: async () =>
+      (await supabase.from("profiles").select("department").eq("id", me!.realId).maybeSingle()).data?.department ?? null,
+  });
+
+  const isBdMember =
+    (myDept ?? "").toLowerCase() === "business development" ||
+    isAdmin ||
+    !!me?.headOfDepartments.some((d) => d.toLowerCase() === "business development");
+
+  // A reporting manager who is not in BD only qualifies if they actually manage BD people.
+  // The RPC bd_list_visible_users already returns [] in that case, so the tabs will just be empty —
+  // but we still want to hide the page for non-BD non-managers entirely.
+  const canAccess = isBdMember || isManager;
+
+  if (me && !canAccess) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center text-sm text-muted-foreground">
+          Business Development is only available to the BD team.
+        </CardContent>
+      </Card>
+    );
+  }
 
   const tabs: Array<{ to: string; label: string; show: boolean }> = [
     { to: "/bd", label: "My Day", show: true },

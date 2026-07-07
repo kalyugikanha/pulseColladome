@@ -23,19 +23,17 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-type EmployeeItem = { title: string; url: string; icon: typeof LayoutDashboard; marketingOnly?: boolean };
+type EmployeeItem = { title: string; url: string; icon: typeof LayoutDashboard };
 const employeeItems: EmployeeItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Punch In/Out", url: "/punch", icon: Clock },
   { title: "My Tasks", url: "/tasks", icon: ListChecks },
-  { title: "Marketing Kanban", url: "/marketing-kanban", icon: Megaphone, marketingOnly: true },
   { title: "My Timesheet", url: "/my-timesheet", icon: TableProperties },
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Leave", url: "/leave", icon: CalendarRange },
   { title: "Team Calendar", url: "/calendar", icon: CalendarDays },
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
   { title: "My Performance", url: "/performance", icon: Star },
-  { title: "Business Development", url: "/bd", icon: Briefcase },
 ];
 
 function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; userId: string; fullName: string | null; email: string | null }) {
@@ -47,9 +45,11 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
     queryKey: ["my-dept", userId], staleTime: 5 * 60_000,
     queryFn: async () => (await supabase.from("profiles").select("department").eq("id", userId).maybeSingle()).data?.department ?? null,
   });
-  const isMarketing = (myDept ?? "").toLowerCase() === "marketing"
-    || headOfDepartments.some((d) => d.toLowerCase() === "marketing")
-    || isAdmin || isSuperAdmin;
+  const deptLower = (myDept ?? "").toLowerCase();
+  const isBd = deptLower === "business development"
+    || headOfDepartments.some((d) => d.toLowerCase() === "business development")
+    || isAdmin || isSuperAdmin
+    || isReportingManager;
 
   async function signOut() {
     await qc.cancelQueries();
@@ -78,7 +78,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {employeeItems.filter((item) => !item.marketingOnly || isMarketing).map((item) => (
+              {employeeItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")}>
                     <Link to={item.url}>
@@ -88,6 +88,25 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Project Management</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith("/marketing-kanban")}>
+                  <Link to="/marketing-kanban"><Megaphone /><span>Marketing</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {isBd && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith("/bd")}>
+                    <Link to="/bd"><Briefcase /><span>Business Development</span></Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

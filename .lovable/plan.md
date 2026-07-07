@@ -1,36 +1,64 @@
-## Add silent auto-save to the employee onboarding form
+## Goal
 
-The self-onboarding form (`src/routes/_authenticated/complete-onboarding.tsx`) is long and today only persists when the user clicks **Save progress** or **Submit**. Any refresh, tab close, or navigation before that loses everything typed.
+Group Marketing Kanban + Business Development under a new sidebar section "Project Management", lock down write/move access per team, upgrade the Marketing cross-department flow, and set the BD reporting tree — without deleting any existing rows.
 
-Add a soft, background auto-save so every field change is quietly persisted to the user's own draft, without changing the visible flow.
+## 1. Sidebar: new "Project Management" group
 
-### Behaviour
+In `src/routes/_authenticated/route.tsx`:
+- Remove the "Marketing Kanban" and "Business Development" items from the Workspace list.
+- Add a new `SidebarGroup` labelled **Project Management** with two children:
+  - **Marketing** → `/marketing-kanban` (visible to everyone — anyone can browse the board)
+  - **Business Development** → `/bd` (visible only to BD team: `department = 'Business Development'`, plus admins/super-admins and BD reporting-tree managers). Add a `myDept` check + a small `isBdVisible` flag.
 
-- Debounced auto-save fires ~800 ms after the last keystroke / date-picker / time-picker change on any of the text/date/time/textarea fields (personal, work preferences, bank).
-- Uses the existing `saveMyOnboarding` server function — same shape, same auth, so it also serves as the "session-attached" store (rows are keyed by `auth.uid()`).
-- Skipped while the initial `getMyOnboarding` query is still loading, so hydrating the form doesn't cause a phantom write-back.
-- Skipped for submitted-and-approved records only when the user is a read-only viewer; here everyone can edit, so auto-save stays on for approved profiles too (matches current Save behaviour).
-- Also fires on `beforeunload` via a `navigator.sendBeacon`-style final flush attempt (best-effort, non-blocking) so a tab close still captures the latest text.
-- Document uploads already persist immediately — no change there.
+## 2. Marketing Kanban — read-open, write-restricted, better crossover
 
-### UI
+File: `src/routes/_authenticated/marketing-kanban.tsx`
 
-- Replace the "Save progress" button's role: keep it as an optional manual trigger, but add a small right-aligned status pill next to it — `Saved`, `Saving…`, or `Unsaved changes` (with timestamp on hover). No toasts on auto-save success; toast only on failure (rate-limited to one per 30 s so we don't spam if the network is flaky).
-- Submit button behaviour unchanged.
+- Compute `isMarketingMember = department === 'Marketing' || headOfDepartments includes marketing || isAdmin || isSuperAdmin`.
+- **Read**: unchanged (query runs for everyone).
+- **Write gates**:
+  - Drag/drop, Approve, Send back, New task, Clients: only when `isMarketingMember` (buttons hidden, `DndContext` no-op for non-members, guarded in `commitMove`).
+  - Cross-department "Request" button: available to everyone (that's the whole point).
+- **Crossover dialog** (`CrossoverDialog`) upgrades:
+  - Requesting department: **auto-populated read-only** from `profiles.department` (fallback "Unknown", editable only if empty).
+  - Requester name: shown as a read-only line ("Requesting as: {me.fullName}"). `requester_id` already set from `me.realId`.
+  - Add **Information** field (multi-line textarea) and **References** (repeatable `{label, url}` list, same UI as New task's asset links). Stored as `asset_links` on the task; the free-text "Information" appends into `description` alongside existing Reason/context.
+  - Remove the target-department picker — this dialog is Marketing-only crossover, so always create a Marketing task.
+  - On submit: create the task with `marketing_stage = 'script_writing'`, `status = 'todo'`, `department_id = <Marketing>`, and **auto-assign to Kanishka** by looking up `profiles` where `lower(email) = 'kanishka@colladome.in'`. If not found, fall back to the Marketing head (first `department_heads.user_id where department = 'Marketing'`). Insert a `notifications` row for Kanishka.
+- **Requester progress visibility** — already works: rows are visible via existing tasks RLS (`can_view_task` covers `t.created_by = auth.uid()`, and the requester is the creator). To make it tangible, add a small **"My requests"** collapsible strip above the columns for non-Marketing viewers showing their `requester_id = me` tasks with current stage, and clicking opens the existing `TaskDetailSheet` (which already shows comments/output). Marketing members see the full board as today.
 
-### Implementation notes
+No schema changes needed for this part; `tasks.asset_links`, `requester_id`, `origin_department`, `marketing_stage` all already exist.
 
-- Add a `useAutoSave` hook local to the file (or `src/hooks/use-auto-save.ts` if it's reusable) that takes the serialized field payload plus a save function; internally uses `useEffect` + `setTimeout` + a `useRef` to skip the first hydration render and to cancel in-flight timers.
-- Track `dirty` and `lastSavedAt` state; drive the status pill from it.
-- Guard against concurrent writes by tracking an `inFlight` ref — if a change lands while one is in-flight, schedule another after it resolves.
-- No schema or RLS change needed — `saveMyOnboarding` already writes to the user's profile + bank rows via `requireSupabaseAuth`.
+## 3. Business Development — team-only access + reporting tree
 
-### Files touched
+- **Route guard** (`src/routes/_authenticated/bd.tsx`): if user is not BD (department, admin, super-admin, or has any BD reports), render a "Not available" card instead of the tabs. The sidebar link is also hidden per §1.
+- **Data migration** to set the reporting tree by email (no deletes, only `UPDATE profiles SET reporting_manager_id = …`):
+  - Shubham Saxena — top of BD tree (`reporting_manager_id` untouched unless null).
+  - Juhi, Jagjeet, Chirag → report to Shubham.
+  - Riyanshi, Sarita → report to Juhi.
+  - Also ensure their `department = 'Business Development'` where currently null/empty (do not overwrite existing non-null values that differ, just log).
+  - Aarti (super admin) needs no change — `bd_visible_user_ids` already returns everyone for admins/super-admins.
+- Existing SQL (`private.bd_visible_user_ids`, `private.can_manage_bd_user`, RLS on `bd_activity_logs` / `bd_recurring_items`) already implements the "Juhi sees Riyanshi + Sarita; Shubham sees all three; admins see all" rule via the recursive `bd_report_ids` walk — no policy changes required.
 
-- `src/routes/_authenticated/complete-onboarding.tsx` — wire the debounced auto-save, status pill, and `beforeunload` flush; leave field markup and validation intact.
-- (optional) `src/hooks/use-auto-save.ts` — small reusable hook if we want to reuse elsewhere.
+## 4. Preserve data
 
-### Out of scope
+- No `DROP` / `DELETE` in the migration; only `UPDATE profiles SET reporting_manager_id = <shubham|juhi>` guarded by `WHERE lower(email) = …`.
+- No changes to `tasks`, `bd_activity_logs`, or any other data table.
 
-- HR-side onboarding form in `src/routes/_authenticated/onboarding.tsx` (that's a create-user flow, not a long-form draft).
-- Server-side changes to `saveMyOnboarding` — the existing function already handles partial saves.
+## Technical notes
+
+- Emails I need to resolve at runtime for #2 auto-assign: `kanishka@colladome.in`. For #3 tree updates I'll match by exact lowercased email; I'll ask for the specific emails inline in the migration (using pattern matches on first name @ `colladome.com`/`colladome.in` with `RAISE NOTICE` when a row is missing so nothing silently fails).
+- BD sidebar visibility uses the same `myDept` query already present in the layout; extend it to expose `isBdVisible`.
+- Marketing write-gating reuses the existing `canAssignAny` computation but broadens it to any Marketing member (not just head/admin) so writers can drag cards.
+- Runtime `permission denied for function can_view_task` — silently fix by granting execute on `public.can_view_task(uuid)` to `authenticated` in the same migration (it's called from `TaskDetailSheet`).
+
+## Files touched
+
+- `src/routes/_authenticated/route.tsx` — sidebar regrouping + BD visibility gate.
+- `src/routes/_authenticated/marketing-kanban.tsx` — write-gating, crossover dialog rewrite, "My requests" strip.
+- `src/routes/_authenticated/bd.tsx` — non-BD access guard.
+- New migration — reporting_manager_id updates for BD tree + `GRANT EXECUTE ON public.can_view_task TO authenticated`.
+
+## Out of scope
+
+- Future "Project Management" department tab is left as a placeholder in the new sidebar group; no route added yet.

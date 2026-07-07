@@ -590,11 +590,10 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
   open: boolean; onClose: () => void; me: any; onCreated: () => void;
 }) {
   const [myDept, setMyDept] = useState<string>("");
-  const [target, setTarget] = useState<string>(DEPT);
   const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
+  const [info, setInfo] = useState("");
   const [deadline, setDeadline] = useState("");
-  const [reason, setReason] = useState("");
+  const [references, setReferences] = useState<{ label: string; url: string }[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -602,66 +601,101 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
     (async () => {
       const { data } = await supabase.from("profiles").select("department").eq("id", me.realId).maybeSingle();
       setMyDept(data?.department ?? "");
-      setTitle(""); setDesc(""); setDeadline(""); setReason(""); setTarget(DEPT);
+      setTitle(""); setInfo(""); setDeadline(""); setReferences([]);
     })();
   }, [open, me]);
 
-  const { data: depts } = useQuery({
-    queryKey: ["taxonomy-departments-list"], enabled: open,
-    queryFn: async () => (await supabase.from("taxonomy_departments").select("id,name").order("name")).data ?? [],
+  const { data: mktDeptId } = useQuery({
+    queryKey: ["taxonomy-dept-id", DEPT], enabled: open,
+    queryFn: async () => {
+      const { data } = await supabase.from("taxonomy_departments").select("id").ilike("name", DEPT).maybeSingle();
+      return (data as any)?.id ?? null;
+    },
+  });
+
+  // Auto-assign to Kanishka; fall back to Marketing head.
+  const { data: autoAssignee } = useQuery({
+    queryKey: ["mkt-auto-assignee"], enabled: open,
+    queryFn: async () => {
+      const { data: k } = await supabase.from("profiles")
+        .select("id").ilike("email", "kanishka@colladome.in").maybeSingle();
+      if (k?.id) return k.id as string;
+      const { data: head } = await supabase.from("department_heads")
+        .select("user_id").eq("department", DEPT).limit(1).maybeSingle();
+      return (head?.user_id as string | undefined) ?? null;
+    },
   });
 
   async function submit() {
     if (!title.trim()) return toast.error("Title required");
-    if (!target) return toast.error("Target department required");
+    if (!me?.realId) return;
     setSaving(true);
-    const targetDeptId = ((depts ?? []) as Array<{ id: string; name: string }>)
-      .find((d) => d.name.toLowerCase() === target.toLowerCase())?.id ?? null;
+    const links = references.filter((l) => l.url.trim());
     const patch: any = {
       title: title.trim(),
-      description: desc.trim() || null,
+      description: info.trim() || null,
       due_date: deadline || null,
       priority: "medium",
       status: "todo",
-      created_by: me!.realId,
-      requester_id: me!.realId,
+      created_by: me.realId,
+      requester_id: me.realId,
       origin_department: myDept || "Unknown",
+      marketing_stage: "script_writing",
+      asset_links: links,
     };
-    if (targetDeptId) patch.department_id = targetDeptId;
-    if (target === DEPT) patch.marketing_stage = "script_writing";
-    if (reason.trim()) patch.description = `${patch.description ?? ""}\n\nContext: ${reason.trim()}`.trim();
-    const { error } = await supabase.from("tasks").insert(patch);
+    if (mktDeptId) patch.department_id = mktDeptId;
+    if (autoAssignee) patch.assignee_id = autoAssignee;
+    const { data: inserted, error } = await supabase.from("tasks").insert(patch).select("id").single();
+    if (error) { setSaving(false); return toast.error(error.message); }
+
+    if (autoAssignee && autoAssignee !== me.realId && inserted?.id) {
+      await supabase.from("notifications").insert({
+        user_id: autoAssignee, kind: "task_assigned", task_id: inserted.id,
+        body: `New cross-department request from ${myDept || "another team"}: "${title.trim()}"`,
+      });
+    }
     setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Request sent");
+    toast.success("Request sent to Marketing");
     onCreated();
     onClose();
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle className="font-display">Request from another department</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-display">Request from Marketing</DialogTitle>
+        </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Requesting department</Label>
-              <Input value={myDept} onChange={(e) => setMyDept(e.target.value)} placeholder="Your department" />
-            </div>
-            <div className="space-y-1"><Label>Target department</Label>
-              <Select value={target} onValueChange={setTarget}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={DEPT}>{DEPT}</SelectItem>
-                  {(depts ?? []).map((d: any) => d.name !== DEPT && <SelectItem key={d.name} value={d.name}>{d.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs space-y-1">
+            <div><span className="text-muted-foreground">Requesting as:</span>{" "}
+              <span className="font-medium">{me?.fullName ?? me?.email ?? "—"}</span></div>
+            <div><span className="text-muted-foreground">Department:</span>{" "}
+              <span className="font-medium">{myDept || "—"}</span></div>
+            <div className="text-muted-foreground">Will be routed to Script Writing{autoAssignee ? " · Kanishka" : ""}.</div>
           </div>
-          <div className="space-y-1"><Label>Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-          <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Reason / context</Label><Input value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What do you need Marketing to create?" />
+          </div>
+          <div className="space-y-1"><Label>Information</Label>
+            <Textarea rows={4} value={info} onChange={(e) => setInfo(e.target.value)}
+              placeholder="Context, goals, audience, tone — anything the writer needs." />
+          </div>
+          <div className="space-y-1"><Label>Deadline (optional)</Label>
+            <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-48" />
+          </div>
+          <div className="space-y-1">
+            <Label>References</Label>
+            {references.map((l, i) => (
+              <div key={i} className="flex gap-1">
+                <Input placeholder="Label" value={l.label}
+                  onChange={(e) => setReferences((arr) => arr.map((x, ix) => ix === i ? { ...x, label: e.target.value } : x))} />
+                <Input placeholder="https://…" value={l.url}
+                  onChange={(e) => setReferences((arr) => arr.map((x, ix) => ix === i ? { ...x, url: e.target.value } : x))} />
+                <Button variant="ghost" size="sm" onClick={() => setReferences((arr) => arr.filter((_, ix) => ix !== i))}>×</Button>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" onClick={() => setReferences((arr) => [...arr, { label: "", url: "" }])}>+ Add reference</Button>
           </div>
         </div>
         <DialogFooter>
@@ -670,6 +704,38 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MyRequestsStrip({ meId, tasks, onOpen }: {
+  meId: string; tasks: KanbanTask[]; onOpen: (id: string) => void;
+}) {
+  const mine = tasks.filter((t) => t.requester_id === meId);
+  if (mine.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-border/60 bg-surface/40 p-3">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+        My marketing requests
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {mine.map((t) => {
+          const label = COLUMNS.find((c) => c.key === t.marketing_stage)?.label ?? t.marketing_stage;
+          const done = t.marketing_stage === "posted";
+          return (
+            <button key={t.id} onClick={() => onOpen(t.id)}
+              className="text-left min-w-[220px] rounded-md border border-border/60 bg-card p-2 hover:border-primary transition">
+              <div className="text-sm font-medium leading-tight truncate">{t.title}</div>
+              <div className="mt-1 flex items-center gap-1 flex-wrap">
+                <Badge variant={done ? "default" : "outline"} className="text-[10px] h-5">{label}</Badge>
+                {t.assignee?.full_name && (
+                  <span className="text-[10px] text-muted-foreground truncate">· {t.assignee.full_name}</span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

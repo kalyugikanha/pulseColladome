@@ -18,6 +18,7 @@ import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthenticatedWorkflowsRouteImport } from './routes/_authenticated/workflows'
 import { Route as AuthenticatedVendorsRouteImport } from './routes/_authenticated/vendors'
 import { Route as AuthenticatedTimesheetRouteImport } from './routes/_authenticated/timesheet'
+import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedResourcesRouteImport } from './routes/_authenticated/resources'
 import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/punch'
@@ -92,6 +93,11 @@ const AuthenticatedVendorsRoute = AuthenticatedVendorsRouteImport.update({
 const AuthenticatedTimesheetRoute = AuthenticatedTimesheetRouteImport.update({
   id: '/timesheet',
   path: '/timesheet',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
@@ -283,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
   '/workflows': typeof AuthenticatedWorkflowsRoute
@@ -323,6 +330,7 @@ export interface FileRoutesByTo {
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
   '/workflows': typeof AuthenticatedWorkflowsRoute
@@ -366,6 +374,7 @@ export interface FileRoutesById {
   '/_authenticated/punch': typeof AuthenticatedPunchRoute
   '/_authenticated/resources': typeof AuthenticatedResourcesRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
+  '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
   '/_authenticated/workflows': typeof AuthenticatedWorkflowsRoute
@@ -409,6 +418,7 @@ export interface FileRouteTypes {
     | '/punch'
     | '/resources'
     | '/tasks'
+    | '/team'
     | '/timesheet'
     | '/vendors'
     | '/workflows'
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/punch'
     | '/resources'
     | '/tasks'
+    | '/team'
     | '/timesheet'
     | '/vendors'
     | '/workflows'
@@ -491,6 +502,7 @@ export interface FileRouteTypes {
     | '/_authenticated/punch'
     | '/_authenticated/resources'
     | '/_authenticated/tasks'
+    | '/_authenticated/team'
     | '/_authenticated/timesheet'
     | '/_authenticated/vendors'
     | '/_authenticated/workflows'
@@ -583,6 +595,13 @@ declare module '@tanstack/react-router' {
       path: '/timesheet'
       fullPath: '/timesheet'
       preLoaderRoute: typeof AuthenticatedTimesheetRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/team': {
+      id: '/_authenticated/team'
+      path: '/team'
+      fullPath: '/team'
+      preLoaderRoute: typeof AuthenticatedTeamRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/tasks': {
@@ -845,6 +864,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPunchRoute: typeof AuthenticatedPunchRoute
   AuthenticatedResourcesRoute: typeof AuthenticatedResourcesRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
+  AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedTimesheetRoute: typeof AuthenticatedTimesheetRoute
   AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRoute
   AuthenticatedWorkflowsRoute: typeof AuthenticatedWorkflowsRoute
@@ -874,6 +894,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPunchRoute: AuthenticatedPunchRoute,
   AuthenticatedResourcesRoute: AuthenticatedResourcesRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
+  AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedTimesheetRoute: AuthenticatedTimesheetRoute,
   AuthenticatedVendorsRoute: AuthenticatedVendorsRoute,
   AuthenticatedWorkflowsRoute: AuthenticatedWorkflowsRoute,

@@ -15,19 +15,29 @@ function MyPerformancePage() {
     queryKey: ["my-performance", me?.id],
     enabled: !!me?.id,
     queryFn: async () => {
-      const [tasks, activity] = await Promise.all([
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const [tasks, activity, ratings] = await Promise.all([
         supabase.from("tasks").select("id, status, created_at").eq("assignee_id", me!.id),
         supabase.from("task_activity" as never)
           .select("hours, approval_status, completion_date")
           .eq("actor_id", me!.id)
           .not("hours", "is", null),
+        supabase.from("task_ratings" as never)
+          .select("rating")
+          .eq("ratee_id", me!.id)
+          .gte("created_at", monthStart),
       ]);
       const rows = (tasks.data ?? []) as Array<{ id: string; status: string; created_at: string }>;
       const acts = ((activity.data ?? []) as unknown as Array<{ hours: number | string; approval_status: string; completion_date: string | null }>);
+      const rateRows = ((ratings.data ?? []) as unknown as Array<{ rating: number }>);
       const totalHours = acts.filter((a) => a.approval_status !== "rejected").reduce((s, a) => s + Number(a.hours ?? 0), 0);
       const done = rows.filter((r) => r.status === "done").length;
       const inProgress = rows.filter((r) => r.status === "in_progress" || r.status === "review").length;
-      return { done, inProgress, totalHours, totalTasks: rows.length };
+      const avgRating = rateRows.length > 0
+        ? rateRows.reduce((s, r) => s + Number(r.rating ?? 0), 0) / rateRows.length
+        : null;
+      return { done, inProgress, totalHours, totalTasks: rows.length, avgRating, ratingCount: rateRows.length };
     },
   });
 
@@ -46,6 +56,23 @@ function MyPerformancePage() {
         <Stat label="In progress / review" value={stats?.inProgress ?? 0} />
         <Stat label="Total hours logged" value={(stats?.totalHours ?? 0).toFixed(1)} icon={<TrendingUp className="h-5 w-5 text-primary" />} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500" /> Average rating this month</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stats?.avgRating != null ? (
+            <div className="flex items-baseline gap-2">
+              <div className="text-3xl font-bold">{stats.avgRating.toFixed(2)}</div>
+              <div className="text-sm text-muted-foreground">/ 5 · from {stats.ratingCount} rating{stats.ratingCount === 1 ? "" : "s"}</div>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">No ratings yet this month.</div>
+          )}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader>

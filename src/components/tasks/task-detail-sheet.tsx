@@ -35,6 +35,7 @@ const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In P
 export function TaskDetailSheet({ taskId, onClose }: Props) {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
+  const { viewAsUserId } = useViewAs();
   const detailFn = useServerFn(getTaskDetail);
   const setStatusFn = useServerFn(setTaskStatus);
   const reviewFn = useServerFn(submitReviewDecision);

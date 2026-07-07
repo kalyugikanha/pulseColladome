@@ -28,6 +28,8 @@ type Log = {
   status: "pending" | "done" | "carried_forward";
   carried_forward_to: string | null;
   media_url: string | null;
+  assigned_by: string | null;
+  title: string | null;
 };
 
 type Recurring = {

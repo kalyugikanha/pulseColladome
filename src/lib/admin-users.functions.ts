@@ -620,4 +620,74 @@ export const deleteUserPermanently = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+async function assertHrOrSuper(context: { supabase: any; userId: string }) {
+  const [{ data: superRow }, { data: roleRows }] = await Promise.all([
+    context.supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle(),
+    context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+  ]);
+  const isSuper = !!superRow;
+  const isHr = !!roleRows?.some((r: { role: string }) => r.role === "hr_admin");
+  if (!isSuper && !isHr) throw new Error("Forbidden");
+}
+
+export const updateLeaveForEmployee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    id: string;
+    leave_type?: LeaveType;
+    start_date?: string;
+    end_date?: string;
+    days?: number;
+    reason?: string | null;
+    status?: "pending" | "approved" | "rejected" | "cancelled";
+    admin_comment?: string | null;
+  }) => input)
+  .handler(async ({ data, context }) => {
+    await assertHrOrSuper(context);
+    if (!data.id) throw new Error("Missing leave id");
+    if (data.start_date && data.end_date && data.start_date > data.end_date) {
+      throw new Error("End must be on or after start");
+    }
+    if (data.days !== undefined && (!Number.isFinite(data.days) || data.days <= 0)) {
+      throw new Error("Days must be positive");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const patch: Record<string, unknown> = {};
+    if (data.leave_type !== undefined) patch.leave_type = data.leave_type;
+    if (data.start_date !== undefined) patch.start_date = data.start_date;
+    if (data.end_date !== undefined) patch.end_date = data.end_date;
+    if (data.days !== undefined) patch.days = data.days;
+    if (data.reason !== undefined) patch.reason = data.reason;
+    if (data.admin_comment !== undefined) patch.admin_comment = data.admin_comment;
+    if (data.status !== undefined) {
+      patch.status = data.status;
+      patch.decided_by = context.userId;
+      patch.decided_at = new Date().toISOString();
+    }
+
+    const { error } = await supabaseAdmin
+      .from("leave_requests")
+      .update(patch)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteLeaveForEmployee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => input)
+  .handler(async ({ data, context }) => {
+    await assertHrOrSuper(context);
+    if (!data.id) throw new Error("Missing leave id");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("leave_requests")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+
 

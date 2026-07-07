@@ -85,7 +85,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {(isAdmin || isDepartmentHead || isReportingManager) && (
+                {(isAdmin || isSuperAdmin || isHrAdmin || isDepartmentHead || isReportingManager) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/attendance")}>
                       <Link to="/attendance"><Users /><span>Attendance</span></Link>

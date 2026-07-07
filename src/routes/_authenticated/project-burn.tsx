@@ -288,6 +288,21 @@ function ProjectBurnPage() {
   }, [filteredDaily, month, daysInMonth, showCosts]);
   const trendMax = Math.max(1, ...dailyTrend.map((d) => d.total));
 
+  // Burn by project rollup (respects month/dept/employee/project filters).
+  const projectRollup = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; hours: number; burn: number; contributors: Set<string> }>();
+    for (const r of filteredDaily) {
+      const cur = map.get(r.code) ?? { code: r.code, name: r.name, hours: 0, burn: 0, contributors: new Set<string>() };
+      cur.hours += r.hours;
+      cur.burn += r.burn;
+      cur.contributors.add(r.user_id);
+      map.set(r.code, cur);
+    }
+    return Array.from(map.values())
+      .map((v) => ({ code: v.code, name: v.name, hours: v.hours, burn: v.burn, contributors: v.contributors.size }))
+      .sort((a, b) => (showCosts ? b.burn - a.burn : b.hours - a.hours));
+  }, [filteredDaily, showCosts]);
+
 
   if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!canView) throw redirect({ to: "/dashboard" });

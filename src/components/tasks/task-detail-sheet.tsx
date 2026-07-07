@@ -123,7 +123,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
   async function doStatus(s: "todo" | "in_progress" | "review" | "done") {
     try {
-      await setStatusFn({ data: { taskId: taskId!, status: s } });
+      await setStatusFn({ data: { taskId: taskId!, status: s, viewAsUserId } });
       toast.success("Status updated");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }

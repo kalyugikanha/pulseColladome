@@ -66,6 +66,7 @@ function MarketingKanbanPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [crossOpen, setCrossOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   const isMarketingHead = !!me?.headOfDepartments.some((d) => d.toLowerCase() === "marketing");
   const canAssignAny = !!me && (me.isAdmin || me.isSuperAdmin || isMarketingHead);

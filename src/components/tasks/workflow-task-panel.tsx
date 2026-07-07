@@ -161,7 +161,6 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
 
 function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
-  const { viewAsUserId } = useViewAs();
   const [hours, setHours] = useState("");
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
@@ -354,7 +353,6 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
 
 function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: () => void; onDone: () => void | Promise<void> }) {
   const log = useServerFn(logTaskTime);
-  const { viewAsUserId } = useViewAs();
   const [hours, setHours] = useState("");
   const [date, setDate] = useState(todayInIndia);
   const [note, setNote] = useState("");

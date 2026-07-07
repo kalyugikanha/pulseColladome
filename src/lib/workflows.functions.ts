@@ -169,6 +169,15 @@ export const startWorkflow = createServerFn({ method: "POST" })
     return { taskId, instanceId };
   });
 
+/** Resolve the acting user id (super admin can act as an impersonated user). */
+async function resolveActingUser(
+  supabase: any, userId: string, viewAsUserId?: string | null,
+): Promise<string> {
+  if (!viewAsUserId || viewAsUserId === userId) return userId;
+  const { data: sa } = await supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle();
+  return sa ? viewAsUserId : userId;
+}
+
 /** Assignee closes a task. If a branching stage, they pick branch + next assignee. */
 export const closeTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -178,9 +187,11 @@ export const closeTask = createServerFn({ method: "POST" })
     branchKey?: string | null;
     nextAssigneeId?: string | null;
     requiredFieldValues?: Record<string, unknown>;
+    viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
     const { data: taskRow, error: tErr } = await supabase
       .from("tasks")
       .select("*")
@@ -192,7 +203,8 @@ export const closeTask = createServerFn({ method: "POST" })
       workflow_instance_id: string | null; stage_index: number | null;
       stage_snapshot: WorkflowStageInput | null; project_id: string;
     };
-    if (task.assignee_id !== userId) throw new Error("Only the assignee can close this task.");
+    if (task.assignee_id !== actingUserId) throw new Error("Only the assignee can close this task.");
+
     const stage = task.stage_snapshot;
 
     // Validate required fields
@@ -207,7 +219,7 @@ export const closeTask = createServerFn({ method: "POST" })
     if (data.actualHours && data.actualHours > 0) {
       const today = new Date().toISOString().slice(0, 10);
       await supabase.from("task_activity" as never).insert({
-        task_id: task.id, actor_id: userId, kind: "task_completed",
+        task_id: task.id, actor_id: actingUserId, kind: "task_completed",
         hours: data.actualHours, approval_status: "auto", completion_date: today,
       } as never);
     }
@@ -225,7 +237,7 @@ export const closeTask = createServerFn({ method: "POST" })
         const { data: inst } = await supabase.from("workflow_instances" as never)
           .select("started_by").eq("id", task.workflow_instance_id).single();
         const reviewer = (inst as unknown as { started_by: string } | null)?.started_by;
-        if (reviewer && reviewer !== userId) {
+        if (reviewer && reviewer !== actingUserId) {
           await supabase.from("notifications").insert({
             user_id: reviewer, kind: "review_requested", task_id: task.id,
             body: `"${task.title}" is ready for your review.`,
@@ -237,9 +249,10 @@ export const closeTask = createServerFn({ method: "POST" })
 
     // Done + optional next stage
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
-    await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, userId);
+    await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
     return { ok: true, status: "done" };
   });
+
 
 /** Reviewer approves / requests changes / just comments. */
 export const reviewTask = createServerFn({ method: "POST" })
@@ -250,9 +263,11 @@ export const reviewTask = createServerFn({ method: "POST" })
     body?: string | null;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
+    viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
     const { data: taskRow, error: tErr } = await supabase.from("tasks").select("*").eq("id", data.taskId).single();
     if (tErr) throw tErr;
     const task = taskRow as unknown as {
@@ -261,7 +276,7 @@ export const reviewTask = createServerFn({ method: "POST" })
     };
 
     await supabase.from("task_review_comments" as never).insert({
-      task_id: task.id, author_id: userId,
+      task_id: task.id, author_id: actingUserId,
       body: data.body ?? null, kind: data.action,
     } as never);
 
@@ -269,7 +284,7 @@ export const reviewTask = createServerFn({ method: "POST" })
 
     if (data.action === "request_changes") {
       await supabase.from("tasks").update({ status: "in_progress" } as never).eq("id", task.id);
-      if (task.assignee_id && task.assignee_id !== userId) {
+      if (task.assignee_id && task.assignee_id !== actingUserId) {
         await supabase.from("notifications").insert({
           user_id: task.assignee_id, kind: "changes_requested", task_id: task.id,
           body: `Changes requested on "${task.title}"${data.body ? `: ${data.body}` : ""}`,
@@ -280,30 +295,33 @@ export const reviewTask = createServerFn({ method: "POST" })
 
     // approve
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
-    await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, userId);
+    await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
     return { ok: true };
   });
+
 
 /** Log time from a task (self, on own task). */
 export const logTaskTime = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; hours: number; note?: string | null; date?: string | null }) => d)
+  .inputValidator((d: { taskId: string; hours: number; note?: string | null; date?: string | null; viewAsUserId?: string | null }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
     const { data: t, error: tErr } = await supabase.from("tasks").select("assignee_id").eq("id", data.taskId).single();
     if (tErr) throw tErr;
-    if ((t as { assignee_id: string | null }).assignee_id !== userId) {
+    if ((t as { assignee_id: string | null }).assignee_id !== actingUserId) {
       throw new Error("You can only log time on tasks assigned to you.");
     }
     const date = data.date ?? new Date().toISOString().slice(0, 10);
     const { error } = await supabase.from("task_activity" as never).insert({
-      task_id: data.taskId, actor_id: userId, kind: "time_logged",
+      task_id: data.taskId, actor_id: actingUserId, kind: "time_logged",
       hours: data.hours, note: data.note ?? null,
       approval_status: "auto", completion_date: date,
     } as never);
     if (error) throw error;
     return { ok: true };
   });
+
 
 /** ---------- helpers ---------- */
 async function spawnNextStage(

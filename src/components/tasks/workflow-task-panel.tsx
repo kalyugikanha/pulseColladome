@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { CheckCircle2, Circle, Workflow, Clock } from "lucide-react";
 import { closeTask, reviewTask, listTaskReviewComments, logTaskTime, type WorkflowStageInput } from "@/lib/workflows.functions";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useViewAs } from "@/hooks/use-view-as";
 import { format } from "date-fns";
 
 type TaskInfo = {
@@ -140,6 +141,7 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
 
 function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
+  const { viewAsUserId } = useViewAs();
   const [hours, setHours] = useState("");
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
@@ -163,6 +165,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
         requiredFieldValues: values,
+        viewAsUserId,
       }});
       toast.success("Stage closed");
       await onDone();
@@ -225,6 +228,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
   onClose: () => void; onDone: () => void | Promise<void>;
 }) {
   const review = useServerFn(reviewTask);
+  const { viewAsUserId } = useViewAs();
   const [body, setBody] = useState("");
   const [branchKey, setBranchKey] = useState("");
   const [nextAssignee, setNextAssignee] = useState("");
@@ -245,6 +249,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
         body: body.trim() || null,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
+        viewAsUserId,
       }});
       toast.success(action === "approve" ? "Approved" : action === "request_changes" ? "Sent back" : "Comment added");
       await onDone();
@@ -294,6 +299,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
 
 function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: () => void; onDone: () => void | Promise<void> }) {
   const log = useServerFn(logTaskTime);
+  const { viewAsUserId } = useViewAs();
   const [hours, setHours] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -317,7 +323,7 @@ function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: (
             const h = Number(hours);
             if (!h || h <= 0) return toast.error("Enter valid hours");
             setBusy(true);
-            try { await log({ data: { taskId, hours: h, note: note || null } }); toast.success("Time logged"); await onDone(); }
+            try { await log({ data: { taskId, hours: h, note: note || null, viewAsUserId } }); toast.success("Time logged"); await onDone(); }
             catch (e) { toast.error((e as Error).message); }
             finally { setBusy(false); }
           }}>Log</Button>
@@ -325,4 +331,5 @@ function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: (
       </DialogContent>
     </Dialog>
   );
+
 }

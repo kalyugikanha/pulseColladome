@@ -7,6 +7,8 @@ export function useFirstLoginWelcome(userId: string | null | undefined) {
 
   useEffect(() => {
     if (!userId || checked) return;
+    const host = typeof window !== "undefined" ? window.location.hostname : "";
+    if (host !== "colladome-pulse.lovable.app") return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase

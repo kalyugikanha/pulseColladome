@@ -1,37 +1,23 @@
-## First-login welcome animation
+## Restrict welcome overlay to the live URL only
 
-Show a celebratory full-screen overlay the very first time a user signs into the app, then never again for that user.
+Right now the first-login welcome overlay fires on any host — preview and production. Gate it so it only shows when the app is running on `colladome-pulse.lovable.app` (or its custom domain, if one is added later).
 
-### What the user sees
-- Confetti bursts across the whole viewport (multi-second, multi-burst)
-- Large animated headline sweeping in center-screen:
-  > "Welcome to the world of AI — to organize you better and be more productive."
-- Sub-line:
-  > "An initiative by the Admin team @ Colladome. Thanks for the ideas from Kanishka, Sarita, Sweksha & Aarti. Let's get rolling!"
-- A "Let's go" dismiss button (also auto-dismisses after ~8s)
-- Backdrop blurs the app; body scroll locked while shown
+### Change
+In `src/hooks/useFirstLoginWelcome.ts`, before running the profile check, verify the current host is the production host:
 
-### How we detect "first login"
-Add a boolean `welcomed_at timestamptz` column on `profiles` (nullable). On mount inside the authenticated layout:
-1. Fetch current profile's `welcomed_at`.
-2. If `null` → render `<WelcomeOverlay />`, then on dismiss call an RPC / update that sets `welcomed_at = now()`.
-3. If not null → render nothing.
+```ts
+const host = typeof window !== "undefined" ? window.location.hostname : "";
+const isLive = host === "colladome-pulse.lovable.app";
+if (!isLive) return; // skip preview / localhost / *id-preview*.lovable.app
+```
 
-Using the DB (not localStorage) means the welcome shows once per user across devices/browsers, and existing users who have already been using the app won't see it (we backfill `welcomed_at = now()` for all current profiles in the same migration).
+Effect:
+- `id-preview--…lovable.app` → no overlay, no DB write.
+- `localhost` → no overlay.
+- `colladome-pulse.lovable.app` → overlay shows once per user (unchanged behavior).
 
-### Files
-- **Migration**: add `welcomed_at` to `profiles`; backfill existing rows to `now()` so only brand-new sign-ins trigger it; RLS already lets a user update their own profile row.
-- **New**: `src/components/WelcomeOverlay.tsx` — confetti (via `canvas-confetti`) + animated headline (Tailwind keyframes already in project: `fade-in`, `scale-in`).
-- **New**: `src/hooks/useFirstLoginWelcome.ts` — reads `welcomed_at`, exposes `{ show, dismiss }`.
-- **Edit**: `src/routes/_authenticated/route.tsx` — mount the overlay hook + component once for the whole authenticated tree.
-- **Dependency**: `bun add canvas-confetti @types/canvas-confetti`.
-
-### Copy (final)
-Headline: **Welcome to the world of AI**
-Body: *to organize you better and be more productive — an initiative by the Admin team @ Colladome.*
-Credits: *Thanks for the ideas from Kanishka, Sarita, Sweksha & Aarti. Let's get rolling!*
+Nothing else changes — DB column, backfill, and component stay as-is. This also means when a user's first-ever login happens on the live URL, `welcomed_at` gets stamped there and they won't re-see it on preview later either.
 
 ### Verify
-- New test signup → overlay appears once, confetti fires, dismiss persists.
-- Reload / sign in again → no overlay.
-- Existing users (backfilled) → no overlay.
+- Load preview URL as a fresh user → no overlay.
+- Load `https://colladome-pulse.lovable.app` as a fresh user → overlay + confetti, dismiss persists.

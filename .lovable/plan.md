@@ -1,36 +1,37 @@
-## Two changes
+## First-login welcome animation
 
-### 1. Don't block seeding on "have they signed up?"
+Show a celebratory full-screen overlay the very first time a user signs into the app, then never again for that user.
 
-Root cause: `punch_sessions.user_id`, `employee_bank_details.user_id`, and `employee_documents.user_id` all FK to `auth.users(id)`, which excludes placeholder profiles (users who haven't signed in yet). But the `handle_new_user` trigger already re-parents these rows from placeholder → real profile on first sign-in.
+### What the user sees
+- Confetti bursts across the whole viewport (multi-second, multi-burst)
+- Large animated headline sweeping in center-screen:
+  > "Welcome to the world of AI — to organize you better and be more productive."
+- Sub-line:
+  > "An initiative by the Admin team @ Colladome. Thanks for the ideas from Kanishka, Sarita, Sweksha & Aarti. Let's get rolling!"
+- A "Let's go" dismiss button (also auto-dismisses after ~8s)
+- Backdrop blurs the app; body scroll locked while shown
 
-Fix (migration):
-- Drop the three `..._user_id_fkey` constraints that reference `auth.users(id)`.
-- Recreate each as a FK to `profiles(id) ON DELETE CASCADE`.
-- After the migration, re-run the June-30 seed to cover Deepak (5 rows / 200h) and Sweksha (2 rows / 200h). Their placeholder profile IDs will migrate to their real auth IDs on first Google sign-in.
+### How we detect "first login"
+Add a boolean `welcomed_at timestamptz` column on `profiles` (nullable). On mount inside the authenticated layout:
+1. Fetch current profile's `welcomed_at`.
+2. If `null` → render `<WelcomeOverlay />`, then on dismiss call an RPC / update that sets `welcomed_at = now()`.
+3. If not null → render nothing.
 
-Behavior stays the same for existing users; RLS still hinges on `auth.uid() = user_id`, and for placeholder rows that check just returns false — no one but the target user (once they sign in) or an HR admin can see them.
+Using the DB (not localStorage) means the welcome shows once per user across devices/browsers, and existing users who have already been using the app won't see it (we backfill `welcomed_at = now()` for all current profiles in the same migration).
 
-### 2. Per-stage project dropdown in workflow templates
+### Files
+- **Migration**: add `welcomed_at` to `profiles`; backfill existing rows to `now()` so only brand-new sign-ins trigger it; RLS already lets a user update their own profile row.
+- **New**: `src/components/WelcomeOverlay.tsx` — confetti (via `canvas-confetti`) + animated headline (Tailwind keyframes already in project: `fade-in`, `scale-in`).
+- **New**: `src/hooks/useFirstLoginWelcome.ts` — reads `welcomed_at`, exposes `{ show, dismiss }`.
+- **Edit**: `src/routes/_authenticated/route.tsx` — mount the overlay hook + component once for the whole authenticated tree.
+- **Dependency**: `bun add canvas-confetti @types/canvas-confetti`.
 
-Right now a workflow instance carries one `project_id` and every stage's task inherits it. Add a per-stage override so a template can cross projects.
-
-Migration:
-- `workflow_template_stages.project_id uuid NULL REFERENCES projects(id) ON DELETE SET NULL`
-- No default (NULL means "use the instance's project").
-
-Server (`src/lib/workflows.functions.ts`):
-- Extend `WorkflowStageInput` with `project_id: string | null`.
-- Persist it in the stage insert/update.
-- In `advanceWorkflowTaskFromStage` (and initial stage creation), pass `next_stage.project_id ?? instance.project_id` to `create_task_full`.
-
-UI (`src/routes/_authenticated/workflows.tsx`, `StageEditor`):
-- New "Project" select per stage. Options: "Same as workflow" (null) + all active projects. Uses existing project fetcher (already used in board Kanban); add a lightweight fetch in the workflows route loader.
-- Show the selected project code beside each stage badge in the list view.
-
-No changes to `workflow_instances` shape — instance-level project stays as the default.
+### Copy (final)
+Headline: **Welcome to the world of AI**
+Body: *to organize you better and be more productive — an initiative by the Admin team @ Colladome.*
+Credits: *Thanks for the ideas from Kanishka, Sarita, Sweksha & Aarti. Let's get rolling!*
 
 ### Verify
-
-- Punch: re-run the seed and confirm Deepak + Sweksha totals appear in the same query.
-- Template: create a 2-stage template with different projects, launch an instance, close stage 1, and confirm stage 2's task is created against the other project.
+- New test signup → overlay appears once, confetti fires, dismiss persists.
+- Reload / sign in again → no overlay.
+- Existing users (backfilled) → no overlay.

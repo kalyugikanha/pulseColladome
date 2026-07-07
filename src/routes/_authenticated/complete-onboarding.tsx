@@ -140,6 +140,30 @@ function CompleteOnboardingPage() {
   const isApproved = !!approvedAt;
   const isPendingReview = !!submittedAt && !isApproved;
 
+  // ---- Profile completion % ----
+  const profileFieldValues: Record<string, string> = {
+    full_name: fullName, personal_email: personalEmail, phone, permanent_address: address,
+    date_of_birth: dob, linkedin_url: linkedin, github_url: github, facebook_url: facebook,
+    instagram_url: instagram, twitter_url: twitter, department, day_start_time: dayStart, standup_time: standup,
+  };
+  const bankFieldValues: Record<string, string> = {
+    account_holder_name: holder, account_number: account, bank_branch: branch, ifsc_code: ifsc, pan_number: pan,
+  };
+  const requiredDocKeys: OnboardingDocType[] = [
+    "profile_picture","offer_letter","aadhar","pan","cancelled_cheque",
+    "marksheet_10","marksheet_12","graduation","resume",
+    "follow_facebook","follow_instagram","follow_twitter","follow_linkedin",
+    "follow_youtube","follow_pinterest","follow_whatsapp",
+    "review_google_jaipur","review_google_hyderabad","review_glassdoor","review_ambitionbox",
+    "linkedin_employment",
+  ];
+  const filledProfile = Object.values(profileFieldValues).filter((v) => v && v.trim() !== "").length;
+  const filledBank = Object.values(bankFieldValues).filter((v) => v && v.trim() !== "").length;
+  const filledDocs = requiredDocKeys.filter((k) => uploaded.has(k)).length;
+  const totalItems = Object.keys(profileFieldValues).length + Object.keys(bankFieldValues).length + requiredDocKeys.length;
+  const filledItems = filledProfile + filledBank + filledDocs;
+  const completionPct = Math.round((filledItems / totalItems) * 100);
+
   async function saveDraft() {
     setSaving(true);
     try {

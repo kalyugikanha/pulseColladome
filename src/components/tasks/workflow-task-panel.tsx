@@ -222,7 +222,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="gradient-primary" onClick={submit}
-            disabled={busy || (hasBranches && (!branchKey || !nextAssignee))}
+            disabled={busy || (hasBranches && !branchKey)}
           >Close stage</Button>
         </DialogFooter>
       </DialogContent>

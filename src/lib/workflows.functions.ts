@@ -258,13 +258,17 @@ export const closeTask = createServerFn({ method: "POST" })
       if (reviewer && reviewer !== task.reviewer_id) {
         await supabase.from("tasks").update({ reviewer_id: reviewer } as never).eq("id", task.id);
       }
-      await supabase.from("tasks").update({ status: "review" } as never).eq("id", task.id);
-      if (reviewer && reviewer !== actingUserId) {
-        await supabase.from("notifications").insert({
-          user_id: reviewer, kind: "review_requested", task_id: task.id,
-          body: `"${task.title}" is ready for your review.`,
-        });
+      // If the assignee is also the reviewer (or no distinct reviewer resolved), auto-approve.
+      if (!reviewer || reviewer === actingUserId) {
+        await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
+        await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
+        return { ok: true, status: "done" };
       }
+      await supabase.from("tasks").update({ status: "review" } as never).eq("id", task.id);
+      await supabase.from("notifications").insert({
+        user_id: reviewer, kind: "review_requested", task_id: task.id,
+        body: `"${task.title}" is ready for your review.`,
+      });
       return { ok: true, status: "review" };
     }
 

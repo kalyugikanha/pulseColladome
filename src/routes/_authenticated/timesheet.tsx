@@ -105,7 +105,9 @@ export function TimesheetPage() {
   const { deptScope, userScope } = useVisibilityScope(me);
 
   const dateIso = ymd(day);
+  const prevDayIso = ymd(addDays(day, -1));
   const nextDayIso = ymd(addDays(day, 1));
+  const afterNextDayIso = ymd(addDays(day, 2));
   const dateLabel = format(day, "EEEE, d MMM yyyy");
 
   // Visibility model shared with the Pending panel:
@@ -157,7 +159,7 @@ export function TimesheetPage() {
   });
 
   // Kanban-logged task hours (task_activity) for the visible team on the selected day.
-  const { data: activityRows } = useQuery({
+  const { data: rawActivityRows } = useQuery({
     queryKey: ["ts-activity", dateIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
     enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
     queryFn: async () => {
@@ -166,13 +168,18 @@ export function TimesheetPage() {
         .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
         .not("hours", "is", null)
         .neq("approval_status", "rejected")
-        .gte("completion_date", dateIso).lt("completion_date", nextDayIso);
+        .gte("completion_date", prevDayIso).lt("completion_date", afterNextDayIso);
       if (hasScope || fallbackActorIds) q = q.in("actor_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as unknown as ActivityRow[]);
     },
   });
+
+  const activityRows = useMemo(
+    () => (rawActivityRows ?? []).filter((row) => activityWorkDate(row) === dateIso),
+    [rawActivityRows, dateIso],
+  );
 
   const pendingActorIds = pendingIsAdmin
     ? (hasScope ? visibleUserIds : null) // null = unscoped, no in() filter

@@ -109,6 +109,15 @@ export const createTaskFull = createServerFn({ method: "POST" })
       await supabase.from("tasks").update({ created_by: context.actingUserId } as never).eq("id", taskId);
     }
 
+    // Default reviewer to the person who assigned/created the task, unless
+    // they are also the assignee. Only sets when reviewer_id is still null.
+    const creatorId = context.actingUserId;
+    if (creatorId && data.assigneeId && creatorId !== data.assigneeId) {
+      await supabase.from("tasks").update({ reviewer_id: creatorId } as never)
+        .eq("id", taskId).is("reviewer_id", null);
+    }
+
+
 
     if (isRecurring) {
       const { error: upErr } = await supabase

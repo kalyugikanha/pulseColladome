@@ -423,7 +423,7 @@ async function spawnNextStage(
   if (!nextStage) return;
   const assignee = nextAssigneeId ?? nextStage.default_assignee_id ?? instance.started_by;
 
-  const projectId = task.project_id ?? instance.project_id;
+  const projectId = nextStage.project_id ?? task.project_id ?? instance.project_id;
   if (!projectId) return;
 
   const { data: newTask, error } = await supabase.rpc("create_task_full", {

@@ -1990,6 +1990,7 @@ export type Database = {
           created_at: string
           default_assignee_id: string | null
           default_due_offset_days: number | null
+          default_reviewer_id: string | null
           id: string
           name: string
           position: number
@@ -2003,6 +2004,7 @@ export type Database = {
           created_at?: string
           default_assignee_id?: string | null
           default_due_offset_days?: number | null
+          default_reviewer_id?: string | null
           id?: string
           name: string
           position: number
@@ -2016,6 +2018,7 @@ export type Database = {
           created_at?: string
           default_assignee_id?: string | null
           default_due_offset_days?: number | null
+          default_reviewer_id?: string | null
           id?: string
           name?: string
           position?: number
@@ -2027,6 +2030,13 @@ export type Database = {
           {
             foreignKeyName: "workflow_template_stages_default_assignee_id_fkey"
             columns: ["default_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_template_stages_default_reviewer_id_fkey"
+            columns: ["default_reviewer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

@@ -1,46 +1,205 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, useRouterState, useNavigate, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Workflow } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Workflow, LayoutGrid, List as ListIcon, Layers, ListChecks } from "lucide-react";
 import { toast } from "sonner";
-import { BoardKanban, fetchBoardCards } from "@/components/board/board-kanban";
+import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board/board-kanban";
 import { createTaskFull } from "@/lib/tasks-plus.functions";
 import { startWorkflow, listWorkflowTemplates } from "@/lib/workflows.functions";
+import { TaxonomyPage } from "./admin.taxonomy";
 
-export const Route = createFileRoute("/_authenticated/tasks")({ component: TasksPage });
+type View = "list" | "kanban";
+type Scope = "mine" | "dept" | "all";
+
+const DEPTS = [
+  { value: "Marketing", label: "Marketing" },
+  { value: "Business Development", label: "Business Development" },
+  { value: "Tech", label: "Tech" },
+];
+
+export const Route = createFileRoute("/_authenticated/tasks")({
+  validateSearch: (s: Record<string, unknown>): { view?: View; scope?: Scope; dept?: string } => {
+    const v = s.view;
+    const sc = s.scope;
+    return {
+      view: v === "list" || v === "kanban" ? v : undefined,
+      scope: sc === "mine" || sc === "dept" || sc === "all" ? sc : undefined,
+      dept: typeof s.dept === "string" ? s.dept : undefined,
+    };
+  },
+  component: TasksPage,
+});
 
 function TasksPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
+  const search = useRouterState({ select: (s) => s.location.search }) as { view?: View; scope?: Scope; dept?: string };
+  const navigate = useNavigate({ from: "/tasks" });
+
   const [open, setOpen] = useState(false);
+  const [taxonomyOpen, setTaxonomyOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   if (!me) return <div className="text-muted-foreground">Loading…</div>;
+
+  const canDept = me.isReportingManager || me.isDepartmentHead || me.isAdmin || me.isSuperAdmin;
+  const canAll = me.isAdmin || me.isSuperAdmin;
+  const canManageTaxonomy = me.isSuperAdmin || me.isDepartmentHead || me.isReportingManager;
+
+  const view: View = search.view ?? "kanban";
+  const scope: Scope = search.scope ?? "mine";
+  const dept = search.dept ?? DEPTS[0].value;
+
+  const effectiveScope: Scope = scope === "all" && !canAll ? (canDept ? "dept" : "mine") : scope === "dept" && !canDept ? "mine" : scope;
+
+  const setSearch = (patch: Partial<{ view: View; scope: Scope; dept: string }>) => {
+    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+  };
+
+  const fetcherArgs = useMemo(() => {
+    if (effectiveScope === "mine") return { assigneeId: me.id };
+    if (effectiveScope === "dept") return { department: dept };
+    return {};
+  }, [effectiveScope, me.id, dept]);
+
+  const queryKey = ["tasks-unified", effectiveScope, dept, me.id];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <header className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-3xl font-bold">My Tasks</h1>
-          <p className="text-muted-foreground text-sm mt-1">Everything assigned to you.</p>
+          <h1 className="font-display text-3xl font-bold flex items-center gap-2"><ListChecks className="h-7 w-7 text-primary" /> Tasks</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {effectiveScope === "mine" && "Everything assigned to you."}
+            {effectiveScope === "dept" && `All tasks in ${dept}.`}
+            {effectiveScope === "all" && "Every task across the org."}
+          </p>
         </div>
-        <Button onClick={() => setOpen(true)} className="gradient-primary"><Plus className="h-4 w-4 mr-1" /> New task</Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Tabs value={effectiveScope} onValueChange={(v) => setSearch({ scope: v as Scope })}>
+            <TabsList>
+              <TabsTrigger value="mine">Mine</TabsTrigger>
+              {canDept && <TabsTrigger value="dept">Department</TabsTrigger>}
+              {canAll && <TabsTrigger value="all">All</TabsTrigger>}
+            </TabsList>
+          </Tabs>
+          {effectiveScope === "dept" && (
+            <Select value={dept} onValueChange={(v) => setSearch({ dept: v })}>
+              <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DEPTS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          <div className="inline-flex rounded-md border overflow-hidden">
+            <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className="rounded-none h-9" onClick={() => setSearch({ view: "kanban" })}>
+              <LayoutGrid className="h-4 w-4 mr-1" /> Kanban
+            </Button>
+            <Button variant={view === "list" ? "default" : "ghost"} size="sm" className="rounded-none h-9" onClick={() => setSearch({ view: "list" })}>
+              <ListIcon className="h-4 w-4 mr-1" /> List
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setTemplatesOpen(true)} title="Task workflows & templates">
+            <Workflow className="h-4 w-4 mr-1" /> Templates
+          </Button>
+          {canManageTaxonomy && (
+            <Button variant="outline" size="sm" onClick={() => setTaxonomyOpen(true)} title="Manage domain / department / task type">
+              <Layers className="h-4 w-4 mr-1" /> Taxonomy
+            </Button>
+          )}
+          <Button onClick={() => setOpen(true)} className="gradient-primary"><Plus className="h-4 w-4 mr-1" /> New task</Button>
+        </div>
       </header>
-      <BoardKanban
-        queryKey={["my-tasks-board", me.id]}
-        fetcher={() => fetchBoardCards({ assigneeId: me.id })}
-        canMoveTask={(t) => t.assignee_id === me.id}
-        currentUserId={me.id}
-      />
-      <NewTaskDialog open={open} onClose={() => setOpen(false)} defaultAssigneeId={me.id} onCreated={() => qc.invalidateQueries()} />
+
+      {view === "kanban" ? (
+        <BoardKanban
+          queryKey={queryKey}
+          fetcher={() => fetchBoardCards(fetcherArgs)}
+          canMoveTask={(t) => effectiveScope !== "mine" || t.assignee_id === me.id}
+          currentUserId={me.id}
+        />
+      ) : (
+        <TasksListView queryKey={queryKey} fetcher={() => fetchBoardCards(fetcherArgs)} />
+      )}
+
+      <NewTaskDialog open={open} onClose={() => setOpen(false)} defaultAssigneeId={me.id} defaultDepartment={effectiveScope === "dept" ? dept : null} onCreated={() => qc.invalidateQueries()} />
+
+      <Dialog open={taxonomyOpen} onOpenChange={setTaxonomyOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-display flex items-center gap-2"><Layers className="h-5 w-5" /> Manage taxonomy</DialogTitle></DialogHeader>
+          <TaxonomyPage />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle className="font-display flex items-center gap-2"><Workflow className="h-5 w-5" /> Task templates & workflows</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">Templates and multi-stage workflows are managed on the Workflows page. Start a task from a template using "Start from a workflow" in the New task dialog.</p>
+            <div className="flex gap-2">
+              <Button asChild variant="outline" onClick={() => setTemplatesOpen(false)}>
+                <Link to="/workflows">Open Workflows</Link>
+              </Button>
+              <Button onClick={() => { setTemplatesOpen(false); setOpen(true); }} className="gradient-primary">
+                <Plus className="h-4 w-4 mr-1" /> New task from template
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function TasksListView({ queryKey, fetcher }: { queryKey: unknown[]; fetcher: () => Promise<BoardCard[]> }) {
+  const { data: cards } = useQuery({ queryKey, queryFn: fetcher });
+  if (!cards) return <div className="text-muted-foreground">Loading…</div>;
+  if (cards.length === 0) return <Card><CardContent className="p-6 text-sm text-muted-foreground">No tasks match this scope.</CardContent></Card>;
+
+  const grouped: Record<string, BoardCard[]> = { todo: [], in_progress: [], review: [], done: [] };
+  for (const c of cards) (grouped[c.status] ??= []).push(c);
+  const labels: Record<string, string> = { todo: "To do", in_progress: "In progress", review: "Review", done: "Done" };
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(grouped).map(([status, items]) => (
+        <Card key={status}>
+          <CardContent className="p-0">
+            <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
+              <div className="text-sm font-semibold">{labels[status] ?? status}</div>
+              <Badge variant="outline">{items.length}</Badge>
+            </div>
+            <div className="divide-y">
+              {items.length === 0 && <div className="px-4 py-3 text-xs text-muted-foreground">Nothing here.</div>}
+              {items.map((c) => (
+                <div key={c.id} className="px-4 py-2 flex items-center justify-between gap-2 hover:bg-muted/40">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{c.title}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {c.project?.name ?? "No project"}
+                      {c.assignee && ` · ${c.assignee.full_name ?? c.assignee.email}`}
+                      {c.due_date && ` · Due ${c.due_date}`}
+                    </div>
+                  </div>
+                  {c.priority && <Badge variant={c.priority === "high" ? "destructive" : "outline"} className="uppercase text-[10px]">{c.priority}</Badge>}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -139,11 +298,10 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     } finally { setBusy(false); }
   }
 
-
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="font-display">New task</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display">New task{defaultDepartment ? ` — ${defaultDepartment}` : ""}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="rounded-md border border-primary/30 bg-primary/5 p-2 flex items-center gap-2">
             <Workflow className="h-4 w-4 text-primary" />

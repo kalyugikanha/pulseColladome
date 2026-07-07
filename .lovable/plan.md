@@ -1,42 +1,36 @@
-## Seed June-30 punch sessions
+## Two changes
 
-Each row becomes a closed `punch_sessions` entry on **2026-06-30**, with times stacked sequentially per employee (09:00 IST + running total) so `hours` sums correctly and the AFTER-INSERT trigger fills `attendance_logs`.
+### 1. Don't block seeding on "have they signed up?"
 
-### Name → profile mapping
+Root cause: `punch_sessions.user_id`, `employee_bank_details.user_id`, and `employee_documents.user_id` all FK to `auth.users(id)`, which excludes placeholder profiles (users who haven't signed in yet). But the `handle_new_user` trigger already re-parents these rows from placeholder → real profile on first sign-in.
 
-| Sheet name | Profile |
-| --- | --- |
-| Kanishka | Kanishka Khunteta |
-| Deepak | Deepak Patel |
-| Sandeep | Sandeep Kumar Mandal |
-| Sharaddha | Shraddha Saxena |
-| Arti | Arti Kumawat |
-| Akash | Akash Jangid |
-| Sweksha | Sweksha Jadon |
-| Jagjeet | Jagjeet Singh Jassal |
-| Chirag | Chirag Bansal |
-| Juhi | Juhi Nagar |
-| Anjali | Anjali |
-| Neetu | Neetu Rauniyar |
-| Sridhar Hemanth | Addala Hemanth Sridhar |
-| Manvi | Manvi Bansal |
-| Trisha | Trisha Panday |
+Fix (migration):
+- Drop the three `..._user_id_fkey` constraints that reference `auth.users(id)`.
+- Recreate each as a FK to `profiles(id) ON DELETE CASCADE`.
+- After the migration, re-run the June-30 seed to cover Deepak (5 rows / 200h) and Sweksha (2 rows / 200h). Their placeholder profile IDs will migrate to their real auth IDs on first Google sign-in.
 
-### Filters
+Behavior stays the same for existing users; RLS still hinges on `auth.uid() = user_id`, and for placeholder rows that check just returns false — no one but the target user (once they sign in) or an HR admin can see them.
 
-- Rows with `hours = 0` are skipped (Kanishka×CLDM00521, Kanishka×CLDM00564, Deepak×CLDM00563, Anjali×CLDM00563).
-- **Deepak Patel and Sweksha Jadon are placeholder profiles** (haven't signed in yet). `punch_sessions.user_id` FKs to `auth.users`, so their rows will be rejected. Those 8 rows (Deepak: 5 non-zero, Sweksha: 2) will be **skipped and reported back**. Reseed after they log in.
+### 2. Per-stage project dropdown in workflow templates
 
-### Method
+Right now a workflow instance carries one `project_id` and every stage's task inherits it. Add a per-stage override so a template can cross projects.
 
-Single SQL with a `VALUES` CTE → join to `profiles` (by first-name match, `is_placeholder=false`) + `projects` (by `code`) → `INSERT INTO punch_sessions` with per-user running-window timestamps and an `allocations` JSON of one item mirroring the punch.
+Migration:
+- `workflow_template_stages.project_id uuid NULL REFERENCES projects(id) ON DELETE SET NULL`
+- No default (NULL means "use the instance's project").
 
-The existing `handle_punch_session_attendance_sync` trigger will populate `attendance_logs` for 2026-06-30 automatically.
+Server (`src/lib/workflows.functions.ts`):
+- Extend `WorkflowStageInput` with `project_id: string | null`.
+- Persist it in the stage insert/update.
+- In `advanceWorkflowTaskFromStage` (and initial stage creation), pass `next_stage.project_id ?? instance.project_id` to `create_task_full`.
+
+UI (`src/routes/_authenticated/workflows.tsx`, `StageEditor`):
+- New "Project" select per stage. Options: "Same as workflow" (null) + all active projects. Uses existing project fetcher (already used in board Kanban); add a lightweight fetch in the workflows route loader.
+- Show the selected project code beside each stage badge in the list view.
+
+No changes to `workflow_instances` shape — instance-level project stays as the default.
 
 ### Verify
 
-Query total hours per employee for 2026-06-30 after insert and compare with the sheet.
-
-### Note
-
-Some totals are large (Akash ≈ 310h, Chirag/Juhi 200h) — impossible in one calendar day, but I'll seed exactly as you specified since this is for a monthly finance snapshot dated 30-Jun.
+- Punch: re-run the seed and confirm Deepak + Sweksha totals appear in the same query.
+- Template: create a 2-stage template with different projects, launch an instance, close stage 1, and confirm stage 2's task is created against the other project.

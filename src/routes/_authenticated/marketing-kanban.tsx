@@ -249,6 +249,7 @@ function MarketingKanbanPage() {
         onCreated={() => qc.invalidateQueries({ queryKey: ["mkt-kanban"] })}
       />
       <ClientsDialog open={clientsOpen} onClose={() => setClientsOpen(false)} />
+      <TaskDetailSheet taskId={openTaskId} onClose={() => { setOpenTaskId(null); qc.invalidateQueries({ queryKey: ["mkt-kanban"] }); }} />
     </div>
   );
 }

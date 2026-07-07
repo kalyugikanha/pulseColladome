@@ -173,14 +173,7 @@ export const startWorkflow = createServerFn({ method: "POST" })
     return { taskId, instanceId };
   });
 
-/** Resolve the acting user id (super admin can act as an impersonated user). */
-async function resolveActingUser(
-  supabase: any, userId: string, viewAsUserId?: string | null,
-): Promise<string> {
-  if (!viewAsUserId || viewAsUserId === userId) return userId;
-  const { data: sa } = await supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle();
-  return sa ? viewAsUserId : userId;
-}
+
 
 /** Assignee closes a task. If a branching stage, they pick branch + next assignee. */
 export const closeTask = createServerFn({ method: "POST" })

@@ -1,27 +1,36 @@
-## Goal
-Make the Department field in the onboarding module a dropdown fed by the existing taxonomy departments instead of a free-text input.
+## Three fixes
 
-## Scope
-Frontend only. No schema, RLS, or backend changes. `profiles.department` stays a string; we just constrain the UI to values from `taxonomy_departments` (already fetched via `getTaxonomy` in `src/lib/tasks-plus.functions.ts`).
+### 1. Default reviewer = the person who assigned/created the task (all tasks)
+Today the reviewer default only kicks in when:
+- workflow task: stage's `default_reviewer_id` at creation
+- non-workflow task: `created_by`, but only lazily when the assignee first marks it Done
+
+Change: at **task creation** always set `reviewer_id = created_by` when it's null and `created_by !== assignee_id`. Apply to every path that creates a task:
+
+- `src/lib/tasks-plus.functions.ts` → `createTaskFull` and `duplicateTask`: after the `create_task_full` RPC, update `reviewer_id = actingUserId` when assignee ≠ actingUserId.
+- `src/lib/workflows.functions.ts` → `startWorkflow` (line ~159) and `advanceWorkflow` helper (line ~419): replace `reviewer_id: first.default_reviewer_id ?? null` / `nextStage.default_reviewer_id ?? null` with `reviewer_id = actingUserId (creator) when creator ≠ assignee, else stage default_reviewer_id, else null`. Creator is the workflow starter for stage 1; the actor who closed the previous stage for subsequent stages.
+- Notification block that currently only fires for the stage's default reviewer expands to notify whoever ends up as the resolved reviewer (skipping when reviewer == assignee or reviewer == acting user).
+- `src/lib/tasks-workflow.functions.ts` `markStatus`: keep the existing "fall back to created_by on mark-done" as a safety net — no-op when reviewer_id is already set at creation.
+
+Rating/review flow is unchanged: whoever ends up as `reviewer_id` still reviews and rates.
+
+### 2. Approved pending hours don't refresh the day card
+`decidePending` in `src/routes/_authenticated/timesheet.tsx` (line ~172) invalidates `my-ts-activity`, `my-performance`, `pb-activity` — but **not** the team-timesheet's own `["ts-activity", …]` query that feeds the employee card above. So approving a row updates the DB but the card keeps showing it as unapproved (or missing) until a manual reload.
+
+Fix: after a successful approve/reject, also `qc.invalidateQueries({ queryKey: ["ts-activity"] })` (and `["ts-logs"]` for completeness). The activity row's `approval_status` flips to `approved` with `approved_hours` set, the merged `empRows` recomputes, and the approved hours appear in the card above the same instant.
+
+Note on visibility: the top card is scoped to the selected day via `completion_date`. A pending entry logged for another day will still not appear in *today's* card after approval — that's correct behavior. This fix only addresses the missing refresh for same-day entries.
+
+### 3. Reorder: pending approvals card first, then day's employee card
+Currently the layout is: header → employee day card → pending approvals card. Swap them so **"Task hours awaiting your approval"** renders first (above), and the **employee day breakdown** (with totals row) renders below it, unchanged in content.
 
 ## Files to change
-1. `src/routes/_authenticated/onboarding.tsx`
-   - Create panel (line ~191): replace the free-text `<Input>` for Department with a shadcn `<Select>` populated from `getTaxonomy().departments` (grouped/labeled by domain for readability). Store the department **name** (to remain compatible with existing string column and existing rows).
-   - Edit sheet (line ~347): same replacement inside the edit dialog.
-   - Add a "Clear" / empty option so a user can unset the department.
-
-2. `src/routes/_authenticated/complete-onboarding.tsx`
-   - Line ~413 ("Job department *"): replace the `<Input>` with the same `<Select>` sourced from taxonomy departments. Keep it required.
-
-## Data source
-Reuse existing `getTaxonomy` server fn via TanStack Query (same pattern as `taxonomy-picker.tsx`). No new endpoint.
-
-## Behavior
-- Options list = all active departments across domains, sorted by domain then name; label shown as `"<Domain> — <Department>"` for disambiguation. Value stored = department name string (matches current column semantics and preserves legacy rows).
-- If a profile already has a department string that isn't in the list, show it as a disabled current-value option so it isn't silently dropped on edit.
-- HR view (`hr.onboarding.tsx`) unchanged (read-only display already works with strings).
+- `src/lib/tasks-plus.functions.ts`
+- `src/lib/workflows.functions.ts`
+- `src/routes/_authenticated/timesheet.tsx`
 
 ## Out of scope
-- Migrating `profiles.department` to a FK.
-- Editing taxonomy from the onboarding screens (still done in Admin > Taxonomy).
-- Changes to workflows / board / directory department usage.
+- Changing the `create_task_full` RPC itself
+- Removing the ability to override reviewer via the task detail sheet
+- Any change to the review/rating workflow after a task is marked done
+- Cross-day visibility of approved task hours (day card stays scoped to the selected date)

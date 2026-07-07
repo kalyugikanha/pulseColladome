@@ -30,9 +30,14 @@ export const Route = createFileRoute("/_authenticated/timesheet")({
 });
 
 type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
-type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string };
+type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string; source?: "log" | "activity" };
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
+type ActivityRow = {
+  id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
+  note: string | null; completion_date: string | null; created_at: string; approval_status: string;
+  task: { id: string; title: string | null; project: { id: string; code: string | null; name: string | null } | null } | null;
+};
 
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -111,19 +116,49 @@ export function TimesheetPage() {
     queryFn: async () => (await supabase.from("projects").select("code, name").order("code")).data as Project[] ?? [],
   });
 
-  // Direct reports of the current user — they can approve their reports' task-hour logs.
-  const directReportIds = me?.directReportIds ?? [];
-  const { data: pendingHours, refetch: refetchPending } = useQuery({
-    queryKey: ["ts-pending-task-hours", me?.id, directReportIds.join(",")],
-    enabled: !!me?.id && directReportIds.length > 0,
+  // Kanban-logged task hours (task_activity) for the visible team on the selected day.
+  const { data: activityRows } = useQuery({
+    queryKey: ["ts-activity", dateIso, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
+        .from("task_activity" as never)
+        .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
+        .not("hours", "is", null)
+        .neq("approval_status", "rejected")
+        .gte("completion_date", dateIso).lt("completion_date", nextDayIso);
+      if (hasScope) q = q.in("actor_id", visibleUserIds);
+      const { data, error } = await q;
+      if (error) throw error;
+      return ((data ?? []) as unknown as ActivityRow[]);
+    },
+  });
+
+  // Approvers of pending task-hour entries:
+  // - Managers see only their direct reports (existing behavior).
+  // - Admins / PMs / super admins see all pending entries in the visible scope.
+  const directReportIds = me?.directReportIds ?? [];
+  const pendingIsAdmin = !!me && (me.isAdmin || me.canManageProjects || me.isSuperAdmin);
+  const pendingActorIds = pendingIsAdmin
+    ? (hasScope ? visibleUserIds : null) // null = unscoped, no in() filter
+    : directReportIds;
+  const pendingEnabled = !!me?.id && (
+    pendingIsAdmin
+      ? (!hasScope || visibleUserIds.length > 0)
+      : directReportIds.length > 0
+  );
+  const { data: pendingHours, refetch: refetchPending } = useQuery({
+    queryKey: ["ts-pending-task-hours", me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
+    enabled: pendingEnabled,
+    queryFn: async () => {
+      let q = supabase
         .from("task_activity" as never)
         .select("id, task_id, actor_id, hours, note, completion_date, created_at, kind, task:tasks(id, title, project:projects(id, code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email)")
         .eq("approval_status", "pending")
         .not("hours", "is", null)
-        .in("actor_id", directReportIds)
         .order("created_at", { ascending: false });
+      if (pendingActorIds && pendingActorIds.length > 0) q = q.in("actor_id", pendingActorIds);
+      const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as unknown as Array<{
         id: string; task_id: string; actor_id: string; hours: number | null; note: string | null;
@@ -162,15 +197,31 @@ export function TimesheetPage() {
   const profileById = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p])), [profiles]);
   const logByUser = useMemo(() => new Map((logs ?? []).map((r) => [r.user_id, r])), [logs]);
 
-  // Projects that actually appear in the day (for filter list).
+  // Group activity rows by actor for merging into empRows.
+  const activityByUser = useMemo(() => {
+    const m = new Map<string, ActivityRow[]>();
+    for (const a of activityRows ?? []) {
+      if (!a.actor_id) continue;
+      const arr = m.get(a.actor_id) ?? [];
+      arr.push(a);
+      m.set(a.actor_id, arr);
+    }
+    return m;
+  }, [activityRows]);
+
+  // Projects that actually appear in the day (for filter list) — from both sources.
   const projectsInDay = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of logs ?? []) for (const t of r.tasks ?? []) {
       const code = t.project_code?.trim();
       if (code && !m.has(code)) m.set(code, t.project_name || code);
     }
+    for (const a of activityRows ?? []) {
+      const code = a.task?.project?.code?.trim();
+      if (code && !m.has(code)) m.set(code, a.task?.project?.name || code);
+    }
     return Array.from(m.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
-  }, [logs]);
+  }, [logs, activityRows]);
 
   const allDepts = useMemo(() => {
     const s = new Set<string>();
@@ -178,7 +229,7 @@ export function TimesheetPage() {
     return Array.from(s).sort();
   }, [profiles]);
 
-  // Build rows: employees (filtered) with their tasks for the day.
+  // Build rows: employees (filtered) with their tasks for the day (log + activity).
   type EmpRow = { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number; approvedTotal: number };
   const empRows = useMemo<EmpRow[]>(() => {
     const src = (profiles ?? []).filter((p) => {
@@ -191,20 +242,42 @@ export function TimesheetPage() {
     });
     const out: EmpRow[] = src.map((p) => {
       const log = logByUser.get(p.id) ?? null;
-      let tasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t }));
+      const logTasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t, source: "log" as const }));
+      const acts = activityByUser.get(p.id) ?? [];
+      const actTasks: Task[] = acts.map((a) => {
+        const proj = a.task?.project;
+        const code = proj?.code?.trim() || "—";
+        const name = proj?.name || a.task?.title || "Task";
+        const hrs = Number(a.hours) || 0;
+        const approved = a.approval_status === "approved" || a.approval_status === "auto";
+        return {
+          project_code: code,
+          project_name: name,
+          hours: hrs,
+          approved_hours: approved ? Number(a.approved_hours ?? hrs) : undefined,
+          comments: a.note ?? a.task?.title ?? undefined,
+          source: "activity" as const,
+        };
+      });
+      let tasks: Task[] = [...logTasks, ...actTasks];
       if (projSel.size > 0) tasks = tasks.filter((t) => t.project_code && projSel.has(t.project_code));
       const total = tasks.reduce((s, t) => s + (Number(t.hours) || 0), 0);
-      const approvedTotal = !!log?.approved_at
-        ? tasks.reduce((s, t) => s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0)), 0)
-        : 0;
-      return { profile: p, log, tasks, approved: !!log?.approved_at, total, approvedTotal };
+      const dayApproved = !!log?.approved_at;
+      const approvedTotal = tasks.reduce((s, t) => {
+        if (t.source === "activity") return s + (t.approved_hours != null ? Number(t.approved_hours) : 0);
+        // log-sourced task: day-approval stamps everything
+        if (!dayApproved) return s;
+        return s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0));
+      }, 0);
+      return { profile: p, log, tasks, approved: dayApproved, total, approvedTotal };
     });
     return out
       .filter((r) => showEmpty || r.tasks.length > 0)
       .sort((a, b) =>
         (a.profile.full_name ?? a.profile.email ?? "").localeCompare(b.profile.full_name ?? b.profile.email ?? "")
       );
-  }, [profiles, logByUser, deptSel, empSel, projSel, showEmpty]);
+  }, [profiles, logByUser, activityByUser, deptSel, empSel, projSel, showEmpty]);
+
 
   const dayTotal = useMemo(() => empRows.reduce((s, r) => s + r.total, 0), [empRows]);
   const dayApprovedTotal = useMemo(() => empRows.reduce((s, r) => s + r.approvedTotal, 0), [empRows]);
@@ -553,47 +626,61 @@ function EmployeeBlock({
           </TableCell>
         </TableRow>
       ) : (
-        row.tasks.map((t, i) => (
-          <TableRow key={`${row.profile.id}-${i}`}>
-            {i === 0 && (
-              <TableCell rowSpan={rowspan} className="align-top border-r">
-                <div className="font-medium">{name}</div>
-                {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
-                <div className="mt-2 text-xs font-mono">Total: <span className="font-bold">{row.total.toFixed(1)}</span></div>
-              </TableCell>
-            )}
-            <TableCell>
-              <Select value={t.project_code ?? ""} onValueChange={(v) => onUpdate(i, { project_code: v })} disabled={!mayEdit}>
-                <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </TableCell>
-            <TableCell className="text-right">
-              <InlineNumber value={Number(t.hours) || 0} disabled={!mayEdit} onCommit={(v) => onUpdate(i, { hours: v })} />
-            </TableCell>
-            <TableCell>
-              <InlineText value={t.comments ?? ""} disabled={!mayEdit} onCommit={(v) => onUpdate(i, { comments: v })} placeholder="Optional" />
-            </TableCell>
-            {i === 0 && (
-              <TableCell rowSpan={rowspan} className="align-top">
-                {row.approved
-                  ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
-                  : <Badge variant="outline">Pending</Badge>}
-                {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
-              </TableCell>
-            )}
-            <TableCell>
-              <div className="flex items-center gap-1 justify-end">
-                <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!mayEdit} onClick={() => onDelete(i)} aria-label="Delete row">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-                {i === 0 && <RowMenu canApprove={canApprove} approved={row.approved} onToggleApproval={onToggleApproval} onOpenFull={onOpenFull} />}
-              </div>
-            </TableCell>
-          </TableRow>
-        ))
+        (() => {
+          let logCounter = -1;
+          return row.tasks.map((t, i) => {
+            const isActivity = t.source === "activity";
+            if (!isActivity) logCounter++;
+            const logIdx = isActivity ? -1 : logCounter;
+            const editableRow = mayEdit && !isActivity;
+            return (
+              <TableRow key={`${row.profile.id}-${i}`}>
+                {i === 0 && (
+                  <TableCell rowSpan={rowspan} className="align-top border-r">
+                    <div className="font-medium">{name}</div>
+                    {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
+                    <div className="mt-2 text-xs font-mono">Total: <span className="font-bold">{row.total.toFixed(1)}</span></div>
+                  </TableCell>
+                )}
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Select value={t.project_code ?? ""} onValueChange={(v) => onUpdate(logIdx, { project_code: v })} disabled={!editableRow}>
+                      <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {isActivity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">via task</Badge>}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <InlineNumber value={Number(t.hours) || 0} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { hours: v })} />
+                </TableCell>
+                <TableCell>
+                  <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { comments: v })} placeholder="Optional" />
+                </TableCell>
+                {i === 0 && (
+                  <TableCell rowSpan={rowspan} className="align-top">
+                    {row.approved
+                      ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
+                      : <Badge variant="outline">Pending</Badge>}
+                    {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
+                  </TableCell>
+                )}
+                <TableCell>
+                  <div className="flex items-center gap-1 justify-end">
+                    {!isActivity && (
+                      <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!editableRow} onClick={() => onDelete(logIdx)} aria-label="Delete row">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {i === 0 && <RowMenu canApprove={canApprove} approved={row.approved} onToggleApproval={onToggleApproval} onOpenFull={onOpenFull} />}
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          });
+        })()
       )}
       {mayEdit && row.tasks.length > 0 && addOpen && (
         <TableRow className="bg-muted/20">

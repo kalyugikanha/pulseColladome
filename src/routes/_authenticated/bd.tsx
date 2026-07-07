@@ -25,7 +25,7 @@ function BDLayout() {
         <p className="text-sm text-muted-foreground">Daily activity checklist and BD reporting.</p>
       </div>
       <div className="flex gap-1 border-b border-border overflow-x-auto">
-        {tabs.filter((t) => !t.admin || isAdmin).map((t) => {
+        {tabs.filter((t) => t.show).map((t) => {
           const active = t.to === "/bd" ? pathname === "/bd" : pathname.startsWith(t.to);
           return (
             <Link

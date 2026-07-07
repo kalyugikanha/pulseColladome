@@ -30,12 +30,12 @@ import { logTaskTime } from "@/lib/workflows.functions";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
 
-type Props = { taskId: string | null; onClose: (nextTaskId?: string) => void };
+type Props = { taskId: string | null; onClose: (nextTaskId?: string) => void; initialAction?: "mark-done" | null };
 
 const STATUS: Array<"todo" | "in_progress" | "review" | "done"> = ["todo", "in_progress", "review", "done"];
 const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In Progress", review: "In Review", done: "Done" };
 
-export function TaskDetailSheet({ taskId, onClose }: Props) {
+export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props) {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   const { viewAsUserId } = useViewAs();

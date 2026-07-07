@@ -1,23 +1,20 @@
-## Restrict welcome overlay to the live URL only
+## Show welcome overlay on every sign-in
 
-Right now the first-login welcome overlay fires on any host — preview and production. Gate it so it only shows when the app is running on `colladome-pulse.lovable.app` (or its custom domain, if one is added later).
+Switch from "once per user forever" to "once per sign-in event" on the live URL.
 
 ### Change
-In `src/hooks/useFirstLoginWelcome.ts`, before running the profile check, verify the current host is the production host:
+- Drop the `profiles.welcomed_at` gate. Instead, trigger the overlay from Supabase's `onAuthStateChange` `SIGNED_IN` event.
+- `src/hooks/useFirstLoginWelcome.ts` → rename intent to `useWelcomeOnSignIn(userId)`:
+  - Subscribe to `supabase.auth.onAuthStateChange`.
+  - When event === `"SIGNED_IN"` AND hostname === `colladome-pulse.lovable.app`, set `show = true`.
+  - `dismiss()` just sets `show = false` (no DB write).
+- Keep the live-URL gate so preview/localhost stay quiet.
+- Leave the `welcomed_at` column in place (harmless, no code path reads it anymore).
 
-```ts
-const host = typeof window !== "undefined" ? window.location.hostname : "";
-const isLive = host === "colladome-pulse.lovable.app";
-if (!isLive) return; // skip preview / localhost / *id-preview*.lovable.app
-```
+### Why `SIGNED_IN` and not mount
+`SIGNED_IN` fires only on an actual auth transition (fresh login, OAuth return). Page reloads and tab switches fire `TOKEN_REFRESHED` / `INITIAL_SESSION`, which we ignore — so the overlay shows on real sign-ins, not on every reload.
 
-Effect:
-- `id-preview--…lovable.app` → no overlay, no DB write.
-- `localhost` → no overlay.
-- `colladome-pulse.lovable.app` → overlay shows once per user (unchanged behavior).
-
-Nothing else changes — DB column, backfill, and component stay as-is. This also means when a user's first-ever login happens on the live URL, `welcomed_at` gets stamped there and they won't re-see it on preview later either.
-
-### Verify
-- Load preview URL as a fresh user → no overlay.
-- Load `https://colladome-pulse.lovable.app` as a fresh user → overlay + confetti, dismiss persists.
+### Verify on live URL
+- Sign out → sign in → overlay + confetti appears.
+- Reload the page while signed in → no overlay.
+- Sign out → sign in again → overlay appears again.

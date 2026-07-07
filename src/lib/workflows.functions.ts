@@ -338,7 +338,7 @@ export const logTaskTime = createServerFn({ method: "POST" })
 /** ---------- helpers ---------- */
 async function spawnNextStage(
   supabase: any,
-  task: { id: string; title: string; workflow_instance_id: string | null; stage_snapshot: WorkflowStageInput | null; project_id?: string },
+  task: { id: string; title: string; workflow_instance_id: string | null; stage_snapshot: WorkflowStageInput | null; project_id?: string; asset_links?: any[] | null },
   stage: WorkflowStageInput | null,
   branchKey: string | null,
   nextAssigneeId: string | null,
@@ -376,7 +376,7 @@ async function spawnNextStage(
     _title: task.title,
     _priority: "medium",
     _assignee_id: assignee,
-    _asset_links: [],
+    _asset_links: task.asset_links ?? [],
     _task_type_ids: [],
   });
   if (error) throw error;

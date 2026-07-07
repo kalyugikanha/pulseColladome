@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CheckCircle2, Circle, Workflow, Clock } from "lucide-react";
+import { CheckCircle2, Circle, Workflow, Clock, Star } from "lucide-react";
 import { closeTask, reviewTask, listTaskReviewComments, logTaskTime, type WorkflowStageInput } from "@/lib/workflows.functions";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";

@@ -46,7 +46,7 @@ type LeaveRow = {
 
 type Employee = { id: string; full_name: string | null; email: string | null; department: string | null };
 
-function HrLeavePage() {
+export function HrLeavePage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
 

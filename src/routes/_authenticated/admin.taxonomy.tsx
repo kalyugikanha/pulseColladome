@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   listTaxonomy, upsertDomain, deleteDomain, upsertDepartment, deleteDepartment,
-  upsertTaskType, deleteTaskType, setRolePresets,
+  upsertTaskType, deleteTaskType,
 } from "@/lib/tasks-plus.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/taxonomy")({ component: Page });
@@ -35,7 +35,6 @@ function Page() {
   const dDep = useServerFn(deleteDepartment);
   const uType = useServerFn(upsertTaskType);
   const dType = useServerFn(deleteTaskType);
-  const setPresetsFn = useServerFn(setRolePresets);
 
   const departments = useMemo(() => (tax?.departments ?? []).filter((d) => d.domain_id === selDomain), [tax, selDomain]);
   const types = useMemo(() => (tax?.taskTypes ?? []).filter((t) => t.department_id === selDept), [tax, selDept]);
@@ -54,7 +53,6 @@ function Page() {
       <Tabs defaultValue="tree">
         <TabsList>
           <TabsTrigger value="tree">Domain → Department → Type</TabsTrigger>
-          <TabsTrigger value="presets">Role presets</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tree" className="grid gap-4 md:grid-cols-3 mt-4">
@@ -72,7 +70,7 @@ function Page() {
               ))}
               <div className="flex gap-1 pt-2">
                 <Input placeholder="New domain" value={newDomain} onChange={(e) => setNewDomain(e.target.value)} className="h-8 text-sm" />
-                <Button size="sm" onClick={async () => { if (!newDomain.trim()) return; await uDom({ data: { name: newDomain } }); setNewDomain(""); refresh(); }}>
+                <Button size="sm" onClick={async () => { if (!newDomain.trim()) return; await uDom({ data: { name: newDomain } }); setNewDomain(""); refresh(); toast.success("Added"); }}>
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
@@ -129,55 +127,7 @@ function Page() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="presets" className="mt-4">
-          <RolePresetsEditor tax={tax} onSave={async (role, ids) => { await setPresetsFn({ data: { roleKey: role, taskTypeIds: ids } }); toast.success("Presets saved"); }} />
-        </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function RolePresetsEditor({ tax, onSave }: { tax: Awaited<ReturnType<typeof listTaxonomy>> | undefined; onSave: (role: string, ids: string[]) => Promise<void> }) {
-  const [role, setRole] = useState<string>("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const roleKeys = useMemo(() => {
-    const deptNames = (tax?.departments ?? []).map((d) => d.name);
-    return Array.from(new Set([...deptNames, "admin", "employee", "project_manager", "hr_admin"])).sort();
-  }, [tax]);
-
-  return (
-    <Card>
-      <CardHeader><CardTitle className="text-sm">Default task types per role/department</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex gap-3 items-end">
-          <div className="space-y-1 flex-1"><span className="text-xs text-muted-foreground">Role or department</span>
-            <Select value={role} onValueChange={(v) => { setRole(v); setSelected(new Set()); }}>
-              <SelectTrigger><SelectValue placeholder="Pick role/department" /></SelectTrigger>
-              <SelectContent>{roleKeys.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <Button onClick={() => role && onSave(role, Array.from(selected))} disabled={!role}>
-            <Save className="h-4 w-4 mr-1" /> Save
-          </Button>
-        </div>
-        {role && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-1">
-            {(tax?.taskTypes ?? []).map((t) => {
-              const active = selected.has(t.id);
-              return (
-                <button key={t.id} onClick={() => {
-                  const next = new Set(selected);
-                  active ? next.delete(t.id) : next.add(t.id);
-                  setSelected(next);
-                }} className={`text-left text-sm rounded px-2 py-1 border ${active?"bg-primary/10 border-primary":"border-border"}`}>
-                  {t.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }

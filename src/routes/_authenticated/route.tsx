@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } fr
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard, ClipboardCheck, Star, BarChart3, Briefcase, Megaphone } from "lucide-react";
+import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard, ClipboardCheck, Star, BarChart3, Briefcase, Megaphone, Workflow, Cpu } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/top-bar";
 import { ViewAsBanner } from "@/components/view-as-banner";
@@ -96,14 +96,24 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith("/marketing-kanban")}>
-                  <Link to="/marketing-kanban"><Megaphone /><span>Marketing</span></Link>
+                <SidebarMenuButton asChild isActive={pathname === "/board/marketing"}>
+                  <Link to="/board/$dept" params={{ dept: "marketing" }}><Megaphone /><span>Marketing</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/board/business-development"}>
+                  <Link to="/board/$dept" params={{ dept: "business-development" }}><Briefcase /><span>Business Development</span></Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/board/tech"}>
+                  <Link to="/board/$dept" params={{ dept: "tech" }}><Cpu /><span>Tech</span></Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {isBd && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={pathname.startsWith("/bd")}>
-                    <Link to="/bd"><Briefcase /><span>Business Development</span></Link>
+                    <Link to="/bd"><Briefcase /><span>BD activity log</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
@@ -146,38 +156,20 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                   </SidebarMenuItem>
                 )}
                 {(canManageProjects || isDepartmentHead || isReportingManager) && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/timesheet")}>
-                        <Link to="/timesheet"><TableProperties /><span>Timesheet</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/tasks-overview")}>
-                        <Link to="/tasks-overview"><ListChecks /><span>Task Overview</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/task-templates")}>
-                        <Link to="/task-templates"><Repeat /><span>Task Templates</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
-                )}
-                {(isAdmin || isSuperAdmin || isHrAdmin || isReportingManager) && (
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname === "/performance"}>
-                      <Link to="/performance"><Star /><span>Team Performance</span></Link>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/timesheet")}>
+                      <Link to="/timesheet"><TableProperties /><span>Timesheet</span></Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
-                {(isAdmin || isSuperAdmin || isHrAdmin || isReportingManager || isDepartmentHead || canManageProjects) && (
+                {(isAdmin || isSuperAdmin) && (
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/analytics")}>
-                      <Link to="/analytics"><BarChart3 /><span>Output Analytics</span></Link>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/workflows")}>
+                      <Link to="/workflows"><Workflow /><span>Workflows</span></Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
+
 
                 {(isSuperAdmin || isHrAdmin) && (
                   <>

@@ -951,38 +951,6 @@ export type Database = {
         }
         Relationships: []
       }
-      role_task_type_presets: {
-        Row: {
-          created_at: string
-          id: string
-          role_key: string
-          sort: number
-          task_type_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role_key: string
-          sort?: number
-          task_type_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role_key?: string
-          sort?: number
-          task_type_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "role_task_type_presets_task_type_id_fkey"
-            columns: ["task_type_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_task_types"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       salaries: {
         Row: {
           comp_type: string
@@ -1306,130 +1274,41 @@ export type Database = {
           },
         ]
       }
-      task_stage_events: {
+      task_review_comments: {
         Row: {
-          actor_id: string | null
+          author_id: string
+          body: string | null
           created_at: string
-          from_status: string | null
-          hours: number | null
           id: string
           kind: string
-          note: string | null
-          stage_id: string
           task_id: string
-          to_status: string | null
         }
         Insert: {
-          actor_id?: string | null
+          author_id: string
+          body?: string | null
           created_at?: string
-          from_status?: string | null
-          hours?: number | null
           id?: string
           kind: string
-          note?: string | null
-          stage_id: string
           task_id: string
-          to_status?: string | null
         }
         Update: {
-          actor_id?: string | null
+          author_id?: string
+          body?: string | null
           created_at?: string
-          from_status?: string | null
-          hours?: number | null
           id?: string
           kind?: string
-          note?: string | null
-          stage_id?: string
           task_id?: string
-          to_status?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "task_stage_events_actor_id_fkey"
-            columns: ["actor_id"]
+            foreignKeyName: "task_review_comments_author_id_fkey"
+            columns: ["author_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "task_stage_events_stage_id_fkey"
-            columns: ["stage_id"]
-            isOneToOne: false
-            referencedRelation: "task_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_stage_events_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      task_stages: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          decision_note: string | null
-          id: string
-          kind: Database["public"]["Enums"]["task_stage_kind"]
-          name: string
-          owner_id: string
-          position: number
-          reviewer_id: string | null
-          started_at: string | null
-          status: Database["public"]["Enums"]["task_stage_status"]
-          task_id: string
-          updated_at: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          decision_note?: string | null
-          id?: string
-          kind?: Database["public"]["Enums"]["task_stage_kind"]
-          name: string
-          owner_id: string
-          position: number
-          reviewer_id?: string | null
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["task_stage_status"]
-          task_id: string
-          updated_at?: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          decision_note?: string | null
-          id?: string
-          kind?: Database["public"]["Enums"]["task_stage_kind"]
-          name?: string
-          owner_id?: string
-          position?: number
-          reviewer_id?: string | null
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["task_stage_status"]
-          task_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "task_stages_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_stages_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_stages_task_id_fkey"
+            foreignKeyName: "task_review_comments_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
@@ -1505,129 +1384,6 @@ export type Database = {
           },
         ]
       }
-      task_template_task_types: {
-        Row: {
-          task_type_id: string
-          template_id: string
-        }
-        Insert: {
-          task_type_id: string
-          template_id: string
-        }
-        Update: {
-          task_type_id?: string
-          template_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "task_template_task_types_task_type_id_fkey"
-            columns: ["task_type_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_task_types"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_template_task_types_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "task_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      task_templates: {
-        Row: {
-          active: boolean
-          asset_links: Json
-          created_at: string
-          created_by: string | null
-          day_of_month: number | null
-          default_assignee_id: string | null
-          department_id: string | null
-          description: string | null
-          domain_id: string | null
-          id: string
-          priority: Database["public"]["Enums"]["task_priority"]
-          project_id: string | null
-          recurrence: Database["public"]["Enums"]["task_recurrence"]
-          title: string
-          updated_at: string
-          weekday: number | null
-        }
-        Insert: {
-          active?: boolean
-          asset_links?: Json
-          created_at?: string
-          created_by?: string | null
-          day_of_month?: number | null
-          default_assignee_id?: string | null
-          department_id?: string | null
-          description?: string | null
-          domain_id?: string | null
-          id?: string
-          priority?: Database["public"]["Enums"]["task_priority"]
-          project_id?: string | null
-          recurrence?: Database["public"]["Enums"]["task_recurrence"]
-          title: string
-          updated_at?: string
-          weekday?: number | null
-        }
-        Update: {
-          active?: boolean
-          asset_links?: Json
-          created_at?: string
-          created_by?: string | null
-          day_of_month?: number | null
-          default_assignee_id?: string | null
-          department_id?: string | null
-          description?: string | null
-          domain_id?: string | null
-          id?: string
-          priority?: Database["public"]["Enums"]["task_priority"]
-          project_id?: string | null
-          recurrence?: Database["public"]["Enums"]["task_recurrence"]
-          title?: string
-          updated_at?: string
-          weekday?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "task_templates_created_by_profile_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_templates_default_assignee_profile_fkey"
-            columns: ["default_assignee_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_templates_department_id_fkey"
-            columns: ["department_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_departments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_templates_domain_id_fkey"
-            columns: ["domain_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_domains"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_templates_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       task_watchers: {
         Row: {
           created_at: string
@@ -1672,26 +1428,27 @@ export type Database = {
           completion_percent: number
           created_at: string
           created_by: string | null
-          current_stage_id: string | null
           department_id: string | null
           description: string | null
           domain_id: string | null
           due_date: string | null
           estimated_hours: number | null
           id: string
-          is_multi_stage: boolean
-          marketing_stage: string | null
           origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
           requester_id: string | null
+          required_fields_values: Json | null
           review_state: string
           reviewer_id: string | null
           scheduled_post_date: string | null
+          stage_index: number | null
+          stage_snapshot: Json | null
           status: Database["public"]["Enums"]["task_status"]
-          template_id: string | null
           title: string
           updated_at: string
+          workflow_instance_id: string | null
+          workflow_template_id: string | null
         }
         Insert: {
           asset_links?: Json
@@ -1700,26 +1457,27 @@ export type Database = {
           completion_percent?: number
           created_at?: string
           created_by?: string | null
-          current_stage_id?: string | null
           department_id?: string | null
           description?: string | null
           domain_id?: string | null
           due_date?: string | null
           estimated_hours?: number | null
           id?: string
-          is_multi_stage?: boolean
-          marketing_stage?: string | null
           origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
           requester_id?: string | null
+          required_fields_values?: Json | null
           review_state?: string
           reviewer_id?: string | null
           scheduled_post_date?: string | null
+          stage_index?: number | null
+          stage_snapshot?: Json | null
           status?: Database["public"]["Enums"]["task_status"]
-          template_id?: string | null
           title: string
           updated_at?: string
+          workflow_instance_id?: string | null
+          workflow_template_id?: string | null
         }
         Update: {
           asset_links?: Json
@@ -1728,26 +1486,27 @@ export type Database = {
           completion_percent?: number
           created_at?: string
           created_by?: string | null
-          current_stage_id?: string | null
           department_id?: string | null
           description?: string | null
           domain_id?: string | null
           due_date?: string | null
           estimated_hours?: number | null
           id?: string
-          is_multi_stage?: boolean
-          marketing_stage?: string | null
           origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
           requester_id?: string | null
+          required_fields_values?: Json | null
           review_state?: string
           reviewer_id?: string | null
           scheduled_post_date?: string | null
+          stage_index?: number | null
+          stage_snapshot?: Json | null
           status?: Database["public"]["Enums"]["task_status"]
-          template_id?: string | null
           title?: string
           updated_at?: string
+          workflow_instance_id?: string | null
+          workflow_template_id?: string | null
         }
         Relationships: [
           {
@@ -1755,13 +1514,6 @@ export type Database = {
             columns: ["assignee_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_current_stage_fkey"
-            columns: ["current_stage_id"]
-            isOneToOne: false
-            referencedRelation: "task_stages"
             referencedColumns: ["id"]
           },
           {
@@ -1797,13 +1549,6 @@ export type Database = {
             columns: ["reviewer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "task_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -1997,61 +1742,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_task_presets: {
-        Row: {
-          department_id: string | null
-          domain_id: string | null
-          id: string
-          label: string | null
-          task_type_id: string | null
-          updated_at: string
-          use_count: number
-          user_id: string
-        }
-        Insert: {
-          department_id?: string | null
-          domain_id?: string | null
-          id?: string
-          label?: string | null
-          task_type_id?: string | null
-          updated_at?: string
-          use_count?: number
-          user_id: string
-        }
-        Update: {
-          department_id?: string | null
-          domain_id?: string | null
-          id?: string
-          label?: string | null
-          task_type_id?: string | null
-          updated_at?: string
-          use_count?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_task_presets_department_id_fkey"
-            columns: ["department_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_departments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_task_presets_domain_id_fkey"
-            columns: ["domain_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_domains"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_task_presets_task_type_id_fkey"
-            columns: ["task_type_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_task_types"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       vendor_payments: {
         Row: {
           amount: number
@@ -2187,6 +1877,156 @@ export type Database = {
           },
         ]
       }
+      workflow_instances: {
+        Row: {
+          current_stage_position: number
+          id: string
+          project_id: string | null
+          root_task_id: string | null
+          started_at: string
+          started_by: string
+          template_id: string
+        }
+        Insert: {
+          current_stage_position?: number
+          id?: string
+          project_id?: string | null
+          root_task_id?: string | null
+          started_at?: string
+          started_by: string
+          template_id: string
+        }
+        Update: {
+          current_stage_position?: number
+          id?: string
+          project_id?: string | null
+          root_task_id?: string | null
+          started_at?: string
+          started_by?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_instances_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_started_by_fkey"
+            columns: ["started_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_instances_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_template_stages: {
+        Row: {
+          branch_options: Json
+          branch_target_map: Json
+          created_at: string
+          default_assignee_id: string | null
+          default_due_offset_days: number | null
+          id: string
+          name: string
+          position: number
+          required_fields: Json
+          requires_review: boolean
+          template_id: string
+        }
+        Insert: {
+          branch_options?: Json
+          branch_target_map?: Json
+          created_at?: string
+          default_assignee_id?: string | null
+          default_due_offset_days?: number | null
+          id?: string
+          name: string
+          position: number
+          required_fields?: Json
+          requires_review?: boolean
+          template_id: string
+        }
+        Update: {
+          branch_options?: Json
+          branch_target_map?: Json
+          created_at?: string
+          default_assignee_id?: string | null
+          default_due_offset_days?: number | null
+          id?: string
+          name?: string
+          position?: number
+          required_fields?: Json
+          requires_review?: boolean
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_template_stages_default_assignee_id_fkey"
+            columns: ["default_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_template_stages_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       team_leave_calendar: {
@@ -2235,15 +2075,6 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      advance_task_stage: {
-        Args: {
-          _action: string
-          _note?: string
-          _reassign_to?: string
-          _stage_id: string
-        }
-        Returns: Json
-      }
       bd_list_visible_users: {
         Args: never
         Returns: {
@@ -2277,26 +2108,27 @@ export type Database = {
               completion_percent: number
               created_at: string
               created_by: string | null
-              current_stage_id: string | null
               department_id: string | null
               description: string | null
               domain_id: string | null
               due_date: string | null
               estimated_hours: number | null
               id: string
-              is_multi_stage: boolean
-              marketing_stage: string | null
               origin_department: string | null
               priority: Database["public"]["Enums"]["task_priority"]
               project_id: string | null
               requester_id: string | null
+              required_fields_values: Json | null
               review_state: string
               reviewer_id: string | null
               scheduled_post_date: string | null
+              stage_index: number | null
+              stage_snapshot: Json | null
               status: Database["public"]["Enums"]["task_status"]
-              template_id: string | null
               title: string
               updated_at: string
+              workflow_instance_id: string | null
+              workflow_template_id: string | null
             }
             SetofOptions: {
               from: "*"
@@ -2326,26 +2158,27 @@ export type Database = {
               completion_percent: number
               created_at: string
               created_by: string | null
-              current_stage_id: string | null
               department_id: string | null
               description: string | null
               domain_id: string | null
               due_date: string | null
               estimated_hours: number | null
               id: string
-              is_multi_stage: boolean
-              marketing_stage: string | null
               origin_department: string | null
               priority: Database["public"]["Enums"]["task_priority"]
               project_id: string | null
               requester_id: string | null
+              required_fields_values: Json | null
               review_state: string
               reviewer_id: string | null
               scheduled_post_date: string | null
+              stage_index: number | null
+              stage_snapshot: Json | null
               status: Database["public"]["Enums"]["task_status"]
-              template_id: string | null
               title: string
               updated_at: string
+              workflow_instance_id: string | null
+              workflow_template_id: string | null
             }
             SetofOptions: {
               from: "*"
@@ -2382,30 +2215,6 @@ export type Database = {
       request_task_from_manager: {
         Args: { _note?: string; _project_id?: string; _title: string }
         Returns: string
-      }
-      set_task_stages: {
-        Args: { _stages: Json; _task_id: string }
-        Returns: {
-          completed_at: string | null
-          created_at: string
-          decision_note: string | null
-          id: string
-          kind: Database["public"]["Enums"]["task_stage_kind"]
-          name: string
-          owner_id: string
-          position: number
-          reviewer_id: string | null
-          started_at: string | null
-          status: Database["public"]["Enums"]["task_stage_status"]
-          task_id: string
-          updated_at: string
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "task_stages"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       sync_attendance_from_punch_sessions: {
         Args: { _session_date: string; _user_id: string }
@@ -2444,14 +2253,6 @@ export type Database = {
       project_status: "active" | "on_hold" | "completed"
       task_priority: "low" | "medium" | "high"
       task_recurrence: "none" | "weekly" | "monthly"
-      task_stage_kind: "work" | "internal_review" | "client_review"
-      task_stage_status:
-        | "pending"
-        | "active"
-        | "in_review"
-        | "changes_requested"
-        | "done"
-        | "skipped"
       task_status: "todo" | "in_progress" | "review" | "done"
     }
     CompositeTypes: {
@@ -2612,15 +2413,6 @@ export const Constants = {
       project_status: ["active", "on_hold", "completed"],
       task_priority: ["low", "medium", "high"],
       task_recurrence: ["none", "weekly", "monthly"],
-      task_stage_kind: ["work", "internal_review", "client_review"],
-      task_stage_status: [
-        "pending",
-        "active",
-        "in_review",
-        "changes_requested",
-        "done",
-        "skipped",
-      ],
       task_status: ["todo", "in_progress", "review", "done"],
     },
   },

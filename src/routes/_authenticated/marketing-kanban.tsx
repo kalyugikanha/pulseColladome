@@ -184,6 +184,7 @@ function MarketingKanbanPage() {
     if (!overId) return;
     const t = (tasks ?? []).find((x) => x.id === e.active.id);
     if (!t || t.marketing_stage === overId) return;
+    if (overId === "posted") { setMarkDone(t); return; }
     setPending({ task: t, toStage: overId });
   }
 

@@ -147,7 +147,7 @@ function typeColor(t: LType) {
   return TYPES.find((x) => x.v === t)?.color ?? "bg-muted";
 }
 
-function DayView({ empMap }: { empMap: Map<string, Employee> }) {
+function DayView({ empMap, onChanged }: { empMap: Map<string, Employee>; onChanged: () => void }) {
   const { data: me } = useCurrentUser();
   const [day, setDay] = useState(() => format(new Date(), "yyyy-MM-dd"));
 

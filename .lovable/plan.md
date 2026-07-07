@@ -1,34 +1,27 @@
-## Problem
+## Goal
+Make the Department field in the onboarding module a dropdown fed by the existing taxonomy departments instead of a free-text input.
 
-On **Attendance → Team timesheet**, admins see only entries stored in `attendance_logs.tasks`. Hours the team logs from a Kanban task (which write to `task_activity`) never appear — so most modern per-task hours (both logged and approved) are invisible on the team view.
+## Scope
+Frontend only. No schema, RLS, or backend changes. `profiles.department` stays a string; we just constrain the UI to values from `taxonomy_departments` (already fetched via `getTaxonomy` in `src/lib/tasks-plus.functions.ts`).
 
-For reference: **My Timesheet** already merges both sources (`attendance_logs.tasks` + `task_activity`). Team timesheet was never updated to do the same.
+## Files to change
+1. `src/routes/_authenticated/onboarding.tsx`
+   - Create panel (line ~191): replace the free-text `<Input>` for Department with a shadcn `<Select>` populated from `getTaxonomy().departments` (grouped/labeled by domain for readability). Store the department **name** (to remain compatible with existing string column and existing rows).
+   - Edit sheet (line ~347): same replacement inside the edit dialog.
+   - Add a "Clear" / empty option so a user can unset the department.
 
-A second, smaller gap: the "Task hours awaiting your approval" panel only lights up when the viewer has direct reports. An admin/PM without direct reports sees nothing to approve, even though they're the fallback approver.
+2. `src/routes/_authenticated/complete-onboarding.tsx`
+   - Line ~413 ("Job department *"): replace the `<Input>` with the same `<Select>` sourced from taxonomy departments. Keep it required.
 
-## Fix (frontend-only, single file)
+## Data source
+Reuse existing `getTaxonomy` server fn via TanStack Query (same pattern as `taxonomy-picker.tsx`). No new endpoint.
 
-Edit `src/routes/_authenticated/timesheet.tsx`:
-
-1. Add a second query alongside `logs` that fetches `task_activity` rows for the visible users for the selected day:
-   - Filter: `actor_id in (visibleUserIds)`, `completion_date = dateIso` (fallback to `created_at::date` when `completion_date` is null, same as My Timesheet), `hours is not null`, `approval_status != 'rejected'`.
-   - Select the same shape My Timesheet uses (task + project join, hours, approved_hours, approval_status, note).
-   - Respect `hasScope` gate the same way `logs` does.
-
-2. In the `empRows` builder, per employee merge two sources into `tasks`:
-   - Existing `attendance_logs.tasks` (unchanged).
-   - Synthetic task rows derived from that user's `task_activity` records: `project_code` from `task.project.code`, `project_name` from project or task title, `hours`, `approved_hours` (when `approval_status` is `approved`/`auto`), `comments` from note/title.
-   - Recompute `total` and `approvedTotal` from the merged list. Keep the existing `approved` flag driven by `attendance_logs.approved_at` (unchanged) so day-approval UI stays the same.
-
-3. Mark synthetic rows read-only in `EmployeeBlock` (add `source: 'log' | 'activity'` on the Task shape locally). For activity rows: disable inline edit/delete and hide the row-level trash button — approval of task_activity already happens in the "Task hours awaiting your approval" panel below. This mirrors My Timesheet's "via task" affordance.
-
-4. Widen the pending-approvals query for admins/PMs: when `me.isAdmin || me.canManageProjects`, drop the `directReportIds` gate and instead filter `actor_id in (visibleUserIds)` (or unscoped when `isUnscoped`). Managers still see only their reports (unchanged).
-
-5. CSV export: include the merged rows so the exported file matches the on-screen totals.
-
-No schema changes. No RLS changes. No changes to My Timesheet, task_activity write paths, or approval flows.
+## Behavior
+- Options list = all active departments across domains, sorted by domain then name; label shown as `"<Domain> — <Department>"` for disambiguation. Value stored = department name string (matches current column semantics and preserves legacy rows).
+- If a profile already has a department string that isn't in the list, show it as a disabled current-value option so it isn't silently dropped on edit.
+- HR view (`hr.onboarding.tsx`) unchanged (read-only display already works with strings).
 
 ## Out of scope
-
-- Changing the day-only view to month/range (separate UX ask).
-- Editing task_activity hours from the team timesheet (they already have an approval UI in the same page).
+- Migrating `profiles.department` to a FK.
+- Editing taxonomy from the onboarding screens (still done in Admin > Taxonomy).
+- Changes to workflows / board / directory department usage.

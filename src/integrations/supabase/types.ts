@@ -1641,7 +1641,7 @@ export type Database = {
           marketing_stage: string | null
           origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
-          project_id: string
+          project_id: string | null
           requester_id: string | null
           review_state: string
           reviewer_id: string | null
@@ -1668,7 +1668,7 @@ export type Database = {
           marketing_stage?: string | null
           origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
-          project_id: string
+          project_id?: string | null
           requester_id?: string | null
           review_state?: string
           reviewer_id?: string | null
@@ -1695,7 +1695,7 @@ export type Database = {
           marketing_stage?: string | null
           origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
-          project_id?: string
+          project_id?: string | null
           requester_id?: string | null
           review_state?: string
           reviewer_id?: string | null
@@ -2242,7 +2242,7 @@ export type Database = {
           marketing_stage: string | null
           origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
-          project_id: string
+          project_id: string | null
           requester_id: string | null
           review_state: string
           reviewer_id: string | null

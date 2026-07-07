@@ -104,6 +104,15 @@ function CompleteOnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Auto-save state
+  type AutoStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
+  const [autoStatus, setAutoStatus] = useState<AutoStatus>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const hydratedRef = useRef(false);
+  const inFlightRef = useRef(false);
+  const pendingRef = useRef(false);
+  const lastErrorToastRef = useRef(0);
+
   useEffect(() => {
     if (!data) return;
     const p = (data.profile ?? {}) as Record<string, string | null>;
@@ -130,7 +139,94 @@ function CompleteOnboardingPage() {
     setBranch(b.bank_branch ?? "");
     setIfsc(b.ifsc_code ?? "");
     setPan(b.pan_number ?? "");
+    // Mark hydrated on the next tick so the field-hydration setState calls
+    // do not trigger a spurious auto-save.
+    const t = setTimeout(() => {
+      hydratedRef.current = true;
+      setAutoStatus("saved");
+    }, 50);
+    return () => clearTimeout(t);
   }, [data]);
+
+  // Serialized payload for both auto-save and manual save
+  const autoSavePayload = useMemo(() => ({
+    profile: {
+      full_name: fullName.trim() || null,
+      personal_email: personalEmail.trim() || null,
+      phone: phone.trim() || null,
+      permanent_address: address.trim() || null,
+      date_of_birth: dob || null,
+      marriage_anniversary: anniversary || null,
+      linkedin_url: linkedin.trim() || null,
+      github_url: github.trim() || null,
+      facebook_url: facebook.trim() || null,
+      instagram_url: instagram.trim() || null,
+      twitter_url: twitter.trim() || null,
+      youtube_url: youtube.trim() || null,
+      pinterest_url: pinterest.trim() || null,
+      department: department.trim() || null,
+      day_start_time: dayStart || null,
+      standup_time: standup || null,
+      hobbies: hobbies.trim() || null,
+    },
+    bank: {
+      account_holder_name: holder.trim(),
+      account_number: account.trim(),
+      bank_branch: branch.trim(),
+      ifsc_code: ifsc.trim().toUpperCase(),
+      pan_number: pan.trim().toUpperCase(),
+    },
+  }), [fullName, personalEmail, phone, address, dob, anniversary, linkedin, github, facebook, instagram, twitter, youtube, pinterest, department, dayStart, standup, hobbies, holder, account, branch, ifsc, pan]);
+
+  // Debounced auto-save on any field change
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    setAutoStatus((prev) => (prev === "saving" ? prev : "unsaved"));
+    const t = setTimeout(async () => {
+      if (inFlightRef.current) { pendingRef.current = true; return; }
+      const runSave = async () => {
+        inFlightRef.current = true;
+        setAutoStatus("saving");
+        try {
+          await saveOnboarding({ data: autoSavePayload });
+          setLastSavedAt(new Date());
+          setAutoStatus("saved");
+        } catch (e: unknown) {
+          setAutoStatus("error");
+          const now = Date.now();
+          if (now - lastErrorToastRef.current > 30000) {
+            lastErrorToastRef.current = now;
+            toast.error(e instanceof Error ? `Auto-save failed: ${e.message}` : "Auto-save failed");
+          }
+        } finally {
+          inFlightRef.current = false;
+          if (pendingRef.current) {
+            pendingRef.current = false;
+            await runSave();
+          }
+        }
+      };
+      await runSave();
+    }, 800);
+    return () => clearTimeout(t);
+  }, [autoSavePayload, saveOnboarding]);
+
+  // Best-effort flush on tab close / hide
+  useEffect(() => {
+    const flush = () => {
+      if (!hydratedRef.current) return;
+      // Fire-and-forget; not guaranteed to reach server during unload.
+      saveOnboarding({ data: autoSavePayload }).catch(() => {});
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [autoSavePayload, saveOnboarding]);
+
 
   const uploaded = new Set((data?.documents ?? []).map((d) => d.doc_type));
   const profileAny = (data?.profile ?? {}) as Record<string, unknown>;

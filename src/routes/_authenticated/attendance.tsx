@@ -34,8 +34,9 @@ function AttendancePage() {
   const [overviewSearch, setOverviewSearch] = useState("");
   const overviewDateStr = format(overviewDate, "yyyy-MM-dd");
 
-  const canView = !!me && (me.isAdmin || me.isDepartmentHead || me.isReportingManager);
-  const { deptScope, userScope } = useVisibilityScope(me);
+  const canView = !!me && (me.isAdmin || me.isReportingManager);
+  const { userScope } = useVisibilityScope(me);
+  const deptScope: string[] | null = null;
 
   const { data } = useQuery({
     queryKey: ["attendance", me?.id, today, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],

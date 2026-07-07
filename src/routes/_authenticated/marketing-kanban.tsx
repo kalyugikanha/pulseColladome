@@ -209,11 +209,17 @@ function MarketingKanbanPage() {
               <Settings2 className="h-4 w-4 mr-1" /> Clients
             </Button>
           )}
-          <Button className="gradient-primary" onClick={() => setNewOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> New task
-          </Button>
+          {isMarketingMember && (
+            <Button className="gradient-primary" onClick={() => setNewOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" /> New task
+            </Button>
+          )}
         </div>
       </header>
+
+      {!isMarketingMember && me && (
+        <MyRequestsStrip meId={me.realId} tasks={tasks ?? []} onOpen={(id) => setOpenTaskId(id)} />
+      )}
 
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="grid gap-3 min-h-[60vh]" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(240px, 1fr))` }}>

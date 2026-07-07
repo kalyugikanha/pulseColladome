@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Check, X, CalendarIcon, Download, Users, Palmtree, LogIn, UserX } from "lucide-react";
+import { Check, X, CalendarIcon, Download, Users, Plane, LogIn, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 

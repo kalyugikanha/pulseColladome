@@ -108,14 +108,6 @@ function toPunchSession(row: any): PunchSessionResult {
   };
 }
 
-async function syncAttendance(supabase: any, userId: string, sessionDate: string) {
-  const { error } = await supabase.rpc("sync_attendance_from_punch_sessions", {
-    _user_id: userId,
-    _session_date: sessionDate,
-  });
-  if (error) console.warn("Attendance sync fallback failed", error.message);
-}
-
 export const punchIn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: PunchInInput) => ({ sessionDate: requireIsoDate(input.sessionDate) }))
@@ -134,7 +126,6 @@ export const punchIn = createServerFn({ method: "POST" })
     if (existingError) throw new Error(existingError.message);
 
     if (existingToday) {
-      await syncAttendance(supabase, userId, data.sessionDate);
       return { status: "already_open" as const, session: toPunchSession(existingToday) } satisfies PunchInResult;
     }
 
@@ -163,11 +154,9 @@ export const punchIn = createServerFn({ method: "POST" })
       if (openError) throw new Error(openError.message);
       if (!openSession) throw new Error("You already have an open session. Please refresh and try again.");
 
-      await syncAttendance(supabase, userId, openSession.session_date);
       return { status: "already_open" as const, session: toPunchSession(openSession) } satisfies PunchInResult;
     }
 
-    await syncAttendance(supabase, userId, data.sessionDate);
     return { status: "punched_in" as const, session: toPunchSession(inserted) } satisfies PunchInResult;
   });
 
@@ -220,6 +209,5 @@ export const punchOut = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!updated) throw new Error("No open punch session found. Please refresh and try again.");
 
-    await syncAttendance(supabase, userId, updated.session_date);
     return { status: "punched_out" as const, session: toPunchSession(updated) } satisfies PunchOutResult;
   });

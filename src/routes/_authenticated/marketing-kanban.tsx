@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Send, Check, Undo2, AlertTriangle, ExternalLink, ArrowRightLeft, Settings2 } from "lucide-react";
+import { Plus, Send, Check, Undo2, AlertTriangle, ExternalLink, ArrowRightLeft, Settings2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { format, isPast, parseISO } from "date-fns";
 import {
@@ -22,7 +23,10 @@ import {
 } from "@dnd-kit/core";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 
+const searchSchema = z.object({ assignee: z.string().optional() });
+
 export const Route = createFileRoute("/_authenticated/marketing-kanban")({
+  validateSearch: searchSchema,
   component: MarketingKanbanPage,
 });
 
@@ -63,6 +67,12 @@ function initialsOf(name?: string | null, email?: string | null) {
 function MarketingKanbanPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
+  const search = useSearch({ from: "/_authenticated/marketing-kanban" });
+  const navigate = useNavigate({ from: "/_authenticated/marketing-kanban" });
+  const assigneeFilter = search.assignee ?? "all";
+  const setAssignee = (v: string) =>
+    navigate({ search: (prev: { assignee?: string }) => ({ ...prev, assignee: v === "all" ? undefined : v }) });
+
   const [newOpen, setNewOpen] = useState(false);
   const [crossOpen, setCrossOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
@@ -118,13 +128,40 @@ function MarketingKanbanPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Burn totals per task from task_activity.hours
+  const taskIds = useMemo(() => (tasks ?? []).map((t) => t.id), [tasks]);
+  const { data: burnMap } = useQuery({
+    queryKey: ["mkt-burn", taskIds.join(",")],
+    enabled: taskIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_activity" as any)
+        .select("task_id, hours")
+        .in("task_id", taskIds)
+        .not("hours", "is", null);
+      if (error) throw error;
+      const m = new Map<string, number>();
+      (data ?? []).forEach((r: any) => {
+        if (r.hours == null) return;
+        m.set(r.task_id, (m.get(r.task_id) ?? 0) + Number(r.hours));
+      });
+      return m;
+    },
+  });
+
+  const filteredTasks = useMemo(() => {
+    if (assigneeFilter === "all") return tasks ?? [];
+    if (assigneeFilter === "unassigned") return (tasks ?? []).filter((t) => !t.assignee_id);
+    return (tasks ?? []).filter((t) => t.assignee_id === assigneeFilter);
+  }, [tasks, assigneeFilter]);
+
   const byCol = useMemo(() => {
     const m: Record<Stage, KanbanTask[]> = {
       script_writing: [], script_wip: [], design: [], review: [], posting: [], posted: [],
     };
-    (tasks ?? []).forEach((t) => { if (t.marketing_stage) m[t.marketing_stage].push(t); });
+    filteredTasks.forEach((t) => { if (t.marketing_stage) m[t.marketing_stage].push(t); });
     return m;
-  }, [tasks]);
+  }, [filteredTasks]);
 
   const [pending, setPending] = useState<{ task: KanbanTask; toStage: Stage } | null>(null);
   const [sendBack, setSendBack] = useState<KanbanTask | null>(null);
@@ -147,7 +184,12 @@ function MarketingKanbanPage() {
     setPending({ task: t, toStage: overId });
   }
 
-  async function commitMove(task: KanbanTask, toStage: Stage, newAssigneeId: string, note?: string) {
+  async function commitMove(
+    task: KanbanTask,
+    toStage: Stage,
+    newAssigneeId: string,
+    opts: { hours: number; note?: string; kind?: string },
+  ) {
     if (!isMarketingMember) { toast.error("Only the Marketing team can move cards."); return; }
     const fromStage = task.marketing_stage;
     const patch: any = { marketing_stage: toStage, assignee_id: newAssigneeId };
@@ -156,18 +198,21 @@ function MarketingKanbanPage() {
     const { error } = await supabase.from("tasks").update(patch).eq("id", task.id);
     if (error) { toast.error(error.message); return; }
 
-    // Activity log (best-effort)
+    // Activity log with hours
     try {
       await supabase.from("task_activity" as any).insert({
         task_id: task.id,
         actor_id: me!.realId,
-        kind: "marketing_stage_moved",
-        payload: { from: fromStage, to: toStage, from_assignee: task.assignee_id, to_assignee: newAssigneeId, note: note ?? null },
+        kind: opts.kind ?? "marketing_stage_moved",
+        from_value: fromStage,
+        to_value: toStage,
+        note: opts.note ?? null,
+        hours: opts.hours,
       } as any);
     } catch { /* ignore */ }
 
-    if (note && note.trim()) {
-      await supabase.from("task_comments").insert({ task_id: task.id, author_id: me!.realId, body: note.trim() });
+    if (opts.note && opts.note.trim()) {
+      await supabase.from("task_comments").insert({ task_id: task.id, author_id: me!.realId, body: opts.note.trim() });
     }
 
     // Notify new assignee on reassignment
@@ -186,8 +231,9 @@ function MarketingKanbanPage() {
       });
     }
 
-    toast.success("Card moved");
+    toast.success(`Card moved · ${opts.hours}h logged`);
     qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
+    qc.invalidateQueries({ queryKey: ["mkt-burn"] });
     refetch();
   }
 
@@ -217,6 +263,32 @@ function MarketingKanbanPage() {
         </div>
       </header>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <Label className="text-xs text-muted-foreground">Assignee</Label>
+        <Select value={assigneeFilter} onValueChange={setAssignee}>
+          <SelectTrigger className="h-8 w-[220px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {(roster ?? []).map((u) => (
+              <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {me && (roster ?? []).some((u) => u.id === me.realId) && (
+          <Button
+            size="sm"
+            variant={assigneeFilter === me.realId ? "default" : "outline"}
+            onClick={() => setAssignee(assigneeFilter === me.realId ? "all" : me.realId)}
+          >
+            My tasks
+          </Button>
+        )}
+        {assigneeFilter !== "all" && (
+          <Button size="sm" variant="ghost" onClick={() => setAssignee("all")}>Clear</Button>
+        )}
+      </div>
+
       {!isMarketingMember && me && (
         <MyRequestsStrip meId={me.realId} tasks={tasks ?? []} onOpen={(id) => setOpenTaskId(id)} />
       )}
@@ -225,7 +297,7 @@ function MarketingKanbanPage() {
         <div className="grid gap-3 min-h-[60vh]" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(240px, 1fr))` }}>
           {COLUMNS.map((col) => (
             <Column key={col.key} stage={col.key} label={col.label} cards={byCol[col.key]}
-              roster={roster ?? []} canAssignAny={canAssignAny}
+              roster={roster ?? []} canAssignAny={canAssignAny} burnMap={burnMap}
               onSendBack={(t) => setSendBack(t)}
               onApprove={(t) => setPending({ task: t, toStage: "posting" })}
               onOpen={(t) => setOpenTaskId(t.id)}
@@ -240,18 +312,18 @@ function MarketingKanbanPage() {
       <ReassignDialog
         state={pending} onClose={() => setPending(null)}
         roster={roster ?? []}
-        onConfirm={async (assigneeId) => {
+        onConfirm={async ({ assigneeId, hours, note }) => {
           if (!pending) return;
-          await commitMove(pending.task, pending.toStage, assigneeId);
+          await commitMove(pending.task, pending.toStage, assigneeId, { hours, note });
           setPending(null);
         }}
       />
       <SendBackDialog
         task={sendBack} onClose={() => setSendBack(null)}
         roster={roster ?? []}
-        onConfirm={async ({ toStage, assigneeId, note }) => {
+        onConfirm={async ({ toStage, assigneeId, note, hours }) => {
           if (!sendBack) return;
-          await commitMove(sendBack, toStage, assigneeId, note);
+          await commitMove(sendBack, toStage, assigneeId, { hours, note, kind: "marketing_stage_sent_back" });
           setSendBack(null);
         }}
       />
@@ -270,10 +342,11 @@ function MarketingKanbanPage() {
   );
 }
 
-function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onApprove, onOpen }: {
+function Column({ stage, label, cards, roster, canAssignAny, burnMap, onSendBack, onApprove, onOpen }: {
   stage: Stage; label: string; cards: KanbanTask[];
   roster: { id: string; full_name: string | null; email: string | null }[];
   canAssignAny: boolean;
+  burnMap?: Map<string, number>;
   onSendBack: (t: KanbanTask) => void;
   onApprove: (t: KanbanTask) => void;
   onOpen: (t: KanbanTask) => void;
@@ -290,7 +363,7 @@ function Column({ stage, label, cards, roster, canAssignAny, onSendBack, onAppro
       <div className="flex-1 space-y-2 overflow-y-auto max-h-[70vh] pr-1">
         {cards.map((t) => (
           <DraggableCard key={t.id} task={t} onOpen={() => onOpen(t)}>
-            <KanbanCardView task={t} />
+            <KanbanCardView task={t} burnHours={burnMap?.get(t.id)} />
             {stage === "review" && (
               <div className="mt-2 flex gap-1" onPointerDown={(e) => e.stopPropagation()}>
                 <Button size="sm" variant="outline" className="h-7 text-xs flex-1"
@@ -322,7 +395,7 @@ function DraggableCard({ task, children, onOpen }: { task: KanbanTask; children:
   );
 }
 
-function KanbanCardView({ task, dragging }: { task: KanbanTask; dragging?: boolean }) {
+function KanbanCardView({ task, dragging, burnHours }: { task: KanbanTask; dragging?: boolean; burnHours?: number }) {
   const internalOverdue = task.due_date && task.marketing_stage !== "posted" && isPast(parseISO(task.due_date));
   return (
     <div className={dragging ? "rounded-md border border-primary bg-card p-2 shadow-lg" : ""}>
@@ -337,6 +410,11 @@ function KanbanCardView({ task, dragging }: { task: KanbanTask; dragging?: boole
       </div>
       <div className="flex flex-wrap items-center gap-1 mt-2">
         <Badge variant="outline" className="capitalize text-[10px] h-5">{task.priority}</Badge>
+        {burnHours != null && burnHours > 0 && (
+          <Badge variant="outline" className="text-[10px] h-5 gap-1">
+            <Clock className="h-2.5 w-2.5" />{burnHours}h
+          </Badge>
+        )}
         {task.client_brand && <Badge variant="secondary" className="text-[10px] h-5">{task.client_brand}</Badge>}
         {task.origin_department && (
           <Badge className="text-[10px] h-5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30" variant="outline">
@@ -373,30 +451,51 @@ function ReassignDialog({ state, onClose, roster, onConfirm }: {
   state: { task: KanbanTask; toStage: Stage } | null;
   onClose: () => void;
   roster: { id: string; full_name: string | null; email: string | null }[];
-  onConfirm: (assigneeId: string) => void;
+  onConfirm: (v: { assigneeId: string; hours: number; note?: string }) => void;
 }) {
   const [aid, setAid] = useState<string>("");
-  useEffect(() => { setAid(state?.task.assignee_id ?? ""); }, [state]);
+  const [hours, setHours] = useState<string>("");
+  const [note, setNote] = useState<string>("");
+  useEffect(() => {
+    setAid(state?.task.assignee_id ?? "");
+    setHours(""); setNote("");
+  }, [state]);
   const label = state ? COLUMNS.find((c) => c.key === state.toStage)?.label : "";
+  const hoursNum = Number(hours);
+  const valid = !!aid && hours !== "" && !Number.isNaN(hoursNum) && hoursNum >= 0;
   return (
     <Dialog open={!!state} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle className="font-display">Move to {label}</DialogTitle></DialogHeader>
-        <div className="space-y-2">
-          <Label>Assign to</Label>
-          <Select value={aid} onValueChange={setAid}>
-            <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
-            <SelectContent>
-              {roster.map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">Reassignment is prompted every move — keep the same person or change it.</p>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label>Assign to</Label>
+            <Select value={aid} onValueChange={setAid}>
+              <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
+              <SelectContent>
+                {roster.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Hours spent on this stage</Label>
+            <Input type="number" min={0} step={0.25} value={hours}
+              onChange={(e) => setHours(e.target.value)} placeholder="e.g. 1.5" />
+          </div>
+          <div className="space-y-1">
+            <Label>Note (optional)</Label>
+            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything worth logging?" />
+          </div>
+          <p className="text-xs text-muted-foreground">Every move records hours to keep task burn accurate.</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" disabled={!aid} onClick={() => onConfirm(aid)}>Confirm move</Button>
+          <Button className="gradient-primary" disabled={!valid}
+            onClick={() => onConfirm({ assigneeId: aid, hours: hoursNum, note: note || undefined })}>
+            Confirm move
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -406,15 +505,18 @@ function ReassignDialog({ state, onClose, roster, onConfirm }: {
 function SendBackDialog({ task, onClose, roster, onConfirm }: {
   task: KanbanTask | null; onClose: () => void;
   roster: { id: string; full_name: string | null; email: string | null }[];
-  onConfirm: (v: { toStage: Stage; assigneeId: string; note?: string }) => void;
+  onConfirm: (v: { toStage: Stage; assigneeId: string; note?: string; hours: number }) => void;
 }) {
   const [stage, setStage] = useState<Stage>("script_writing");
   const [aid, setAid] = useState<string>("");
   const [note, setNote] = useState("");
+  const [hours, setHours] = useState<string>("");
   useEffect(() => {
-    setStage("script_writing"); setNote("");
+    setStage("script_writing"); setNote(""); setHours("");
     setAid(task?.assignee_id ?? "");
   }, [task]);
+  const hoursNum = Number(hours);
+  const valid = !!aid && hours !== "" && !Number.isNaN(hoursNum) && hoursNum >= 0;
   return (
     <Dialog open={!!task} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
@@ -443,14 +545,19 @@ function SendBackDialog({ task, onClose, roster, onConfirm }: {
             </Select>
           </div>
           <div className="space-y-1">
+            <Label>Review hours (time you spent reviewing)</Label>
+            <Input type="number" min={0} step={0.25} value={hours}
+              onChange={(e) => setHours(e.target.value)} placeholder="e.g. 0.5" />
+          </div>
+          <div className="space-y-1">
             <Label>Comment (optional)</Label>
             <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What needs changing?" />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" disabled={!aid}
-            onClick={() => onConfirm({ toStage: stage, assigneeId: aid, note })}>
+          <Button className="gradient-primary" disabled={!valid}
+            onClick={() => onConfirm({ toStage: stage, assigneeId: aid, note, hours: hoursNum })}>
             Send back
           </Button>
         </DialogFooter>

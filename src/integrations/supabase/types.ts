@@ -1040,6 +1040,7 @@ export type Database = {
           actor_id: string | null
           created_at: string
           from_value: string | null
+          hours: number | null
           id: string
           kind: string
           note: string | null
@@ -1050,6 +1051,7 @@ export type Database = {
           actor_id?: string | null
           created_at?: string
           from_value?: string | null
+          hours?: number | null
           id?: string
           kind: string
           note?: string | null
@@ -1060,6 +1062,7 @@ export type Database = {
           actor_id?: string | null
           created_at?: string
           from_value?: string | null
+          hours?: number | null
           id?: string
           kind?: string
           note?: string | null
@@ -1273,6 +1276,7 @@ export type Database = {
           actor_id: string | null
           created_at: string
           from_status: string | null
+          hours: number | null
           id: string
           kind: string
           note: string | null
@@ -1284,6 +1288,7 @@ export type Database = {
           actor_id?: string | null
           created_at?: string
           from_status?: string | null
+          hours?: number | null
           id?: string
           kind: string
           note?: string | null
@@ -1295,6 +1300,7 @@ export type Database = {
           actor_id?: string | null
           created_at?: string
           from_status?: string | null
+          hours?: number | null
           id?: string
           kind?: string
           note?: string | null

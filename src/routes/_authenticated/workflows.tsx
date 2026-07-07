@@ -94,6 +94,7 @@ function WorkflowsAdmin() {
                             branch_options: s.branch_options as WorkflowBranchOption[],
                             branch_target_map: s.branch_target_map as Record<string, number>,
                             next_stage_position: (s as { next_stage_position?: number | null }).next_stage_position ?? null,
+                            project_id: (s as { project_id?: string | null }).project_id ?? null,
                           })),
                         }});
                         toast.success("Template duplicated");

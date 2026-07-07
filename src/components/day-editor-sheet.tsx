@@ -313,6 +313,20 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                         className="h-8 text-right font-mono"
                       />
                     </TableCell>
+                    {canApprove && (
+                      <TableCell className="text-right">
+                        <Input
+                          type="number" min={0} step={0.25}
+                          value={r.approved_hours ?? ""}
+                          placeholder={String(r.hours ?? 0)}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateRow(i, { approved_hours: v === "" ? undefined : Number(v) });
+                          }}
+                          className="h-8 text-right font-mono"
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Input
                         value={r.comments ?? ""}

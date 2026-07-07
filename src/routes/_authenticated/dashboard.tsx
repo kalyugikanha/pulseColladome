@@ -42,8 +42,9 @@ function Dashboard() {
     enabled: !!me,
     queryFn: async () => {
       const uid = me!.id;
-      const [todayLog, weekLogs, myTasks, myLeave, balances] = await Promise.all([
+      const [todayLog, openSessions, weekLogs, myTasks, myLeave, balances] = await Promise.all([
         supabase.from("attendance_logs").select("*").eq("user_id", uid).eq("date", today).maybeSingle(),
+        supabase.from("punch_sessions").select("id, punch_in_time").eq("user_id", uid).eq("session_date", today).is("punch_out_time", null).order("punch_in_time", { ascending: false }).limit(1),
         supabase.from("attendance_logs").select("total_hours,date").eq("user_id", uid).gte("date", weekStart).lte("date", weekEnd),
         supabase.from("tasks").select("id,title,status,priority,due_date,project:projects(name)").eq("assignee_id", uid).neq("status", "done").order("due_date", { ascending: true }).limit(5),
         supabase.from("leave_requests").select("id,leave_type,start_date,end_date,status").eq("user_id", uid).order("created_at", { ascending: false }).limit(3),
@@ -52,26 +53,27 @@ function Dashboard() {
 
       let admin: any = null;
       if (me!.isAdmin) {
-        const [punchedIn, pendingLeave, activeProjects, weekTeamHours] = await Promise.all([
-          supabase.from("attendance_logs").select("user_id,punch_in_time,punch_out_time").eq("date", today),
+        const [openTeamSessions, pendingLeave, activeProjects, weekTeamHours] = await Promise.all([
+          supabase.from("punch_sessions").select("user_id").eq("session_date", today).is("punch_out_time", null),
           supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
           supabase.from("projects").select("id", { count: "exact", head: true }).eq("status", "active"),
           supabase.from("attendance_logs").select("total_hours").gte("date", weekStart).lte("date", weekEnd),
         ]);
         admin = {
-          punchedInCount: punchedIn.data?.filter((l) => l.punch_in_time && !l.punch_out_time).length ?? 0,
-          totalToday: punchedIn.data?.length ?? 0,
+          punchedInCount: new Set((openTeamSessions.data ?? []).map((l) => l.user_id)).size,
+          totalToday: openTeamSessions.data?.length ?? 0,
           pendingLeave: pendingLeave.count ?? 0,
           activeProjects: activeProjects.count ?? 0,
           teamHours: (weekTeamHours.data ?? []).reduce((s, r) => s + Number(r.total_hours ?? 0), 0),
         };
       }
-      return { todayLog: todayLog.data, weekLogs: weekLogs.data ?? [], myTasks: myTasks.data ?? [], myLeave: myLeave.data ?? [], balances: balances.data ?? [], admin };
+      return { todayLog: todayLog.data, openSession: openSessions.data?.[0] ?? null, weekLogs: weekLogs.data ?? [], myTasks: myTasks.data ?? [], myLeave: myLeave.data ?? [], balances: balances.data ?? [], admin };
     },
   });
 
   const weekHours = (data?.weekLogs ?? []).reduce((s, r) => s + Number(r.total_hours ?? 0), 0);
-  const punchedIn = !!data?.todayLog?.punch_in_time && !data?.todayLog?.punch_out_time;
+  const activePunchInTime = data?.openSession?.punch_in_time ?? (data?.todayLog?.punch_in_time && !data?.todayLog?.punch_out_time ? data.todayLog.punch_in_time : null);
+  const punchedIn = !!activePunchInTime;
 
   return (
     <div className="space-y-6">
@@ -89,7 +91,7 @@ function Dashboard() {
 
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Clock} label="Status today" value={punchedIn ? "Punched in" : data?.todayLog?.punch_out_time ? "Signed off" : "Not started"} hint={data?.todayLog?.punch_in_time ? `Since ${format(new Date(data.todayLog.punch_in_time), "HH:mm")}` : "Tap punch in to begin"} tone={punchedIn ? "success" : "default"} />
+        <StatCard icon={Clock} label="Status today" value={punchedIn ? "Punched in" : data?.todayLog?.punch_out_time ? "Signed off" : "Not started"} hint={activePunchInTime ? `Since ${format(new Date(activePunchInTime), "HH:mm")}` : "Tap punch in to begin"} tone={punchedIn ? "success" : "default"} />
         <StatCard icon={TrendingUp} label="Hours this week" value={weekHours.toFixed(1)} hint="Mon–Sun" tone="primary" />
         <StatCard icon={ListChecks} label="Open tasks" value={data?.myTasks.length ?? 0} hint="Assigned to you" />
         <StatCard icon={CalendarRange} label="Leave balance" value={`${(data?.balances ?? []).reduce((s, r) => s + (Number(r.allocated) - Number(r.used)), 0).toFixed(1)}d`} hint="Across all types" tone="warning" />

@@ -592,24 +592,26 @@ function CrossoverDialog({ open, onClose, me, onCreated }: {
 
   const { data: depts } = useQuery({
     queryKey: ["taxonomy-departments-list"], enabled: open,
-    queryFn: async () => (await supabase.from("taxonomy_departments").select("name").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("taxonomy_departments").select("id,name").order("name")).data ?? [],
   });
 
   async function submit() {
     if (!title.trim()) return toast.error("Title required");
     if (!target) return toast.error("Target department required");
     setSaving(true);
+    const targetDeptId = ((depts ?? []) as Array<{ id: string; name: string }>)
+      .find((d) => d.name.toLowerCase() === target.toLowerCase())?.id ?? null;
     const patch: any = {
       title: title.trim(),
       description: desc.trim() || null,
       due_date: deadline || null,
       priority: "medium",
       status: "todo",
-      department: target,
       created_by: me!.realId,
       requester_id: me!.realId,
       origin_department: myDept || "Unknown",
     };
+    if (targetDeptId) patch.department_id = targetDeptId;
     if (target === DEPT) patch.marketing_stage = "script_writing";
     if (reason.trim()) patch.description = `${patch.description ?? ""}\n\nContext: ${reason.trim()}`.trim();
     const { error } = await supabase.from("tasks").insert(patch);

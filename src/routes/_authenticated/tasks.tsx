@@ -267,6 +267,23 @@ function TasksPage() {
         </Button>
       </header>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground mr-1">Show:</span>
+        {STATUS.map((s) => {
+          const active = statusFilter.has(s);
+          return (
+            <button
+              key={s}
+              type="button"
+              onClick={() => toggleStatus(s)}
+              className={`text-xs rounded-full px-3 py-1 border transition ${active ? "bg-primary text-primary-foreground border-primary" : "bg-transparent text-muted-foreground border-border hover:bg-accent"}`}
+            >
+              {STATUS_LABEL[s]}
+            </button>
+          );
+        })}
+      </div>
+
       {(awaiting?.length ?? 0) > 0 && (
         <Card className="border-primary/50">
           <CardHeader><CardTitle className="font-display text-base">Awaiting my review</CardTitle></CardHeader>

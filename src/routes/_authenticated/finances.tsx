@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -24,6 +24,7 @@ type Profile = { id: string; full_name: string | null; email: string | null; dep
 type Salary = { id: string; user_id: string; monthly_salary: number | null; hourly_rate: number | null; comp_type: "monthly" | "hourly"; currency: string; effective_from: string };
 type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly"; department: string | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
+type TaskHourRow = { actor_id: string; hours: number | string | null; approved_hours: number | string | null; completion_date: string | null; created_at: string; task: { id: string; title: string; project: { id: string; code: string; name: string } | null } | null };
 
 function monthKey(d: string | Date) {
   const dt = typeof d === "string" ? new Date(d) : d;
@@ -89,18 +90,34 @@ function FinancesPage() {
     enabled: !!me?.isFinanceAdmin,
     queryFn: async () => {
       const [y, m] = month.split("-").map(Number);
-      const startIso = new Date(Date.UTC(y, m - 1, 1)).toISOString();
-      const endIso = new Date(Date.UTC(y, m, 1)).toISOString();
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
       const { data, error } = await supabase
         .from("task_activity" as any)
-        .select("actor_id, hours, created_at, task:tasks(id, title, project:projects(id, code, name))")
+        .select("actor_id, hours, approved_hours, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
+        .eq("approval_status", "approved")
         .not("hours", "is", null)
-        .gte("created_at", startIso)
-        .lt("created_at", endIso);
+        .gte("completion_date", start)
+        .lt("completion_date", end);
       if (error) throw error;
-      return (data ?? []) as unknown as Array<{ actor_id: string; hours: number | string | null; task: { id: string; title: string; project: { id: string; code: string; name: string } | null } | null }>;
+      return (data ?? []) as unknown as TaskHourRow[];
     },
   });
+
+  const combinedLogs = useMemo<LogRow[]>(() => {
+    const base = (logs ?? []).slice();
+    for (const r of taskLoggedHours ?? []) {
+      const project = r.task?.project;
+      const hrs = Number(r.approved_hours ?? r.hours) || 0;
+      if (!project?.code || hrs <= 0) continue;
+      base.push({
+        user_id: r.actor_id,
+        date: r.completion_date ?? r.created_at.slice(0, 10),
+        tasks: [{ project_code: project.code, project_name: project.name, hours: hrs }],
+      });
+    }
+    return base;
+  }, [logs, taskLoggedHours]);
 
   const { data: unpaidLeaves } = useQuery({
     queryKey: ["finances-unpaid-leaves", month],
@@ -182,11 +199,11 @@ function FinancesPage() {
   // Compute per-project burn using salary-share allocation
   const burnByProject = useMemo(() => {
     const result = new Map<string, { code: string; name: string; burn: number; hours: number }>();
-    if (!logs) return result;
+    if (!combinedLogs) return result;
     // Aggregate hours per (user, project) and per user total
     const userHoursByProject = new Map<string, Map<string, { hours: number; name: string }>>();
     const userTotalHours = new Map<string, number>();
-    for (const row of logs) {
+    for (const row of combinedLogs) {
       const tasks = row.tasks ?? [];
       for (const t of tasks) {
         const code = t.project_code?.trim();
@@ -221,7 +238,7 @@ function FinancesPage() {
       }
     }
     return result;
-  }, [logs, currentSalaryByUser, monthlyContribByUser]);
+  }, [combinedLogs, currentSalaryByUser, monthlyContribByUser]);
 
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
@@ -231,7 +248,7 @@ function FinancesPage() {
     for (const r of taskLoggedHours ?? []) {
       const p = r.task?.project;
       if (!p) continue;
-      const hrs = Number(r.hours) || 0;
+      const hrs = Number(r.approved_hours ?? r.hours) || 0;
       if (hrs <= 0) continue;
       const cur = map.get(p.code) ?? { code: p.code, name: p.name, hours: 0, users: new Set<string>(), entries: 0 };
       cur.hours += hrs;
@@ -244,19 +261,19 @@ function FinancesPage() {
 
   const userHoursThisMonth = useMemo(() => {
     const m = new Map<string, number>();
-    for (const row of logs ?? []) {
+    for (const row of combinedLogs ?? []) {
       let sum = 0;
       for (const t of row.tasks ?? []) sum += Number(t.hours) || 0;
       m.set(row.user_id, (m.get(row.user_id) ?? 0) + sum);
     }
     return m;
-  }, [logs]);
+  }, [combinedLogs]);
 
   // Per-user allocated burn (sum across projects for that user).
   const allocatedByUser = useMemo(() => {
     const m = new Map<string, number>();
-    if (!logs) return m;
-    for (const row of logs) {
+    if (!combinedLogs) return m;
+    for (const row of combinedLogs) {
       const salary = currentSalaryByUser.get(row.user_id);
       if (!salary) continue;
       let projectHours = 0;
@@ -287,7 +304,7 @@ function FinancesPage() {
       }
     }
     return out;
-  }, [logs, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth]);
+  }, [combinedLogs, currentSalaryByUser, monthlyContribByUser, userHoursThisMonth]);
 
 
   // Merge profiles + grants so uninvited-but-signed-up and invited-but-unsigned users both appear
@@ -403,6 +420,9 @@ function FinancesPage() {
           <p className="text-sm text-muted-foreground">Salaries and monthly project burn (salary-share allocation).</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link to="/project-burn"><Flame className="h-3.5 w-3.5 mr-1.5" />Detailed project burn</Link>
+          </Button>
           {me?.realIsSuperAdmin && <ProvisionButton pendingCount={pendingGrants.length} />}
           <MultiSelectFilter
             label="Department"

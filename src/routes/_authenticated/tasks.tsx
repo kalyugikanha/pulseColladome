@@ -230,7 +230,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
 
   const { data: projects } = useQuery({
     queryKey: ["projects-list-lite"],
-    queryFn: async () => (await supabase.from("projects").select("id, name").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("projects").select("id, code, name").order("code")).data as Array<{ id: string; code: string | null; name: string | null }> ?? [],
   });
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const { data: people } = useQuery({
@@ -337,9 +337,13 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
               <Select value={projectId} onValueChange={setProjectId}>
                 <SelectTrigger><SelectValue placeholder="Pick project" /></SelectTrigger>
                 <SelectContent>
-                  {(projects ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  {(projects ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.code ? `${p.code} · ` : ""}{p.name ?? "Untitled project"}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {projectId && (() => {
+                const p = (projects ?? []).find((project) => project.id === projectId);
+                return p ? <div className="text-[10px] text-muted-foreground font-mono">Project ID: {p.code ?? p.id}</div> : null;
+              })()}
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Priority</Label>

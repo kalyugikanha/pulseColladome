@@ -166,6 +166,7 @@ function MarketingKanbanPage() {
   }, [filteredTasks]);
 
   const [pending, setPending] = useState<{ task: KanbanTask; toStage: Stage } | null>(null);
+  const [markDone, setMarkDone] = useState<KanbanTask | null>(null);
   const [sendBack, setSendBack] = useState<KanbanTask | null>(null);
   const [dragging, setDragging] = useState<KanbanTask | null>(null);
 

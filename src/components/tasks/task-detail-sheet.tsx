@@ -275,9 +275,11 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                 <TabsTrigger value="comments"><MessageSquare className="h-3.5 w-3.5 mr-1" />Comments</TabsTrigger>
                 <TabsTrigger value="checklist"><ListChecks className="h-3.5 w-3.5 mr-1" />Checklist</TabsTrigger>
                 <TabsTrigger value="deps"><GitBranch className="h-3.5 w-3.5 mr-1" />Dependencies</TabsTrigger>
+                <TabsTrigger value="refs"><LinkIcon className="h-3.5 w-3.5 mr-1" />References</TabsTrigger>
                 <TabsTrigger value="watchers"><Users className="h-3.5 w-3.5 mr-1" />Watchers</TabsTrigger>
                 <TabsTrigger value="history"><HistoryIcon className="h-3.5 w-3.5 mr-1" />History</TabsTrigger>
               </TabsList>
+
 
 
 

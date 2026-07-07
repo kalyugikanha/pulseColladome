@@ -19,6 +19,8 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { StageEditor } from "@/components/tasks/stage-editor";
+import { MarkDoneDialog } from "@/components/tasks/mark-done-dialog";
+import { closeMarketingTask } from "@/lib/marketing-close";
 import { TaxonomyPicker, AssetLinksEditor, useTaxonomy, type TaxonomyValue } from "@/components/taxonomy-picker";
 import {
   createTaskFull, listUserPresets, bumpUserPreset, listRolePresets,
@@ -262,8 +264,19 @@ function TasksPage() {
     }).filter((x) => x.label);
   }, [presets, tax]);
 
+  const [markDone, setMarkDone] = useState<{ id: string; title: string; marketing_stage: string | null; assignee_id: string | null; created_by: string | null } | null>(null);
+
   async function updateStatus(id: string, status: string) {
     try {
+      // Marketing tasks going to "done" must go through the Mark Done flow so
+      // actual hours + handoff are captured and reviewed.
+      if (status === "done") {
+        const t = (tasks ?? []).find((x) => x.id === id) as any;
+        if (t?.marketing_stage) {
+          setMarkDone({ id: t.id, title: t.title, marketing_stage: t.marketing_stage, assignee_id: t.assignee_id, created_by: t.created_by });
+          return;
+        }
+      }
       const { setTaskStatus } = await import("@/lib/tasks-workflow.functions");
       await setTaskStatus({ data: { taskId: id, status: status as "todo"|"in_progress"|"review"|"done" } });
       toast.success("Task updated");
@@ -484,6 +497,32 @@ function TasksPage() {
       )}
 
       <TaskDetailSheet taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
+
+      <MarkDoneDialog
+        task={markDone ? { id: markDone.id, title: markDone.title, assigneeId: markDone.assignee_id, creatorId: markDone.created_by } : null}
+        onClose={() => setMarkDone(null)}
+        roster={(assignees ?? []).map((a) => ({ id: a.id, full_name: a.full_name, email: null }))}
+        defaultHandoffId={markDone?.created_by ?? null}
+        onConfirm={async ({ hours, note, handoffId }) => {
+          if (!markDone || !me) return;
+          try {
+            await closeMarketingTask({
+              taskId: markDone.id,
+              title: markDone.title,
+              fromStage: markDone.marketing_stage,
+              currentAssigneeId: markDone.assignee_id,
+              requesterId: markDone.created_by,
+              actorId: me.id,
+              hours, note,
+              nextAssigneeId: handoffId ?? markDone.created_by ?? markDone.assignee_id,
+            });
+            toast.success("Sent for approval");
+            setMarkDone(null);
+            qc.invalidateQueries();
+          } catch (e) { toast.error((e as Error).message); }
+        }}
+      />
+
 
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm(); }}>

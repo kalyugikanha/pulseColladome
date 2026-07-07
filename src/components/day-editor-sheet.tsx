@@ -48,11 +48,13 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
     queryKey: ["day-editor-user-tasks", userId],
     enabled: open && !!userId,
     queryFn: async () => {
-      // Tasks where this person is assignee, reviewer, or creator.
+      // Only tasks assigned to this person. Hours must be logged against
+      // work you actually own — creating a task for someone else does not
+      // let you log time against it.
       const { data } = await supabase
         .from("tasks")
         .select("id, title, project_id, status")
-        .or(`assignee_id.eq.${userId},reviewer_id.eq.${userId},created_by.eq.${userId}`)
+        .eq("assignee_id", userId)
         .order("created_at", { ascending: false })
         .limit(500);
       return (data ?? []) as UserTask[];
@@ -215,7 +217,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
 
         <div className="mt-3 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-2 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
-          <span>Hours must be tied to a task. If you don't see the task you worked on, ask your manager to create one for you first.</span>
+          <span>You can only log hours against tasks assigned to you. If the task you worked on isn't here, ask your manager to assign it — or use the "Request a task" flow on Punch.</span>
         </div>
 
         <div className="mt-4 space-y-3">

@@ -81,29 +81,42 @@ export function TimesheetPage() {
   const nextDayIso = ymd(addDays(day, 1));
   const dateLabel = format(day, "EEEE, d MMM yyyy");
 
+  // Visibility model shared with the Pending panel:
+  // - Admins / PMs / super admins: use dept/user scope, else all.
+  // - Managers: use dept/user scope, else fall back to direct reports.
+  const directReportIds = me?.directReportIds ?? [];
+  const pendingIsAdmin = !!me && (me.isAdmin || me.canManageProjects || me.isSuperAdmin);
+  const hasScope = !!deptScope || !!userScope;
+  // IDs to restrict profiles/activity to when no dept/user scope is set.
+  const fallbackActorIds: string[] | null = pendingIsAdmin ? null : directReportIds;
+  const fallbackKey = fallbackActorIds ? fallbackActorIds.join(",") : "all";
+
   const { data: profiles } = useQuery({
-    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
-    enabled: canView,
+    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all", hasScope ? "scoped" : fallbackKey],
+    enabled: canView && !!me?.id,
     queryFn: async () => {
       let q = supabase.from("profiles").select("id, full_name, email, department");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
       if (userScope && userScope.length) q = q.in("id", userScope);
+      if (!hasScope && fallbackActorIds) {
+        if (fallbackActorIds.length === 0) return [] as Profile[];
+        q = q.in("id", fallbackActorIds);
+      }
       return (await q).data as Profile[] ?? [];
     },
   });
 
   const visibleUserIds = useMemo(() => (profiles ?? []).map((p) => p.id), [profiles]);
-  const hasScope = !!deptScope || !!userScope;
 
   const { data: logs, refetch: refetchLogs } = useQuery({
-    queryKey: ["ts-logs", dateIso, hasScope ? visibleUserIds.join(",") : "all"],
-    enabled: canView && (!hasScope || visibleUserIds.length > 0),
+    queryKey: ["ts-logs", dateIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
+    enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
     queryFn: async () => {
       let q = supabase
         .from("attendance_logs")
         .select("id, user_id, date, tasks, approved_at, approved_by")
         .gte("date", dateIso).lt("date", nextDayIso);
-      if (hasScope) q = q.in("user_id", visibleUserIds);
+      if (hasScope || fallbackActorIds) q = q.in("user_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as LogRow[];
@@ -118,8 +131,8 @@ export function TimesheetPage() {
 
   // Kanban-logged task hours (task_activity) for the visible team on the selected day.
   const { data: activityRows } = useQuery({
-    queryKey: ["ts-activity", dateIso, hasScope ? visibleUserIds.join(",") : "all"],
-    enabled: canView && (!hasScope || visibleUserIds.length > 0),
+    queryKey: ["ts-activity", dateIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
+    enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
     queryFn: async () => {
       let q = supabase
         .from("task_activity" as never)
@@ -127,18 +140,13 @@ export function TimesheetPage() {
         .not("hours", "is", null)
         .neq("approval_status", "rejected")
         .gte("completion_date", dateIso).lt("completion_date", nextDayIso);
-      if (hasScope) q = q.in("actor_id", visibleUserIds);
+      if (hasScope || fallbackActorIds) q = q.in("actor_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as unknown as ActivityRow[]);
     },
   });
 
-  // Approvers of pending task-hour entries:
-  // - Managers see only their direct reports (existing behavior).
-  // - Admins / PMs / super admins see all pending entries in the visible scope.
-  const directReportIds = me?.directReportIds ?? [];
-  const pendingIsAdmin = !!me && (me.isAdmin || me.canManageProjects || me.isSuperAdmin);
   const pendingActorIds = pendingIsAdmin
     ? (hasScope ? visibleUserIds : null) // null = unscoped, no in() filter
     : directReportIds;
@@ -147,6 +155,7 @@ export function TimesheetPage() {
       ? (!hasScope || visibleUserIds.length > 0)
       : directReportIds.length > 0
   );
+
   const { data: pendingHours, refetch: refetchPending } = useQuery({
     queryKey: ["ts-pending-task-hours", me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
     enabled: pendingEnabled,

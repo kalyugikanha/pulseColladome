@@ -7,6 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/top-bar";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AssistantDock } from "@/components/assistant/AssistantDock";
+import { WelcomeOverlay } from "@/components/WelcomeOverlay";
+import { useFirstLoginWelcome } from "@/hooks/useFirstLoginWelcome";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";

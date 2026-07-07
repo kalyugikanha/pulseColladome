@@ -44,7 +44,7 @@ function WorkflowsAdmin() {
         </div>
         <Button className="gradient-primary" onClick={() => setEditing({
           name: "", description: "", department: "", is_active: true,
-          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null }],
+          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null, project_id: null }],
         })}><Plus className="h-4 w-4 mr-1" /> New template</Button>
       </header>
 
@@ -62,6 +62,7 @@ function WorkflowsAdmin() {
               branch_options: s.branch_options as WorkflowBranchOption[],
               branch_target_map: s.branch_target_map as Record<string, number>,
               next_stage_position: (s as { next_stage_position?: number | null }).next_stage_position ?? null,
+              project_id: (s as { project_id?: string | null }).project_id ?? null,
             })),
           })}>
             <CardHeader className="pb-2">
@@ -93,6 +94,7 @@ function WorkflowsAdmin() {
                             branch_options: s.branch_options as WorkflowBranchOption[],
                             branch_target_map: s.branch_target_map as Record<string, number>,
                             next_stage_position: (s as { next_stage_position?: number | null }).next_stage_position ?? null,
+                            project_id: (s as { project_id?: string | null }).project_id ?? null,
                           })),
                         }});
                         toast.success("Template duplicated");
@@ -140,15 +142,17 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
   const [isActive, setIsActive] = useState(initial.is_active);
   const [stages, setStages] = useState<WorkflowStageInput[]>(initial.stages);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
+  const [projects, setProjects] = useState<Array<{ id: string; code: string; name: string }>>([]);
   useEffect(() => { setName(initial.name); setStages(initial.stages); }, [initial]);
   useEffect(() => {
     supabase.from("profiles").select("id, full_name, email").order("full_name").then(({ data }) => setPeople((data ?? []) as typeof people));
+    supabase.from("projects").select("id, code, name").eq("status", "active").order("code").then(({ data }) => setProjects((data ?? []) as typeof projects));
   }, []);
 
 
   function addStage() {
     const pos = stages.length + 1;
-    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null }]);
+    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null, project_id: null }]);
   }
   function moveStage(idx: number, dir: -1 | 1) {
     const target = idx + dir;
@@ -192,6 +196,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
           {stages.map((s, i) => (
             <StageEditor key={i} stage={s} index={i} totalStages={stages.length} allStages={stages}
               people={people}
+              projects={projects}
               onChange={(patch) => updateStage(i, patch)}
               onMoveUp={() => moveStage(i, -1)} onMoveDown={() => moveStage(i, 1)}
               onRemove={() => removeStage(i)} />
@@ -202,9 +207,10 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
   );
 }
 
-function StageEditor({ stage, index, totalStages, allStages, people, onChange, onMoveUp, onMoveDown, onRemove }: {
+function StageEditor({ stage, index, totalStages, allStages, people, projects, onChange, onMoveUp, onMoveDown, onRemove }: {
   stage: WorkflowStageInput; index: number; totalStages: number; allStages: WorkflowStageInput[];
   people: Array<{ id: string; full_name: string | null; email: string | null }>;
+  projects: Array<{ id: string; code: string; name: string }>;
   onChange: (patch: Partial<WorkflowStageInput>) => void;
   onMoveUp: () => void; onMoveDown: () => void; onRemove: () => void;
 }) {
@@ -276,6 +282,24 @@ function StageEditor({ stage, index, totalStages, allStages, people, onChange, o
               </Select>
             </div>
           </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Project for this stage</Label>
+            <Select
+              value={stage.project_id ?? "__same__"}
+              onValueChange={(v) => onChange({ project_id: v === "__same__" ? null : v })}
+            >
+              <SelectTrigger className="h-8"><SelectValue placeholder="Same as workflow" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="__same__">Same as workflow</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.code} — {p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+
 
 
           <div className="space-y-1">

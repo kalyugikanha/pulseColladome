@@ -22,6 +22,7 @@ export type WorkflowStageInput = {
   branch_options: WorkflowBranchOption[];
   branch_target_map: Record<string, number>;
   next_stage_position: number | null;
+  project_id: string | null;
 };
 
 /** List all templates + stages. */
@@ -96,6 +97,7 @@ export const saveWorkflowTemplate = createServerFn({ method: "POST" })
         branch_options: s.branch_options,
         branch_target_map: s.branch_target_map,
         next_stage_position: s.next_stage_position,
+        project_id: s.project_id ?? null,
       })) as never
     );
     return { id };
@@ -144,8 +146,9 @@ export const startWorkflow = createServerFn({ method: "POST" })
     if (instErr) throw instErr;
     const instanceId = (inst as unknown as { id: string }).id;
 
+    const firstStageProjectId = first.project_id ?? data.projectId;
     const { data: task, error: taskErr } = await supabase.rpc("create_task_full", {
-      _project_id: data.projectId,
+      _project_id: firstStageProjectId,
       _title: data.title.trim(),
       _description: data.description ?? undefined,
       _due_date: data.dueDate ?? undefined,
@@ -421,7 +424,7 @@ async function spawnNextStage(
   if (!nextStage) return;
   const assignee = nextAssigneeId ?? nextStage.default_assignee_id ?? instance.started_by;
 
-  const projectId = task.project_id ?? instance.project_id;
+  const projectId = nextStage.project_id ?? task.project_id ?? instance.project_id;
   if (!projectId) return;
 
   const { data: newTask, error } = await supabase.rpc("create_task_full", {

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, ListChecks, CalendarRange, FolderKanban, Users, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { GoogleCalendarConnectCard } from "@/components/google-calendar-connect";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -33,9 +35,11 @@ function StatCard({ icon: Icon, label, value, hint, tone = "default" }: { icon: 
 
 function Dashboard() {
   const { data: me } = useCurrentUser();
+  const qc = useQueryClient();
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
   const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const [punchingIn, setPunchingIn] = useState(false);
 
   const { data } = useQuery({
     queryKey: ["dashboard", me?.id, me?.isAdmin],
@@ -75,6 +79,31 @@ function Dashboard() {
   const activePunchInTime = data?.openSession?.punch_in_time ?? (data?.todayLog?.punch_in_time && !data?.todayLog?.punch_out_time ? data.todayLog.punch_in_time : null);
   const punchedIn = !!activePunchInTime;
 
+  async function punchInFromDashboard() {
+    if (!me || punchingIn || punchedIn) return;
+    setPunchingIn(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("punch_sessions").insert({
+      user_id: me.id,
+      session_date: today,
+      punch_in_time: new Date().toISOString(),
+    });
+    if (error) {
+      toast.error(error.message.includes("duplicate") ? "You are already punched in." : error.message);
+      setPunchingIn(false);
+      return;
+    }
+    toast.success("Punched in");
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["dashboard"] }),
+      qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
+      qc.invalidateQueries({ queryKey: ["punch-history"] }),
+      qc.invalidateQueries({ queryKey: ["attendance"] }),
+      qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
+    ]);
+    setPunchingIn(false);
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -82,9 +111,15 @@ function Dashboard() {
           <h1 className="font-display text-3xl font-bold">Welcome back{me?.fullName ? `, ${me.fullName.split(" ")[0]}` : ""}.</h1>
           <p className="text-muted-foreground text-sm mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
         </div>
-        <Button asChild size="lg" className="gradient-primary shadow-glow">
-          <Link to="/punch">{punchedIn ? "Punch out" : "Punch in"}</Link>
-        </Button>
+        {punchedIn ? (
+          <Button asChild size="lg" className="gradient-primary shadow-glow">
+            <Link to="/punch">Punch out</Link>
+          </Button>
+        ) : (
+          <Button size="lg" className="gradient-primary shadow-glow" onClick={punchInFromDashboard} disabled={!me || punchingIn}>
+            {punchingIn ? "Punching in…" : "Punch in"}
+          </Button>
+        )}
       </header>
 
       <GoogleCalendarConnectCard />

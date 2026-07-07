@@ -330,20 +330,31 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                 {(detail?.watchers?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">Nobody is watching yet.</p>}
               </TabsContent>
 
-              <TabsContent value="history" className="space-y-1">
-                {(detail?.activity ?? []).map((a) => {
-                  const aa = a as { id: string; kind: string; actor: { full_name?: string } | null; from_value: string | null; to_value: string | null; note: string | null; created_at: string };
+              <TabsContent value="history" className="space-y-2">
+                {(() => {
+                  const acts = (detail?.activity ?? []) as Array<{ id: string; kind: string; actor: { full_name?: string } | null; from_value: string | null; to_value: string | null; note: string | null; created_at: string; hours: number | string | null }>;
+                  const totalBurn = acts.reduce((s, a) => s + (a.hours == null ? 0 : Number(a.hours)), 0);
                   return (
-                    <div key={aa.id} className="text-xs border-l-2 border-border pl-2 py-0.5">
-                      <span className="font-medium">{aa.actor?.full_name ?? "System"}</span>{" "}
-                      <span className="text-muted-foreground">{aa.kind.replace(/_/g, " ")}</span>
-                      {aa.from_value != null && aa.to_value != null && <span className="text-muted-foreground"> · {aa.from_value} → {aa.to_value}</span>}
-                      {aa.note && <span className="text-muted-foreground"> · {aa.note}</span>}
-                      <span className="text-muted-foreground"> · {format(new Date(aa.created_at), "MMM d HH:mm")}</span>
-                    </div>
+                    <>
+                      {totalBurn > 0 && (
+                        <div className="text-xs font-medium border rounded-md p-2 bg-muted/30">
+                          Total burn: {totalBurn}h
+                        </div>
+                      )}
+                      {acts.map((aa) => (
+                        <div key={aa.id} className="text-xs border-l-2 border-border pl-2 py-0.5">
+                          <span className="font-medium">{aa.actor?.full_name ?? "System"}</span>{" "}
+                          <span className="text-muted-foreground">{aa.kind.replace(/_/g, " ")}</span>
+                          {aa.from_value != null && aa.to_value != null && <span className="text-muted-foreground"> · {aa.from_value} → {aa.to_value}</span>}
+                          {aa.hours != null && <span className="text-muted-foreground"> · {Number(aa.hours)}h</span>}
+                          {aa.note && <span className="text-muted-foreground"> · {aa.note}</span>}
+                          <span className="text-muted-foreground"> · {format(new Date(aa.created_at), "MMM d HH:mm")}</span>
+                        </div>
+                      ))}
+                      {acts.length === 0 && <p className="text-xs text-muted-foreground">No activity yet.</p>}
+                    </>
                   );
-                })}
-                {(detail?.activity?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No activity yet.</p>}
+                })()}
               </TabsContent>
             </Tabs>
           </>

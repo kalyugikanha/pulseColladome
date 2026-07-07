@@ -30,6 +30,7 @@ import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authentic
 import { Route as AuthenticatedMyTimesheetRouteImport } from './routes/_authenticated/my-timesheet'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
+import { Route as AuthenticatedHrAdminRouteImport } from './routes/_authenticated/hr-admin'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -159,6 +160,11 @@ const AuthenticatedLeaveRoute = AuthenticatedLeaveRouteImport.update({
   path: '/leave',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedHrAdminRoute = AuthenticatedHrAdminRouteImport.update({
+  id: '/hr-admin',
+  path: '/hr-admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedFinancesRoute = AuthenticatedFinancesRouteImport.update({
   id: '/finances',
   path: '/finances',
@@ -278,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
+  '/hr-admin': typeof AuthenticatedHrAdminRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
@@ -319,6 +326,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
+  '/hr-admin': typeof AuthenticatedHrAdminRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
@@ -363,6 +371,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
+  '/_authenticated/hr-admin': typeof AuthenticatedHrAdminRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/my-timesheet': typeof AuthenticatedMyTimesheetRoute
@@ -407,6 +416,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/directory'
     | '/finances'
+    | '/hr-admin'
     | '/leave'
     | '/meetings'
     | '/my-timesheet'
@@ -448,6 +458,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/directory'
     | '/finances'
+    | '/hr-admin'
     | '/leave'
     | '/meetings'
     | '/my-timesheet'
@@ -491,6 +502,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/directory'
     | '/_authenticated/finances'
+    | '/_authenticated/hr-admin'
     | '/_authenticated/leave'
     | '/_authenticated/meetings'
     | '/_authenticated/my-timesheet'
@@ -681,6 +693,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLeaveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/hr-admin': {
+      id: '/_authenticated/hr-admin'
+      path: '/hr-admin'
+      fullPath: '/hr-admin'
+      preLoaderRoute: typeof AuthenticatedHrAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/finances': {
       id: '/_authenticated/finances'
       path: '/finances'
@@ -853,6 +872,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
+  AuthenticatedHrAdminRoute: typeof AuthenticatedHrAdminRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedMyTimesheetRoute: typeof AuthenticatedMyTimesheetRoute
@@ -883,6 +903,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
+  AuthenticatedHrAdminRoute: AuthenticatedHrAdminRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedMyTimesheetRoute: AuthenticatedMyTimesheetRoute,

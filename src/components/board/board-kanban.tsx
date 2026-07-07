@@ -111,7 +111,14 @@ export function BoardKanban({
 function Column({ col, cards, onOpen, currentUserId }: { col: { key: Status; label: string }; cards: BoardCard[]; onOpen: (id: string) => void; currentUserId: string }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.key });
   return (
-    <div ref={setNodeRef} className={`rounded-lg border p-2 space-y-2 min-h-[400px] ${isOver ? "border-primary bg-primary/5" : "border-border/60 bg-muted/20"}`}>
+    <div
+      ref={setNodeRef}
+      className={`rounded-lg border-2 p-2 space-y-2 min-h-[400px] transition-colors ${
+        isOver
+          ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+          : "border-border/60 bg-muted/20"
+      }`}
+    >
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{col.label}</span>
         <span className="text-xs text-muted-foreground">{cards.length}</span>
@@ -121,15 +128,9 @@ function Column({ col, cards, onOpen, currentUserId }: { col: { key: Status; lab
   );
 }
 
-function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => void; currentUserId: string }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id });
+function CardBody({ card }: { card: BoardCard }) {
   return (
-    <Card
-      ref={setNodeRef}
-      {...attributes} {...listeners}
-      onDoubleClick={() => onOpen(card.id)}
-      className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-50" : ""}`}
-    >
+    <>
       <div className="text-sm font-medium">{card.title}</div>
       <div className="flex flex-wrap gap-1 mt-2 items-center">
         <Badge variant="outline" className="capitalize text-[10px]">{card.priority}</Badge>
@@ -146,6 +147,28 @@ function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => v
           {card.assignee.full_name ?? card.assignee.email}
         </div>
       )}
+    </>
+  );
+}
+
+function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => void; currentUserId: string }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id });
+  return (
+    <Card
+      ref={setNodeRef}
+      {...attributes} {...listeners}
+      onDoubleClick={() => onOpen(card.id)}
+      className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-30 border-dashed" : ""}`}
+    >
+      <CardBody card={card} />
+    </Card>
+  );
+}
+
+function CardPreview({ card }: { card: BoardCard }) {
+  return (
+    <Card className="p-3 select-none bg-background">
+      <CardBody card={card} />
     </Card>
   );
 }

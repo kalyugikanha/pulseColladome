@@ -130,6 +130,70 @@ function TasksPage() {
     queryFn: () => awaitingFn(),
   });
 
+  // Hours awaiting my approval — task_activity pending rows for tasks I created.
+  const { data: pendingHours } = useQuery({
+    queryKey: ["pending-hour-approvals", me?.id], enabled: !!me,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_activity" as any)
+        .select("id, task_id, actor_id, hours, note, completion_date, created_at, task:tasks!inner(id, title, created_by, estimated_hours, project:projects(name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email)")
+        .eq("approval_status", "pending")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).filter((r: any) => r.task?.created_by === me!.id) as Array<{
+        id: string; task_id: string; actor_id: string | null; hours: number | null;
+        note: string | null; completion_date: string | null; created_at: string;
+        task: { id: string; title: string; created_by: string; estimated_hours: number | null; project: { name: string | null } | null };
+        actor: { id: string; full_name: string | null; email: string | null } | null;
+      }>;
+    },
+  });
+
+  async function approveHours(activityId: string) {
+    const { error } = await supabase
+      .from("task_activity" as any)
+      .update({ approval_status: "approved", approved_by: me!.id, approved_at: new Date().toISOString() })
+      .eq("id", activityId);
+    if (error) return toast.error(error.message);
+    // Flip the task to done.
+    const row = (pendingHours ?? []).find((r) => r.id === activityId);
+    if (row?.task_id) {
+      await supabase.from("tasks").update({ status: "done" }).eq("id", row.task_id);
+      if (row.actor_id && row.actor_id !== me!.id) {
+        await supabase.from("notifications").insert({
+          user_id: row.actor_id, kind: "task_hours_approved", task_id: row.task_id,
+          body: `${me!.fullName ?? "Your manager"} approved ${row.hours}h on "${row.task.title}".`,
+        });
+      }
+    }
+    toast.success("Hours approved");
+    qc.invalidateQueries();
+  }
+
+  async function rejectHours(activityId: string) {
+    const reason = window.prompt("Reason for rejecting these hours?");
+    if (!reason || !reason.trim()) return;
+    const { error } = await supabase
+      .from("task_activity" as any)
+      .update({ approval_status: "rejected", rejected_reason: reason.trim(), approved_by: me!.id, approved_at: new Date().toISOString() })
+      .eq("id", activityId);
+    if (error) return toast.error(error.message);
+    const row = (pendingHours ?? []).find((r) => r.id === activityId);
+    if (row?.task_id) {
+      // Send the task back to "posting" so the assignee can re-close with corrected hours.
+      await supabase.from("tasks").update({ status: "in_progress", marketing_stage: "posting" }).eq("id", row.task_id);
+      if (row.actor_id && row.actor_id !== me!.id) {
+        await supabase.from("notifications").insert({
+          user_id: row.actor_id, kind: "task_hours_rejected", task_id: row.task_id,
+          body: `${me!.fullName ?? "Your manager"} sent "${row.task.title}" back: ${reason.trim()}`,
+        });
+      }
+    }
+    toast.success("Sent back to assignee");
+    qc.invalidateQueries();
+  }
+
+
   const { data: projects } = useQuery({
     queryKey: ["projects-list"],
     queryFn: async () => (await supabase.from("projects").select("id, name").order("name")).data ?? [],

@@ -452,10 +452,13 @@ export function TimesheetPage() {
         continue;
       }
       for (const t of r.tasks) {
+        const status = t.source === "activity"
+          ? (t.approval_status === "approved" || t.approval_status === "auto" ? "Approved" : t.approval_status === "pending" ? "Pending" : t.approval_status ?? "Pending")
+          : (r.approved ? "Approved" : "Pending");
         rows.push([
           r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "",
           t.project_code ?? "", t.project_name ?? "",
-          String(t.hours ?? 0), t.comments ?? "", r.approved ? "Approved" : "Pending",
+          String(t.hours ?? 0), t.comments ?? "", status,
         ]);
       }
     }

@@ -97,6 +97,161 @@ export type Database = {
           },
         ]
       }
+      bd_activity_logs: {
+        Row: {
+          activity_type_id: string
+          carried_forward_to: string | null
+          created_at: string
+          description: string
+          hours_spent: number | null
+          id: string
+          log_date: string
+          media_url: string | null
+          recurring_item_id: string | null
+          status: Database["public"]["Enums"]["bd_log_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_type_id: string
+          carried_forward_to?: string | null
+          created_at?: string
+          description?: string
+          hours_spent?: number | null
+          id?: string
+          log_date?: string
+          media_url?: string | null
+          recurring_item_id?: string | null
+          status?: Database["public"]["Enums"]["bd_log_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_type_id?: string
+          carried_forward_to?: string | null
+          created_at?: string
+          description?: string
+          hours_spent?: number | null
+          id?: string
+          log_date?: string
+          media_url?: string | null
+          recurring_item_id?: string | null
+          status?: Database["public"]["Enums"]["bd_log_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bd_activity_logs_activity_type_id_fkey"
+            columns: ["activity_type_id"]
+            isOneToOne: false
+            referencedRelation: "bd_activity_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bd_activity_logs_recurring_item_id_fkey"
+            columns: ["recurring_item_id"]
+            isOneToOne: false
+            referencedRelation: "bd_recurring_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bd_activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bd_activity_types: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bd_recurring_items: {
+        Row: {
+          activity_type_id: string
+          assignee_id: string
+          created_at: string
+          created_by: string | null
+          frequency: Database["public"]["Enums"]["bd_frequency"]
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+          weekdays: number[]
+        }
+        Insert: {
+          activity_type_id: string
+          assignee_id: string
+          created_at?: string
+          created_by?: string | null
+          frequency?: Database["public"]["Enums"]["bd_frequency"]
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          weekdays?: number[]
+        }
+        Update: {
+          activity_type_id?: string
+          assignee_id?: string
+          created_at?: string
+          created_by?: string | null
+          frequency?: Database["public"]["Enums"]["bd_frequency"]
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          weekdays?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bd_recurring_items_activity_type_id_fkey"
+            columns: ["activity_type_id"]
+            isOneToOne: false
+            referencedRelation: "bd_activity_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bd_recurring_items_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bd_recurring_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       department_heads: {
         Row: {
           created_at: string
@@ -2081,6 +2236,8 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "employee" | "project_manager" | "hr_admin"
+      bd_frequency: "daily" | "weekly"
+      bd_log_status: "pending" | "done" | "carried_forward"
       employee_doc_type:
         | "offer_letter"
         | "aadhar"
@@ -2246,6 +2403,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "employee", "project_manager", "hr_admin"],
+      bd_frequency: ["daily", "weekly"],
+      bd_log_status: ["pending", "done", "carried_forward"],
       employee_doc_type: [
         "offer_letter",
         "aadhar",

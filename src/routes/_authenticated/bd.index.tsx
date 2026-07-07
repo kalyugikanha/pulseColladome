@@ -213,7 +213,7 @@ function BDDayPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Extra activities</CardTitle>
+          <CardTitle className="text-base">Extra & assigned activities</CardTitle>
           <AddAdHoc types={types ?? []} onAdd={async (input) => {
             if (!me) return;
             const { error } = await supabase.from("bd_activity_logs").insert({
@@ -232,12 +232,14 @@ function BDDayPage() {
           {adHocLogs.length === 0 && <p className="text-sm text-muted-foreground">No extra activities logged.</p>}
           {adHocLogs.map((l) => {
             const type = typeById.get(l.activity_type_id);
+            const displayTitle = l.title || l.description || "(no description)";
             return (
               <LogRow
                 key={l.id}
                 log={l}
-                title={l.description || "(no description)"}
+                title={displayTitle}
                 typeName={type?.name}
+                assigned={!!l.assigned_by}
                 onChange={(p) => updateLog(l.id, p)}
                 onDelete={() => deleteLog(l.id)}
                 onUpload={(f) => uploadMedia(l.id, f)}

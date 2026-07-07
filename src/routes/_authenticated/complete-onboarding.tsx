@@ -140,6 +140,30 @@ function CompleteOnboardingPage() {
   const isApproved = !!approvedAt;
   const isPendingReview = !!submittedAt && !isApproved;
 
+  // ---- Profile completion % ----
+  const profileFieldValues: Record<string, string> = {
+    full_name: fullName, personal_email: personalEmail, phone, permanent_address: address,
+    date_of_birth: dob, linkedin_url: linkedin, github_url: github, facebook_url: facebook,
+    instagram_url: instagram, twitter_url: twitter, department, day_start_time: dayStart, standup_time: standup,
+  };
+  const bankFieldValues: Record<string, string> = {
+    account_holder_name: holder, account_number: account, bank_branch: branch, ifsc_code: ifsc, pan_number: pan,
+  };
+  const requiredDocKeys: OnboardingDocType[] = [
+    "profile_picture","offer_letter","aadhar","pan","cancelled_cheque",
+    "marksheet_10","marksheet_12","graduation","resume",
+    "follow_facebook","follow_instagram","follow_twitter","follow_linkedin",
+    "follow_youtube","follow_pinterest","follow_whatsapp",
+    "review_google_jaipur","review_google_hyderabad","review_glassdoor","review_ambitionbox",
+    "linkedin_employment",
+  ];
+  const filledProfile = Object.values(profileFieldValues).filter((v) => v && v.trim() !== "").length;
+  const filledBank = Object.values(bankFieldValues).filter((v) => v && v.trim() !== "").length;
+  const filledDocs = requiredDocKeys.filter((k) => uploaded.has(k)).length;
+  const totalItems = Object.keys(profileFieldValues).length + Object.keys(bankFieldValues).length + requiredDocKeys.length;
+  const filledItems = filledProfile + filledBank + filledDocs;
+  const completionPct = Math.round((filledItems / totalItems) * 100);
+
   async function saveDraft() {
     setSaving(true);
     try {
@@ -244,6 +268,33 @@ function CompleteOnboardingPage() {
             : "Fill in your details, upload every document and screenshot proof, then submit for HR approval. Portal access unlocks once HR approves."}
         </p>
       </header>
+
+      <Card>
+        <CardContent className="p-4 flex items-center gap-4">
+          <div
+            className="relative h-16 w-16 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold"
+            style={{ background: `conic-gradient(hsl(var(--primary)) ${completionPct * 3.6}deg, hsl(var(--muted)) 0deg)` }}
+          >
+            <div className="absolute inset-1 rounded-full bg-background flex items-center justify-center">
+              {completionPct}%
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium">Profile completion</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {filledProfile}/{Object.keys(profileFieldValues).length} personal · {filledBank}/{Object.keys(bankFieldValues).length} bank · {filledDocs}/{requiredDocKeys.length} documents
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              {isApproved
+                ? "HR has approved your onboarding — keep this up to date."
+                : completionPct >= 100
+                  ? "All set. Submit for HR approval."
+                  : "Complete every section to unlock the Submit button."}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
 
       {isPendingReview && (
         <div className="rounded-md border border-amber-400/40 bg-amber-500/10 p-3 text-sm">

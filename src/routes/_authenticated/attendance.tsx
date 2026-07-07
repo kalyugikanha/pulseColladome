@@ -34,15 +34,14 @@ function AttendancePage() {
   const [overviewSearch, setOverviewSearch] = useState("");
   const overviewDateStr = format(overviewDate, "yyyy-MM-dd");
 
-  const canView = !!me && (me.isAdmin || me.isDepartmentHead || me.isReportingManager);
-  const { deptScope, userScope } = useVisibilityScope(me);
+  const canView = !!me && (me.isAdmin || me.isReportingManager);
+  const { userScope } = useVisibilityScope(me);
 
   const { data } = useQuery({
-    queryKey: ["attendance", me?.id, today, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
+    queryKey: ["attendance", me?.id, today, userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
-      if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
       const [people, todayAtt, todayLeaves] = await Promise.all([
         peopleQ,
@@ -82,11 +81,10 @@ function AttendancePage() {
   });
 
   const { data: overview } = useQuery({
-    queryKey: ["attendance-overview", overviewDateStr, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
+    queryKey: ["attendance-overview", overviewDateStr, userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
-      if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
       const [people, att, leaves] = await Promise.all([
         peopleQ,

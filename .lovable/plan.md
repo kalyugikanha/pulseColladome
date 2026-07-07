@@ -1,75 +1,58 @@
-## Goal
+## 1. Fix attendance visibility (managers see reporting team only)
 
-Let managers (not just admins) run BD for their reporting tree — create recurring items, assign one-off ad-hoc tasks, view/edit their team's daily logs, and see team reports. Reporting depth = full tree (you → Juhi → Sarita/Riyanji).
+Right now Kanishka sees the whole Marketing department because she is a Department Head for "Marketing" (`department_heads` table) — not because of a bug. Akash is the head of "Project Management" so he sees that department; Juhi has no head row so she sees only her direct reports.
 
-## Reporting tree helpers (DB)
+You want: **only admins/HR/super-admins see everyone; everybody else sees just their own reporting tree (self + everyone under them).**
 
-Add security-definer helpers in `private` schema (reuse existing `profiles.reporting_manager_id`):
+Changes:
+- Drop the department-head SELECT/UPDATE paths from `attendance_logs`, `leave_requests`, `punch_sessions`, and related management screens. The `department_heads` concept is retired for visibility purposes (we can keep the table for now, unused).
+- Add a `private.reports_tree_ids(_manager)` recursive helper (full subtree, not just direct reports). Reuse the one from the BD plan if we introduce it in the same turn.
+- Add RLS policies: `attendance: manager tree read/update`, same for `leave_requests`, `punch_sessions`, using `_manager IN reports_tree_ids(auth.uid())`.
+- `use-visibility-scope.ts`: drop `deptScope`; `userScope` becomes the full reports tree (self + all descendants) fetched from a small server fn `listReportsTree()`.
+- Attendance page: `canView = isAdmin || isReportingManager` (drop `isDepartmentHead`); cards + table use the tree scope.
+- Verify: Kanishka sees only her 6 reports + self; Juhi sees Sarita, Riyanshi + self; Akash sees his 1 report + self; Shubham (admin) sees everyone.
 
-- `private.bd_report_ids(_manager uuid) returns setof uuid` — recursive CTE walking `profiles.reporting_manager_id` down from `_manager`, returning the full subtree (excluding the manager themselves).
-- `private.can_manage_bd_user(_actor uuid, _target uuid) returns boolean` — true if `_actor` is admin/super-admin, OR `_target` is in `bd_report_ids(_actor)`, OR `_actor = _target` (self).
-- `private.bd_visible_user_ids(_actor uuid) returns setof uuid` — admins/super-admins → all active profiles; managers → self + full subtree; regular employees → self only.
+## 2. Seed profile data for 18 employees
 
-These make RLS trivial and are reused by every BD screen.
+Seed by lowercased email (works for both existing auth users and future signups):
 
-## RLS updates
+- **`profiles`**: `full_name`, `department`, `phone`, `permanent_address`, `date_of_birth`, `marriage_anniversary`, `linkedin_url`, `github_url`, `day_start_time`, `standup_time`, `profile_picture_url`. Rows that don't exist yet are inserted as placeholders (`is_placeholder=true`, generated uuid) so `handle_new_user` merges them on first sign-in.
+- **`employee_bank_details`**: `account_holder_name`, `account_number`, `bank_branch`, `ifsc_code`, `pan_number` — only for rows where an auth user exists (FK to `auth.users`).
+- **`employee_documents`**: one row per non-empty Drive link, mapped to enum: `resume`, `profile_picture`, `offer_letter`, `aadhar`, `pan`, `cancelled_cheque`, `marksheet_10`, `marksheet_12`, `graduation`, `masters`. `storage_path` stores the Drive URL as-is (pragmatic — we don't re-host). Also FK-gated to existing auth users.
 
-- `bd_recurring_items`: replace admin-only policies with `USING/WITH CHECK (private.can_manage_bd_user(auth.uid(), assignee_id))` for INSERT/UPDATE/DELETE; SELECT allowed when the row's assignee is in `bd_visible_user_ids(auth.uid())` (so managers see team templates + their own).
-- `bd_activity_logs`: SELECT when `user_id in bd_visible_user_ids`; INSERT/UPDATE/DELETE when `can_manage_bd_user`. Keeps employees on own rows, opens managers to their subtree, admins keep full.
-- `bd_activity_types`: unchanged (admin-managed lookup).
+Free-text time strings ("9 AM - 10 AM", "10 AM - 6 PM") are parsed to the **start** time. Weird values like "4:00:00 PM" as day_start are kept as-is. "N/a"/"NA"/blank ⇒ NULL. Ambiguous dates (e.g. "30-Apr-2025") normalized to ISO.
 
-## Server functions (`src/lib/bd.functions.ts`)
+Arti Kumawat's row is all blank ⇒ skipped.
 
-Extend / add:
+Executed via the migration tool (one-shot idempotent upserts on `(user_id, doc_type)` and email-keyed upserts on `profiles`/`employee_bank_details`).
 
-- `listBdVisibleUsers()` — returns `{id, full_name, email, department}[]` for the actor's scope (drives user pickers, filters, reports).
-- `listBdRecurringItems({ assigneeId? })` — scoped by RLS; supports filtering to one teammate.
-- `upsertBdRecurringItem(...)`, `deleteBdRecurringItem(id)` — already exist; now callable by managers because RLS allows it.
-- `assignBdOneOffTask({ assignee_id, log_date, title, activity_type_id, hours_estimate?, description? })` — new. Inserts a `bd_activity_logs` row for the given date/user with `status = 'pending'` and `recurring_item_id = null`, marked `assigned_by = auth.uid()` (new column). Enforces `can_manage_bd_user`.
-- `listBdLogsForUser({ user_id, date })`, `listBdLogsForRange({ user_ids?, from, to })` — scoped reads for team views and reports.
-- `updateBdLog(...)`, `rollForwardBdPending(...)` — allow managers to edit/close their team's logs (RLS enforces).
+## 3. Profile completion %
 
-## Schema tweaks
+Client helper `computeProfileCompletion(profile, bank, docs)` counts filled fields out of a fixed 25-field checklist matching the seed columns above. Shown as:
+- A ring/badge on **My Profile** (`/profile`) with a checklist of missing items.
+- A "Completion" column in the **HR → Team** roster.
 
-- `bd_activity_logs`: add `assigned_by uuid null references profiles(id)` and `title text null` (one-off tasks need a title; recurring rows keep title from template). Backfill nothing.
-- Migration adds the three `private` helpers, replaces RLS policies as above.
+## 4. HR approval workflow
 
-## UI changes
+The `profiles` table already has `onboarding_submitted_at / approved_at / approved_by / rejected_at / rejection_reason` — we wire them up:
 
-Sidebar item stays "Business Development". Existing tabs adjusted:
-
-1. **My Day** (`bd/index.tsx`) — unchanged for the logged-in user; still shows their own auto-generated recurring items + any one-off tasks a manager pushed onto that date.
-
-2. **Team** (new, `bd/team.tsx`, visible to anyone with reports OR admins) —
-   - Date picker (defaults today).
-   - Left column: teammate list from `listBdVisibleUsers()` minus self, grouped by direct reports vs indirect (small subtitle). Click a teammate → right panel loads their log for that date.
-   - Right panel: read-only preview of their pending / done items + a **"Mark done" / "Edit hours" / "Add note"** inline actions (RLS-allowed) + **"+ Assign one-off task"** button → dialog with title, activity type, optional hours estimate → calls `assignBdOneOffTask`.
-   - "Roll pending forward" button for that teammate/date.
-
-3. **Recurring items** (`bd/recurring.tsx`) — opens to admins as today; now also opens to any manager. Add a "For teammate" dropdown at top (defaults to self) sourced from `listBdVisibleUsers()`. All CRUD scoped by that selection; RLS backstops.
-
-4. **Reports** (`bd/reports.tsx`) — visible to admins AND managers. Data auto-scoped to `bd_visible_user_ids`. Filters unchanged (date range, activity type, member multi-select). Admins still see everyone.
-
-5. **Activity types** (`bd/activity-types.tsx`) — remains admin-only.
-
-## Access summary
-
-| Role | My Day | Team | Recurring items | Reports | Activity types |
-|---|---|---|---|---|---|
-| Employee (no reports) | ✅ self | — | ✅ self only | — | — |
-| Manager (has reports) | ✅ self | ✅ subtree | ✅ self + subtree | ✅ subtree | — |
-| Admin / super admin | ✅ self | ✅ everyone | ✅ everyone | ✅ everyone | ✅ |
-
-Tab visibility is driven by `me.hasReports` (derived client-side from `listBdVisibleUsers().length > 1`) and existing `isAdmin` / `isSuperAdmin` flags.
+- **Employee side (`/profile`)**: banner shows current status (`draft` / `pending HR approval` / `approved` / `changes requested`). "Submit for HR approval" button (enabled once completion ≥ 90% AND required fields filled) sets `onboarding_submitted_at = now()`. After submit, fields are read-only until HR approves or requests changes.
+- **HR side (new `/hr/approvals` route, gated to `isHrAdmin || isAdmin`)**: list of pending submissions with per-employee diff of key fields + document links. Actions: **Approve** (sets `onboarding_approved_at`, `onboarding_approved_by`, `onboarding_completed=true`, `onboarding_required=false`) or **Request changes** (sets `onboarding_rejected_at` + `onboarding_rejection_reason`, clears `onboarding_submitted_at` so employee can edit again).
+- Server fns in `src/lib/onboarding.functions.ts`: `submitOnboarding()`, `approveOnboarding(userId)`, `rejectOnboarding(userId, reason)` — all with `requireSupabaseAuth` and HR/admin checks for the approve/reject ones.
+- Notification row inserted for the employee on approve/reject; HR admins notified on submit.
+- RLS: profile writes to onboarding_* columns restricted to (self for `submitted_at`) and (HR/admin for the rest) via a trigger check.
 
 ## Files touched
 
-- Migration: new `private` helpers, altered RLS on `bd_recurring_items` + `bd_activity_logs`, new columns on `bd_activity_logs`.
-- `src/lib/bd.functions.ts` — extend with new fns, adjust existing ones to drop admin-only guards (RLS enforces).
-- `src/routes/_authenticated/bd.tsx` — add "Team" tab, gate visibility on `hasReports || isAdmin`.
-- `src/routes/_authenticated/bd.team.tsx` — new route.
-- `src/routes/_authenticated/bd.recurring.tsx` — add teammate dropdown, drop admin-only gate.
-- `src/routes/_authenticated/bd.reports.tsx` — drop admin-only gate; keep filters.
-- `src/routes/_authenticated/bd.index.tsx` — render one-off assigned tasks alongside recurring items (small "assigned by X" tag).
+- new migration: attendance/leave/punch RLS + `reports_tree_ids` helper
+- new migration: seed profiles/bank/documents (idempotent)
+- new migration: onboarding submit/approve trigger + notification policies
+- new `src/lib/onboarding.functions.ts`
+- new `src/lib/profile-completion.ts`
+- new `src/routes/_authenticated/hr.approvals.tsx`
+- edit `src/hooks/use-visibility-scope.ts`
+- edit `src/routes/_authenticated/attendance.tsx` (remove dept-head branch)
+- edit `src/routes/_authenticated/profile.tsx` (completion ring + submit banner)
+- edit `src/routes/_authenticated/hr.*` sidebar to add Approvals link
 
-No changes to Marketing / tasks module.
+Confirm and I'll build.

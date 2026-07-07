@@ -36,14 +36,12 @@ function AttendancePage() {
 
   const canView = !!me && (me.isAdmin || me.isReportingManager);
   const { userScope } = useVisibilityScope(me);
-  const deptScope: string[] | null = null;
 
   const { data } = useQuery({
-    queryKey: ["attendance", me?.id, today, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
+    queryKey: ["attendance", me?.id, today, userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
-      if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
       const [people, todayAtt, todayLeaves] = await Promise.all([
         peopleQ,

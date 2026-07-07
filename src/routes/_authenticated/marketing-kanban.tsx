@@ -401,6 +401,16 @@ function MarketingKanbanPage() {
           setPending(null);
         }}
       />
+      <MarkDoneDialog
+        task={markDone} onClose={() => setMarkDone(null)}
+        onConfirm={async ({ hours, note }) => {
+          if (!markDone) return;
+          await commitMove(markDone, "posted", markDone.assignee_id ?? me!.realId, {
+            hours, note, kind: "task_completed", pendingApproval: true,
+          });
+          setMarkDone(null);
+        }}
+      />
       <SendBackDialog
         task={sendBack} onClose={() => setSendBack(null)}
         roster={roster ?? []}

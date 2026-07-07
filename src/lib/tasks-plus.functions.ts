@@ -293,7 +293,7 @@ export const listTasksOverview = createServerFn({ method: "POST" })
     let q = context.supabase
       .from("tasks")
       .select(`
-        id, title, description, status, priority, due_date, created_at, asset_links,
+        id, title, description, status, priority, due_date, created_at, created_by, asset_links,
         assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
         project:projects(id, name, code),
         domain:taxonomy_domains(id, name),

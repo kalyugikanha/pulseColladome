@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { punchIn as punchInServerFn } from "@/lib/punch.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,25 +38,28 @@ function StatCard({ icon: Icon, label, value, hint, tone = "default" }: { icon: 
 function Dashboard() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
+  const punchInServer = useServerFn(punchInServerFn);
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
   const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
   const [punchingIn, setPunchingIn] = useState(false);
+  const dashboardQueryKey = ["dashboard", me?.id, me?.realId, me?.isAdmin];
 
   const { data } = useQuery({
-    queryKey: ["dashboard", me?.id, me?.isAdmin],
+    queryKey: dashboardQueryKey,
     enabled: !!me,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
       const uid = me!.id;
+      const punchUid = me!.realId;
       const [todayLog, openSessions, weekLogs, myTasks, myLeave, balances] = await Promise.all([
-        supabase.from("attendance_logs").select("*").eq("user_id", uid).eq("date", today).maybeSingle(),
-        supabase.from("punch_sessions").select("id, punch_in_time").eq("user_id", uid).eq("session_date", today).is("punch_out_time", null).order("punch_in_time", { ascending: false }).limit(1),
-        supabase.from("attendance_logs").select("total_hours,date").eq("user_id", uid).gte("date", weekStart).lte("date", weekEnd),
+        supabase.from("attendance_logs").select("*").eq("user_id", punchUid).eq("date", today).maybeSingle(),
+        supabase.from("punch_sessions").select("id, punch_in_time").eq("user_id", punchUid).eq("session_date", today).is("punch_out_time", null).order("punch_in_time", { ascending: false }).limit(1),
+        supabase.from("attendance_logs").select("total_hours,date").eq("user_id", punchUid).gte("date", weekStart).lte("date", weekEnd),
         supabase.from("tasks").select("id,title,status,priority,due_date,project:projects(name)").eq("assignee_id", uid).neq("status", "done").order("due_date", { ascending: true }).limit(5),
         supabase.from("leave_requests").select("id,leave_type,start_date,end_date,status").eq("user_id", uid).order("created_at", { ascending: false }).limit(3),
-        supabase.from("leave_balances").select("leave_type,allocated,used").eq("user_id", uid),
+        supabase.from("leave_balances").select("leave_type,allocated,used").eq("user_id", punchUid),
       ]);
 
       let admin: any = null;
@@ -84,28 +89,22 @@ function Dashboard() {
   async function punchInFromDashboard() {
     if (!me || punchingIn || punchedIn) return;
     setPunchingIn(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from("punch_sessions").insert({
-      user_id: me.id,
-      session_date: today,
-      punch_in_time: new Date().toISOString(),
-    });
-    if (error) {
-      const isDup = error.code === "23505" || /duplicate|unique/i.test(error.message);
-      toast.error(isDup ? "You are already punched in — refreshing…" : error.message);
-      await qc.invalidateQueries({ queryKey: ["dashboard"] });
+    try {
+      const result = await punchInServer({ data: { sessionDate: today } });
+      qc.setQueryData(dashboardQueryKey, (old: any) => old ? { ...old, openSession: result.session } : old);
+      toast.success(result.status === "already_open" ? "You are already punched in — refreshed." : "Punched in");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["dashboard"] }),
+        qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
+        qc.invalidateQueries({ queryKey: ["punch-history"] }),
+        qc.invalidateQueries({ queryKey: ["attendance"] }),
+        qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not punch in.");
+    } finally {
       setPunchingIn(false);
-      return;
     }
-    toast.success("Punched in");
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ["dashboard"] }),
-      qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
-      qc.invalidateQueries({ queryKey: ["punch-history"] }),
-      qc.invalidateQueries({ queryKey: ["attendance"] }),
-      qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
-    ]);
-    setPunchingIn(false);
   }
 
   return (

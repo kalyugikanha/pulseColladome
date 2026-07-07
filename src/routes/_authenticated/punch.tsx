@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { punchIn as punchInServerFn, punchOut as punchOutServerFn } from "@/lib/punch.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,7 +48,10 @@ type Row = { projectId: string; hours: string; comments: string };
 function PunchPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
+  const punchInServer = useServerFn(punchInServerFn);
+  const punchOutServer = useServerFn(punchOutServerFn);
   const today = format(new Date(), "yyyy-MM-dd");
+  const punchUserId = me?.realId ?? me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>([{ projectId: "", hours: "", comments: "" }]);
   const [submitting, setSubmitting] = useState(false);
@@ -54,8 +59,8 @@ function PunchPage() {
   const [nowTick, setNowTick] = useState(() => Date.now());
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
-    queryKey: ["punch-sessions-today", me?.id],
-    enabled: !!me,
+    queryKey: ["punch-sessions-today", punchUserId],
+    enabled: !!punchUserId,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -63,7 +68,7 @@ function PunchPage() {
       const { data } = await (supabase as any)
         .from("punch_sessions")
         .select("*")
-        .eq("user_id", me!.id)
+        .eq("user_id", punchUserId!)
         .eq("session_date", today)
         .order("punch_in_time", { ascending: true });
       return (data ?? []) as Session[];
@@ -77,9 +82,9 @@ function PunchPage() {
   });
 
   const { data: history } = useQuery({
-    queryKey: ["punch-history", me?.id],
-    enabled: !!me,
-    queryFn: async () => (await supabase.from("attendance_logs").select("date,total_hours,punch_in_time,punch_out_time").eq("user_id", me!.id).order("date", { ascending: false }).limit(14)).data ?? [],
+    queryKey: ["punch-history", punchUserId],
+    enabled: !!punchUserId,
+    queryFn: async () => (await supabase.from("attendance_logs").select("date,total_hours,punch_in_time,punch_out_time").eq("user_id", punchUserId!).order("date", { ascending: false }).limit(14)).data ?? [],
   });
 
   const openSession = sessions?.find((s) => !s.punch_out_time) ?? null;
@@ -100,68 +105,34 @@ function PunchPage() {
 
   const allocatedTotal = rows.reduce((s, r) => s + (Number(r.hours) || 0), 0);
 
-  async function refreshDailyRollup() {
-    if (!me) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: fresh } = await (supabase as any)
-      .from("punch_sessions")
-      .select("punch_in_time, punch_out_time, hours, allocations")
-      .eq("user_id", me.id)
-      .eq("session_date", today)
-      .order("punch_in_time", { ascending: true });
-    const rowsFresh = (fresh ?? []) as Session[];
-    if (rowsFresh.length === 0) return;
-    const ins = rowsFresh.map((r) => r.punch_in_time).filter(Boolean).sort();
-    const outs = rowsFresh.map((r) => r.punch_out_time).filter(Boolean).sort();
-    const total = rowsFresh.reduce((s, r) => s + Number(r.hours ?? 0), 0);
-    const tasks = rowsFresh.flatMap((r) => (r.allocations ?? []).map((a) => ({
-      project_id: a.project_id,
-      project_code: a.project_code,
-      project_name: a.project_name,
-      hours: Number(a.hours ?? 0),
-      comments: a.comments ?? "",
-    })));
-    await supabase.from("attendance_logs").upsert({
-      user_id: me.id,
-      date: today,
-      punch_in_time: ins[0] ?? null,
-      punch_out_time: outs.length ? outs[outs.length - 1] : null,
-      total_hours: Number(total.toFixed(2)),
-      tasks,
-    }, { onConflict: "user_id,date" });
-  }
-
   async function punchIn() {
     if (!me || punchingIn) return;
     if (openSession) { toast.error("You already have an open session. Punch out first."); return; }
     setPunchingIn(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from("punch_sessions").insert({
-      user_id: me.id,
-      session_date: today,
-      punch_in_time: new Date().toISOString(),
-    });
-    if (error) {
-      const isDup = (error as { code?: string }).code === "23505" || /duplicate|unique/i.test(error.message);
-      if (isDup) {
-        await refetchSessions();
-        toast.error("You already have an open session — refreshed.");
-      } else {
-        toast.error(error.message);
+    try {
+      const result = await punchInServer({ data: { sessionDate: today } });
+      if (result.session.session_date === today) {
+        qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => {
+          const next = old.some((row) => row.id === result.session.id)
+            ? old.map((row) => row.id === result.session.id ? result.session as Session : row)
+            : [...old, result.session as Session];
+          return next.sort((a, b) => a.punch_in_time.localeCompare(b.punch_in_time));
+        });
       }
+      toast.success(result.status === "already_open" ? "You are already punched in — refreshed." : "Punched in");
+      await refetchSessions();
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
+        qc.invalidateQueries({ queryKey: ["punch-history"] }),
+        qc.invalidateQueries({ queryKey: ["dashboard"] }),
+        qc.invalidateQueries({ queryKey: ["attendance"] }),
+        qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not punch in.");
+    } finally {
       setPunchingIn(false);
-      return;
     }
-    toast.success("Punched in");
-    await refetchSessions();
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
-      qc.invalidateQueries({ queryKey: ["punch-history"] }),
-      qc.invalidateQueries({ queryKey: ["dashboard"] }),
-      qc.invalidateQueries({ queryKey: ["attendance"] }),
-      qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
-    ]);
-    setPunchingIn(false);
   }
 
   function openPunchOut() {
@@ -193,46 +164,32 @@ function PunchPage() {
     const ids = rows.map((r) => r.projectId);
     if (new Set(ids).size !== ids.length) { toast.error("Same project listed twice — merge them."); return; }
 
-    const allocations: Allocation[] = rows.map((r) => {
-      const p = projects?.find((pr) => pr.id === r.projectId);
-      return {
-        project_id: r.projectId,
-        project_code: p?.code ?? null,
-        project_name: p?.name ?? null,
-        hours: Number(Number(r.hours).toFixed(2)),
-        comments: r.comments.trim(),
-      };
-    });
+    const allocations = rows.map((r) => ({
+      projectId: r.projectId,
+      hours: Number(Number(r.hours).toFixed(2)),
+      comments: r.comments.trim(),
+    }));
     const totalHours = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
-    const first = allocations[0];
-    const now = new Date();
 
     setSubmitting(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from("punch_sessions").update({
-      punch_out_time: now.toISOString(),
-      hours: totalHours,
-      project_id: first.project_id,
-      project_code: first.project_code,
-      project_name: first.project_name,
-      comments: allocations.length === 1
-        ? first.comments
-        : allocations.map((a) => `[${a.project_code ?? ""}] ${a.hours}h — ${a.comments}`).join("\n"),
-      allocations,
-    }).eq("id", openSession.id);
-    setSubmitting(false);
-    if (error) { toast.error(error.message); return; }
-    await refetchSessions();
-    await refreshDailyRollup();
-    toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);
-    setDialogOpen(false);
-    await Promise.all([
-      qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
-      qc.invalidateQueries({ queryKey: ["punch-history"] }),
-      qc.invalidateQueries({ queryKey: ["dashboard"] }),
-      qc.invalidateQueries({ queryKey: ["attendance"] }),
-      qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
-    ]);
+    try {
+      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations } });
+      qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => old.map((row) => row.id === result.session.id ? result.session as Session : row));
+      await refetchSessions();
+      toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);
+      setDialogOpen(false);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
+        qc.invalidateQueries({ queryKey: ["punch-history"] }),
+        qc.invalidateQueries({ queryKey: ["dashboard"] }),
+        qc.invalidateQueries({ queryKey: ["attendance"] }),
+        qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not punch out.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (

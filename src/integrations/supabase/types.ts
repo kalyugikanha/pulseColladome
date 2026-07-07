@@ -1274,6 +1274,41 @@ export type Database = {
           },
         ]
       }
+      task_ratings: {
+        Row: {
+          created_at: string
+          id: string
+          ratee_id: string
+          rater_id: string
+          rating: number
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ratee_id: string
+          rater_id: string
+          rating: number
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ratee_id?: string
+          rater_id?: string
+          rating?: number
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_ratings_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_review_comments: {
         Row: {
           author_id: string

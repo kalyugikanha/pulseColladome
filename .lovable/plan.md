@@ -1,5 +1,5 @@
-In `closeTask` (src/lib/workflows.functions.ts), when the stage requires review, after resolving the reviewer, check if the resolved reviewer is the same person as the acting assignee. If so, treat the close as auto-approved: skip the "move to review + notify reviewer" branch and fall through to the done path — mark the task `status: done, completion_percent: 100` and call `spawnNextStage(...)` exactly like the non-review path.
+In `spawnNextStage` (src/lib/workflows.functions.ts), when the new stage task is created, also set `reviewer_id` on the new task from `nextStage.default_reviewer_id` (if non-null). Currently only `default_assignee_id` is applied; `default_reviewer_id` is ignored on stage advancement, so downstream stages never pre-populate their reviewer from the template.
 
-No other behavior changes. If the reviewer is a different person, current review flow stays intact.
+Add `reviewer_id: nextStage.default_reviewer_id ?? null` to the `.update({...})` call that stamps `workflow_template_id / workflow_instance_id / stage_index / stage_snapshot` on the newly created task.
 
-Technical detail: after computing `reviewer` (task.reviewer_id → stage.default_reviewer_id → creator/starter fallback), if `reviewer === actingUserId` (or reviewer is null and the assignee is effectively their own reviewer), persist the reviewer_id if newly set, then run the same done+spawn logic and return `{ ok: true, status: "done" }`.
+No other change.

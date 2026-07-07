@@ -413,6 +413,7 @@ async function spawnNextStage(
     workflow_instance_id: task.workflow_instance_id,
     stage_index: nextStage.position,
     stage_snapshot: nextStage as never,
+    reviewer_id: nextStage.default_reviewer_id ?? null,
   } as never).eq("id", newTaskId);
   await supabase.from("workflow_instances" as never).update({ current_stage_position: nextStage.position } as never).eq("id", task.workflow_instance_id);
   if (assignee && assignee !== actorId) {

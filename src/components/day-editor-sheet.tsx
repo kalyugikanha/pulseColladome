@@ -217,7 +217,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
 
         <div className="mt-3 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-2 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5 mt-0.5 text-primary shrink-0" />
-          <span>Hours must be tied to a task. If you don't see the task you worked on, ask your manager to create one for you first.</span>
+          <span>You can only log hours against tasks assigned to you. If the task you worked on isn't here, ask your manager to assign it — or use the "Request a task" flow on Punch.</span>
         </div>
 
         <div className="mt-4 space-y-3">

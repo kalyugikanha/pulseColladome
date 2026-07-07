@@ -45,7 +45,7 @@ const EMPLOYMENT_LABEL: Record<EmploymentType, string> = {
   consultant: "Consultant",
 };
 
-function OnboardingPage() {
+export function OnboardingPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const createUserFn = useServerFn(createTeamUser);

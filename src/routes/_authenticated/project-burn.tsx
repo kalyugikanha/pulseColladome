@@ -223,7 +223,7 @@ function ProjectBurnPage() {
   // Monthly totals: per-user, sum hours per project (for salary-share)
   const monthlyUserTotals = useMemo(() => {
     const totals = new Map<string, number>(); // user_id -> monthly total hours
-    for (const row of logs ?? []) {
+    for (const row of combinedLogs) {
       for (const t of row.tasks ?? []) {
         const h = Number(t.hours) || 0;
         if (h <= 0) continue;

@@ -55,6 +55,8 @@ type KanbanTask = {
   origin_department: string | null;
   requester_id: string | null;
   asset_links: { label: string; url: string }[] | null;
+  project_id: string | null;
+  project: { id: string; code: string | null; name: string | null } | null;
   assignee: { id: string; full_name: string | null; email: string | null } | null;
   requester: { id: string; full_name: string | null } | null;
 };

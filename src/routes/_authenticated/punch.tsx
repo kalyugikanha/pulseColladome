@@ -56,6 +56,8 @@ function PunchPage() {
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["punch-sessions-today", me?.id],
     enabled: !!me,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
@@ -140,8 +142,14 @@ function PunchPage() {
       punch_in_time: new Date().toISOString(),
     });
     if (error) {
+      const isDup = (error as { code?: string }).code === "23505" || /duplicate|unique/i.test(error.message);
+      if (isDup) {
+        await refetchSessions();
+        toast.error("You already have an open session — refreshed.");
+      } else {
+        toast.error(error.message);
+      }
       setPunchingIn(false);
-      toast.error(error.message);
       return;
     }
     toast.success("Punched in");

@@ -44,6 +44,8 @@ function Dashboard() {
   const { data } = useQuery({
     queryKey: ["dashboard", me?.id, me?.isAdmin],
     enabled: !!me,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const uid = me!.id;
       const [todayLog, openSessions, weekLogs, myTasks, myLeave, balances] = await Promise.all([
@@ -89,7 +91,9 @@ function Dashboard() {
       punch_in_time: new Date().toISOString(),
     });
     if (error) {
-      toast.error(error.message.includes("duplicate") ? "You are already punched in." : error.message);
+      const isDup = error.code === "23505" || /duplicate|unique/i.test(error.message);
+      toast.error(isDup ? "You are already punched in — refreshing…" : error.message);
+      await qc.invalidateQueries({ queryKey: ["dashboard"] });
       setPunchingIn(false);
       return;
     }

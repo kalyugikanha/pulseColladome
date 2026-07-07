@@ -212,6 +212,7 @@ function MarketingKanbanPage() {
               roster={roster ?? []} canAssignAny={canAssignAny}
               onSendBack={(t) => setSendBack(t)}
               onApprove={(t) => setPending({ task: t, toStage: "posting" })}
+              onOpen={(t) => setOpenTaskId(t.id)}
             />
           ))}
         </div>

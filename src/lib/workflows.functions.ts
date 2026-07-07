@@ -191,6 +191,7 @@ export const closeTask = createServerFn({ method: "POST" })
     branchKey?: string | null;
     nextAssigneeId?: string | null;
     requiredFieldValues?: Record<string, unknown>;
+    rating?: number | null;
     viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
@@ -234,6 +235,15 @@ export const closeTask = createServerFn({ method: "POST" })
       await supabase.from("tasks").update({ required_fields_values: data.requiredFieldValues as never } as never).eq("id", task.id);
     }
 
+    async function maybeRecordRating(rateeId: string | null) {
+      const r = data.rating;
+      if (r == null || !Number.isFinite(r) || r < 1 || r > 5 || !rateeId) return;
+      await supabase.from("task_ratings" as never).insert({
+        task_id: task.id, ratee_id: rateeId, rater_id: actingUserId,
+        rating: Math.round(r),
+      } as never);
+    }
+
     // Stage requires a review? Move to review, do NOT spawn next stage yet.
     if (stage?.requires_review) {
       // Reviewer priority:
@@ -261,6 +271,7 @@ export const closeTask = createServerFn({ method: "POST" })
       // If the assignee is also the reviewer (or no distinct reviewer resolved), auto-approve.
       if (!reviewer || reviewer === actingUserId) {
         await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
+        await maybeRecordRating(task.assignee_id);
         await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
         return { ok: true, status: "done" };
       }
@@ -274,6 +285,7 @@ export const closeTask = createServerFn({ method: "POST" })
 
     // Done + optional next stage
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
+    await maybeRecordRating(task.assignee_id);
     await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
     return { ok: true, status: "done" };
   });

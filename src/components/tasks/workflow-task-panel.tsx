@@ -141,6 +141,7 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
 
 function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
+  const { viewAsUserId } = useViewAs();
   const [hours, setHours] = useState("");
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
@@ -164,6 +165,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
         requiredFieldValues: values,
+        viewAsUserId,
       }});
       toast.success("Stage closed");
       await onDone();

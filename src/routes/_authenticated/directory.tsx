@@ -89,6 +89,29 @@ export function DirectoryPage() {
     },
   });
 
+  const { data: rolesByUser } = useQuery({
+    queryKey: ["directory-roles"],
+    enabled: canView,
+    queryFn: async () => {
+      const [{ data: ur }, { data: sa }] = await Promise.all([
+        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("super_admins").select("user_id"),
+      ]);
+      const map = new Map<string, string[]>();
+      (ur ?? []).forEach((r: { user_id: string; role: string }) => {
+        const list = map.get(r.user_id) ?? [];
+        if (!list.includes(r.role)) list.push(r.role);
+        map.set(r.user_id, list);
+      });
+      (sa ?? []).forEach((r: { user_id: string }) => {
+        const list = map.get(r.user_id) ?? [];
+        if (!list.includes("super_admin")) list.unshift("super_admin");
+        map.set(r.user_id, list);
+      });
+      return map;
+    },
+  });
+
   // For the "reporting manager" dropdown super/HR admins pick from — full list
   // regardless of scope.
   const { data: managerChoices } = useQuery({
@@ -99,6 +122,7 @@ export function DirectoryPage() {
       return (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>;
     },
   });
+
 
   const nameById = useMemo(() => {
     const m = new Map<string, string>();

@@ -109,8 +109,8 @@ function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => v
     <Card
       ref={setNodeRef}
       {...attributes} {...listeners}
-      onClick={() => onOpen(card.id)}
-      className={`p-3 cursor-pointer hover:border-primary/50 ${isDragging ? "opacity-50" : ""}`}
+      onDoubleClick={() => onOpen(card.id)}
+      className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-50" : ""}`}
     >
       <div className="text-sm font-medium">{card.title}</div>
       <div className="flex flex-wrap gap-1 mt-2 items-center">

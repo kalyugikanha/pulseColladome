@@ -25,6 +25,7 @@ import {
   toggleWatcher, addDependency, removeDependency,
 } from "@/lib/tasks-workflow.functions";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useViewAs } from "@/hooks/use-view-as";
 
 type Props = { taskId: string | null; onClose: () => void };
 
@@ -34,6 +35,7 @@ const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In P
 export function TaskDetailSheet({ taskId, onClose }: Props) {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
+  const { viewAsUserId } = useViewAs();
   const detailFn = useServerFn(getTaskDetail);
   const setStatusFn = useServerFn(setTaskStatus);
   const reviewFn = useServerFn(submitReviewDecision);
@@ -121,7 +123,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
   async function doStatus(s: "todo" | "in_progress" | "review" | "done") {
     try {
-      await setStatusFn({ data: { taskId: taskId!, status: s } });
+      await setStatusFn({ data: { taskId: taskId!, status: s, viewAsUserId } });
       toast.success("Status updated");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
@@ -129,7 +131,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
   async function doReview(decision: "approve" | "request_changes" | "reject") {
     try {
-      await reviewFn({ data: { taskId: taskId!, decision, note: reviewNote.trim() || undefined } });
+      await reviewFn({ data: { taskId: taskId!, decision, note: reviewNote.trim() || undefined, viewAsUserId } });
       setReviewNote("");
       toast.success("Review submitted");
       await refresh();
@@ -244,7 +246,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Reviewer</div>
                 <Select value={(task as { reviewer_id: string | null }).reviewer_id ?? "none"} onValueChange={async (v) => {
-                  await setReviewerFn({ data: { taskId: taskId!, reviewerId: v === "none" ? null : v } });
+                  await setReviewerFn({ data: { taskId: taskId!, reviewerId: v === "none" ? null : v, viewAsUserId } });
                   toast.success("Reviewer updated");
                   await refresh();
                 }}>

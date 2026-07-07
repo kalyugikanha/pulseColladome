@@ -29,6 +29,15 @@ async function notify(
   });
 }
 
+/** Resolve the acting user id (super admin can act as an impersonated user). */
+async function resolveActingUser(
+  supabase: any, userId: string, viewAsUserId?: string | null,
+): Promise<string> {
+  if (!viewAsUserId || viewAsUserId === userId) return userId;
+  const { data: sa } = await supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle();
+  return sa ? viewAsUserId : userId;
+}
+
 /* ============ Task detail read ============ */
 export const getTaskDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -59,10 +68,11 @@ export const getTaskDetail = createServerFn({ method: "POST" })
 /* ============ Status / review workflow ============ */
 export const setTaskStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; status: TaskStatus }) => d)
+  .inputValidator((d: { taskId: string; status: TaskStatus; viewAsUserId?: string | null }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: task } = await supabase.from("tasks").select("id, status, reviewer_id, assignee_id, review_state").eq("id", data.taskId).maybeSingle();
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const { data: task } = await supabase.from("tasks").select("id, status, reviewer_id, assignee_id, review_state, created_by").eq("id", data.taskId).maybeSingle();
     if (!task) throw new Error("Task not found");
 
     // Dependency gate: cannot leave 'todo' if any dep is not done
@@ -78,10 +88,18 @@ export const setTaskStatus = createServerFn({ method: "POST" })
       if (blocking) throw new Error("This task is blocked by an incomplete dependency.");
     }
 
+    // Default reviewer to the ORIGINAL CREATOR of the task when moving to done
+    // and no reviewer has been explicitly set. Only used as a default — never overwrites.
+    let reviewerId: string | null = task.reviewer_id ?? null;
+    if (data.status === "done" && !reviewerId && task.created_by && task.created_by !== actingUserId) {
+      reviewerId = task.created_by;
+      await supabase.from("tasks").update({ reviewer_id: reviewerId }).eq("id", data.taskId);
+    }
+
     let nextStatus: TaskStatus = data.status;
     let reviewState: string = task.review_state;
     // Assignee marking done + reviewer set → move to review
-    if (data.status === "done" && task.reviewer_id && task.reviewer_id !== userId) {
+    if (data.status === "done" && reviewerId && reviewerId !== actingUserId) {
       nextStatus = "review";
       reviewState = "pending_review";
     } else if (data.status !== "done") {
@@ -92,22 +110,23 @@ export const setTaskStatus = createServerFn({ method: "POST" })
       status: nextStatus, review_state: reviewState,
     }).eq("id", data.taskId);
     if (error) throw error;
-    await logActivity(supabase, data.taskId, userId, "status_changed", task.status, nextStatus);
+    await logActivity(supabase, data.taskId, actingUserId, "status_changed", task.status, nextStatus);
 
-    if (nextStatus === "review" && task.reviewer_id) {
-      await notify(supabase, task.reviewer_id, "review_requested", data.taskId, null, "A task is waiting for your review.");
+    if (nextStatus === "review" && reviewerId) {
+      await notify(supabase, reviewerId, "review_requested", data.taskId, null, "A task is waiting for your review.");
     }
     return { ok: true, status: nextStatus, review_state: reviewState };
   });
 
 export const submitReviewDecision = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; decision: "approve" | "request_changes" | "reject"; note?: string }) => d)
+  .inputValidator((d: { taskId: string; decision: "approve" | "request_changes" | "reject"; note?: string; viewAsUserId?: string | null }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
     const { data: task } = await supabase.from("tasks").select("id, status, reviewer_id, assignee_id").eq("id", data.taskId).maybeSingle();
     if (!task) throw new Error("Task not found");
-    if (task.reviewer_id !== userId) throw new Error("Not the reviewer");
+    if (task.reviewer_id !== actingUserId) throw new Error("Not the reviewer");
 
     let nextStatus: TaskStatus = "done";
     let reviewState: string = "approved";
@@ -119,20 +138,21 @@ export const submitReviewDecision = createServerFn({ method: "POST" })
       status: nextStatus, review_state: reviewState,
     }).eq("id", data.taskId);
     if (error) throw error;
-    await logActivity(supabase, data.taskId, userId, "review_submitted", task.status, `${nextStatus}:${data.decision}`, data.note ?? null);
+    await logActivity(supabase, data.taskId, actingUserId, "review_submitted", task.status, `${nextStatus}:${data.decision}`, data.note ?? null);
     if (task.assignee_id) await notify(supabase, task.assignee_id, "review_decided", data.taskId, null, notifBody + (data.note ? ` — ${data.note}` : ""));
     return { ok: true };
   });
 
 export const setReviewer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; reviewerId: string | null }) => d)
+  .inputValidator((d: { taskId: string; reviewerId: string | null; viewAsUserId?: string | null }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
     const { data: prev } = await supabase.from("tasks").select("reviewer_id").eq("id", data.taskId).maybeSingle();
     const { error } = await supabase.from("tasks").update({ reviewer_id: data.reviewerId }).eq("id", data.taskId);
     if (error) throw error;
-    await logActivity(supabase, data.taskId, userId, "reviewer_changed", prev?.reviewer_id ?? null, data.reviewerId);
+    await logActivity(supabase, data.taskId, actingUserId, "reviewer_changed", prev?.reviewer_id ?? null, data.reviewerId);
     if (data.reviewerId) await notify(supabase, data.reviewerId, "reviewer_assigned", data.taskId, null, "You were added as reviewer on a task.");
     return { ok: true };
   });

@@ -66,6 +66,37 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [myDept, setMyDept] = useState<string | null>(null);
+  const [refLabel, setRefLabel] = useState("");
+  const [refUrl, setRefUrl] = useState("");
+  const [refBusy, setRefBusy] = useState(false);
+
+  const assetLinks = ((task as { asset_links?: { label: string; url: string }[] | null } | undefined)?.asset_links) ?? [];
+
+  async function saveAssetLinks(next: { label: string; url: string }[]) {
+    if (!task) return;
+    const { error } = await supabase.from("tasks").update({ asset_links: next as never } as never).eq("id", task.id);
+    if (error) throw new Error(error.message);
+    await refresh();
+  }
+
+  async function addReference() {
+    const label = refLabel.trim();
+    let url = refUrl.trim();
+    if (!label || !url) return toast.error("Label and URL required");
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    setRefBusy(true);
+    try {
+      await saveAssetLinks([...assetLinks, { label, url }]);
+      setRefLabel(""); setRefUrl("");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setRefBusy(false); }
+  }
+
+  async function removeReference(idx: number) {
+    try { await saveAssetLinks(assetLinks.filter((_, i) => i !== idx)); }
+    catch (e) { toast.error((e as Error).message); }
+  }
+
 
   useEffect(() => {
     if (!me?.realId) { setMyDept(null); return; }

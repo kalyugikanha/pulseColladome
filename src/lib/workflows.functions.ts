@@ -275,6 +275,7 @@ export const reviewTask = createServerFn({ method: "POST" })
     body?: string | null;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
+    rating?: number | null;
     viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
@@ -307,9 +308,20 @@ export const reviewTask = createServerFn({ method: "POST" })
 
     // approve
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
+
+    // Optional rating: reviewer rating a different assignee
+    const r = data.rating;
+    if (r != null && Number.isFinite(r) && r >= 1 && r <= 5 && task.assignee_id && task.assignee_id !== actingUserId) {
+      await supabase.from("task_ratings" as never).insert({
+        task_id: task.id, ratee_id: task.assignee_id, rater_id: actingUserId,
+        rating: Math.round(r),
+      } as never);
+    }
+
     await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
     return { ok: true };
   });
+
 
 
 /** Log time from a task (self, on own task). */

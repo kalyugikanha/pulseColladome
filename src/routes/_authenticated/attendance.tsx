@@ -34,7 +34,7 @@ function AttendancePage() {
   const [overviewSearch, setOverviewSearch] = useState("");
   const overviewDateStr = format(overviewDate, "yyyy-MM-dd");
 
-  const canView = !!me && (me.isAdmin || me.isReportingManager);
+  const canView = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin || me.isReportingManager);
   const { userScope } = useVisibilityScope(me);
 
   const { data } = useQuery({
@@ -57,11 +57,12 @@ function AttendancePage() {
       const scopedLeaves = ((todayLeaves.data ?? []) as Array<{
         user_id: string; leave_type: string; start_date: string; end_date: string; reason: string | null;
       }>).filter((l) => nameById.has(l.user_id));
-      const pendingReq = me?.isAdmin
-        ? await supabase.rpc("admin_get_leave_requests", { _status: "pending" })
+      const isOrgWide = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin);
+      const pendingReq = isOrgWide
+        ? await supabase.from("leave_requests").select("*").eq("status", "pending")
         : await supabase.from("leave_requests").select("*").eq("status", "pending");
       const pendingWithUser = ((pendingReq.data ?? []) as Array<Record<string, unknown> & { user_id: string }>)
-        .filter((r) => nameById.has(r.user_id) || me?.isAdmin)
+        .filter((r) => nameById.has(r.user_id) || isOrgWide)
         .map((r) => ({
           ...r,
           user: nameById.get(r.user_id)

@@ -344,7 +344,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "employee_bank_details_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       employee_documents: {
         Row: {
@@ -368,7 +376,15 @@ export type Database = {
           uploaded_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       google_calendar_events: {
         Row: {
@@ -941,6 +957,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "punch_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2028,6 +2051,7 @@ export type Database = {
           name: string
           next_stage_position: number | null
           position: number
+          project_id: string | null
           required_fields: Json
           requires_review: boolean
           template_id: string
@@ -2043,6 +2067,7 @@ export type Database = {
           name: string
           next_stage_position?: number | null
           position: number
+          project_id?: string | null
           required_fields?: Json
           requires_review?: boolean
           template_id: string
@@ -2058,6 +2083,7 @@ export type Database = {
           name?: string
           next_stage_position?: number | null
           position?: number
+          project_id?: string | null
           required_fields?: Json
           requires_review?: boolean
           template_id?: string
@@ -2075,6 +2101,13 @@ export type Database = {
             columns: ["default_reviewer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_template_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {

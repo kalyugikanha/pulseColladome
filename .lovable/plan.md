@@ -1,5 +1,5 @@
-Delete every row from the `tasks` table (all users, all projects, including recurring templates). This will cascade through related task tables (comments, subtasks, dependencies, watchers, activity, ratings, mentions, review comments, task_task_types, workflow_instances references, etc.) depending on FK settings.
+In `closeTask` (src/lib/workflows.functions.ts), when the stage requires review, after resolving the reviewer, check if the resolved reviewer is the same person as the acting assignee. If so, treat the close as auto-approved: skip the "move to review + notify reviewer" branch and fall through to the done path — mark the task `status: done, completion_percent: 100` and call `spawnNextStage(...)` exactly like the non-review path.
 
-This is irreversible. No code or schema changes — data only, via a single `DELETE FROM public.tasks;` using the insert tool.
+No other behavior changes. If the reviewer is a different person, current review flow stays intact.
 
-Confirm to proceed.
+Technical detail: after computing `reviewer` (task.reviewer_id → stage.default_reviewer_id → creator/starter fallback), if `reviewer === actingUserId` (or reviewer is null and the assignee is effectively their own reviewer), persist the reviewer_id if newly set, then run the same done+spawn logic and return `{ ok: true, status: "done" }`.

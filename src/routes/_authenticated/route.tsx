@@ -53,7 +53,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
     { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
     { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
-    { title: "Projects", url: "/projects", icon: FolderKanban, match: "/projects|/project-burn" },
+    { title: "Projects", url: "/projects", icon: FolderKanban, match: "/projects" },
     { title: "Team", url: "/team", icon: Users, match: "/team|/leave|/calendar|/directory" },
     { title: "Performance", url: "/performance", icon: Star },
     ...(isBd ? [{ title: "Business Development", url: "/bd", icon: Briefcase } as NavItem] : []),
@@ -112,7 +112,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                 )}
                 {isFinanceAdmin && (
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/finances")}>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/finances") || pathname.startsWith("/project-burn")}>
                       <Link to="/finances"><Wallet /><span>Finances</span></Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

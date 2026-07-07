@@ -30,7 +30,16 @@ export const Route = createFileRoute("/_authenticated/timesheet")({
 });
 
 type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
-type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string; source?: "log" | "activity" };
+type Task = {
+  project_code?: string;
+  project_name?: string;
+  hours?: number;
+  approved_hours?: number;
+  logged_hours?: number;
+  comments?: string;
+  source?: "log" | "activity";
+  approval_status?: string;
+};
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
 type ActivityRow = {
@@ -49,6 +58,24 @@ function addDays(d: Date, n: number) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
   return x;
+}
+
+function ymdInTimeZone(d: Date, timeZone = "Asia/Kolkata") {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function activityWorkDate(row: Pick<ActivityRow, "completion_date" | "created_at">) {
+  const createdUtcDay = row.created_at.slice(0, 10);
+  const createdLocalDay = ymdInTimeZone(new Date(row.created_at));
+  if (row.completion_date && row.completion_date !== createdUtcDay) return row.completion_date;
+  return createdLocalDay || row.completion_date || createdUtcDay;
 }
 
 export function TimesheetPage() {
@@ -78,7 +105,9 @@ export function TimesheetPage() {
   const { deptScope, userScope } = useVisibilityScope(me);
 
   const dateIso = ymd(day);
+  const prevDayIso = ymd(addDays(day, -1));
   const nextDayIso = ymd(addDays(day, 1));
+  const afterNextDayIso = ymd(addDays(day, 2));
   const dateLabel = format(day, "EEEE, d MMM yyyy");
 
   // Visibility model shared with the Pending panel:
@@ -130,7 +159,7 @@ export function TimesheetPage() {
   });
 
   // Kanban-logged task hours (task_activity) for the visible team on the selected day.
-  const { data: activityRows } = useQuery({
+  const { data: rawActivityRows } = useQuery({
     queryKey: ["ts-activity", dateIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
     enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
     queryFn: async () => {
@@ -139,13 +168,18 @@ export function TimesheetPage() {
         .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
         .not("hours", "is", null)
         .neq("approval_status", "rejected")
-        .gte("completion_date", dateIso).lt("completion_date", nextDayIso);
+        .gte("completion_date", prevDayIso).lt("completion_date", afterNextDayIso);
       if (hasScope || fallbackActorIds) q = q.in("actor_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as unknown as ActivityRow[]);
     },
   });
+
+  const activityRows = useMemo(
+    () => (rawActivityRows ?? []).filter((row) => activityWorkDate(row) === dateIso),
+    [rawActivityRows, dateIso],
+  );
 
   const pendingActorIds = pendingIsAdmin
     ? (hasScope ? visibleUserIds : null) // null = unscoped, no in() filter
@@ -261,15 +295,21 @@ export function TimesheetPage() {
         const proj = a.task?.project;
         const code = proj?.code?.trim() || "—";
         const name = proj?.name || a.task?.title || "Task";
-        const hrs = Number(a.hours) || 0;
+        const logged = Number(a.hours) || 0;
         const approved = a.approval_status === "approved" || a.approval_status === "auto";
+        const approvedHrs = Number(a.approved_hours ?? logged) || 0;
+        const shownHrs = approved ? approvedHrs : logged;
+        const baseComment = a.note ?? a.task?.title ?? undefined;
+        const partial = approved && approvedHrs < logged;
         return {
           project_code: code,
           project_name: name,
-          hours: hrs,
-          approved_hours: approved ? Number(a.approved_hours ?? hrs) : undefined,
-          comments: a.note ?? a.task?.title ?? undefined,
+          hours: shownHrs,
+          logged_hours: logged,
+          approved_hours: approved ? approvedHrs : undefined,
+          comments: partial ? `${baseComment ?? "Task hours"} · approved ${approvedHrs}/${logged}h` : baseComment,
           source: "activity" as const,
+          approval_status: a.approval_status,
         };
       });
       let tasks: Task[] = [...logTasks, ...actTasks];
@@ -412,10 +452,13 @@ export function TimesheetPage() {
         continue;
       }
       for (const t of r.tasks) {
+        const status = t.source === "activity"
+          ? (t.approval_status === "approved" || t.approval_status === "auto" ? "Approved" : t.approval_status === "pending" ? "Pending" : t.approval_status ?? "Pending")
+          : (r.approved ? "Approved" : "Pending");
         rows.push([
           r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "",
           t.project_code ?? "", t.project_name ?? "",
-          String(t.hours ?? 0), t.comments ?? "", r.approved ? "Approved" : "Pending",
+          String(t.hours ?? 0), t.comments ?? "", status,
         ]);
       }
     }
@@ -498,7 +541,7 @@ export function TimesheetPage() {
                 </TableHeader>
                 <TableBody>
                   {pendingHours.map((r) => {
-                    const date = r.completion_date ?? r.created_at.slice(0, 10);
+                    const date = activityWorkDate(r);
                     const proj = r.task?.project;
                     const logged = Number(r.hours ?? 0);
                     return (
@@ -676,14 +719,10 @@ function EmployeeBlock({
                 <TableCell>
                   <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { comments: v })} placeholder="Optional" />
                 </TableCell>
-                {i === 0 && (
-                  <TableCell rowSpan={rowspan} className="align-top">
-                    {row.approved
-                      ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
-                      : <Badge variant="outline">Pending</Badge>}
-                    {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
-                  </TableCell>
-                )}
+                <TableCell>
+                  {taskStatusBadge(row, t)}
+                  {locked && !isActivity && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 justify-end">
                     {!isActivity && (
@@ -712,7 +751,7 @@ function EmployeeBlock({
           <TableCell className="text-right">
             <Input type="number" min={0} step={0.25} value={addHrs} onChange={(e) => setAddHrs(e.target.value)} className="h-8 text-right font-mono" placeholder="0" />
           </TableCell>
-          <TableCell colSpan={2}>
+          <TableCell colSpan={3}>
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => {
                 const h = Number(addHrs);
@@ -727,16 +766,34 @@ function EmployeeBlock({
       )}
       {mayEdit && row.tasks.length > 0 && !addOpen && (
         <TableRow>
-          <TableCell colSpan={3}>
+          <TableCell colSpan={5}>
             <Button size="sm" variant="ghost" className="h-7 text-muted-foreground" onClick={() => setAddOpen(true)}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Add project
             </Button>
           </TableCell>
-          <TableCell />
         </TableRow>
       )}
     </>
   );
+}
+
+function taskStatusBadge(row: { approved: boolean }, task?: Task) {
+  if (task?.source === "activity") {
+    const approved = task.approval_status === "approved" || task.approval_status === "auto";
+    if (approved) {
+      const partial = task.logged_hours != null && task.approved_hours != null && task.approved_hours < task.logged_hours;
+      return (
+        <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300">
+          <CheckCircle2 className="h-3 w-3" /> {partial ? `${task.approved_hours}/${task.logged_hours}h` : "Approved"}
+        </Badge>
+      );
+    }
+    return <Badge variant="outline">Pending</Badge>;
+  }
+
+  return row.approved
+    ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
+    : <Badge variant="outline">Pending</Badge>;
 }
 
 function RowMenu({ canApprove, approved, onToggleApproval, onOpenFull }: { canApprove: boolean; approved: boolean; onToggleApproval: () => void; onOpenFull: () => void }) {

@@ -107,7 +107,7 @@ function ProjectBurnPage() {
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
       let q = supabase
         .from("task_activity" as never)
-        .select("actor_id, hours, completion_date, created_at, approval_status, task:tasks(project:projects(code, name))")
+        .select("actor_id, hours, approved_hours, completion_date, created_at, approval_status, task:tasks(project:projects(code, name))")
         .eq("approval_status", "approved")
         .not("hours", "is", null)
         .gte("completion_date", start)
@@ -116,7 +116,7 @@ function ProjectBurnPage() {
       const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as unknown as Array<{
-        actor_id: string; hours: number | null;
+        actor_id: string; hours: number | null; approved_hours: number | null;
         completion_date: string | null; created_at: string;
         task: { project: { code: string | null; name: string | null } | null } | null;
       }>);
@@ -127,7 +127,7 @@ function ProjectBurnPage() {
   const combinedLogs = useMemo<LogRow[]>(() => {
     const base = (logs ?? []).slice();
     for (const a of activityLogs ?? []) {
-      const h = Number(a.hours) || 0;
+      const h = Number(a.approved_hours ?? a.hours) || 0;
       if (h <= 0) continue;
       const code = a.task?.project?.code?.trim();
       if (!code) continue; // no project = can't attribute to a project's burn
@@ -138,6 +138,7 @@ function ProjectBurnPage() {
         tasks: [{ project_code: code, project_name: a.task?.project?.name ?? code, hours: h }],
       });
     }
+
     return base;
   }, [logs, activityLogs]);
 

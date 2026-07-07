@@ -20,7 +20,7 @@ function MyPerformancePage() {
       const [tasks, activity, ratings] = await Promise.all([
         supabase.from("tasks").select("id, status, created_at").eq("assignee_id", me!.id),
         supabase.from("task_activity" as never)
-          .select("hours, approval_status, completion_date")
+          .select("hours, approved_hours, approval_status, completion_date")
           .eq("actor_id", me!.id)
           .not("hours", "is", null),
         supabase.from("task_ratings" as never)
@@ -29,9 +29,14 @@ function MyPerformancePage() {
           .gte("created_at", monthStart),
       ]);
       const rows = (tasks.data ?? []) as Array<{ id: string; status: string; created_at: string }>;
-      const acts = ((activity.data ?? []) as unknown as Array<{ hours: number | string; approval_status: string; completion_date: string | null }>);
+      const acts = ((activity.data ?? []) as unknown as Array<{ hours: number | string; approved_hours: number | string | null; approval_status: string; completion_date: string | null }>);
       const rateRows = ((ratings.data ?? []) as unknown as Array<{ rating: number }>);
-      const totalHours = acts.filter((a) => a.approval_status !== "rejected").reduce((s, a) => s + Number(a.hours ?? 0), 0);
+      const totalHours = acts.filter((a) => a.approval_status !== "rejected").reduce((s, a) => {
+        const approved = a.approval_status === "approved" || a.approval_status === "auto";
+        const h = approved ? Number(a.approved_hours ?? a.hours ?? 0) : Number(a.hours ?? 0);
+        return s + h;
+      }, 0);
+
       const done = rows.filter((r) => r.status === "done").length;
       const inProgress = rows.filter((r) => r.status === "in_progress" || r.status === "review").length;
       const avgRating = rateRows.length > 0

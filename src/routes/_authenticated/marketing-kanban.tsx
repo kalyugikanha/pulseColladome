@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Plus, Send, Check, Undo2, AlertTriangle, ExternalLink, ArrowRightLeft, Settings2 } from "lucide-react";
+import { Plus, Send, Check, Undo2, AlertTriangle, ExternalLink, ArrowRightLeft, Settings2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { format, isPast, parseISO } from "date-fns";
 import {
@@ -22,7 +23,10 @@ import {
 } from "@dnd-kit/core";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 
+const searchSchema = z.object({ assignee: z.string().optional() });
+
 export const Route = createFileRoute("/_authenticated/marketing-kanban")({
+  validateSearch: searchSchema,
   component: MarketingKanbanPage,
 });
 

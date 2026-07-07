@@ -207,9 +207,9 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Assign next stage to *</Label>
+                <Label className="text-xs">Assign next stage to (optional)</Label>
                 <Select value={nextAssignee} onValueChange={setNextAssignee}>
-                  <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Use stage default" /></SelectTrigger>
                   <SelectContent className="max-h-72">
                     {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
                   </SelectContent>

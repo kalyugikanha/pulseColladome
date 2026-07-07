@@ -627,6 +627,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
   const [client, setClient] = useState<string>("");
   const [clientOther, setClientOther] = useState("");
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
+  const [estimatedHours, setEstimatedHours] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const { data: clients } = useQuery({
@@ -650,7 +651,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
   useEffect(() => {
     if (open) {
       setTitle(""); setDesc(""); setAssignee(me?.realId ?? ""); setProjectId(""); setDeadline(""); setPostDate("");
-      setPriority("medium"); setClient(""); setClientOther(""); setLinks([]);
+      setPriority("medium"); setClient(""); setClientOther(""); setLinks([]); setEstimatedHours("");
     }
   }, [open, me?.realId]);
 
@@ -658,6 +659,12 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
     if (!title.trim()) return toast.error("Title required");
     if (!assignee) return toast.error("Assignee required");
     if (!projectId) return toast.error("Project required");
+    let estHours: number | null = null;
+    if (estimatedHours.trim()) {
+      const n = Number(estimatedHours);
+      if (!Number.isFinite(n) || n <= 0) return toast.error("Estimated hours must be a positive number.");
+      estHours = n;
+    }
     setSaving(true);
     const brand = client === "__other__" ? clientOther.trim() || null : client || null;
     const payload: Record<string, unknown> = {
@@ -673,6 +680,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
       assignee_id: assignee,
       created_by: me!.realId,
       asset_links: links.filter((l) => l.url.trim()),
+      estimated_hours: estHours,
     };
     if (mktDeptId) payload.department_id = mktDeptId;
     const { error } = await supabase.from("tasks").insert(payload as any);
@@ -714,6 +722,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
             <div className="space-y-1"><Label>Internal deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
             <div className="space-y-1"><Label>Scheduled post date</Label><Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} /></div>
           </div>
+          <div className="space-y-1"><Label>Estimated hours</Label><Input type="number" min={0} step={0.25} placeholder="e.g. 4" value={estimatedHours} onChange={(e) => setEstimatedHours(e.target.value)} /></div>
           <div className="space-y-1"><Label>Project</Label>
             <Select value={projectId} onValueChange={setProjectId}>
               <SelectTrigger><SelectValue placeholder="Pick project" /></SelectTrigger>

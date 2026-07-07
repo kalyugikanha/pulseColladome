@@ -22,8 +22,9 @@ import { WorkflowTaskPanel } from "./workflow-task-panel";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
   addSubtask, toggleSubtask, deleteSubtask, addComment, resolveComment,
-  toggleWatcher, addDependency, removeDependency,
+  toggleWatcher, addDependency, removeDependency, rateTask,
 } from "@/lib/tasks-workflow.functions";
+
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
 

@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { impersonationMiddleware } from "./impersonation.middleware";
+
 
 /** =========== Taxonomy read ============== */
 export const listTaxonomy = createServerFn({ method: "GET" })

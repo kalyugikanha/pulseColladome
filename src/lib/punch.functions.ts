@@ -16,6 +16,38 @@ type PunchOutInput = {
   allocations: PunchAllocationInput[];
 };
 
+export type PunchAllocation = {
+  project_id: string;
+  project_code: string | null;
+  project_name: string | null;
+  hours: number;
+  comments: string;
+};
+
+export type PunchSessionResult = {
+  id: string;
+  user_id: string;
+  session_date: string;
+  punch_in_time: string;
+  punch_out_time: string | null;
+  hours: number | null;
+  project_id: string | null;
+  project_code: string | null;
+  project_name: string | null;
+  comments: string | null;
+  allocations: PunchAllocation[] | null;
+};
+
+export type PunchInResult = {
+  status: "punched_in" | "already_open";
+  session: PunchSessionResult;
+};
+
+export type PunchOutResult = {
+  status: "punched_out";
+  session: PunchSessionResult;
+};
+
 function requireIsoDate(value: unknown) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new Error("Invalid session date.");
@@ -51,7 +83,16 @@ function normalizePunchOutInput(input: PunchOutInput) {
   return { sessionId: input.sessionId.trim(), allocations };
 }
 
-function toPunchSession(row: any) {
+function toPunchSession(row: any): PunchSessionResult {
+  const rawAllocations = Array.isArray(row.allocations) ? row.allocations : null;
+  const allocations = rawAllocations?.map((allocation: any) => ({
+    project_id: String(allocation?.project_id ?? ""),
+    project_code: allocation?.project_code == null ? null : String(allocation.project_code),
+    project_name: allocation?.project_name == null ? null : String(allocation.project_name),
+    hours: Number(allocation?.hours ?? 0),
+    comments: String(allocation?.comments ?? ""),
+  })) ?? null;
+
   return {
     id: row.id as string,
     user_id: row.user_id as string,
@@ -63,7 +104,7 @@ function toPunchSession(row: any) {
     project_code: (row.project_code as string | null) ?? null,
     project_name: (row.project_name as string | null) ?? null,
     comments: (row.comments as string | null) ?? null,
-    allocations: (row.allocations as unknown[] | null) ?? null,
+    allocations,
   };
 }
 
@@ -94,7 +135,7 @@ export const punchIn = createServerFn({ method: "POST" })
 
     if (existingToday) {
       await syncAttendance(supabase, userId, data.sessionDate);
-      return { status: "already_open" as const, session: toPunchSession(existingToday) };
+      return { status: "already_open" as const, session: toPunchSession(existingToday) } satisfies PunchInResult;
     }
 
     const { data: inserted, error } = await supabase
@@ -123,11 +164,11 @@ export const punchIn = createServerFn({ method: "POST" })
       if (!openSession) throw new Error("You already have an open session. Please refresh and try again.");
 
       await syncAttendance(supabase, userId, openSession.session_date);
-      return { status: "already_open" as const, session: toPunchSession(openSession) };
+      return { status: "already_open" as const, session: toPunchSession(openSession) } satisfies PunchInResult;
     }
 
     await syncAttendance(supabase, userId, data.sessionDate);
-    return { status: "punched_in" as const, session: toPunchSession(inserted) };
+    return { status: "punched_in" as const, session: toPunchSession(inserted) } satisfies PunchInResult;
   });
 
 export const punchOut = createServerFn({ method: "POST" })
@@ -180,5 +221,5 @@ export const punchOut = createServerFn({ method: "POST" })
     if (!updated) throw new Error("No open punch session found. Please refresh and try again.");
 
     await syncAttendance(supabase, userId, updated.session_date);
-    return { status: "punched_out" as const, session: toPunchSession(updated) };
+    return { status: "punched_out" as const, session: toPunchSession(updated) } satisfies PunchOutResult;
   });

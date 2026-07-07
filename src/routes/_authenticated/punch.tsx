@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { punchIn as punchInServerFn, punchOut as punchOutServerFn } from "@/lib/punch.functions";
+import { punchIn as punchInServerFn, punchOut as punchOutServerFn, type PunchInResult, type PunchOutResult } from "@/lib/punch.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -110,7 +110,7 @@ function PunchPage() {
     if (openSession) { toast.error("You already have an open session. Punch out first."); return; }
     setPunchingIn(true);
     try {
-      const result = await punchInServer({ data: { sessionDate: today } });
+      const result = await punchInServer({ data: { sessionDate: today } }) as PunchInResult;
       if (result.session.session_date === today) {
         qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => {
           const next = old.some((row) => row.id === result.session.id)
@@ -173,7 +173,7 @@ function PunchPage() {
 
     setSubmitting(true);
     try {
-      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations } });
+      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations } }) as PunchOutResult;
       qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => old.map((row) => row.id === result.session.id ? result.session as Session : row));
       await refetchSessions();
       toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);

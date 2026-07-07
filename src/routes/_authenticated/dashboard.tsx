@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { punchIn as punchInServerFn } from "@/lib/punch.functions";
+import { punchIn as punchInServerFn, type PunchInResult } from "@/lib/punch.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,7 +90,7 @@ function Dashboard() {
     if (!me || punchingIn || punchedIn) return;
     setPunchingIn(true);
     try {
-      const result = await punchInServer({ data: { sessionDate: today } });
+      const result = await punchInServer({ data: { sessionDate: today } }) as PunchInResult;
       qc.setQueryData(dashboardQueryKey, (old: any) => old ? { ...old, openSession: result.session } : old);
       toast.success(result.status === "already_open" ? "You are already punched in — refreshed." : "Punched in");
       await Promise.all([

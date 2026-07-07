@@ -87,6 +87,20 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
       .then(({ data }) => setMyDept((data?.department as string | null) ?? null));
   }, [me?.realId]);
 
+  // Auto-open mark-done when the sheet is opened with initialAction="mark-done"
+  // (e.g. dropping a non-workflow card onto Done). Only fires once per taskId.
+  const [autoTriggeredFor, setAutoTriggeredFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (initialAction !== "mark-done" || !taskId || !detail?.task) return;
+    if (autoTriggeredFor === taskId) return;
+    const t = detail.task as { assignee_id: string | null; status: string; workflow_instance_id: string | null };
+    if (t.workflow_instance_id) return; // workflow tasks use CloseStageDialog instead
+    if (t.status === "done") return;
+    if (t.assignee_id !== me?.id) return;
+    setMarkDoneOpen(true);
+    setAutoTriggeredFor(taskId);
+  }, [initialAction, taskId, detail?.task, me?.id, autoTriggeredFor]);
+
   const task = detail?.task;
   const isAssignee = !!task && me?.id === task.assignee_id;
   const isReviewer = !!task && me?.id === (task as { reviewer_id: string | null }).reviewer_id;

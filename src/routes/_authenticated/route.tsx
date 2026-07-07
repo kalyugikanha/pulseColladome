@@ -2,7 +2,8 @@ import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } fr
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard, ClipboardCheck, Star, BarChart3, Briefcase } from "lucide-react";
+import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard, ClipboardCheck, Star, BarChart3, Briefcase, Megaphone } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/top-bar";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { AssistantDock } from "@/components/assistant/AssistantDock";
@@ -22,10 +23,12 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-const employeeItems = [
+type EmployeeItem = { title: string; url: string; icon: typeof LayoutDashboard; marketingOnly?: boolean };
+const employeeItems: EmployeeItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Punch In/Out", url: "/punch", icon: Clock },
   { title: "My Tasks", url: "/tasks", icon: ListChecks },
+  { title: "Marketing Kanban", url: "/marketing-kanban", icon: Megaphone, marketingOnly: true },
   { title: "My Timesheet", url: "/my-timesheet", icon: TableProperties },
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Leave", url: "/leave", icon: CalendarRange },
@@ -33,12 +36,20 @@ const employeeItems = [
   { title: "Resource Hub", url: "/resources", icon: BookOpen },
   { title: "My Performance", url: "/performance", icon: Star },
   { title: "Business Development", url: "/bd", icon: Briefcase },
-] as const;
+];
 
-function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; userId: string; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();
+
+  const { data: myDept } = useQuery({
+    queryKey: ["my-dept", userId], staleTime: 5 * 60_000,
+    queryFn: async () => (await supabase.from("profiles").select("department").eq("id", userId).maybeSingle()).data?.department ?? null,
+  });
+  const isMarketing = (myDept ?? "").toLowerCase() === "marketing"
+    || headOfDepartments.some((d) => d.toLowerCase() === "marketing")
+    || isAdmin || isSuperAdmin;
 
   async function signOut() {
     await qc.cancelQueries();
@@ -67,7 +78,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {employeeItems.map((item) => (
+              {employeeItems.filter((item) => !item.marketingOnly || isMarketing).map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")}>
                     <Link to={item.url}>
@@ -253,7 +264,7 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} isReportingManager={user.isReportingManager} fullName={user.fullName} email={user.email} />
+        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} isReportingManager={user.isReportingManager} headOfDepartments={user.headOfDepartments} userId={user.realId} fullName={user.fullName} email={user.email} />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />

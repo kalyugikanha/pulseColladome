@@ -578,6 +578,30 @@ export type Database = {
           },
         ]
       }
+      marketing_clients: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string
@@ -1603,6 +1627,7 @@ export type Database = {
         Row: {
           asset_links: Json
           assignee_id: string | null
+          client_brand: string | null
           completion_percent: number
           created_at: string
           created_by: string | null
@@ -1613,10 +1638,14 @@ export type Database = {
           due_date: string | null
           id: string
           is_multi_stage: boolean
+          marketing_stage: string | null
+          origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string
+          requester_id: string | null
           review_state: string
           reviewer_id: string | null
+          scheduled_post_date: string | null
           status: Database["public"]["Enums"]["task_status"]
           template_id: string | null
           title: string
@@ -1625,6 +1654,7 @@ export type Database = {
         Insert: {
           asset_links?: Json
           assignee_id?: string | null
+          client_brand?: string | null
           completion_percent?: number
           created_at?: string
           created_by?: string | null
@@ -1635,10 +1665,14 @@ export type Database = {
           due_date?: string | null
           id?: string
           is_multi_stage?: boolean
+          marketing_stage?: string | null
+          origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id: string
+          requester_id?: string | null
           review_state?: string
           reviewer_id?: string | null
+          scheduled_post_date?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           template_id?: string | null
           title: string
@@ -1647,6 +1681,7 @@ export type Database = {
         Update: {
           asset_links?: Json
           assignee_id?: string | null
+          client_brand?: string | null
           completion_percent?: number
           created_at?: string
           created_by?: string | null
@@ -1657,10 +1692,14 @@ export type Database = {
           due_date?: string | null
           id?: string
           is_multi_stage?: boolean
+          marketing_stage?: string | null
+          origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string
+          requester_id?: string | null
           review_state?: string
           reviewer_id?: string | null
+          scheduled_post_date?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           template_id?: string | null
           title?: string
@@ -1700,6 +1739,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2182,6 +2228,7 @@ export type Database = {
         Returns: {
           asset_links: Json
           assignee_id: string | null
+          client_brand: string | null
           completion_percent: number
           created_at: string
           created_by: string | null
@@ -2192,10 +2239,14 @@ export type Database = {
           due_date: string | null
           id: string
           is_multi_stage: boolean
+          marketing_stage: string | null
+          origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string
+          requester_id: string | null
           review_state: string
           reviewer_id: string | null
+          scheduled_post_date: string | null
           status: Database["public"]["Enums"]["task_status"]
           template_id: string | null
           title: string

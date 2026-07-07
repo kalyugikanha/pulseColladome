@@ -20,6 +20,7 @@ export type WorkflowStageInput = {
   required_fields: WorkflowRequiredField[];
   branch_options: WorkflowBranchOption[];
   branch_target_map: Record<string, number>;
+  next_stage_position: number | null;
 };
 
 /** List all templates + stages. */

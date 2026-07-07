@@ -55,11 +55,17 @@ function PunchPage() {
   const qc = useQueryClient();
   const punchInServer = useServerFn(punchInServerFn);
   const punchOutServer = useServerFn(punchOutServerFn);
+  const requestTaskServer = useServerFn(requestTaskFromManager);
   const today = format(new Date(), "yyyy-MM-dd");
   const punchUserId = me?.realId ?? me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "" }]);
   const [submitting, setSubmitting] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [reqTitle, setReqTitle] = useState("");
+  const [reqProjectId, setReqProjectId] = useState<string>("");
+  const [reqNote, setReqNote] = useState("");
+  const [reqSubmitting, setReqSubmitting] = useState(false);
   const [punchingIn, setPunchingIn] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
 

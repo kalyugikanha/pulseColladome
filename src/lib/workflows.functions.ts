@@ -161,6 +161,7 @@ export const startWorkflow = createServerFn({ method: "POST" })
       workflow_instance_id: instanceId,
       stage_index: first.position,
       stage_snapshot: first as never,
+      reviewer_id: first.default_reviewer_id ?? null,
     } as never).eq("id", taskId);
 
     await supabase.from("workflow_instances" as never).update({ root_task_id: taskId } as never).eq("id", instanceId);
@@ -171,6 +172,13 @@ export const startWorkflow = createServerFn({ method: "POST" })
         body: `New task: "${data.title}" — ${first.name}`,
       });
     }
+    if (first.default_reviewer_id && first.default_reviewer_id !== assignee && first.default_reviewer_id !== userId) {
+      await supabase.from("notifications").insert({
+        user_id: first.default_reviewer_id, kind: "reviewer_assigned", task_id: taskId,
+        body: `You were added as reviewer on "${data.title}".`,
+      });
+    }
+
     return { taskId, instanceId };
   });
 

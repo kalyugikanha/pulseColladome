@@ -153,6 +153,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
           </div>
           {stages.map((s, i) => (
             <StageEditor key={i} stage={s} index={i} totalStages={stages.length} allStages={stages}
+              people={people}
               onChange={(patch) => updateStage(i, patch)}
               onMoveUp={() => moveStage(i, -1)} onMoveDown={() => moveStage(i, 1)}
               onRemove={() => removeStage(i)} />

@@ -43,9 +43,10 @@ function AttendancePage() {
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
-      const [people, todayAtt, todayLeaves] = await Promise.all([
+      const [people, todayAtt, todayOpenSessions, todayLeaves] = await Promise.all([
         peopleQ,
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", today),
+        supabase.from("punch_sessions").select("user_id, punch_in_time").eq("session_date", today).is("punch_out_time", null),
         supabase.from("leave_requests")
           .select("user_id, leave_type, start_date, end_date, reason")
           .eq("status", "approved")
@@ -77,7 +78,7 @@ function AttendancePage() {
           reason?: string | null;
           user: { full_name: string | null; email: string | null } | null;
         }>;
-      return { people: peopleList, todayAtt: todayAtt.data ?? [], pending: pendingWithUser, onLeave: scopedLeaves };
+      return { people: peopleList, todayAtt: todayAtt.data ?? [], todayOpenSessions: todayOpenSessions.data ?? [], pending: pendingWithUser, onLeave: scopedLeaves };
     },
   });
 
@@ -87,16 +88,17 @@ function AttendancePage() {
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
-      const [people, att, leaves] = await Promise.all([
+      const [people, att, openSessions, leaves] = await Promise.all([
         peopleQ,
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", overviewDateStr),
+        supabase.from("punch_sessions").select("user_id, punch_in_time").eq("session_date", overviewDateStr).is("punch_out_time", null),
         supabase.from("leave_requests")
           .select("user_id, leave_type, start_date, end_date")
           .eq("status", "approved")
           .lte("start_date", overviewDateStr)
           .gte("end_date", overviewDateStr),
       ]);
-      return { people: people.data ?? [], att: att.data ?? [], leaves: leaves.data ?? [] };
+      return { people: people.data ?? [], att: att.data ?? [], openSessions: openSessions.data ?? [], leaves: leaves.data ?? [] };
     },
   });
 
@@ -110,15 +112,17 @@ function AttendancePage() {
 
   const overviewRows = useMemo(() => {
     const attById = new Map((overview?.att ?? []).map((a) => [a.user_id, a]));
+    const openById = new Map((overview?.openSessions ?? []).map((s) => [s.user_id, s]));
     const leaveById = new Map((overview?.leaves ?? []).map((l) => [l.user_id, l]));
     const rows = (overview?.people ?? []).map((p) => {
       const a = attById.get(p.id);
+      const open = openById.get(p.id);
       const leave = leaveById.get(p.id);
       const status: "leave" | "in" | "out" | "absent" = leave
         ? "leave"
-        : a?.punch_in_time && !a.punch_out_time ? "in"
+        : open || (a?.punch_in_time && !a.punch_out_time) ? "in"
         : a?.punch_out_time ? "out" : "absent";
-      return { p, a, leave, status };
+      return { p, a, open, leave, status };
     });
     const order = { leave: 0, absent: 1, in: 2, out: 3 } as const;
     rows.sort((x, y) => {
@@ -264,7 +268,9 @@ function AttendancePage() {
                         </TableCell>
                       </TableRow>
                     )}
-                    {overviewRows.map(({ p, a, leave, status }) => (
+                    {overviewRows.map(({ p, a, open, leave, status }) => {
+                      const punchInTime = open?.punch_in_time ?? a?.punch_in_time ?? null;
+                      return (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.full_name ?? p.email}</TableCell>
                         <TableCell className="text-muted-foreground">{p.department ?? "—"}</TableCell>
@@ -282,7 +288,7 @@ function AttendancePage() {
                           )}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
-                          {a?.punch_in_time ? format(new Date(a.punch_in_time), "HH:mm") : "—"}
+                          {punchInTime ? format(new Date(punchInTime), "HH:mm") : "—"}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {a?.punch_out_time ? format(new Date(a.punch_out_time), "HH:mm") : "—"}
@@ -291,7 +297,8 @@ function AttendancePage() {
                           {a?.total_hours ? `${Number(a.total_hours).toFixed(2)}h` : "—"}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -327,10 +334,12 @@ function AttendancePage() {
                     )}
                     {sortedPeople.map((p) => {
                       const a = data?.todayAtt.find((x) => x.user_id === p.id);
+                      const open = data?.todayOpenSessions.find((x) => x.user_id === p.id);
+                      const punchInTime = open?.punch_in_time ?? a?.punch_in_time ?? null;
                       const leave = onLeaveById.get(p.id);
                       const status = leave
                         ? "leave"
-                        : a?.punch_in_time && !a.punch_out_time ? "in" : a?.punch_out_time ? "out" : "absent";
+                        : open || (a?.punch_in_time && !a.punch_out_time) ? "in" : a?.punch_out_time ? "out" : "absent";
                       return (
                         <div key={p.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
                           <div className="flex items-center gap-3">
@@ -346,7 +355,7 @@ function AttendancePage() {
                                   ? `On approved leave · ${format(new Date(leave.start_date), "d MMM")} – ${format(new Date(leave.end_date), "d MMM")}`
                                   : (
                                     <>
-                                      {a?.punch_in_time ? `In at ${format(new Date(a.punch_in_time), "HH:mm")}` : "Not punched in"}
+                                      {punchInTime ? `In at ${format(new Date(punchInTime), "HH:mm")}` : "Not punched in"}
                                       {a?.punch_out_time ? ` · Out ${format(new Date(a.punch_out_time), "HH:mm")}` : ""}
                                     </>
                                   )}

@@ -2257,6 +2257,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      sync_attendance_from_punch_sessions: {
+        Args: { _session_date: string; _user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "employee" | "project_manager" | "hr_admin"

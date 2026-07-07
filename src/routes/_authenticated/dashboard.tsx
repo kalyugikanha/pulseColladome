@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, ListChecks, CalendarRange, FolderKanban, Users, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { GoogleCalendarConnectCard } from "@/components/google-calendar-connect";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -33,17 +35,20 @@ function StatCard({ icon: Icon, label, value, hint, tone = "default" }: { icon: 
 
 function Dashboard() {
   const { data: me } = useCurrentUser();
+  const qc = useQueryClient();
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
   const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const [punchingIn, setPunchingIn] = useState(false);
 
   const { data } = useQuery({
     queryKey: ["dashboard", me?.id, me?.isAdmin],
     enabled: !!me,
     queryFn: async () => {
       const uid = me!.id;
-      const [todayLog, weekLogs, myTasks, myLeave, balances] = await Promise.all([
+      const [todayLog, openSessions, weekLogs, myTasks, myLeave, balances] = await Promise.all([
         supabase.from("attendance_logs").select("*").eq("user_id", uid).eq("date", today).maybeSingle(),
+        supabase.from("punch_sessions").select("id, punch_in_time").eq("user_id", uid).eq("session_date", today).is("punch_out_time", null).order("punch_in_time", { ascending: false }).limit(1),
         supabase.from("attendance_logs").select("total_hours,date").eq("user_id", uid).gte("date", weekStart).lte("date", weekEnd),
         supabase.from("tasks").select("id,title,status,priority,due_date,project:projects(name)").eq("assignee_id", uid).neq("status", "done").order("due_date", { ascending: true }).limit(5),
         supabase.from("leave_requests").select("id,leave_type,start_date,end_date,status").eq("user_id", uid).order("created_at", { ascending: false }).limit(3),
@@ -52,26 +57,52 @@ function Dashboard() {
 
       let admin: any = null;
       if (me!.isAdmin) {
-        const [punchedIn, pendingLeave, activeProjects, weekTeamHours] = await Promise.all([
-          supabase.from("attendance_logs").select("user_id,punch_in_time,punch_out_time").eq("date", today),
+        const [openTeamSessions, pendingLeave, activeProjects, weekTeamHours] = await Promise.all([
+          supabase.from("punch_sessions").select("user_id").eq("session_date", today).is("punch_out_time", null),
           supabase.from("leave_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
           supabase.from("projects").select("id", { count: "exact", head: true }).eq("status", "active"),
           supabase.from("attendance_logs").select("total_hours").gte("date", weekStart).lte("date", weekEnd),
         ]);
         admin = {
-          punchedInCount: punchedIn.data?.filter((l) => l.punch_in_time && !l.punch_out_time).length ?? 0,
-          totalToday: punchedIn.data?.length ?? 0,
+          punchedInCount: new Set((openTeamSessions.data ?? []).map((l) => l.user_id)).size,
+          totalToday: openTeamSessions.data?.length ?? 0,
           pendingLeave: pendingLeave.count ?? 0,
           activeProjects: activeProjects.count ?? 0,
           teamHours: (weekTeamHours.data ?? []).reduce((s, r) => s + Number(r.total_hours ?? 0), 0),
         };
       }
-      return { todayLog: todayLog.data, weekLogs: weekLogs.data ?? [], myTasks: myTasks.data ?? [], myLeave: myLeave.data ?? [], balances: balances.data ?? [], admin };
+      return { todayLog: todayLog.data, openSession: openSessions.data?.[0] ?? null, weekLogs: weekLogs.data ?? [], myTasks: myTasks.data ?? [], myLeave: myLeave.data ?? [], balances: balances.data ?? [], admin };
     },
   });
 
   const weekHours = (data?.weekLogs ?? []).reduce((s, r) => s + Number(r.total_hours ?? 0), 0);
-  const punchedIn = !!data?.todayLog?.punch_in_time && !data?.todayLog?.punch_out_time;
+  const activePunchInTime = data?.openSession?.punch_in_time ?? (data?.todayLog?.punch_in_time && !data?.todayLog?.punch_out_time ? data.todayLog.punch_in_time : null);
+  const punchedIn = !!activePunchInTime;
+
+  async function punchInFromDashboard() {
+    if (!me || punchingIn || punchedIn) return;
+    setPunchingIn(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("punch_sessions").insert({
+      user_id: me.id,
+      session_date: today,
+      punch_in_time: new Date().toISOString(),
+    });
+    if (error) {
+      toast.error(error.message.includes("duplicate") ? "You are already punched in." : error.message);
+      setPunchingIn(false);
+      return;
+    }
+    toast.success("Punched in");
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["dashboard"] }),
+      qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
+      qc.invalidateQueries({ queryKey: ["punch-history"] }),
+      qc.invalidateQueries({ queryKey: ["attendance"] }),
+      qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
+    ]);
+    setPunchingIn(false);
+  }
 
   return (
     <div className="space-y-6">
@@ -80,16 +111,22 @@ function Dashboard() {
           <h1 className="font-display text-3xl font-bold">Welcome back{me?.fullName ? `, ${me.fullName.split(" ")[0]}` : ""}.</h1>
           <p className="text-muted-foreground text-sm mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
         </div>
-        <Button asChild size="lg" className="gradient-primary shadow-glow">
-          <Link to="/punch">{punchedIn ? "Punch out" : "Punch in"}</Link>
-        </Button>
+        {punchedIn ? (
+          <Button asChild size="lg" className="gradient-primary shadow-glow">
+            <Link to="/punch">Punch out</Link>
+          </Button>
+        ) : (
+          <Button size="lg" className="gradient-primary shadow-glow" onClick={punchInFromDashboard} disabled={!me || punchingIn}>
+            {punchingIn ? "Punching in…" : "Punch in"}
+          </Button>
+        )}
       </header>
 
       <GoogleCalendarConnectCard />
 
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Clock} label="Status today" value={punchedIn ? "Punched in" : data?.todayLog?.punch_out_time ? "Signed off" : "Not started"} hint={data?.todayLog?.punch_in_time ? `Since ${format(new Date(data.todayLog.punch_in_time), "HH:mm")}` : "Tap punch in to begin"} tone={punchedIn ? "success" : "default"} />
+        <StatCard icon={Clock} label="Status today" value={punchedIn ? "Punched in" : data?.todayLog?.punch_out_time ? "Signed off" : "Not started"} hint={activePunchInTime ? `Since ${format(new Date(activePunchInTime), "HH:mm")}` : "Tap punch in to begin"} tone={punchedIn ? "success" : "default"} />
         <StatCard icon={TrendingUp} label="Hours this week" value={weekHours.toFixed(1)} hint="Mon–Sun" tone="primary" />
         <StatCard icon={ListChecks} label="Open tasks" value={data?.myTasks.length ?? 0} hint="Assigned to you" />
         <StatCard icon={CalendarRange} label="Leave balance" value={`${(data?.balances ?? []).reduce((s, r) => s + (Number(r.allocated) - Number(r.used)), 0).toFixed(1)}d`} hint="Across all types" tone="warning" />

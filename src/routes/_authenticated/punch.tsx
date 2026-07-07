@@ -426,6 +426,103 @@ function PunchPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Request a task</DialogTitle>
+            <DialogDescription>
+              Your reporting manager will get this in their notifications and can create the task for you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Task title <span className="text-destructive">*</span></Label>
+              <Input value={reqTitle} onChange={(e) => setReqTitle(e.target.value)} placeholder="What do you need a task for?" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Project (optional)</Label>
+              <Select value={reqProjectId || "__none__"} onValueChange={(v) => setReqProjectId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="No project" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— No project —</SelectItem>
+                  {projects?.map((p) => (
+                    <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Note (optional)</Label>
+              <Textarea rows={3} value={reqNote} onChange={(e) => setReqNote(e.target.value)} placeholder="Context for your manager" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRequestOpen(false)} disabled={reqSubmitting}>Cancel</Button>
+            <Button onClick={submitTaskRequest} disabled={reqSubmitting} className="gradient-primary">
+              {reqSubmitting ? "Sending…" : "Send request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+type TaskComboTask = { id: string; title: string; project_id: string | null; project: { code: string; name: string } | null };
+
+function TaskCombobox({ tasks, value, onChange, allowNone }: {
+  tasks: TaskComboTask[];
+  value: string;
+  onChange: (taskId: string, projectId: string | null) => void;
+  allowNone: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = tasks.find((t) => t.id === value) ?? null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+          <span className="truncate text-left">
+            {selected ? (
+              <>
+                {selected.project?.code && <span className="font-mono text-xs mr-2">{selected.project.code}</span>}
+                {selected.title}
+              </>
+            ) : (
+              <span className="text-muted-foreground">Pick one of your open tasks</span>
+            )}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search by task or project code…" />
+          <CommandList>
+            <CommandEmpty>No tasks found.</CommandEmpty>
+            <CommandGroup>
+              {allowNone && (
+                <CommandItem value="__none__" onSelect={() => { onChange("", null); setOpen(false); }}>
+                  <Check className={`h-4 w-4 mr-2 ${!value ? "opacity-100" : "opacity-0"}`} />
+                  — No task —
+                </CommandItem>
+              )}
+              {tasks.map((t) => (
+                <CommandItem
+                  key={t.id}
+                  value={`${t.project?.code ?? ""} ${t.title}`}
+                  onSelect={() => { onChange(t.id, t.project_id); setOpen(false); }}
+                >
+                  <Check className={`h-4 w-4 mr-2 ${value === t.id ? "opacity-100" : "opacity-0"}`} />
+                  {t.project?.code && <span className="font-mono text-xs mr-2">{t.project.code}</span>}
+                  <span className="truncate">{t.title}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

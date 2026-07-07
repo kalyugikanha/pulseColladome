@@ -50,6 +50,7 @@ export function BoardKanban({
   const qc = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [openAction, setOpenAction] = useState<"mark-done" | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const { data: tasks } = useQuery({ queryKey, queryFn: fetcher });
 
@@ -79,8 +80,15 @@ export function BoardKanban({
     // Moving to review/done: if the task belongs to a workflow, open the detail sheet
     // so the user runs the close-task or review flow with required fields.
     if ((over === "review" || over === "done") && card.workflow_instance_id) {
+      setOpenAction(null);
       setOpenTaskId(card.id);
       toast.info("Close this stage from the task detail panel.");
+      return;
+    }
+    // Non-workflow: dropping onto Done prompts the assignee to log actual hours.
+    if (over === "done" && card.assignee_id === currentUserId) {
+      setOpenAction("mark-done");
+      setOpenTaskId(card.id);
       return;
     }
     // Simple status flip

@@ -256,13 +256,14 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                 <TableHead className="min-w-[160px]">Project</TableHead>
                 <TableHead className="min-w-[180px]">Task</TableHead>
                 <TableHead className="w-[90px] text-right">Hours</TableHead>
+                {canApprove && <TableHead className="w-[100px] text-right">Approved</TableHead>}
                 <TableHead>Comments</TableHead>
                 <TableHead className="w-[40px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={canApprove ? 6 : 5} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
               )}
               {rows.map((r, i) => {
                 const options = tasksForProject(r.project_code);

@@ -115,6 +115,7 @@ type TaskInput = {
   domainId: string | null;
   departmentId: string | null;
   taskTypeIds: string[];
+  estimatedHours?: number | null;
 };
 
 function taskCreateError(error: { message?: string; code?: string; details?: string } | Error): Error {

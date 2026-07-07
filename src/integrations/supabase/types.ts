@@ -1434,9 +1434,13 @@ export type Database = {
           due_date: string | null
           estimated_hours: number | null
           id: string
+          is_recurring_template: boolean
           origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
+          recurrence_days: number[] | null
+          recurrence_freq: string
+          recurrence_parent_id: string | null
           requester_id: string | null
           required_fields_values: Json | null
           review_state: string
@@ -1463,9 +1467,13 @@ export type Database = {
           due_date?: string | null
           estimated_hours?: number | null
           id?: string
+          is_recurring_template?: boolean
           origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
+          recurrence_days?: number[] | null
+          recurrence_freq?: string
+          recurrence_parent_id?: string | null
           requester_id?: string | null
           required_fields_values?: Json | null
           review_state?: string
@@ -1492,9 +1500,13 @@ export type Database = {
           due_date?: string | null
           estimated_hours?: number | null
           id?: string
+          is_recurring_template?: boolean
           origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
+          recurrence_days?: number[] | null
+          recurrence_freq?: string
+          recurrence_parent_id?: string | null
           requester_id?: string | null
           required_fields_values?: Json | null
           review_state?: string
@@ -1535,6 +1547,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_recurrence_parent_id_fkey"
+            columns: ["recurrence_parent_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {
@@ -2114,9 +2133,13 @@ export type Database = {
           due_date: string | null
           estimated_hours: number | null
           id: string
+          is_recurring_template: boolean
           origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
+          recurrence_days: number[] | null
+          recurrence_freq: string
+          recurrence_parent_id: string | null
           requester_id: string | null
           required_fields_values: Json | null
           review_state: string
@@ -2138,6 +2161,7 @@ export type Database = {
         }
       }
       find_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
+      generate_recurring_task_occurrences: { Args: never; Returns: undefined }
       get_my_leave_requests: {
         Args: never
         Returns: {

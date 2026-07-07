@@ -63,6 +63,8 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   const [assignee, setAssignee] = useState<string>(defaultAssigneeId ?? "");
   const [wfMode, setWfMode] = useState(false);
   const [wfTemplateId, setWfTemplateId] = useState<string>("");
+  const [repeat, setRepeat] = useState<"none" | "daily" | "weekly">("none");
+  const [repeatDays, setRepeatDays] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { if (open) { setAssignee(defaultAssigneeId ?? ""); } }, [open, defaultAssigneeId]);
@@ -96,9 +98,18 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     queryFn: () => listWf(),
   });
 
+  function toggleDay(d: number) {
+    setRepeatDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d); else next.add(d);
+      return next;
+    });
+  }
+
   async function submit() {
     if (!title.trim()) return toast.error("Title required");
     if (!projectId) return toast.error("Project required");
+    if (repeat === "weekly" && repeatDays.size === 0) return toast.error("Pick at least one weekday");
     setBusy(true);
     try {
       if (wfMode && wfTemplateId) {
@@ -113,16 +124,21 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           dueDate: due || null, priority: pri,
           assigneeId: assignee || defaultAssigneeId!, assetLinks: [],
           domainId: null, departmentId: null, taskTypeIds: [],
+          recurrence: repeat === "none"
+            ? null
+            : { freq: repeat, days: repeat === "weekly" ? Array.from(repeatDays).sort() : [] },
         }});
       }
-      toast.success("Task created");
+      toast.success(repeat === "none" ? "Task created" : "Recurring task saved");
       setTitle(""); setDesc(""); setDue(""); setProjectId(""); setWfTemplateId(""); setWfMode(false);
+      setRepeat("none"); setRepeatDays(new Set());
       onCreated?.();
       onClose();
     } catch (e) {
       toast.error((e as Error).message);
     } finally { setBusy(false); }
   }
+
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -209,7 +225,37 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
               </Select>
             </div>
           </div>
+          <div className="space-y-1 rounded-md border border-dashed p-2">
+            <Label className="text-xs">Repeat</Label>
+            <Select value={repeat} onValueChange={(v) => setRepeat(v as "none" | "daily" | "weekly")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly on specific days</SelectItem>
+              </SelectContent>
+            </Select>
+            {repeat === "weekly" && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {[
+                  { d: 1, l: "Mon" }, { d: 2, l: "Tue" }, { d: 3, l: "Wed" },
+                  { d: 4, l: "Thu" }, { d: 5, l: "Fri" }, { d: 6, l: "Sat" }, { d: 7, l: "Sun" },
+                ].map(({ d, l }) => (
+                  <button
+                    key={d} type="button" onClick={() => toggleDay(d)}
+                    className={`h-7 px-2 rounded text-xs border ${repeatDays.has(d) ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+                  >{l}</button>
+                ))}
+              </div>
+            )}
+            {repeat !== "none" && (
+              <p className="text-[11px] text-muted-foreground pt-1">
+                Occurrences are generated automatically on each matching day. The due date field above is ignored for recurring tasks.
+              </p>
+            )}
+          </div>
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="gradient-primary" onClick={submit} disabled={busy}>Create</Button>

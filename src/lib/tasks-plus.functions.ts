@@ -36,6 +36,11 @@ export const createCustomTaskType = createServerFn({ method: "POST" })
 
 /** =========== Task create/update ============== */
 type AssetLink = { label: string; url: string };
+export type RecurrenceInput = {
+  freq: "none" | "daily" | "weekly";
+  /** ISO weekdays: 1=Mon..7=Sun. Only used when freq === "weekly". */
+  days?: number[];
+};
 type TaskInput = {
   projectId: string;
   title: string;
@@ -48,6 +53,7 @@ type TaskInput = {
   departmentId: string | null;
   taskTypeIds: string[];
   estimatedHours?: number | null;
+  recurrence?: RecurrenceInput | null;
 };
 
 function taskCreateError(error: { message?: string; code?: string; details?: string } | Error): Error {
@@ -74,11 +80,16 @@ export const createTaskFull = createServerFn({ method: "POST" })
     if (!title) throw new Error("Task title is required.");
     if (!data.projectId) throw new Error("Please select a project.");
     const { supabase } = context;
+    const rec = data.recurrence;
+    const isRecurring = !!rec && rec.freq !== "none";
+    if (isRecurring && rec!.freq === "weekly" && (!rec!.days || rec!.days.length === 0)) {
+      throw new Error("Pick at least one weekday for weekly recurrence.");
+    }
     const { data: task, error } = await supabase.rpc("create_task_full", {
       _project_id: data.projectId,
       _title: title,
       _description: data.description?.trim() || undefined,
-      _due_date: data.dueDate || undefined,
+      _due_date: isRecurring ? undefined : (data.dueDate || undefined),
       _priority: data.priority,
       _assignee_id: data.assigneeId,
       _asset_links: data.assetLinks,
@@ -88,8 +99,34 @@ export const createTaskFull = createServerFn({ method: "POST" })
       _estimated_hours: data.estimatedHours ?? undefined,
     });
     if (error) throw taskCreateError(error);
+    const taskId = (task as unknown as { id: string }).id;
+
+    if (isRecurring) {
+      const { error: upErr } = await supabase
+        .from("tasks")
+        .update({
+          is_recurring_template: true,
+          recurrence_freq: rec!.freq,
+          recurrence_days: rec!.freq === "weekly" ? (rec!.days ?? []) : null,
+          due_date: null,
+        } as never)
+        .eq("id", taskId);
+      if (upErr) throw upErr;
+      const { error: genErr } = await supabase.rpc("generate_recurring_task_occurrences" as never);
+      if (genErr) throw genErr;
+    }
     return task;
   });
+
+/** Materialize today's occurrences for every recurring template (idempotent). */
+export const generateRecurringOccurrences = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await context.supabase.rpc("generate_recurring_task_occurrences" as never);
+    if (error) throw error;
+    return { ok: true };
+  });
+
 
 export const duplicateTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

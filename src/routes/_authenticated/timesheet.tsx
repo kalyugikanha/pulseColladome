@@ -685,3 +685,55 @@ function InlineText({ value, disabled, onCommit, placeholder }: { value: string;
     />
   );
 }
+
+function PendingRow({
+  id, name, title, projCode, projName, date, logged, note, onDecide,
+}: {
+  id: string; name: string; title: string;
+  projCode: string | null; projName: string | null;
+  date: string; logged: number; note: string | null;
+  onDecide: (id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) => void;
+}) {
+  const [approve, setApprove] = useState<string>(String(logged));
+  const approveNum = Number(approve);
+  const valid = !Number.isNaN(approveNum) && approveNum >= 0 && approveNum <= logged;
+  const reduced = valid && approveNum < logged;
+  return (
+    <TableRow>
+      <TableCell className="text-sm">{name}</TableCell>
+      <TableCell className="text-sm">
+        <div>{title}</div>
+        {projCode && <div className="text-[10px] text-muted-foreground font-mono">{projCode} · {projName}</div>}
+      </TableCell>
+      <TableCell className="text-xs">{format(new Date(date + "T00:00:00"), "d MMM")}</TableCell>
+      <TableCell className="text-right font-mono">{logged.toFixed(2)}</TableCell>
+      <TableCell className="text-right">
+        <Input
+          type="number" min={0} max={logged} step={0.25}
+          value={approve}
+          onChange={(e) => setApprove(e.target.value)}
+          className={`h-8 text-right font-mono ${!valid ? "border-destructive/60" : reduced ? "border-amber-500/60" : ""}`}
+        />
+        {reduced && <div className="text-[10px] text-amber-700 mt-0.5">Approving {approveNum} of {logged}</div>}
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">{note ?? ""}</TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center gap-1 justify-end">
+          <Button size="sm" variant="outline" className="h-7"
+            disabled={!valid}
+            onClick={() => onDecide(id, "approved", undefined, approveNum)}>
+            <Check className="h-3.5 w-3.5 mr-1" /> Approve
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-destructive"
+            onClick={() => {
+              const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
+              onDecide(id, "rejected", reason || undefined);
+            }}>
+            <X className="h-3.5 w-3.5 mr-1" /> Reject
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+

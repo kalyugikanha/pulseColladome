@@ -44,6 +44,8 @@ function Dashboard() {
   const { data } = useQuery({
     queryKey: ["dashboard", me?.id, me?.isAdmin],
     enabled: !!me,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const uid = me!.id;
       const [todayLog, openSessions, weekLogs, myTasks, myLeave, balances] = await Promise.all([

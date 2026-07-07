@@ -347,27 +347,21 @@ function PunchPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Task {requireTask && <span className="text-destructive">*</span>}</Label>
-                    <Select
-                      value={r.taskId || "__none__"}
-                      onValueChange={(v) => {
-                        if (v === "__none__") { updateRow(idx, { taskId: "" }); return; }
-                        const t = (myTasks ?? []).find((x) => x.id === v);
-                        updateRow(idx, { taskId: v, projectId: t?.project_id ?? "" });
-                      }}
+                    <TaskCombobox
+                      tasks={myTasks ?? []}
+                      value={r.taskId}
+                      onChange={(taskId, projectId) => updateRow(idx, { taskId, projectId: projectId ?? "" })}
+                      allowNone={!requireTask}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setReqTitle(""); setReqProjectId(""); setReqNote(""); setRequestOpen(true); }}
+                      className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
                     >
-                      <SelectTrigger><SelectValue placeholder="Pick one of your open tasks" /></SelectTrigger>
-                      <SelectContent>
-                        {!requireTask && <SelectItem value="__none__">— No task —</SelectItem>}
-                        {(myTasks ?? []).map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.project?.code && <span className="font-mono text-xs mr-2">{t.project.code}</span>}
-                            {t.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Send className="h-3 w-3" /> Can't find your task? Request one from your manager
+                    </button>
                     {requireTask && !myTasks?.length && (
-                      <p className="text-[11px] text-warning">No open tasks assigned to you yet — ask your team lead to assign one before punching out.</p>
+                      <p className="text-[11px] text-warning">No open tasks assigned to you yet — request one above and your manager will get it in their notifications.</p>
                     )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-[1fr_120px]">

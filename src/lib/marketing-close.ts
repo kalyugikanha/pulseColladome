@@ -20,12 +20,11 @@ export type MarketingCloseInput = {
  */
 export async function closeMarketingTask(input: MarketingCloseInput) {
   const nextAssignee = input.nextAssigneeId ?? input.currentAssigneeId ?? input.actorId;
-  const patch: Record<string, unknown> = {
-    marketing_stage: "posted",
+  const { error: upErr } = await supabase.from("tasks").update({
+    marketing_stage: "posted" as any,
     status: "review",
     assignee_id: nextAssignee,
-  };
-  const { error: upErr } = await supabase.from("tasks").update(patch).eq("id", input.taskId);
+  }).eq("id", input.taskId);
   if (upErr) throw upErr;
 
   const d = new Date();

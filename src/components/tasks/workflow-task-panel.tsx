@@ -198,21 +198,6 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
               <Input value={values[f.key] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} placeholder={f.kind === "url" ? "https://..." : f.kind === "attachment" ? "Paste link to file" : ""} />
             </div>
           ))}
-          {canRate && (
-            <div className="space-y-1">
-              <Label className="text-xs">Rate this work (optional)</Label>
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} type="button" onClick={() => setRating(rating === n ? 0 : n)} className="p-1" aria-label={`${n} star${n > 1 ? "s" : ""}`}>
-                    <Star className={`h-5 w-5 ${n <= rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
-                  </button>
-                ))}
-                {rating > 0 && (
-                  <button type="button" onClick={() => setRating(0)} className="ml-2 text-xs text-muted-foreground hover:text-foreground">Clear</button>
-                )}
-              </div>
-            </div>
-          )}
           {hasBranches && (
             <>
               <div className="space-y-1">

@@ -20,7 +20,13 @@ export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: st
     queryKey: ["viewas-profiles"],
     enabled: isSuperAdmin,
     staleTime: 5 * 60_000,
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email").order("full_name")).data ?? [],
+    queryFn: async () => {
+      // Super-admin-only RPC that bypasses profiles RLS so the picker shows
+      // every teammate regardless of department/role scoping.
+      const { data, error } = await supabase.rpc("list_all_profiles_for_super_admin");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null; department: string | null; is_active: boolean | null }>;
+    },
   });
 
   const { data: grants } = useQuery({
@@ -34,13 +40,18 @@ export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: st
   const rows = useMemo<Row[]>(() => {
     const profileEmails = new Set((profiles ?? []).map((p) => (p.email ?? "").toLowerCase()));
     const activeRows: Row[] = (profiles ?? [])
-      .filter((p) => p.id !== realUserId)
-      .map((p) => ({ id: p.id, label: p.full_name || p.email || "—", sub: p.email ?? undefined }));
+      .filter((p) => p.id !== realUserId && p.is_active !== false)
+      .map((p) => ({
+        id: p.id,
+        label: p.full_name || p.email || "—",
+        sub: p.department ? `${p.department}${p.email ? ` · ${p.email}` : ""}` : (p.email ?? undefined),
+      }));
     const pendingRows: Row[] = (grants ?? [])
       .filter((g) => g.email && !profileEmails.has(g.email.toLowerCase()))
       .map((g) => ({ id: `pending:${g.email}`, label: g.email, pending: true }));
     return [...activeRows, ...pendingRows].sort((a, b) => a.label.localeCompare(b.label));
   }, [profiles, grants, realUserId]);
+
 
   return (
     <div className="flex items-center gap-3 flex-wrap justify-end">

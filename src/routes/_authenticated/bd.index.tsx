@@ -257,6 +257,7 @@ function LogRow({
   log,
   title,
   typeName,
+  assigned,
   onChange,
   onDelete,
   onUpload,
@@ -265,6 +266,7 @@ function LogRow({
   log: Log;
   title: string;
   typeName?: string;
+  assigned?: boolean;
   onChange: (patch: Partial<Log>) => void;
   onDelete: () => void;
   onUpload: (f: File) => void;
@@ -291,6 +293,7 @@ function LogRow({
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-sm font-medium ${done ? "line-through text-muted-foreground" : ""}`}>{title}</span>
           {typeName && <Badge variant="secondary" className="text-[10px]">{typeName}</Badge>}
+          {assigned && <Badge className="text-[10px] bg-primary/15 text-primary border border-primary/30">Assigned to you</Badge>}
           {carried && <Badge variant="outline" className="text-[10px]">Carried → {log.carried_forward_to}</Badge>}
         </div>
         {!adHoc && (

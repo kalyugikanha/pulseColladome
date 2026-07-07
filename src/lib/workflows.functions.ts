@@ -328,7 +328,7 @@ export const logTaskTime = createServerFn({ method: "POST" })
     const { error } = await supabase.from("task_activity" as never).insert({
       task_id: data.taskId, actor_id: actingUserId, kind: "time_logged",
       hours: data.hours, note: data.note ?? null,
-      approval_status: "auto", completion_date: date,
+      approval_status: "pending", completion_date: date,
     } as never);
     if (error) throw error;
     return { ok: true };

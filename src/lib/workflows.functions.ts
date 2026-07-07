@@ -379,6 +379,8 @@ async function spawnNextStage(
   if (stage.branch_options.length > 0) {
     if (!branchKey) return; // caller must pick — no auto next
     nextPos = stage.branch_target_map[branchKey] ?? null;
+  } else if (stage.next_stage_position != null) {
+    nextPos = stage.next_stage_position;
   } else {
     const later = stages.find((s) => s.position > stage.position);
     nextPos = later?.position ?? null;

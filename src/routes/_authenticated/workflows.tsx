@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Save, ChevronUp, ChevronDown, Copy } from "lucide-react";
 import { toast } from "sonner";
 import {
   listWorkflowTemplates, saveWorkflowTemplate, deleteWorkflowTemplate,

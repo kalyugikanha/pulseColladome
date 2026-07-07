@@ -81,11 +81,10 @@ function AttendancePage() {
   });
 
   const { data: overview } = useQuery({
-    queryKey: ["attendance-overview", overviewDateStr, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
+    queryKey: ["attendance-overview", overviewDateStr, userScope?.join(",") ?? "all"],
     enabled: canView,
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
-      if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
       const [people, att, leaves] = await Promise.all([
         peopleQ,

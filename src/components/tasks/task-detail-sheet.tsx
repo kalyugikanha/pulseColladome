@@ -51,15 +51,17 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const addDepFn = useServerFn(addDependency);
   const rmDepFn = useServerFn(removeDependency);
   const duplicateFn = useServerFn(duplicateTask);
+  const rateFn = useServerFn(rateTask);
 
   const { data: detail, isLoading } = useQuery({
-    queryKey: ["task-detail", taskId], enabled: !!taskId,
-    queryFn: () => detailFn({ data: { taskId: taskId! } }),
+    queryKey: ["task-detail", taskId, viewAsUserId ?? null], enabled: !!taskId,
+    queryFn: () => detailFn({ data: { taskId: taskId!, viewAsUserId } }),
   });
 
   const { data: peopleAll } = useQuery({
     queryKey: ["all-profiles-mini"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department").order("full_name")).data ?? [],
+    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department, reporting_manager_id").order("full_name")).data ?? [],
+
   });
 
   const [newSub, setNewSub] = useState("");

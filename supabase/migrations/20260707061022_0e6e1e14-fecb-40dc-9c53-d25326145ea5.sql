@@ -1,0 +1,1 @@
+DELETE FROM public.punch_sessions; DELETE FROM public.attendance_logs;

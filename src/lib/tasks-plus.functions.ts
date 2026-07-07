@@ -103,6 +103,13 @@ export const createTaskFull = createServerFn({ method: "POST" })
     if (error) throw taskCreateError(error);
     const taskId = (task as unknown as { id: string }).id;
 
+    // Impersonation attribution: the RPC stamps auth.uid() as created_by.
+    // When impersonating, re-attribute the row to the acting user.
+    if (context.isImpersonating && context.actingUserId !== context.userId) {
+      await supabase.from("tasks").update({ created_by: context.actingUserId } as never).eq("id", taskId);
+    }
+
+
     if (isRecurring) {
       const { error: upErr } = await supabase
         .from("tasks")

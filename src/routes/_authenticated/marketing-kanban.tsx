@@ -651,7 +651,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
   useEffect(() => {
     if (open) {
       setTitle(""); setDesc(""); setAssignee(me?.realId ?? ""); setProjectId(""); setDeadline(""); setPostDate("");
-      setPriority("medium"); setClient(""); setClientOther(""); setLinks([]);
+      setPriority("medium"); setClient(""); setClientOther(""); setLinks([]); setEstimatedHours("");
     }
   }, [open, me?.realId]);
 

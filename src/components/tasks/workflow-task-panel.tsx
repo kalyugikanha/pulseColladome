@@ -19,6 +19,7 @@ import { format } from "date-fns";
 type TaskInfo = {
   id: string; title: string; status: string;
   assignee_id: string | null;
+  reviewer_id: string | null;
   workflow_instance_id: string | null;
   stage_index: number | null;
   stage_snapshot: WorkflowStageInput | null;

@@ -23,18 +23,7 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-type EmployeeItem = { title: string; url: string; icon: typeof LayoutDashboard };
-const employeeItems: EmployeeItem[] = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Punch In/Out", url: "/punch", icon: Clock },
-  { title: "My Tasks", url: "/tasks", icon: ListChecks },
-  { title: "My Timesheet", url: "/my-timesheet", icon: TableProperties },
-  { title: "Projects", url: "/projects", icon: FolderKanban },
-  { title: "Leave", url: "/leave", icon: CalendarRange },
-  { title: "Team Calendar", url: "/calendar", icon: CalendarDays },
-  { title: "Resource Hub", url: "/resources", icon: BookOpen },
-  { title: "My Performance", url: "/performance", icon: Star },
-];
+type NavItem = { title: string; url: string; icon: typeof LayoutDashboard; match?: string };
 
 function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; userId: string; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -60,6 +49,23 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
 
   const initials = (fullName ?? email ?? "?").split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
+  const workspaceItems: NavItem[] = [
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+    { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
+    { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
+    { title: "Projects", url: "/projects", icon: FolderKanban, match: "/projects|/project-burn" },
+    { title: "Team", url: "/team", icon: Users, match: "/team|/leave|/calendar|/directory" },
+    { title: "Performance", url: "/performance", icon: Star },
+    ...(isBd ? [{ title: "Business Development", url: "/bd", icon: Briefcase } as NavItem] : []),
+    { title: "Resource Hub", url: "/resources", icon: BookOpen },
+  ];
+
+  const showAdminGroup = isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin;
+  const isActive = (item: NavItem) => {
+    if (item.match) return item.match.split("|").some((p) => pathname === p || pathname.startsWith(p + "/"));
+    return pathname === item.url || pathname.startsWith(item.url + "/");
+  };
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
@@ -78,9 +84,9 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {employeeItems.map((item) => (
+              {workspaceItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={pathname === item.url || pathname.startsWith(item.url + "/")}>
+                  <SidebarMenuButton asChild isActive={isActive(item)}>
                     <Link to={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -91,77 +97,12 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Project Management</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/board/marketing"}>
-                  <Link to="/board/$dept" params={{ dept: "marketing" }}><Megaphone /><span>Marketing</span></Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/board/business-development"}>
-                  <Link to="/board/$dept" params={{ dept: "business-development" }}><Briefcase /><span>Business Development</span></Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/board/tech"}>
-                  <Link to="/board/$dept" params={{ dept: "tech" }}><Cpu /><span>Tech</span></Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              {isBd && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith("/bd")}>
-                    <Link to="/bd"><Briefcase /><span>BD activity log</span></Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        {(isAdmin || canManageProjects || isHrAdmin || isDepartmentHead || isReportingManager) && (
+
+        {showAdminGroup && (
           <SidebarGroup>
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {(isAdmin || isSuperAdmin || isHrAdmin || isDepartmentHead || isReportingManager) && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/attendance")}>
-                      <Link to="/attendance"><Users /><span>Attendance</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                {(isSuperAdmin || isHrAdmin || isDepartmentHead || isReportingManager) && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/directory")}>
-                      <Link to="/directory"><IdCard /><span>Employee Directory</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                {isFinanceAdmin && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/finances")}>
-                        <Link to="/finances"><Wallet /><span>Finances</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
-                )}
-                {(isFinanceAdmin || isDepartmentHead || isReportingManager) && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/project-burn")}>
-                      <Link to="/project-burn"><Flame /><span>Project Burn</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-                {(canManageProjects || isDepartmentHead || isReportingManager) && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/timesheet")}>
-                      <Link to="/timesheet"><TableProperties /><span>Timesheet</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
                 {(isAdmin || isSuperAdmin) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/workflows")}>
@@ -169,8 +110,13 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
-
-
+                {isFinanceAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/finances")}>
+                      <Link to="/finances"><Wallet /><span>Finances</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {(isSuperAdmin || isHrAdmin) && (
                   <>
                     <SidebarMenuItem>
@@ -204,26 +150,15 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/access")}>
-                        <Link to="/access"><Shield /><span>Access & Roles</span></Link>
+                        <Link to="/access"><Shield /><span>Access &amp; Roles</span></Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   </>
                 )}
-                {(isSuperAdmin || isDepartmentHead || isReportingManager) && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/admin/taxonomy")}>
-                      <Link to="/admin/taxonomy"><Layers /><span>Taxonomy</span></Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
-
-
-
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         )}
-
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="flex items-center gap-2 px-1 py-1">

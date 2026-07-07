@@ -50,7 +50,7 @@ type Session = {
 
 type Row = { projectId: string; taskId: string; hours: string; comments: string };
 
-function PunchPage() {
+export function PunchPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const punchInServer = useServerFn(punchInServerFn);

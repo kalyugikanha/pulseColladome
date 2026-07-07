@@ -1,68 +1,109 @@
-## Problem
+# Navigation Consolidation — 8-Item Sidebar
 
-`task_ratings` has **zero rows** in the database — no ratings have ever been recorded. Root causes:
+Restructure the sidebar into 8 top-level items with role-based tabs and scoped filters. Pure IA / routing / UI change — no data-model or permission-rule changes.
 
-1. **The only rating input in the whole app** is inside the Review dialog's "Approve" action (`workflow-task-panel.tsx` → `ReviewDialog`). It never appears on tasks the user closes directly, on tasks that don't have a review stage, or as a standalone action on a done task. So a manager who thinks they "gave a rating on each task" actually never had a place to submit one for most tasks.
-2. `reviewTask` inserts the rating without checking the returned error, so RLS rejections (e.g. rater is neither reviewer nor creator) fail silently. If the rare Review-Approve rating path is used but the RLS policy denies it, the user sees "Approved" and nothing more.
-3. Performance page reads `task_ratings` correctly — it isn't the bug; there's just nothing to show.
+## Final sidebar (in order)
 
-## Changes
+1. **Dashboard** — `/dashboard` (unchanged)
+2. **Tasks** — `/tasks` (unified)
+3. **Attendance** — `/attendance` (unified)
+4. **Projects** — `/projects` (Burn moves inside project detail)
+5. **Team** — `/team` (Leave + Calendar + Directory as tabs)
+6. **Performance** — `/performance` (unified)
+7. **Business Development** — `/bd` (unchanged, role-gated to BD dept / managers / admins as today)
+8. **Resource Hub** — `/resources` (unchanged)
 
-### 1. Standalone rating widget on the task detail
-`src/components/tasks/task-detail-sheet.tsx`:
-- Add a compact "Rate this work" star row (1–5, clickable, with existing rating pre-filled) visible whenever `actingUserId` is one of: task reviewer, task creator, or the assignee's reporting manager — **and** `actingUserId !== assignee_id` — regardless of task status. Reviewer-agnostic so Kanishka can rate any of Sweksha's tasks she owns/manages without going through a review dialog.
-- Fetch the current rating alongside task detail (extend `getTaskDetail` to also return `myRating` — most recent rating by actingUser on this task).
-- Clicking a star calls a new server fn `rateTask({ taskId, rating })`; the widget updates optimistically and toasts on save.
+Admin-only surfaces that don't fit the 8 (Workflows, Finances, HR Leaves, Onboarding approvals, Onboarding, Team Meetings, Vendors, Access & Roles) collapse into a single **Admin** group at the bottom of the sidebar, visible only to users who already qualify for them. This keeps the primary nav at 8 items for everyone.
 
-### 2. New `rateTask` server function
-`src/lib/tasks-workflow.functions.ts`:
-- `createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])` accepting `{ taskId, rating: 1..5, viewAsUserId? }`.
-- Loads the task, resolves acting user via `resolveActingUser`, verifies acting user is reviewer / creator / reporting manager of the assignee and is **not** the assignee.
-- Upserts into `task_ratings` (delete existing rows by same `rater_id` on the same `task_id`, then insert new one — or use a proper `on conflict` if a unique index exists). Checks `error` and throws on failure so the client sees the real reason.
-- Also fix the silent insert in existing `reviewTask` (`workflows.functions.ts` line 334) to check `error` and throw.
+## 1. Tasks (`/tasks`)
 
-### 3. RLS on `task_ratings`
-Migration to update the INSERT policy so it accepts creator, reviewer, or the assignee's reporting manager as the rater, and to enforce `rater_id != ratee_id`. Add matching UPDATE and DELETE policies scoped to the same rater set so a rater can revise or clear their own rating:
+Single page. URL search params drive state so links are shareable.
 
-```sql
-DROP POLICY IF EXISTS "Reviewer can rate a task" ON public.task_ratings;
+- **View toggle** — List ↔ Kanban (`?view=list|kanban`)
+- **Scope filter** — Mine / My Department / All (`?scope=mine|dept|all`), gated by role: employees only Mine; dept heads / reporting managers up to Dept; admins All.
+- **Dept picker** — shown when scope=dept for users who lead more than one department (`?dept=marketing|business-development|tech`).
+- **Header actions**:
+  - **Templates** button → dialog listing task templates with Create / Edit / Duplicate. Gated to users who can currently manage templates.
+  - **Manage taxonomy** button → drawer for Domain / Department / Task Type (content from `/admin/taxonomy`). Gated to super admin / dept head / reporting manager.
 
-CREATE POLICY "Authorised raters can rate a task"
-  ON public.task_ratings FOR INSERT TO authenticated
-  WITH CHECK (
-    rater_id = auth.uid()
-    AND rater_id <> ratee_id
-    AND EXISTS (
-      SELECT 1 FROM public.tasks t
-      LEFT JOIN public.profiles p ON p.id = t.assignee_id
-      WHERE t.id = task_ratings.task_id
-        AND t.assignee_id = task_ratings.ratee_id
-        AND (
-          t.reviewer_id = auth.uid()
-          OR t.created_by = auth.uid()
-          OR p.reporting_manager_id = auth.uid()
-        )
-    )
-  );
+Redirects to preserve deep links:
+- `/board/$dept` → `/tasks?view=kanban&scope=dept&dept=$dept`
+- `/admin/taxonomy` → `/tasks?manage=taxonomy` (still role-gated)
+- `/my-timesheet` handled under Attendance (see §2)
 
-CREATE POLICY "Raters can update own rating"
-  ON public.task_ratings FOR UPDATE TO authenticated
-  USING (rater_id = auth.uid()) WITH CHECK (rater_id = auth.uid());
+## 2. Attendance (`/attendance`)
 
-CREATE POLICY "Raters can delete own rating"
-  ON public.task_ratings FOR DELETE TO authenticated
-  USING (rater_id = auth.uid());
-```
+Tabs (`?tab=…`), triggers role-gated:
+- **My Attendance** — everyone. Punch in/out card + personal daily/weekly history (from current `/punch`).
+- **Timesheet** — everyone sees their own roll-up (from `/my-timesheet`); managers/dept heads/project managers additionally see a "Team" sub-view (from `/timesheet`) via an inner scope toggle.
+- **Team View** — admins, HR admin, dept heads, reporting managers only. Content from current admin `/attendance`.
 
-SELECT policies stay as-is (ratee sees their own; super-admins see all). Add a policy so the rater can also see their own submissions, since the widget re-reads.
+Default tab: employees → My Attendance; managers land on the last tab they used (persisted via URL param).
 
-### 4. Keep the existing review-dialog rating
-No UI removal — the Approve dialog's stars still work; they now route through the same fixed insert path (with error surfacing).
+Redirects: `/punch` → `/attendance?tab=my`; `/my-timesheet` → `/attendance?tab=timesheet`; `/timesheet` → `/attendance?tab=timesheet&scope=team`.
 
-## Verify
+## 3. Projects — Burn inside detail
 
-- As Kanishka on a task assigned to Sweksha (Kanishka = creator/reviewer/manager), open the task: star row appears, clicking 4 stars persists a row in `task_ratings` with `rater_id=Kanishka, ratee_id=Sweksha, rating=4`.
-- As Sweksha on her own task: no star row shown.
-- As Sweksha on Performance page for the current month: "Average rating this month" reflects the new rating.
-- Re-click a different star as Kanishka: the row updates (old one replaced), average shows the new value.
-- Approve flow in Review dialog with a rating still writes correctly; RLS rejection now surfaces as a toast instead of silent success.
+- Sidebar item **Project Burn** removed.
+- Inside the project detail page, add a **Burn** tab (or section) that renders the current `/project-burn` body scoped to that project id. Tab visible to finance admin / dept head / reporting manager (same gating as today).
+- `/project-burn` redirects to `/projects` (list) so old links don't 404.
+
+## 4. Team (`/team`)
+
+New route with tabs:
+- **Leave** — content from `/leave`
+- **Calendar** — content from `/calendar`
+- **Directory** — content from `/directory` (visible only to roles that see it today: super admin, HR admin, dept head, reporting manager). For users without Directory access, the tab is hidden and default lands on Leave.
+
+Redirects: `/leave` → `/team?tab=leave`; `/calendar` → `/team?tab=calendar`; `/directory` → `/team?tab=directory`.
+
+## 5. Performance (`/performance`)
+
+Tabs (role-gated):
+- **My Performance** — everyone.
+- **Team** — reporting managers, dept heads, admins.
+- **Output Analytics** — dept heads, admins.
+
+## Admin group (bottom of sidebar, unchanged surfaces)
+
+Kept as-is, still role-gated per current rules:
+Workflows · Finances · HR Leaves · Onboarding approvals · Onboarding · Team Meetings · Vendors · Access & Roles.
+
+## Implementation steps
+
+1. **Refactor route bodies into components** so tabs can compose them cleanly:
+   - Extract `PunchPanel`, `MyTimesheetPanel`, `TeamTimesheetPanel`, `AdminAttendancePanel` from `punch.tsx` / `my-timesheet.tsx` / `timesheet.tsx` / `attendance.tsx` into `src/components/attendance/`.
+   - Extract `LeavePanel`, `CalendarPanel`, `DirectoryPanel` into `src/components/team/`.
+   - Extract `MyPerformancePanel`, `TeamPerformancePanel`, `OutputAnalyticsPanel` into `src/components/performance/` (Team + Output currently live inside `performance.tsx`; split them out).
+   - Extract `TasksListView` and `TasksKanbanView` from `tasks.tsx` and `board.$dept.tsx` into `src/components/tasks/`.
+   - Extract `ProjectBurnPanel` from `project-burn.tsx` into `src/components/projects/`.
+   - Extract `TaxonomyPanel` from `admin.taxonomy.tsx` and expose a `TemplatesPanel` (lifted from Workflows if that's where templates live today; otherwise a stub wired to the existing template store).
+
+2. **Rewrite unified route files**:
+   - `src/routes/_authenticated/attendance.tsx` — tabs + role gating, reads `?tab=`.
+   - New `src/routes/_authenticated/team.tsx` — tabs + role gating.
+   - `src/routes/_authenticated/performance.tsx` — tabs + role gating.
+   - `src/routes/_authenticated/tasks.tsx` — toolbar (view toggle, scope filter, dept picker, Templates, Manage taxonomy) + dialogs; renders list or kanban based on `?view=`.
+
+3. **Add Burn tab** to the project detail page (find current detail route under `projects.*`; if none exists yet, add a `Burn` section to the existing projects UI where a project is selected).
+
+4. **Replace old route bodies with redirects** (keep files so links resolve):
+   `/punch`, `/my-timesheet`, `/timesheet`, `/board/$dept`, `/admin/taxonomy`, `/leave`, `/calendar`, `/directory`, `/project-burn`. Each becomes a route whose `beforeLoad` throws `redirect({ to: "…", search: {…} })`.
+
+5. **Rewrite sidebar** `src/routes/_authenticated/route.tsx`:
+   - Replace `employeeItems` and the current groups with two groups:
+     - **Workspace**: Dashboard, Tasks, Attendance, Projects, Team, Performance, Business Development, Resource Hub.
+     - **Admin** (only if the user matches any admin surface): Workflows, Finances, HR Leaves, Onboarding approvals, Onboarding, Team Meetings, Vendors, Access & Roles.
+   - Business Development stays gated with the existing `isBd` logic.
+
+6. **Dashboard quick actions**: update the "Punch out" link (`/punch` → `/attendance?tab=my`) and any "View all tasks" links; no behavior change.
+
+## Out of scope
+
+- Permission rules themselves (only tab visibility uses them).
+- Data model, RLS, task/rating/review logic.
+- Visual redesign of individual panels — they render as-is inside their new host.
+
+## Rollout note
+
+All old URLs redirect, so bookmarks and shared links keep working. If the user prefers deleting old routes outright instead of redirecting, that's a one-line change per file — I'll default to redirects for safety.

@@ -46,7 +46,7 @@ function addDays(d: Date, n: number) {
   return x;
 }
 
-function TimesheetPage() {
+export function TimesheetPage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const navigate = useNavigate({ from: "/timesheet" });
   const search = useSearch({ from: "/_authenticated/timesheet" });

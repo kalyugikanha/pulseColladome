@@ -121,7 +121,7 @@ function MarketingKanbanPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks")
-        .select("id,title,description,priority,due_date,scheduled_post_date,marketing_stage,assignee_id,client_brand,origin_department,requester_id,asset_links,assignee:profiles!tasks_assignee_profile_fkey(id,full_name,email),requester:profiles!tasks_requester_id_fkey(id,full_name)" as any)
+        .select("id,title,description,priority,due_date,scheduled_post_date,marketing_stage,assignee_id,client_brand,origin_department,requester_id,asset_links,project_id,project:projects(id,code,name),assignee:profiles!tasks_assignee_profile_fkey(id,full_name,email),requester:profiles!tasks_requester_id_fkey(id,full_name)" as any)
         .not("marketing_stage", "is", null)
         .order("created_at", { ascending: false });
       if (error) throw error;

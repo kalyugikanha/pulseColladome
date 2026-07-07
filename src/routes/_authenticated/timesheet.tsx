@@ -626,47 +626,61 @@ function EmployeeBlock({
           </TableCell>
         </TableRow>
       ) : (
-        row.tasks.map((t, i) => (
-          <TableRow key={`${row.profile.id}-${i}`}>
-            {i === 0 && (
-              <TableCell rowSpan={rowspan} className="align-top border-r">
-                <div className="font-medium">{name}</div>
-                {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
-                <div className="mt-2 text-xs font-mono">Total: <span className="font-bold">{row.total.toFixed(1)}</span></div>
-              </TableCell>
-            )}
-            <TableCell>
-              <Select value={t.project_code ?? ""} onValueChange={(v) => onUpdate(i, { project_code: v })} disabled={!mayEdit}>
-                <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </TableCell>
-            <TableCell className="text-right">
-              <InlineNumber value={Number(t.hours) || 0} disabled={!mayEdit} onCommit={(v) => onUpdate(i, { hours: v })} />
-            </TableCell>
-            <TableCell>
-              <InlineText value={t.comments ?? ""} disabled={!mayEdit} onCommit={(v) => onUpdate(i, { comments: v })} placeholder="Optional" />
-            </TableCell>
-            {i === 0 && (
-              <TableCell rowSpan={rowspan} className="align-top">
-                {row.approved
-                  ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
-                  : <Badge variant="outline">Pending</Badge>}
-                {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
-              </TableCell>
-            )}
-            <TableCell>
-              <div className="flex items-center gap-1 justify-end">
-                <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!mayEdit} onClick={() => onDelete(i)} aria-label="Delete row">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-                {i === 0 && <RowMenu canApprove={canApprove} approved={row.approved} onToggleApproval={onToggleApproval} onOpenFull={onOpenFull} />}
-              </div>
-            </TableCell>
-          </TableRow>
-        ))
+        (() => {
+          let logCounter = -1;
+          return row.tasks.map((t, i) => {
+            const isActivity = t.source === "activity";
+            if (!isActivity) logCounter++;
+            const logIdx = isActivity ? -1 : logCounter;
+            const editableRow = mayEdit && !isActivity;
+            return (
+              <TableRow key={`${row.profile.id}-${i}`}>
+                {i === 0 && (
+                  <TableCell rowSpan={rowspan} className="align-top border-r">
+                    <div className="font-medium">{name}</div>
+                    {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
+                    <div className="mt-2 text-xs font-mono">Total: <span className="font-bold">{row.total.toFixed(1)}</span></div>
+                  </TableCell>
+                )}
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Select value={t.project_code ?? ""} onValueChange={(v) => onUpdate(logIdx, { project_code: v })} disabled={!editableRow}>
+                      <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {isActivity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">via task</Badge>}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <InlineNumber value={Number(t.hours) || 0} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { hours: v })} />
+                </TableCell>
+                <TableCell>
+                  <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { comments: v })} placeholder="Optional" />
+                </TableCell>
+                {i === 0 && (
+                  <TableCell rowSpan={rowspan} className="align-top">
+                    {row.approved
+                      ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
+                      : <Badge variant="outline">Pending</Badge>}
+                    {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
+                  </TableCell>
+                )}
+                <TableCell>
+                  <div className="flex items-center gap-1 justify-end">
+                    {!isActivity && (
+                      <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!editableRow} onClick={() => onDelete(logIdx)} aria-label="Delete row">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {i === 0 && <RowMenu canApprove={canApprove} approved={row.approved} onToggleApproval={onToggleApproval} onOpenFull={onOpenFull} />}
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          });
+        })()
       )}
       {mayEdit && row.tasks.length > 0 && addOpen && (
         <TableRow className="bg-muted/20">

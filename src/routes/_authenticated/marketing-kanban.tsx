@@ -263,6 +263,32 @@ function MarketingKanbanPage() {
         </div>
       </header>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <Label className="text-xs text-muted-foreground">Assignee</Label>
+        <Select value={assigneeFilter} onValueChange={setAssignee}>
+          <SelectTrigger className="h-8 w-[220px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {(roster ?? []).map((u) => (
+              <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {me && (roster ?? []).some((u) => u.id === me.realId) && (
+          <Button
+            size="sm"
+            variant={assigneeFilter === me.realId ? "default" : "outline"}
+            onClick={() => setAssignee(assigneeFilter === me.realId ? "all" : me.realId)}
+          >
+            My tasks
+          </Button>
+        )}
+        {assigneeFilter !== "all" && (
+          <Button size="sm" variant="ghost" onClick={() => setAssignee("all")}>Clear</Button>
+        )}
+      </div>
+
       {!isMarketingMember && me && (
         <MyRequestsStrip meId={me.realId} tasks={tasks ?? []} onOpen={(id) => setOpenTaskId(id)} />
       )}
@@ -271,7 +297,7 @@ function MarketingKanbanPage() {
         <div className="grid gap-3 min-h-[60vh]" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(240px, 1fr))` }}>
           {COLUMNS.map((col) => (
             <Column key={col.key} stage={col.key} label={col.label} cards={byCol[col.key]}
-              roster={roster ?? []} canAssignAny={canAssignAny}
+              roster={roster ?? []} canAssignAny={canAssignAny} burnMap={burnMap}
               onSendBack={(t) => setSendBack(t)}
               onApprove={(t) => setPending({ task: t, toStage: "posting" })}
               onOpen={(t) => setOpenTaskId(t.id)}
@@ -286,18 +312,18 @@ function MarketingKanbanPage() {
       <ReassignDialog
         state={pending} onClose={() => setPending(null)}
         roster={roster ?? []}
-        onConfirm={async (assigneeId) => {
+        onConfirm={async ({ assigneeId, hours, note }) => {
           if (!pending) return;
-          await commitMove(pending.task, pending.toStage, assigneeId);
+          await commitMove(pending.task, pending.toStage, assigneeId, { hours, note });
           setPending(null);
         }}
       />
       <SendBackDialog
         task={sendBack} onClose={() => setSendBack(null)}
         roster={roster ?? []}
-        onConfirm={async ({ toStage, assigneeId, note }) => {
+        onConfirm={async ({ toStage, assigneeId, note, hours }) => {
           if (!sendBack) return;
-          await commitMove(sendBack, toStage, assigneeId, note);
+          await commitMove(sendBack, toStage, assigneeId, { hours, note, kind: "marketing_stage_sent_back" });
           setSendBack(null);
         }}
       />

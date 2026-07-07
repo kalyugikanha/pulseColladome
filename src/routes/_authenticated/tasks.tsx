@@ -94,7 +94,8 @@ function TasksPage() {
       .order("due_date", { ascending: true, nullsFirst: false })).data ?? [],
   });
 
-  // Sum logged & approved hours per task from the current user's attendance logs (last 120 days).
+  // Sum logged & approved hours per task from (a) my attendance_logs entries and
+  // (b) task_activity rows I'm the actor on (kanban moves + completions).
   const { data: hoursMap } = useQuery({
     queryKey: ["my-tasks-hours", me?.id], enabled: !!me,
     queryFn: async () => {
@@ -120,9 +121,25 @@ function TasksPage() {
           map.set(e.task_id, cur);
         }
       }
+      // Add hours from task_activity where I'm the actor (kanban moves, task closures).
+      const { data: acts } = await supabase
+        .from("task_activity" as any)
+        .select("task_id, hours, approval_status")
+        .eq("actor_id", me!.id)
+        .not("hours", "is", null);
+      for (const a of (acts ?? []) as Array<{ task_id: string; hours: number | null; approval_status: string }>) {
+        const h = Number(a.hours) || 0;
+        if (h <= 0) continue;
+        if (a.approval_status === "rejected") continue;
+        const cur = map.get(a.task_id) ?? { logged: 0, approved: 0 };
+        cur.logged += h;
+        if (a.approval_status === "approved" || a.approval_status === "auto") cur.approved += h;
+        map.set(a.task_id, cur);
+      }
       return map;
     },
   });
+
 
   const awaitingFn = useServerFn(listAwaitingMyReview);
   const { data: awaiting } = useQuery({

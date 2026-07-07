@@ -1,5 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,6 +104,15 @@ function CompleteOnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Auto-save state
+  type AutoStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
+  const [autoStatus, setAutoStatus] = useState<AutoStatus>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const hydratedRef = useRef(false);
+  const inFlightRef = useRef(false);
+  const pendingRef = useRef(false);
+  const lastErrorToastRef = useRef(0);
+
   useEffect(() => {
     if (!data) return;
     const p = (data.profile ?? {}) as Record<string, string | null>;
@@ -129,7 +139,94 @@ function CompleteOnboardingPage() {
     setBranch(b.bank_branch ?? "");
     setIfsc(b.ifsc_code ?? "");
     setPan(b.pan_number ?? "");
+    // Mark hydrated on the next tick so the field-hydration setState calls
+    // do not trigger a spurious auto-save.
+    const t = setTimeout(() => {
+      hydratedRef.current = true;
+      setAutoStatus("saved");
+    }, 50);
+    return () => clearTimeout(t);
   }, [data]);
+
+  // Serialized payload for both auto-save and manual save
+  const autoSavePayload = useMemo(() => ({
+    profile: {
+      full_name: fullName.trim() || null,
+      personal_email: personalEmail.trim() || null,
+      phone: phone.trim() || null,
+      permanent_address: address.trim() || null,
+      date_of_birth: dob || null,
+      marriage_anniversary: anniversary || null,
+      linkedin_url: linkedin.trim() || null,
+      github_url: github.trim() || null,
+      facebook_url: facebook.trim() || null,
+      instagram_url: instagram.trim() || null,
+      twitter_url: twitter.trim() || null,
+      youtube_url: youtube.trim() || null,
+      pinterest_url: pinterest.trim() || null,
+      department: department.trim() || null,
+      day_start_time: dayStart || null,
+      standup_time: standup || null,
+      hobbies: hobbies.trim() || null,
+    },
+    bank: {
+      account_holder_name: holder.trim(),
+      account_number: account.trim(),
+      bank_branch: branch.trim(),
+      ifsc_code: ifsc.trim().toUpperCase(),
+      pan_number: pan.trim().toUpperCase(),
+    },
+  }), [fullName, personalEmail, phone, address, dob, anniversary, linkedin, github, facebook, instagram, twitter, youtube, pinterest, department, dayStart, standup, hobbies, holder, account, branch, ifsc, pan]);
+
+  // Debounced auto-save on any field change
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    setAutoStatus((prev) => (prev === "saving" ? prev : "unsaved"));
+    const t = setTimeout(async () => {
+      if (inFlightRef.current) { pendingRef.current = true; return; }
+      const runSave = async () => {
+        inFlightRef.current = true;
+        setAutoStatus("saving");
+        try {
+          await saveOnboarding({ data: autoSavePayload });
+          setLastSavedAt(new Date());
+          setAutoStatus("saved");
+        } catch (e: unknown) {
+          setAutoStatus("error");
+          const now = Date.now();
+          if (now - lastErrorToastRef.current > 30000) {
+            lastErrorToastRef.current = now;
+            toast.error(e instanceof Error ? `Auto-save failed: ${e.message}` : "Auto-save failed");
+          }
+        } finally {
+          inFlightRef.current = false;
+          if (pendingRef.current) {
+            pendingRef.current = false;
+            await runSave();
+          }
+        }
+      };
+      await runSave();
+    }, 800);
+    return () => clearTimeout(t);
+  }, [autoSavePayload, saveOnboarding]);
+
+  // Best-effort flush on tab close / hide
+  useEffect(() => {
+    const flush = () => {
+      if (!hydratedRef.current) return;
+      // Fire-and-forget; not guaranteed to reach server during unload.
+      saveOnboarding({ data: autoSavePayload }).catch(() => {});
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [autoSavePayload, saveOnboarding]);
+
 
   const uploaded = new Set((data?.documents ?? []).map((d) => d.doc_type));
   const profileAny = (data?.profile ?? {}) as Record<string, unknown>;
@@ -164,45 +261,23 @@ function CompleteOnboardingPage() {
   const filledItems = filledProfile + filledBank + filledDocs;
   const completionPct = Math.round((filledItems / totalItems) * 100);
 
-  async function saveDraft() {
+  async function saveDraft(silent = false) {
     setSaving(true);
+    setAutoStatus("saving");
     try {
-      await saveOnboarding({ data: {
-        profile: {
-          full_name: fullName.trim() || null,
-          personal_email: personalEmail.trim() || null,
-          phone: phone.trim() || null,
-          permanent_address: address.trim() || null,
-          date_of_birth: dob || null,
-          marriage_anniversary: anniversary || null,
-          linkedin_url: linkedin.trim() || null,
-          github_url: github.trim() || null,
-          facebook_url: facebook.trim() || null,
-          instagram_url: instagram.trim() || null,
-          twitter_url: twitter.trim() || null,
-          youtube_url: youtube.trim() || null,
-          pinterest_url: pinterest.trim() || null,
-          department: department.trim() || null,
-          day_start_time: dayStart || null,
-          standup_time: standup || null,
-          hobbies: hobbies.trim() || null,
-        },
-        bank: {
-          account_holder_name: holder.trim(),
-          account_number: account.trim(),
-          bank_branch: branch.trim(),
-          ifsc_code: ifsc.trim().toUpperCase(),
-          pan_number: pan.trim().toUpperCase(),
-        },
-      } });
-      toast.success("Progress saved");
+      await saveOnboarding({ data: autoSavePayload });
+      setLastSavedAt(new Date());
+      setAutoStatus("saved");
+      if (!silent) toast.success("Progress saved");
       qc.invalidateQueries({ queryKey: ["my-onboarding"] });
     } catch (e: unknown) {
+      setAutoStatus("error");
       toast.error(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }
   }
+
 
   async function uploadDoc(spec: DocSpec, file: File) {
     if (file.size > 10 * 1024 * 1024) { toast.error("File must be under 10 MB"); return; }
@@ -228,14 +303,14 @@ function CompleteOnboardingPage() {
 
   async function submit() {
     if (isApproved) {
-      await saveDraft();
+      await saveDraft(true);
       qc.invalidateQueries({ queryKey: ["current-user"] });
       qc.invalidateQueries({ queryKey: ["my-onboarding"] });
       return;
     }
     setSubmitting(true);
     try {
-      await saveDraft();
+      await saveDraft(true);
       const res = await finalize();
       if (!res.ok) {
         toast.error(`Please complete: ${res.missing.slice(0, 3).join(", ")}${res.missing.length > 3 ? "…" : ""}`);
@@ -411,7 +486,8 @@ function CompleteOnboardingPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-end gap-2 pb-8">
+      <div className="flex flex-wrap items-center justify-end gap-2 pb-8">
+        <AutoSaveStatusPill status={autoStatus} lastSavedAt={lastSavedAt} />
         <Button variant="outline" onClick={() => saveDraft()} disabled={saving || submitting}>
           {saving ? "Saving…" : "Save progress"}
         </Button>
@@ -419,6 +495,7 @@ function CompleteOnboardingPage() {
           {submitting ? "Submitting…" : isApproved ? "Save changes" : isPendingReview ? "Re-submit for HR approval" : "Submit for HR approval"}
         </Button>
       </div>
+
     </div>
   );
 }
@@ -469,3 +546,31 @@ function Field({ label, children, className }: { label: string; children: React.
     </div>
   );
 }
+
+function AutoSaveStatusPill({
+  status,
+  lastSavedAt,
+}: {
+  status: "idle" | "unsaved" | "saving" | "saved" | "error";
+  lastSavedAt: Date | null;
+}) {
+  if (status === "idle") return null;
+  const title = lastSavedAt ? `Last saved ${formatDistanceToNow(lastSavedAt, { addSuffix: true })}` : undefined;
+  const config: Record<"unsaved" | "saving" | "saved" | "error", { icon: React.ReactNode; label: string; className: string }> = {
+    unsaved:  { icon: <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />, label: "Unsaved changes", className: "text-amber-600 border-amber-400/40 bg-amber-500/10" },
+    saving:   { icon: <Loader2 className="h-3 w-3 animate-spin" />, label: "Saving…", className: "text-muted-foreground border-border/60 bg-muted/40" },
+    saved:    { icon: <CheckCircle2 className="h-3 w-3 text-green-500" />, label: "Saved", className: "text-muted-foreground border-border/60 bg-muted/40" },
+    error:    { icon: <span className="h-1.5 w-1.5 rounded-full bg-destructive" />, label: "Save failed — will retry", className: "text-destructive border-destructive/40 bg-destructive/10" },
+  };
+  const c = config[status];
+  return (
+    <span
+      title={title}
+      className={`mr-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${c.className}`}
+    >
+      {c.icon}
+      {c.label}
+    </span>
+  );
+}
+

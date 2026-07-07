@@ -1,49 +1,36 @@
-## Root cause — trigger bug, not OAuth / proxy
+## Add silent auto-save to the employee onboarding form
 
-Juhi has **no `auth.users` row** (never signed in successfully) but she already has a `public.profiles` row seeded ahead of time:
+The self-onboarding form (`src/routes/_authenticated/complete-onboarding.tsx`) is long and today only persists when the user clicks **Save progress** or **Submit**. Any refresh, tab close, or navigation before that loses everything typed.
 
-```
-id      = 11111111-0000-0000-0000-000000000007
-email   = juhi@colladome.com
-```
+Add a soft, background auto-save so every field change is quietly persisted to the user's own draft, without changing the visible flow.
 
-`public.profiles` has a unique index `profiles_email_lower_unique` on `lower(email)`.
+### Behaviour
 
-When she signs in with Google for the first time, the `handle_new_user()` trigger (fires on `INSERT INTO auth.users`) runs the "placeholder retarget" branch:
+- Debounced auto-save fires ~800 ms after the last keystroke / date-picker / time-picker change on any of the text/date/time/textarea fields (personal, work preferences, bank).
+- Uses the existing `saveMyOnboarding` server function — same shape, same auth, so it also serves as the "session-attached" store (rows are keyed by `auth.uid()`).
+- Skipped while the initial `getMyOnboarding` query is still loading, so hydrating the form doesn't cause a phantom write-back.
+- Skipped for submitted-and-approved records only when the user is a read-only viewer; here everyone can edit, so auto-save stays on for approved profiles too (matches current Save behaviour).
+- Also fires on `beforeunload` via a `navigator.sendBeacon`-style final flush attempt (best-effort, non-blocking) so a tab close still captures the latest text.
+- Document uploads already persist immediately — no change there.
 
-1. `INSERT INTO public.profiles(id, …, email, …) VALUES (NEW.id, …, 'juhi@colladome.com', …)` ← **fails** on `profiles_email_lower_unique` because the placeholder row with the same lowercased email still exists.
-2. Trigger raises → Supabase aborts the auth signup → the OAuth callback returns
-   `#error=server_error&error_description=failed+to+sign+in+with+vendor`.
+### UI
 
-That's the exact error Juhi is seeing. 4 profiles in the DB are in this same "seeded placeholder, never signed in" state — all will hit the same failure on their first login.
+- Replace the "Save progress" button's role: keep it as an optional manual trigger, but add a small right-aligned status pill next to it — `Saved`, `Saving…`, or `Unsaved changes` (with timestamp on hover). No toasts on auto-save success; toast only on failure (rate-limited to one per 30 s so we don't spam if the network is flaky).
+- Submit button behaviour unchanged.
 
-The published-URL fetch-proxy story doesn't apply here (this is `error_description=failed+to+sign+in+with+vendor` from the auth server itself, not a network failure in the browser).
+### Implementation notes
 
-## Fix — one migration, `handle_new_user()` update
+- Add a `useAutoSave` hook local to the file (or `src/hooks/use-auto-save.ts` if it's reusable) that takes the serialized field payload plus a save function; internally uses `useEffect` + `setTimeout` + a `useRef` to skip the first hydration render and to cancel in-flight timers.
+- Track `dirty` and `lastSavedAt` state; drive the status pill from it.
+- Guard against concurrent writes by tracking an `inFlight` ref — if a change lands while one is in-flight, schedule another after it resolves.
+- No schema or RLS change needed — `saveMyOnboarding` already writes to the user's profile + bank rows via `requireSupabaseAuth`.
 
-Patch the placeholder branch to remove the email-collision before the insert. Because `profiles_email_lower_unique` is a partial index `WHERE email IS NOT NULL`, nulling the placeholder's email removes it from the index without dropping the row (we still need the row so FK retargeting can find children).
+### Files touched
 
-New order inside the `ph.id IS NOT NULL AND ph.id <> NEW.id` branch:
+- `src/routes/_authenticated/complete-onboarding.tsx` — wire the debounced auto-save, status pill, and `beforeunload` flush; leave field markup and validation intact.
+- (optional) `src/hooks/use-auto-save.ts` — small reusable hook if we want to reuse elsewhere.
 
-```sql
--- 0) Free the unique-lower(email) index slot held by the placeholder.
-UPDATE public.profiles SET email = NULL WHERE id = ph.id;
+### Out of scope
 
--- 1) Insert the new profile row with the real auth uid.
-INSERT INTO public.profiles (id, …, email, …) VALUES (NEW.id, …, NEW.email, …);
-
--- 2) Retarget all FKs from ph.id → NEW.id (unchanged, existing UPDATEs).
--- 3) DELETE FROM public.profiles WHERE id = ph.id;
-```
-
-Everything else in the function stays as-is (role grants, salaries, leave balances, manager back-fill).
-
-## Verify
-
-- After migration, ask Juhi to try Google sign-in again on the published URL. She should land in the app, `auth.users` gets her row, `profiles` gets her real uid, placeholder row is gone.
-- Spot-check one other placeholder user via `SELECT id, email, is_placeholder FROM public.profiles p LEFT JOIN auth.users u ON u.id = p.id WHERE u.id IS NULL;` — the row should disappear after that user's first successful sign-in.
-- No code changes on the frontend; no OAuth reconfig needed.
-
-## Files touched
-
-- New migration `supabase/migrations/…_fix_handle_new_user_email_collision.sql` — `CREATE OR REPLACE FUNCTION public.handle_new_user()` with the extra `UPDATE … SET email = NULL` at the top of the placeholder branch.
+- HR-side onboarding form in `src/routes/_authenticated/onboarding.tsx` (that's a create-user flow, not a long-form draft).
+- Server-side changes to `saveMyOnboarding` — the existing function already handles partial saves.

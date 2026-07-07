@@ -118,24 +118,13 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                   </SidebarMenuItem>
                 )}
                 {(isSuperAdmin || isHrAdmin) && (
-                  <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/hr/leave")}>
-                        <Link to="/hr/leave"><CalendarRange /><span>HR Leaves</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/hr/onboarding")}>
-                        <Link to="/hr/onboarding"><ClipboardCheck /><span>Onboarding approvals</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/onboarding")}>
-                        <Link to="/onboarding"><UserPlus /><span>Onboarding</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/hr-admin") || pathname.startsWith("/hr/") || pathname.startsWith("/onboarding") || pathname.startsWith("/access")}>
+                      <Link to="/hr-admin"><ClipboardCheck /><span>HR Admin</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 )}
+
                 {isSuperAdmin && (
                   <>
                     <SidebarMenuItem>

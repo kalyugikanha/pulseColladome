@@ -190,7 +190,10 @@ function TimesheetPage() {
       let tasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t }));
       if (projSel.size > 0) tasks = tasks.filter((t) => t.project_code && projSel.has(t.project_code));
       const total = tasks.reduce((s, t) => s + (Number(t.hours) || 0), 0);
-      return { profile: p, log, tasks, approved: !!log?.approved_at, total };
+      const approvedTotal = !!log?.approved_at
+        ? tasks.reduce((s, t) => s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0)), 0)
+        : 0;
+      return { profile: p, log, tasks, approved: !!log?.approved_at, total, approvedTotal };
     });
     return out
       .filter((r) => showEmpty || r.tasks.length > 0)
@@ -200,6 +203,7 @@ function TimesheetPage() {
   }, [profiles, logByUser, deptSel, empSel, projSel, showEmpty]);
 
   const dayTotal = useMemo(() => empRows.reduce((s, r) => s + r.total, 0), [empRows]);
+  const dayApprovedTotal = useMemo(() => empRows.reduce((s, r) => s + r.approvedTotal, 0), [empRows]);
   const entryCount = useMemo(() => empRows.reduce((s, r) => s + r.tasks.length, 0), [empRows]);
 
   async function persistTasks(userId: string, existing: LogRow | null, newTasks: Task[], opts?: { approvedAt?: string | null; approvedBy?: string | null }) {
@@ -209,21 +213,29 @@ function TimesheetPage() {
         project_code: r.project_code,
         project_name: r.project_name || projectByCode.get(r.project_code!)?.name || r.project_code,
         hours: Number(r.hours) || 0,
+        approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
+          ? Number(r.approved_hours) : undefined,
         comments: r.comments?.trim() || undefined,
       }));
     const totalHrs = cleaned.reduce((s, r) => s + (r.hours ?? 0), 0);
+    const isApprovedNow = opts && "approvedAt" in opts
+      ? !!opts.approvedAt
+      : !!existing?.approved_at;
+    const approvedHrs = isApprovedNow
+      ? cleaned.reduce((s, r) => s + (r.approved_hours ?? r.hours ?? 0), 0)
+      : null;
     const { data: userRes } = await supabase.auth.getUser();
     const myId = userRes.user?.id ?? null;
 
     if (existing?.id) {
-      const patch = { tasks: cleaned, total_hours: totalHrs, last_edited_by: myId,
+      const patch = { tasks: cleaned, total_hours: totalHrs, logged_hours: totalHrs, approved_hours: approvedHrs, last_edited_by: myId,
         ...(opts && "approvedAt" in opts ? { approved_at: opts.approvedAt ?? null, approved_by: opts.approvedBy ?? null } : {}) };
-      const { error } = await supabase.from("attendance_logs").update(patch).eq("id", existing.id);
+      const { error } = await supabase.from("attendance_logs").update(patch as never).eq("id", existing.id);
       if (error) throw error;
     } else {
-      const insert = { user_id: userId, date: dateIso, tasks: cleaned, total_hours: totalHrs, last_edited_by: myId,
+      const insert = { user_id: userId, date: dateIso, tasks: cleaned, total_hours: totalHrs, logged_hours: totalHrs, approved_hours: approvedHrs, last_edited_by: myId,
         ...(opts && "approvedAt" in opts ? { approved_at: opts.approvedAt ?? null, approved_by: opts.approvedBy ?? null } : {}) };
-      const { error } = await supabase.from("attendance_logs").insert(insert);
+      const { error } = await supabase.from("attendance_logs").insert(insert as never);
       if (error) throw error;
     }
   }

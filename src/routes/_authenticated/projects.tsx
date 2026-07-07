@@ -269,6 +269,14 @@ function ProjectsPage() {
       </Dialog>
 
       <EditProjectDialog project={editProject} onClose={() => setEditProject(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["projects"] })} />
+
+      <TaskDetailSheet
+        taskId={openTaskId}
+        onClose={() => {
+          setOpenTaskId(null);
+          qc.invalidateQueries({ queryKey: ["projects"] });
+        }}
+      />
     </div>
   );
 }

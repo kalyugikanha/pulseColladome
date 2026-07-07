@@ -185,15 +185,20 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
         <SheetHeader className="mb-4">
           <div className="flex items-start justify-between gap-2 pr-8">
             <SheetTitle className="font-display">{task?.title ?? (isLoading ? "Loading…" : "Task")}</SheetTitle>
-            {canEditDelete && (
+            {!!task && !!me && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1"><MoreVertical className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+                  {canEditDelete && (
+                    <DropdownMenuItem onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={doDuplicate}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
+                  {canEditDelete && <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+                  </>}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}

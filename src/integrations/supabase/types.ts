@@ -746,6 +746,7 @@ export type Database = {
           standup_time: string | null
           twitter_url: string | null
           updated_at: string
+          welcomed_at: string | null
           youtube_url: string | null
         }
         Insert: {
@@ -790,6 +791,7 @@ export type Database = {
           standup_time?: string | null
           twitter_url?: string | null
           updated_at?: string
+          welcomed_at?: string | null
           youtube_url?: string | null
         }
         Update: {
@@ -834,6 +836,7 @@ export type Database = {
           standup_time?: string | null
           twitter_url?: string | null
           updated_at?: string
+          welcomed_at?: string | null
           youtube_url?: string | null
         }
         Relationships: [

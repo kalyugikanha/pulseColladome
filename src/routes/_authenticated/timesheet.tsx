@@ -527,45 +527,32 @@ export function TimesheetPage() {
             {!pendingHours || pendingHours.length === 0 ? (
               <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending. Nice.</div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Task / Project</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Logged</TableHead>
-                    <TableHead className="text-right w-[110px]">Approve</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead className="w-[180px] text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingHours.map((r) => {
-                    const date = activityWorkDate(r);
-                    const proj = r.task?.project;
-                    const logged = Number(r.hours ?? 0);
-                    return (
-                      <PendingRow
-                        key={r.id}
-                        id={r.id}
-                        name={r.actor?.full_name ?? r.actor?.email ?? "—"}
-                        title={r.task?.title ?? "Task"}
-                        projCode={proj?.code ?? null}
-                        projName={proj?.name ?? null}
-                        date={date}
-                        logged={logged}
-                        note={r.note}
-                        onDecide={decidePending}
-                      />
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
+              <div className="grid gap-3 lg:grid-cols-2">
+                {pendingHours.map((r) => {
+                  const date = activityWorkDate(r);
+                  const proj = r.task?.project;
+                  const logged = Number(r.hours ?? 0);
+                  return (
+                    <PendingCard
+                      key={r.id}
+                      id={r.id}
+                      name={r.actor?.full_name ?? r.actor?.email ?? "—"}
+                      title={r.task?.title ?? "Task"}
+                      projCode={proj?.code ?? null}
+                      projName={proj?.name ?? null}
+                      date={date}
+                      logged={logged}
+                      note={r.note}
+                      onDecide={decidePending}
+                    />
+                  );
+                })}
+              </div>
             )}
           </CardContent>
         </Card>
       )}
+
 
 
       <Card>

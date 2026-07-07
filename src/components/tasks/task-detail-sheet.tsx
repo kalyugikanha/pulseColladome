@@ -657,6 +657,15 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <MarkDoneDialog
+          task={markDoneOpen && task ? {
+            id: task.id, title: task.title,
+            assigneeId: (task as { assignee_id?: string | null }).assignee_id ?? null,
+            creatorId: (task as { created_by?: string | null }).created_by ?? null,
+          } : null}
+          onClose={() => setMarkDoneOpen(false)}
+          onConfirm={(v) => confirmMarkDone({ hours: v.hours, note: v.note })}
+        />
       </SheetContent>
     </Sheet>
   );

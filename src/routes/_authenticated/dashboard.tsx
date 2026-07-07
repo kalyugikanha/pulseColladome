@@ -59,7 +59,7 @@ function Dashboard() {
         supabase.from("attendance_logs").select("total_hours,date").eq("user_id", punchUid).gte("date", weekStart).lte("date", weekEnd),
         supabase.from("tasks").select("id,title,status,priority,due_date,project:projects(name)").eq("assignee_id", uid).neq("status", "done").order("due_date", { ascending: true }).limit(5),
         supabase.from("leave_requests").select("id,leave_type,start_date,end_date,status").eq("user_id", uid).order("created_at", { ascending: false }).limit(3),
-        supabase.from("leave_balances").select("leave_type,allocated,used").eq("user_id", punchUid),
+        supabase.from("leave_balances").select("leave_type,allocated,used").eq("user_id", uid),
       ]);
 
       let admin: any = null;

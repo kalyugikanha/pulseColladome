@@ -113,7 +113,7 @@ export function BoardKanban({
           ) : null}
         </DragOverlay>
       </DndContext>
-      <TaskDetailSheet taskId={openTaskId} onClose={(next) => { setOpenTaskId(next ?? null); qc.invalidateQueries({ queryKey }); }} />
+      <TaskDetailSheet taskId={openTaskId} initialAction={openAction} onClose={(next) => { setOpenTaskId(next ?? null); setOpenAction(null); qc.invalidateQueries({ queryKey }); }} />
     </>
   );
 }

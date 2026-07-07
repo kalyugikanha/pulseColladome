@@ -115,6 +115,7 @@ type TaskInput = {
   domainId: string | null;
   departmentId: string | null;
   taskTypeIds: string[];
+  estimatedHours?: number | null;
 };
 
 function taskCreateError(error: { message?: string; code?: string; details?: string } | Error): Error {
@@ -177,6 +178,7 @@ export const createTaskFull = createServerFn({ method: "POST" })
       _domain_id: data.domainId ?? undefined,
       _department_id: data.departmentId ?? undefined,
       _task_type_ids: data.taskTypeIds,
+      _estimated_hours: data.estimatedHours ?? undefined,
     });
     if (error) throw taskCreateError(error);
     return task;
@@ -197,6 +199,7 @@ export const updateTaskFull = createServerFn({ method: "POST" })
       asset_links: AssetLink[];
       domain_id: string | null;
       department_id: string | null;
+      estimated_hours: number | null;
     }> = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.description !== undefined) patch.description = data.description || null;
@@ -207,6 +210,7 @@ export const updateTaskFull = createServerFn({ method: "POST" })
     if (data.assetLinks !== undefined) patch.asset_links = data.assetLinks;
     if (data.domainId !== undefined) patch.domain_id = data.domainId;
     if (data.departmentId !== undefined) patch.department_id = data.departmentId;
+    if (data.estimatedHours !== undefined) patch.estimated_hours = data.estimatedHours;
     if (Object.keys(patch).length > 0) {
       const { error } = await supabase.from("tasks").update(patch).eq("id", data.id);
       if (error) throw error;

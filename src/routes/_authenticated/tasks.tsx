@@ -67,11 +67,15 @@ function TasksPage() {
   const [tPri, setTPri] = useState<"low" | "medium" | "high">("medium");
   const [tAssignee, setTAssignee] = useState<string>("");
   const [tReviewer, setTReviewer] = useState<string>("");
+  const [tEstimate, setTEstimate] = useState<string>("");
   const [tax_, setTax] = useState<TaxonomyValue>({ domainId: null, departmentId: null, taskTypeIds: [] });
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [multiStage, setMultiStage] = useState(false);
   const [stages, setStages] = useState<StageInput[]>([]);
+  const [statusFilter, setStatusFilter] = useState<Set<"todo" | "in_progress" | "review" | "done">>(
+    () => new Set(["todo", "in_progress", "review"]),
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -88,6 +92,36 @@ function TasksPage() {
       .select("*, project:projects(id,name,client_name), task_types:task_task_types(task_type:taxonomy_task_types(id,name)), current_stage:task_stages!tasks_current_stage_fkey(id,name,kind,status,owner:profiles!task_stages_owner_id_fkey(id,full_name))")
       .or(`assignee_id.eq.${me!.id},reviewer_id.eq.${me!.id}`)
       .order("due_date", { ascending: true, nullsFirst: false })).data ?? [],
+  });
+
+  // Sum logged & approved hours per task from the current user's attendance logs (last 120 days).
+  const { data: hoursMap } = useQuery({
+    queryKey: ["my-tasks-hours", me?.id], enabled: !!me,
+    queryFn: async () => {
+      const from = new Date();
+      from.setDate(from.getDate() - 120);
+      const fromStr = from.toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("attendance_logs")
+        .select("tasks, approved_at")
+        .eq("user_id", me!.id)
+        .gte("date", fromStr);
+      const map = new Map<string, { logged: number; approved: number }>();
+      for (const row of data ?? []) {
+        const approved = !!(row as { approved_at: string | null }).approved_at;
+        const entries = Array.isArray((row as { tasks: unknown }).tasks) ? ((row as { tasks: Array<{ task_id?: string; hours?: number }> }).tasks) : [];
+        for (const e of entries) {
+          if (!e?.task_id) continue;
+          const h = Number(e.hours) || 0;
+          if (h <= 0) continue;
+          const cur = map.get(e.task_id) ?? { logged: 0, approved: 0 };
+          cur.logged += h;
+          if (approved) cur.approved += h;
+          map.set(e.task_id, cur);
+        }
+      }
+      return map;
+    },
   });
 
   const awaitingFn = useServerFn(listAwaitingMyReview);
@@ -158,7 +192,7 @@ function TasksPage() {
 
   function resetForm() {
     setTProject(""); setTTitle(""); setTDesc(""); setTDue(""); setTPri("medium");
-    setTAssignee(me?.id ?? ""); setTReviewer("");
+    setTAssignee(me?.id ?? ""); setTReviewer(""); setTEstimate("");
     setTax({ domainId: null, departmentId: null, taskTypeIds: [] }); setLinks([]);
     setMultiStage(false); setStages([]);
   }
@@ -175,6 +209,10 @@ function TasksPage() {
         if (!s.name.trim() || !s.owner_id) return toast.error("Fill in every stage name and owner.");
       }
     }
+    const estHours = tEstimate.trim() === "" ? null : Number(tEstimate);
+    if (estHours !== null && (!Number.isFinite(estHours) || estHours < 0)) {
+      return toast.error("Estimated hours must be a positive number.");
+    }
     const assigneeId = multiStage ? (stages[0].owner_id) : (tAssignee || me!.id);
     try {
       const task = await createFn({ data: {
@@ -182,6 +220,7 @@ function TasksPage() {
         dueDate: tDue || null, priority: tPri, assigneeId,
         assetLinks: links.filter((l) => l.url.trim()),
         domainId: tax_.domainId, departmentId: tax_.departmentId, taskTypeIds: tax_.taskTypeIds,
+        estimatedHours: estHours,
       }});
       if (tReviewer && task?.id && !multiStage) {
         await setReviewerSrv({ data: { taskId: task.id, reviewerId: tReviewer } });
@@ -198,9 +237,20 @@ function TasksPage() {
     } catch (e) { toast.error((e as Error).message); }
   }
 
+  function toggleStatus(s: "todo" | "in_progress" | "review" | "done") {
+    setStatusFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s); else next.add(s);
+      return next;
+    });
+  }
+
+  const filteredTasks = (tasks ?? []).filter((t) =>
+    statusFilter.has((t.status as "todo" | "in_progress" | "review" | "done")),
+  );
 
   const grouped: Record<string, typeof tasks> = {};
-  (tasks ?? []).forEach((t) => {
+  filteredTasks.forEach((t) => {
     const key = (t.project as { name?: string } | null)?.name ?? "Unassigned";
     (grouped[key] ??= []).push(t);
   });
@@ -216,6 +266,23 @@ function TasksPage() {
           <Plus className="h-4 w-4 mr-1" /> New task
         </Button>
       </header>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground mr-1">Show:</span>
+        {STATUS.map((s) => {
+          const active = statusFilter.has(s);
+          return (
+            <button
+              key={s}
+              type="button"
+              onClick={() => toggleStatus(s)}
+              className={`text-xs rounded-full px-3 py-1 border transition ${active ? "bg-primary text-primary-foreground border-primary" : "bg-transparent text-muted-foreground border-border hover:bg-accent"}`}
+            >
+              {STATUS_LABEL[s]}
+            </button>
+          );
+        })}
+      </div>
 
       {(awaiting?.length ?? 0) > 0 && (
         <Card className="border-primary/50">
@@ -249,6 +316,9 @@ function TasksPage() {
                 const linkArr = (t.asset_links as { label: string; url: string }[] | null) ?? [];
                 const pct = (t as { completion_percent?: number }).completion_percent ?? 0;
                 const stage = (t as { current_stage?: { name: string; kind: string; status: string; owner: { full_name: string | null } | null } | null }).current_stage;
+                const est = (t as { estimated_hours?: number | null }).estimated_hours;
+                const h = hoursMap?.get(t.id) ?? { logged: 0, approved: 0 };
+                const overEst = est != null && h.logged > Number(est);
                 return (
                   <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3 hover:border-primary/40 cursor-pointer"
                     onClick={() => setOpenTaskId(t.id)}>
@@ -267,6 +337,10 @@ function TasksPage() {
                       {t.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>}
                       <div className="flex flex-wrap gap-2 mt-1 items-center">
                         {t.due_date && <span className="text-xs text-muted-foreground">Due {format(new Date(t.due_date), "MMM d, yyyy")}</span>}
+                        <span className={`text-xs ${overEst ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                          {h.logged.toFixed(1)}h logged · {h.approved.toFixed(1)}h approved
+                          {est != null && ` · est ${Number(est).toFixed(1)}h`}
+                        </span>
                         {linkArr.map((l, i) => (
                           <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
                             className="text-xs inline-flex items-center gap-1 text-primary hover:underline">
@@ -391,7 +465,7 @@ function TasksPage() {
 
             <TaxonomyPicker value={tax_} onChange={setTax} />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1"><Label>Due date</Label>
                 <Input type="date" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
               <div className="space-y-1"><Label>Priority</Label>
@@ -403,6 +477,15 @@ function TasksPage() {
                     <SelectItem value="high">High</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Estimated hours</Label>
+                <Input
+                  type="number" min={0} step={0.25}
+                  value={tEstimate}
+                  onChange={(e) => setTEstimate(e.target.value)}
+                  placeholder="e.g. 4"
+                />
               </div>
             </div>
 

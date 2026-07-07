@@ -55,6 +55,8 @@ type KanbanTask = {
   origin_department: string | null;
   requester_id: string | null;
   asset_links: { label: string; url: string }[] | null;
+  project_id: string | null;
+  project: { id: string; code: string | null; name: string | null } | null;
   assignee: { id: string; full_name: string | null; email: string | null } | null;
   requester: { id: string; full_name: string | null } | null;
 };
@@ -119,7 +121,7 @@ function MarketingKanbanPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tasks")
-        .select("id,title,description,priority,due_date,scheduled_post_date,marketing_stage,assignee_id,client_brand,origin_department,requester_id,asset_links,assignee:profiles!tasks_assignee_profile_fkey(id,full_name,email),requester:profiles!tasks_requester_id_fkey(id,full_name)" as any)
+        .select("id,title,description,priority,due_date,scheduled_post_date,marketing_stage,assignee_id,client_brand,origin_department,requester_id,asset_links,project_id,project:projects(id,code,name),assignee:profiles!tasks_assignee_profile_fkey(id,full_name,email),requester:profiles!tasks_requester_id_fkey(id,full_name)" as any)
         .not("marketing_stage", "is", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -231,9 +233,53 @@ function MarketingKanbanPage() {
       });
     }
 
-    toast.success(`Card moved · ${opts.hours}h logged`);
+    // Also log these hours to the mover's timesheet for today so project-burn stays honest.
+    let tsMsg = "";
+    if (opts.hours > 0 && task.project_id) {
+      try {
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        const { data: existing } = await supabase
+          .from("attendance_logs")
+          .select("id, tasks, approved_at")
+          .eq("user_id", me!.realId)
+          .eq("date", dateStr)
+          .maybeSingle();
+
+        if (existing?.approved_at) {
+          tsMsg = " (day already approved — ask your manager to unapprove to log this)";
+        } else {
+          const entry = {
+            project_code: task.project?.code ?? null,
+            project_name: task.project?.name ?? task.title,
+            task_id: task.id,
+            task_title: task.title,
+            hours: Number(opts.hours),
+            comments: `Kanban: ${fromStage} → ${toStage}${opts.note ? ` — ${opts.note}` : ""}`,
+          };
+          const prevTasks = Array.isArray(existing?.tasks) ? (existing!.tasks as any[]) : [];
+          const nextTasks = [...prevTasks, entry];
+          const totalHrs = nextTasks.reduce((s, r) => s + (Number(r.hours) || 0), 0);
+          if (existing?.id) {
+            await supabase.from("attendance_logs")
+              .update({ tasks: nextTasks, total_hours: totalHrs, last_edited_by: me!.realId })
+              .eq("id", existing.id);
+          } else {
+            await supabase.from("attendance_logs")
+              .insert({ user_id: me!.realId, date: dateStr, tasks: nextTasks, total_hours: totalHrs, last_edited_by: me!.realId });
+          }
+        }
+      } catch {
+        tsMsg = " (couldn't sync to your timesheet)";
+      }
+    }
+
+    toast.success(`Card moved · ${opts.hours}h logged${tsMsg}`);
     qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
     qc.invalidateQueries({ queryKey: ["mkt-burn"] });
+    qc.invalidateQueries({ queryKey: ["my-ts-logs"] });
+    qc.invalidateQueries({ queryKey: ["ts-logs"] });
+    qc.invalidateQueries({ queryKey: ["pb-logs"] });
     refetch();
   }
 

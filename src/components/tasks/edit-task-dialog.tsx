@@ -20,6 +20,7 @@ type EditableTask = {
   project_id: string | null;
   assignee_id: string | null;
   asset_links: { label: string; url: string }[] | null;
+  estimated_hours?: number | null;
 };
 
 export function EditTaskDialog({
@@ -40,6 +41,7 @@ export function EditTaskDialog({
   const [postDate, setPostDate] = useState<string>("");
   const [client, setClient] = useState<string>("");
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
+  const [estimate, setEstimate] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const { data: projects } = useQuery({
@@ -58,6 +60,7 @@ export function EditTaskDialog({
     setPostDate(task.scheduled_post_date ?? "");
     setClient(task.client_brand ?? "");
     setLinks(Array.isArray(task.asset_links) ? task.asset_links : []);
+    setEstimate(task.estimated_hours == null ? "" : String(task.estimated_hours));
   }, [open, task?.id]);
 
   async function submit() {
@@ -65,6 +68,11 @@ export function EditTaskDialog({
     if (!title.trim()) return toast.error("Title required");
     if (!projectId) return toast.error("Project required");
     setSaving(true);
+    const estNum = estimate.trim() === "" ? null : Number(estimate);
+    if (estNum !== null && (!Number.isFinite(estNum) || estNum < 0)) {
+      setSaving(false);
+      return toast.error("Estimated hours must be a positive number.");
+    }
     const patch: Record<string, unknown> = {
       title: title.trim(),
       description: desc.trim() || null,
@@ -75,6 +83,7 @@ export function EditTaskDialog({
       project_id: projectId,
       assignee_id: assignee || null,
       asset_links: links.filter((l) => l.url.trim()),
+      estimated_hours: estNum,
     };
     const { error } = await supabase.from("tasks").update(patch as never).eq("id", task.id);
     setSaving(false);
@@ -125,8 +134,13 @@ export function EditTaskDialog({
             <div className="space-y-1"><Label>Deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
             <div className="space-y-1"><Label>Scheduled post date</Label><Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} /></div>
           </div>
-          <div className="space-y-1"><Label>Client / Brand</Label>
-            <Input value={client} onChange={(e) => setClient(e.target.value)} placeholder="Optional" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Client / Brand</Label>
+              <Input value={client} onChange={(e) => setClient(e.target.value)} placeholder="Optional" />
+            </div>
+            <div className="space-y-1"><Label>Estimated hours</Label>
+              <Input type="number" min={0} step={0.25} value={estimate} onChange={(e) => setEstimate(e.target.value)} placeholder="Optional" />
+            </div>
           </div>
           <div className="space-y-1">
             <Label>Asset links</Label>

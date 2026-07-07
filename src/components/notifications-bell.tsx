@@ -130,7 +130,7 @@ export function NotificationsBell({ userId }: { userId: string }) {
           </ScrollArea>
         </PopoverContent>
       </Popover>
-      {openTaskId && <TaskDetailSheet taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+      {openTaskId && <TaskDetailSheet taskId={openTaskId} onClose={(next) => setOpenTaskId(next ?? null)} />}
     </>
   );
 }

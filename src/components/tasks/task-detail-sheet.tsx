@@ -415,6 +415,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
             project_id: (task as { project_id?: string | null }).project_id ?? null,
             assignee_id: (task as { assignee_id?: string | null }).assignee_id ?? null,
             asset_links: ((task as { asset_links?: { label: string; url: string }[] | null }).asset_links) ?? null,
+            estimated_hours: (task as { estimated_hours?: number | null }).estimated_hours ?? null,
           } : null}
           roster={(peopleAll ?? []).map((p) => ({ id: p.id, full_name: p.full_name ?? null, email: p.email ?? null }))}
           onClose={() => setEditOpen(false)}

@@ -173,7 +173,6 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
         requiredFieldValues: values,
         rating: null,
-        viewAsUserId,
       }});
       toast.success("Stage closed");
       await onDone();
@@ -262,7 +261,6 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
         rating: canRate && rating > 0 ? rating : null,
-        viewAsUserId,
       }});
       toast.success(action === "approve" ? "Approved" : action === "request_changes" ? "Sent back" : "Comment added");
       await onDone();
@@ -360,7 +358,7 @@ function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: (
             const h = Number(hours);
             if (!h || h <= 0) return toast.error("Enter valid hours");
             setBusy(true);
-            try { await log({ data: { taskId, hours: h, note: note || null, viewAsUserId } }); toast.success("Time logged"); await onDone(); }
+            try { await log({ data: { taskId, hours: h, note: note || null } }); toast.success("Time logged"); await onDone(); }
             catch (e) { toast.error((e as Error).message); }
             finally { setBusy(false); }
           }}>Log</Button>

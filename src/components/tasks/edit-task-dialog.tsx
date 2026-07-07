@@ -94,7 +94,6 @@ export function EditTaskDialog({
           asset_links: links.filter((l) => l.url.trim()),
           estimated_hours: estNum,
         },
-        viewAsUserId,
       }});
       toast.success("Task updated");
       onSaved();

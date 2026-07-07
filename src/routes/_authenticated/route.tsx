@@ -27,6 +27,7 @@ const employeeItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Punch In/Out", url: "/punch", icon: Clock },
   { title: "My Tasks", url: "/tasks", icon: ListChecks },
+  { title: "Marketing Kanban", url: "/marketing-kanban", icon: Megaphone, marketingOnly: true },
   { title: "My Timesheet", url: "/my-timesheet", icon: TableProperties },
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Leave", url: "/leave", icon: CalendarRange },

@@ -87,14 +87,20 @@ function MyTimesheetPage() {
   });
 
   // Flatten to (date, project, hours, comments)
-  type Row = { date: string; code: string; name: string; hours: number; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
+  type Row = { date: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const l of logs ?? []) {
       for (const t of l.tasks ?? []) {
         const code = t.project_code?.trim(); const h = Number(t.hours) || 0;
         if (!code || h <= 0) continue;
-        out.push({ date: l.date, code, name: t.project_name || code, hours: h, comments: t.comments, approved: !!l.approved_at });
+        const isApproved = !!l.approved_at;
+        const ah = t.approved_hours != null ? Number(t.approved_hours) : null;
+        out.push({
+          date: l.date, code, name: t.project_name || code, hours: h,
+          approvedHours: isApproved ? (ah ?? h) : null,
+          comments: t.comments, approved: isApproved,
+        });
       }
     }
     for (const a of activityRows ?? []) {
@@ -107,6 +113,7 @@ function MyTimesheetPage() {
       const approved = a.approval_status === "approved" || a.approval_status === "auto";
       out.push({
         date, code, name, hours: h,
+        approvedHours: approved ? h : null,
         comments: a.note ?? a.task?.title ?? undefined,
         approved,
         pending: !approved,
@@ -128,6 +135,7 @@ function MyTimesheetPage() {
   }, [rows, projectFilter]);
 
   const totalHours = filteredRows.reduce((s, r) => s + r.hours, 0);
+  const totalApproved = filteredRows.reduce((s, r) => s + (r.approvedHours ?? 0), 0);
   const uniqueDays = new Set(filteredRows.map((r) => r.date)).size;
 
   // Unique dates in period (for quick add / edit chips)

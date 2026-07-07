@@ -66,7 +66,7 @@ const DOC_LABELS: Record<OnboardingDocType, string> = {
   linkedin_employment: "LinkedIn 'Works at Colladome' proof",
 };
 
-function HrOnboardingPage() {
+export function HrOnboardingPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const listFn = useServerFn(listOnboardingSubmissions);

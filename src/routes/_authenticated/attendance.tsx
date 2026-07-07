@@ -21,10 +21,10 @@ import { cn } from "@/lib/utils";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/attendance")({
-  component: AttendancePage,
+  component: AttendanceTeamPanel,
 });
 
-function AttendancePage() {
+export function AttendanceTeamPanel() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const today = format(new Date(), "yyyy-MM-dd");

@@ -28,7 +28,7 @@ function monthKey(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 
 function ymd(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 function startOfWeek(d: Date) { const x = new Date(d); const day = x.getDay(); x.setDate(x.getDate() - ((day + 6) % 7)); return x; }
 
-function MyTimesheetPage() {
+export function MyTimesheetPage() {
   const { data: me, isLoading } = useCurrentUser();
   const [view, setView] = useState<ViewMode>("month");
   const [month, setMonth] = useState(() => monthKey(new Date()));

@@ -84,7 +84,7 @@ type Filters = {
 };
 
 // -------- page --------
-function CalendarPage() {
+export function CalendarPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const fetchTeamCalendar = useServerFn(listTeamCalendarEvents);

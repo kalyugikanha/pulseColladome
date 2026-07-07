@@ -28,7 +28,7 @@ const TYPES = [
   { v: "unpaid", l: "Unpaid" },
 ] as const;
 
-function LeavePage() {
+export function LeavePage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);

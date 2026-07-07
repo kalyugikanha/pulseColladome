@@ -16,9 +16,9 @@ import {
   upsertTaskType, deleteTaskType,
 } from "@/lib/tasks-plus.functions";
 
-export const Route = createFileRoute("/_authenticated/admin/taxonomy")({ component: Page });
+export const Route = createFileRoute("/_authenticated/admin/taxonomy")({ component: TaxonomyPage });
 
-function Page() {
+export function TaxonomyPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const listFn = useServerFn(listTaxonomy);

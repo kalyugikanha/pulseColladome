@@ -38,7 +38,7 @@ const EMPLOYMENT_TYPES = ["full_time", "intern", "contract", "consultant"] as co
 
 const UNSET = "__unset__";
 
-function DirectoryPage() {
+export function DirectoryPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");

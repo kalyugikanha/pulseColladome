@@ -22,7 +22,7 @@ type Profile = { id: string; full_name: string | null; email: string | null; dep
 function monthKey(d: Date) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; }
 const inr = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 
-function ProjectBurnPage() {
+export function ProjectBurnPage() {
   const { data: me, isLoading } = useCurrentUser();
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [projectFilter, setProjectFilter] = useState<string>("all");

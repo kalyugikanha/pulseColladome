@@ -15,15 +15,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock, Link as LinkIcon, ExternalLink, Copy } from "lucide-react";
+import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock, Link as LinkIcon, ExternalLink, Copy, Star } from "lucide-react";
 import { EditTaskDialog } from "./edit-task-dialog";
 import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
   addSubtask, toggleSubtask, deleteSubtask, addComment, resolveComment,
-  toggleWatcher, addDependency, removeDependency,
+  toggleWatcher, addDependency, removeDependency, rateTask,
 } from "@/lib/tasks-workflow.functions";
+
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
 
@@ -50,15 +51,17 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const addDepFn = useServerFn(addDependency);
   const rmDepFn = useServerFn(removeDependency);
   const duplicateFn = useServerFn(duplicateTask);
+  const rateFn = useServerFn(rateTask);
 
   const { data: detail, isLoading } = useQuery({
-    queryKey: ["task-detail", taskId], enabled: !!taskId,
-    queryFn: () => detailFn({ data: { taskId: taskId! } }),
+    queryKey: ["task-detail", taskId, viewAsUserId ?? null], enabled: !!taskId,
+    queryFn: () => detailFn({ data: { taskId: taskId!, viewAsUserId } }),
   });
 
   const { data: peopleAll } = useQuery({
     queryKey: ["all-profiles-mini"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department").order("full_name")).data ?? [],
+    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department, reporting_manager_id").order("full_name")).data ?? [],
+
   });
 
   const [newSub, setNewSub] = useState("");
@@ -291,7 +294,46 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
               </div>
             </div>
 
+            {(() => {
+              const actingUserId = me?.id ?? null;
+              const assigneeId = (task as { assignee_id: string | null }).assignee_id;
+              const reviewerId = (task as { reviewer_id: string | null }).reviewer_id;
+              const createdBy = (task as { created_by?: string | null }).created_by ?? null;
+              const assigneeProfile = (peopleAll ?? []).find((p) => p.id === assigneeId) as { reporting_manager_id?: string | null } | undefined;
+              const isManager = !!actingUserId && assigneeProfile?.reporting_manager_id === actingUserId;
+              const canRate = !!actingUserId && !!assigneeId && actingUserId !== assigneeId
+                && (reviewerId === actingUserId || createdBy === actingUserId || isManager);
+              if (!canRate) return null;
+              const current = (detail as { myRating?: number | null } | undefined)?.myRating ?? 0;
+              return (
+                <div className="rounded-lg border border-border/60 p-3 mb-4">
+                  <div className="text-xs text-muted-foreground mb-1">Rate this work</div>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n} type="button" className="p-1"
+                        aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                        onClick={async () => {
+                          const next = current === n ? null : n;
+                          try {
+                            await rateFn({ data: { taskId: task.id, rating: next, viewAsUserId } });
+                            toast.success(next == null ? "Rating cleared" : `Rated ${next}/5`);
+                            await refresh();
+                            await qc.invalidateQueries({ queryKey: ["my-performance"] });
+                          } catch (e) { toast.error((e as Error).message); }
+                        }}
+                      >
+                        <Star className={`h-5 w-5 ${n <= current ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                      </button>
+                    ))}
+                    {current > 0 && <span className="ml-2 text-xs text-muted-foreground">Your rating: {current}/5</span>}
+                  </div>
+                </div>
+              );
+            })()}
+
             {task.description && <p className="text-sm text-muted-foreground mb-4 whitespace-pre-wrap">{task.description}</p>}
+
 
             {task.workflow_instance_id && (
               <div className="mb-4">

@@ -330,12 +330,14 @@ export const reviewTask = createServerFn({ method: "POST" })
 
     // Optional rating from reviewer
     const r = data.rating;
-    if (r != null && Number.isFinite(r) && r >= 1 && r <= 5 && task.assignee_id) {
-      await supabase.from("task_ratings" as never).insert({
+    if (r != null && Number.isFinite(r) && r >= 1 && r <= 5 && task.assignee_id && task.assignee_id !== actingUserId) {
+      const { error: rateErr } = await supabase.from("task_ratings" as never).insert({
         task_id: task.id, ratee_id: task.assignee_id, rater_id: actingUserId,
         rating: Math.round(r),
       } as never);
+      if (rateErr) throw rateErr;
     }
+
 
     await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
     return { ok: true };

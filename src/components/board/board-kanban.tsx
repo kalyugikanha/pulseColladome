@@ -185,7 +185,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
   // Materialize today's recurring occurrences (idempotent, safe to call every load).
   try { await supabase.rpc("generate_recurring_task_occurrences" as never); } catch { /* noop */ }
   let q = supabase.from("tasks").select(`
-    id, title, status, priority, due_date, assignee_id, project_id,
+    id, title, status, priority, due_date, assignee_id, project_id, created_by,
     workflow_instance_id, stage_index, stage_snapshot,
     assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
     project:projects(id, name)
@@ -193,7 +193,15 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
     .order("due_date", { ascending: true, nullsFirst: false });
   if (filter.assigneeId) q = q.eq("assignee_id", filter.assigneeId);
   const { data } = await q;
-  let rows = ((data ?? []) as unknown as Array<Omit<BoardCard, "workflow_template" | "workflow_total_stages"> & { assignee: BoardCard["assignee"] & { department?: string | null } }>);
+  let rows = ((data ?? []) as unknown as Array<Omit<BoardCard, "workflow_template" | "workflow_total_stages" | "creator"> & { assignee: BoardCard["assignee"] & { department?: string | null } }>);
+
+  // Load creator profiles
+  const creatorIds = Array.from(new Set(rows.map((r) => r.created_by).filter(Boolean) as string[]));
+  const creatorMap = new Map<string, { id: string; full_name: string | null; email: string | null }>();
+  if (creatorIds.length) {
+    const { data: creators } = await supabase.from("profiles").select("id, full_name, email").in("id", creatorIds);
+    for (const c of (creators ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>) creatorMap.set(c.id, c);
+  }
 
 
   // Load workflow templates for any that reference one

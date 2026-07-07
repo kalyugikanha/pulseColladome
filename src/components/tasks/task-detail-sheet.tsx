@@ -28,7 +28,7 @@ import {
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
 
-type Props = { taskId: string | null; onClose: () => void };
+type Props = { taskId: string | null; onClose: (nextTaskId?: string) => void };
 
 const STATUS: Array<"todo" | "in_progress" | "review" | "done"> = ["todo", "in_progress", "review", "done"];
 const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In Progress", review: "In Review", done: "Done" };

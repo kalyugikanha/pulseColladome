@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { UserPlus, Search, Pencil, Copy, Check } from "lucide-react";
+import { DepartmentSelect } from "@/components/department-select";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
@@ -188,7 +189,7 @@ function OnboardingPage() {
           <section className="space-y-3">
             <h3 className="text-xs uppercase tracking-wider text-muted-foreground">Work</h3>
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1"><Label>Department</Label><Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Engineering, Design, HR…" /></div>
+              <div className="space-y-1"><Label>Department</Label><DepartmentSelect value={department} onChange={setDepartment} /></div>
               <div className="space-y-1">
                 <Label>Role</Label>
                 <Select value={role} onValueChange={(v) => setRole(v as Role)}>
@@ -344,7 +345,7 @@ function EditProfileSheet({ row, onClose, onSave }: {
         </SheetHeader>
         <div className="mt-4 space-y-3">
           <div className="space-y-1"><Label>Full name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
-          <div className="space-y-1"><Label>Department</Label><Input value={department} onChange={(e) => setDepartment(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Department</Label><DepartmentSelect value={department} onChange={setDepartment} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Date of birth</Label><Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} /></div>
             <div className="space-y-1"><Label>Joined on</Label><Input type="date" value={joinedOn} onChange={(e) => setJoinedOn(e.target.value)} /></div>

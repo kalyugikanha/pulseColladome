@@ -20,6 +20,7 @@ type EditableTask = {
   project_id: string | null;
   assignee_id: string | null;
   asset_links: { label: string; url: string }[] | null;
+  estimated_hours?: number | null;
 };
 
 export function EditTaskDialog({

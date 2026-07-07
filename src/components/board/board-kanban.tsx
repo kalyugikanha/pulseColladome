@@ -28,10 +28,12 @@ export type BoardCard = {
   due_date: string | null;
   assignee_id: string | null;
   assignee: { id: string; full_name: string | null; email: string | null } | null;
+  project_id: string | null;
+  project: { id: string; name: string } | null;
   workflow_instance_id: string | null;
   stage_index: number | null;
   stage_snapshot: { name: string; requires_review: boolean } | null;
-  workflow_template: { id: string; name: string } | null;
+  workflow_template: { id: string; name: string; department: string | null } | null;
   workflow_total_stages: number;
 };
 
@@ -133,23 +135,21 @@ function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => v
 /** Fetch tasks for a given assignee filter (uid or department). Includes workflow linking. */
 export async function fetchBoardCards(filter: { assigneeId?: string; department?: string }): Promise<BoardCard[]> {
   let q = supabase.from("tasks").select(`
-    id, title, status, priority, due_date, assignee_id,
+    id, title, status, priority, due_date, assignee_id, project_id,
     workflow_instance_id, stage_index, stage_snapshot,
-    assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department)
+    assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
+    project:projects(id, name)
   `).order("due_date", { ascending: true, nullsFirst: false });
   if (filter.assigneeId) q = q.eq("assignee_id", filter.assigneeId);
   const { data } = await q;
   let rows = ((data ?? []) as unknown as Array<Omit<BoardCard, "workflow_template" | "workflow_total_stages"> & { assignee: BoardCard["assignee"] & { department?: string | null } }>);
-  if (filter.department) {
-    const key = filter.department.toLowerCase();
-    rows = rows.filter((r) => (r.assignee?.department ?? "").toLowerCase() === key);
-  }
+
   // Load workflow templates for any that reference one
   const wfIds = Array.from(new Set(rows.map((r) => r.workflow_instance_id).filter(Boolean) as string[]));
-  const wfMap = new Map<string, { templateId: string; templateName: string; totalStages: number }>();
+  const wfMap = new Map<string, { templateId: string; templateName: string; templateDepartment: string | null; totalStages: number }>();
   if (wfIds.length) {
     const { data: insts } = await supabase.from("workflow_instances" as never)
-      .select("id, template_id, template:workflow_templates(id, name)")
+      .select("id, template_id, template:workflow_templates(id, name, department)")
       .in("id", wfIds);
     const templateIds = Array.from(new Set(((insts ?? []) as unknown as Array<{ template_id: string }>).map((i) => i.template_id)));
     const { data: stageCounts } = await supabase.from("workflow_template_stages" as never)
@@ -158,19 +158,34 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
     for (const s of ((stageCounts ?? []) as unknown as Array<{ template_id: string }>)) {
       counts.set(s.template_id, (counts.get(s.template_id) ?? 0) + 1);
     }
-    for (const i of ((insts ?? []) as unknown as Array<{ id: string; template_id: string; template: { name: string } | null }>)) {
+    for (const i of ((insts ?? []) as unknown as Array<{ id: string; template_id: string; template: { name: string; department: string | null } | null }>)) {
       wfMap.set(i.id, {
         templateId: i.template_id,
         templateName: i.template?.name ?? "Workflow",
+        templateDepartment: i.template?.department ?? null,
         totalStages: counts.get(i.template_id) ?? 0,
       });
     }
   }
-  return rows.map((r) => ({
-    ...r,
-    workflow_template: r.workflow_instance_id && wfMap.get(r.workflow_instance_id)
-      ? { id: wfMap.get(r.workflow_instance_id)!.templateId, name: wfMap.get(r.workflow_instance_id)!.templateName }
-      : null,
-    workflow_total_stages: r.workflow_instance_id ? (wfMap.get(r.workflow_instance_id)?.totalStages ?? 0) : 0,
-  }));
+
+  if (filter.department) {
+    const key = filter.department.toLowerCase();
+    rows = rows.filter((r) => {
+      const assigneeDept = (r.assignee?.department ?? "").toLowerCase();
+      if (assigneeDept === key) return true;
+      const wf = r.workflow_instance_id ? wfMap.get(r.workflow_instance_id) : null;
+      return (wf?.templateDepartment ?? "").toLowerCase() === key;
+    });
+  }
+
+  return rows.map((r) => {
+    const wf = r.workflow_instance_id ? wfMap.get(r.workflow_instance_id) : null;
+    return {
+      ...r,
+      workflow_template: wf
+        ? { id: wf.templateId, name: wf.templateName, department: wf.templateDepartment }
+        : null,
+      workflow_total_stages: wf?.totalStages ?? 0,
+    };
+  });
 }

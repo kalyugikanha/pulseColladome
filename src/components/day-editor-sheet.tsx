@@ -17,6 +17,7 @@ type Task = {
   task_id?: string;
   task_title?: string;
   hours?: number;
+  approved_hours?: number;
   comments?: string;
 };
 type Project = { id: string; code: string; name: string };
@@ -116,8 +117,14 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
         task_id: r.task_id || undefined,
         task_title: r.task_title || (r.task_id ? taskById.get(r.task_id)?.title : undefined),
         hours: Number(r.hours) || 0,
+        approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
+          ? Number(r.approved_hours) : undefined,
         comments: r.comments?.trim() || undefined,
       }));
+  }
+
+  function sumApproved(cleaned: Task[]): number {
+    return cleaned.reduce((s, r) => s + (r.approved_hours ?? r.hours ?? 0), 0);
   }
 
   async function save() {
@@ -134,16 +141,24 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
       const { data: userRes } = await supabase.auth.getUser();
       const myId = userRes.user?.id ?? null;
 
+      const basePayload: Record<string, unknown> = {
+        tasks: cleaned,
+        total_hours: totalHrs,
+        logged_hours: totalHrs,
+        last_edited_by: myId,
+      };
+      if (isApproved) basePayload.approved_hours = sumApproved(cleaned);
+
       if (log?.id) {
         const { error } = await supabase
           .from("attendance_logs")
-          .update({ tasks: cleaned, total_hours: totalHrs, last_edited_by: myId })
+          .update(basePayload as never)
           .eq("id", log.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("attendance_logs")
-          .insert({ user_id: userId, date, tasks: cleaned, total_hours: totalHrs, last_edited_by: myId });
+          .insert({ user_id: userId, date, ...basePayload } as never);
         if (error) throw error;
       }
       toast.success("Saved");
@@ -175,17 +190,31 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
           return;
         }
         const cleaned = cleanRows();
+        // Default approved = logged for any row the approver didn't override
+        const withApproved = cleaned.map((r) => ({ ...r, approved_hours: r.approved_hours ?? r.hours ?? 0 }));
         const totalHrs = cleaned.reduce((s, r) => s + (r.hours ?? 0), 0);
+        const approvedTotal = sumApproved(withApproved);
         const { error } = await supabase.from("attendance_logs").insert({
-          user_id: userId, date, tasks: cleaned, total_hours: totalHrs,
+          user_id: userId, date, tasks: withApproved, total_hours: totalHrs,
+          logged_hours: totalHrs, approved_hours: approvedTotal,
           approved_at: new Date().toISOString(), approved_by: myId, last_edited_by: myId,
-        });
+        } as never);
         if (error) throw error;
       } else if (isApproved) {
-        const { error } = await supabase.from("attendance_logs").update({ approved_at: null, approved_by: null }).eq("id", log.id);
+        const { error } = await supabase.from("attendance_logs")
+          .update({ approved_at: null, approved_by: null, approved_hours: null } as never)
+          .eq("id", log.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("attendance_logs").update({ approved_at: new Date().toISOString(), approved_by: myId }).eq("id", log.id);
+        const cleaned = cleanRows();
+        const withApproved = cleaned.map((r) => ({ ...r, approved_hours: r.approved_hours ?? r.hours ?? 0 }));
+        const totalHrs = cleaned.reduce((s, r) => s + (r.hours ?? 0), 0);
+        const approvedTotal = sumApproved(withApproved);
+        const { error } = await supabase.from("attendance_logs").update({
+          tasks: withApproved, total_hours: totalHrs, logged_hours: totalHrs,
+          approved_hours: approvedTotal,
+          approved_at: new Date().toISOString(), approved_by: myId,
+        } as never).eq("id", log.id);
         if (error) throw error;
       }
       toast.success(isApproved ? "Unapproved" : "Approved");
@@ -227,13 +256,14 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                 <TableHead className="min-w-[160px]">Project</TableHead>
                 <TableHead className="min-w-[180px]">Task</TableHead>
                 <TableHead className="w-[90px] text-right">Hours</TableHead>
+                {canApprove && <TableHead className="w-[100px] text-right">Approved</TableHead>}
                 <TableHead>Comments</TableHead>
                 <TableHead className="w-[40px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={canApprove ? 6 : 5} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
               )}
               {rows.map((r, i) => {
                 const options = tasksForProject(r.project_code);
@@ -283,6 +313,20 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                         className="h-8 text-right font-mono"
                       />
                     </TableCell>
+                    {canApprove && (
+                      <TableCell className="text-right">
+                        <Input
+                          type="number" min={0} step={0.25}
+                          value={r.approved_hours ?? ""}
+                          placeholder={String(r.hours ?? 0)}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateRow(i, { approved_hours: v === "" ? undefined : Number(v) });
+                          }}
+                          className="h-8 text-right font-mono"
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Input
                         value={r.comments ?? ""}

@@ -250,7 +250,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
 
   const hasBranches = stage.branch_options.length > 0 && action === "approve";
   const actingUserId = viewAsUserId ?? me?.id ?? null;
-  const canRate = action === "approve" && !!task.assignee_id && !!actingUserId && task.assignee_id !== actingUserId;
+  const canRate = action === "approve" && !!task.assignee_id && !!actingUserId;
 
   async function submit() {
     setBusy(true);

@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { punchIn as punchInServerFn, punchOut as punchOutServerFn, type PunchInResult, type PunchOutResult } from "@/lib/punch.functions";
+import { requestTaskFromManager } from "@/lib/tasks-plus.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,8 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Plus, Trash2 } from "lucide-react";
+import { Clock, Plus, Trash2, Check, ChevronsUpDown, Send } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
 
@@ -52,11 +55,17 @@ function PunchPage() {
   const qc = useQueryClient();
   const punchInServer = useServerFn(punchInServerFn);
   const punchOutServer = useServerFn(punchOutServerFn);
+  const requestTaskServer = useServerFn(requestTaskFromManager);
   const today = format(new Date(), "yyyy-MM-dd");
   const punchUserId = me?.realId ?? me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "" }]);
   const [submitting, setSubmitting] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [reqTitle, setReqTitle] = useState("");
+  const [reqProjectId, setReqProjectId] = useState<string>("");
+  const [reqNote, setReqNote] = useState("");
+  const [reqSubmitting, setReqSubmitting] = useState(false);
   const [punchingIn, setPunchingIn] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -219,6 +228,20 @@ function PunchPage() {
     }
   }
 
+  async function submitTaskRequest() {
+    if (!reqTitle.trim()) { toast.error("Task title is required."); return; }
+    setReqSubmitting(true);
+    try {
+      await requestTaskServer({ data: { title: reqTitle.trim(), projectId: reqProjectId || null, note: reqNote.trim() || null } });
+      toast.success("Request sent — your manager has been notified.");
+      setRequestOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not send request.");
+    } finally {
+      setReqSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header>
@@ -338,27 +361,21 @@ function PunchPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Task {requireTask && <span className="text-destructive">*</span>}</Label>
-                    <Select
-                      value={r.taskId || "__none__"}
-                      onValueChange={(v) => {
-                        if (v === "__none__") { updateRow(idx, { taskId: "" }); return; }
-                        const t = (myTasks ?? []).find((x) => x.id === v);
-                        updateRow(idx, { taskId: v, projectId: t?.project_id ?? "" });
-                      }}
+                    <TaskCombobox
+                      tasks={myTasks ?? []}
+                      value={r.taskId}
+                      onChange={(taskId, projectId) => updateRow(idx, { taskId, projectId: projectId ?? "" })}
+                      allowNone={!requireTask}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setReqTitle(""); setReqProjectId(""); setReqNote(""); setRequestOpen(true); }}
+                      className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
                     >
-                      <SelectTrigger><SelectValue placeholder="Pick one of your open tasks" /></SelectTrigger>
-                      <SelectContent>
-                        {!requireTask && <SelectItem value="__none__">— No task —</SelectItem>}
-                        {(myTasks ?? []).map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.project?.code && <span className="font-mono text-xs mr-2">{t.project.code}</span>}
-                            {t.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Send className="h-3 w-3" /> Can't find your task? Request one from your manager
+                    </button>
                     {requireTask && !myTasks?.length && (
-                      <p className="text-[11px] text-warning">No open tasks assigned to you yet — ask your team lead to assign one before punching out.</p>
+                      <p className="text-[11px] text-warning">No open tasks assigned to you yet — request one above and your manager will get it in their notifications.</p>
                     )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
@@ -409,6 +426,103 @@ function PunchPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Request a task</DialogTitle>
+            <DialogDescription>
+              Your reporting manager will get this in their notifications and can create the task for you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Task title <span className="text-destructive">*</span></Label>
+              <Input value={reqTitle} onChange={(e) => setReqTitle(e.target.value)} placeholder="What do you need a task for?" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Project (optional)</Label>
+              <Select value={reqProjectId || "__none__"} onValueChange={(v) => setReqProjectId(v === "__none__" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="No project" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— No project —</SelectItem>
+                  {projects?.map((p) => (
+                    <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Note (optional)</Label>
+              <Textarea rows={3} value={reqNote} onChange={(e) => setReqNote(e.target.value)} placeholder="Context for your manager" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRequestOpen(false)} disabled={reqSubmitting}>Cancel</Button>
+            <Button onClick={submitTaskRequest} disabled={reqSubmitting} className="gradient-primary">
+              {reqSubmitting ? "Sending…" : "Send request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+type TaskComboTask = { id: string; title: string; project_id: string | null; project: { code: string; name: string } | null };
+
+function TaskCombobox({ tasks, value, onChange, allowNone }: {
+  tasks: TaskComboTask[];
+  value: string;
+  onChange: (taskId: string, projectId: string | null) => void;
+  allowNone: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = tasks.find((t) => t.id === value) ?? null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+          <span className="truncate text-left">
+            {selected ? (
+              <>
+                {selected.project?.code && <span className="font-mono text-xs mr-2">{selected.project.code}</span>}
+                {selected.title}
+              </>
+            ) : (
+              <span className="text-muted-foreground">Pick one of your open tasks</span>
+            )}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search by task or project code…" />
+          <CommandList>
+            <CommandEmpty>No tasks found.</CommandEmpty>
+            <CommandGroup>
+              {allowNone && (
+                <CommandItem value="__none__" onSelect={() => { onChange("", null); setOpen(false); }}>
+                  <Check className={`h-4 w-4 mr-2 ${!value ? "opacity-100" : "opacity-0"}`} />
+                  — No task —
+                </CommandItem>
+              )}
+              {tasks.map((t) => (
+                <CommandItem
+                  key={t.id}
+                  value={`${t.project?.code ?? ""} ${t.title}`}
+                  onSelect={() => { onChange(t.id, t.project_id); setOpen(false); }}
+                >
+                  <Check className={`h-4 w-4 mr-2 ${value === t.id ? "opacity-100" : "opacity-0"}`} />
+                  {t.project?.code && <span className="font-mono text-xs mr-2">{t.project.code}</span>}
+                  <span className="truncate">{t.title}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

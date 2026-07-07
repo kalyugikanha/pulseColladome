@@ -2379,6 +2379,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      request_task_from_manager: {
+        Args: { _note?: string; _project_id?: string; _title: string }
+        Returns: string
+      }
       set_task_stages: {
         Args: { _stages: Json; _task_id: string }
         Returns: {

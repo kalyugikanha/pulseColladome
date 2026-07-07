@@ -7,6 +7,7 @@ import { useViewAs } from "@/hooks/use-view-as";
 import { useHolidays, nextHoliday } from "@/hooks/use-holidays";
 import { CalendarClock, Eye } from "lucide-react";
 import { differenceInCalendarDays, format } from "date-fns";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 type Row = { id: string; label: string; sub?: string; pending?: boolean };
 
@@ -77,6 +78,7 @@ export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: st
           </Select>
         </div>
       )}
+      <NotificationsBell userId={realUserId} />
       <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
         <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
         Live

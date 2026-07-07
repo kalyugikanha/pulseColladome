@@ -134,15 +134,19 @@ function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => v
 
 /** Fetch tasks for a given assignee filter (uid or department). Includes workflow linking. */
 export async function fetchBoardCards(filter: { assigneeId?: string; department?: string }): Promise<BoardCard[]> {
+  // Materialize today's recurring occurrences (idempotent, safe to call every load).
+  try { await supabase.rpc("generate_recurring_task_occurrences" as never); } catch { /* noop */ }
   let q = supabase.from("tasks").select(`
     id, title, status, priority, due_date, assignee_id, project_id,
     workflow_instance_id, stage_index, stage_snapshot,
     assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
     project:projects(id, name)
-  `).order("due_date", { ascending: true, nullsFirst: false });
+  `).eq("is_recurring_template" as never, false as never)
+    .order("due_date", { ascending: true, nullsFirst: false });
   if (filter.assigneeId) q = q.eq("assignee_id", filter.assigneeId);
   const { data } = await q;
   let rows = ((data ?? []) as unknown as Array<Omit<BoardCard, "workflow_template" | "workflow_total_stages"> & { assignee: BoardCard["assignee"] & { department?: string | null } }>);
+
 
   // Load workflow templates for any that reference one
   const wfIds = Array.from(new Set(rows.map((r) => r.workflow_instance_id).filter(Boolean) as string[]));

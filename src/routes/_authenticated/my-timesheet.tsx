@@ -35,6 +35,7 @@ function MyTimesheetPage() {
   const [rangeFrom, setRangeFrom] = useState<Date>(() => startOfWeek(new Date()));
   const [rangeTo, setRangeTo] = useState<Date>(() => new Date());
   const [day, setDay] = useState<Date>(() => new Date());
+  const [projectFilter, setProjectFilter] = useState<string>("__all__");
   const [editor, setEditor] = useState<{ date: string } | null>(null);
 
   const { startIso, endIso, label } = useMemo(() => {

@@ -659,6 +659,12 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
     if (!title.trim()) return toast.error("Title required");
     if (!assignee) return toast.error("Assignee required");
     if (!projectId) return toast.error("Project required");
+    let estHours: number | null = null;
+    if (estimatedHours.trim()) {
+      const n = Number(estimatedHours);
+      if (!Number.isFinite(n) || n <= 0) return toast.error("Estimated hours must be a positive number.");
+      estHours = n;
+    }
     setSaving(true);
     const brand = client === "__other__" ? clientOther.trim() || null : client || null;
     const payload: Record<string, unknown> = {

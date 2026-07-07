@@ -441,20 +441,24 @@ function RequestsTable({ rows, empMap, onChanged }: { rows: LeaveRow[]; empMap: 
                 </div>
                 <Badge variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "secondary"} className="capitalize shrink-0">{r.status}</Badge>
               </div>
-              {(r.status === "pending") && (
-                <div className="mt-3 flex items-center gap-2 flex-wrap">
-                  <Input placeholder="Optional comment" value={comment[r.id] ?? ""} onChange={(e) => setComment((c) => ({ ...c, [r.id]: e.target.value }))} className="h-8 flex-1 min-w-48" />
-                  <Button size="sm" onClick={() => decide(r, "approved")} disabled={busy === r.id} className="gap-1"><Check className="h-3.5 w-3.5" /> Approve</Button>
-                  <Button size="sm" variant="outline" onClick={() => decide(r, "rejected")} disabled={busy === r.id} className="gap-1"><X className="h-3.5 w-3.5" /> Reject</Button>
-                </div>
-              )}
-              {r.status !== "pending" && (
-                <div className="mt-2 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                {r.status === "pending" && (
+                  <>
+                    <Input placeholder="Optional comment" value={comment[r.id] ?? ""} onChange={(e) => setComment((c) => ({ ...c, [r.id]: e.target.value }))} className="h-8 flex-1 min-w-48" />
+                    <Button size="sm" onClick={() => decide(r, "approved")} disabled={busy === r.id} className="gap-1"><Check className="h-3.5 w-3.5" /> Approve</Button>
+                    <Button size="sm" variant="outline" onClick={() => decide(r, "rejected")} disabled={busy === r.id} className="gap-1"><X className="h-3.5 w-3.5" /> Reject</Button>
+                  </>
+                )}
+                {r.status !== "pending" && (
                   <Button size="sm" variant="ghost" onClick={() => decide(r, r.status === "approved" ? "rejected" : "approved")} disabled={busy === r.id}>
                     Change to {r.status === "approved" ? "rejected" : "approved"}
                   </Button>
+                )}
+                <div className="ml-auto flex items-center gap-1.5">
+                  <EditLeaveDialog row={r} employee={p} onChanged={onChanged} />
+                  <DeleteLeaveButton row={r} onChanged={onChanged} />
                 </div>
-              )}
+              </div>
             </div>
           );
         })}

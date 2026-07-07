@@ -184,6 +184,58 @@ export const createTaskFull = createServerFn({ method: "POST" })
     return task;
   });
 
+export const duplicateTask = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: src, error: readErr } = await supabase
+      .from("tasks")
+      .select("title, description, project_id, priority, due_date, assignee_id, asset_links, domain_id, department_id, estimated_hours, task_types:task_task_types(task_type_id)")
+      .eq("id", data.id)
+      .single();
+    if (readErr) throw readErr;
+    if (!src?.project_id) throw new Error("Source task has no project.");
+    const typeIds = ((src.task_types as { task_type_id: string }[] | null) ?? []).map((t) => t.task_type_id);
+    const { data: task, error } = await supabase.rpc("create_task_full", {
+      _project_id: src.project_id,
+      _title: `${src.title} (copy)`,
+      _description: src.description ?? undefined,
+      _due_date: src.due_date ?? undefined,
+      _priority: src.priority,
+      _assignee_id: src.assignee_id ?? context.userId,
+      _asset_links: src.asset_links ?? [],
+      _domain_id: src.domain_id ?? undefined,
+      _department_id: src.department_id ?? undefined,
+      _task_type_ids: typeIds,
+      _estimated_hours: src.estimated_hours ?? undefined,
+    });
+    if (error) throw taskCreateError(error);
+    return task;
+  });
+
+export const deleteTask = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("tasks").delete().eq("id", data.id);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const requestTaskFromManager = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { title: string; projectId?: string | null; note?: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: id, error } = await context.supabase.rpc("request_task_from_manager", {
+      _title: data.title,
+      _project_id: data.projectId ?? undefined,
+      _note: data.note ?? undefined,
+    });
+    if (error) throw error;
+    return { id };
+  });
+
 export const updateTaskFull = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: Partial<TaskInput> & { id: string }) => d)

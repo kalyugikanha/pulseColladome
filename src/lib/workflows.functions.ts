@@ -94,6 +94,7 @@ export const saveWorkflowTemplate = createServerFn({ method: "POST" })
         required_fields: s.required_fields,
         branch_options: s.branch_options,
         branch_target_map: s.branch_target_map,
+        next_stage_position: s.next_stage_position,
       })) as never
     );
     return { id };

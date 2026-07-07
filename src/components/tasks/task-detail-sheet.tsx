@@ -129,9 +129,26 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
 
   async function doStatus(s: "todo" | "in_progress" | "review" | "done") {
+    // When the assignee marks a task done, prompt for actual hours first.
+    // Applies to both plain and workflow tasks; workflow tasks whose "close stage"
+    // dialog is used instead never come through this code path.
+    if (s === "done" && isAssignee && task?.status !== "done" && !task?.workflow_instance_id) {
+      setMarkDoneOpen(true);
+      return;
+    }
     try {
       await setStatusFn({ data: { taskId: taskId!, status: s } });
       toast.success("Status updated");
+      await refresh();
+    } catch (e) { toast.error((e as Error).message); }
+  }
+
+  async function confirmMarkDone(v: { hours: number; note?: string }) {
+    try {
+      await logTimeFn({ data: { taskId: taskId!, hours: v.hours, note: v.note ?? null } });
+      await setStatusFn({ data: { taskId: taskId!, status: "done" } });
+      setMarkDoneOpen(false);
+      toast.success("Marked done — hours sent for approval");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
   }

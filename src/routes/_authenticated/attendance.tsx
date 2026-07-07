@@ -81,6 +81,25 @@ function AttendancePage() {
     },
   });
 
+  const { data: overview } = useQuery({
+    queryKey: ["attendance-overview", overviewDateStr, deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
+    enabled: canView,
+    queryFn: async () => {
+      let peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
+      if (deptScope && deptScope.length) peopleQ = peopleQ.in("department", deptScope);
+      if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
+      const [people, att, leaves] = await Promise.all([
+        peopleQ,
+        supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", overviewDateStr),
+        supabase.from("leave_requests")
+          .select("user_id, leave_type, start_date, end_date")
+          .eq("status", "approved")
+          .lte("start_date", overviewDateStr)
+          .gte("end_date", overviewDateStr),
+      ]);
+      return { people: people.data ?? [], att: att.data ?? [], leaves: leaves.data ?? [] };
+    },
+  });
 
   if (me && !canView) {
     throw redirect({ to: "/dashboard" });
@@ -89,6 +108,65 @@ function AttendancePage() {
   const sortedPeople = useMemo(() => {
     return (data?.people ?? []).slice().sort((a, b) => (a.full_name ?? a.email ?? "").localeCompare(b.full_name ?? b.email ?? ""));
   }, [data]);
+
+  const overviewRows = useMemo(() => {
+    const attById = new Map((overview?.att ?? []).map((a) => [a.user_id, a]));
+    const leaveById = new Map((overview?.leaves ?? []).map((l) => [l.user_id, l]));
+    const rows = (overview?.people ?? []).map((p) => {
+      const a = attById.get(p.id);
+      const leave = leaveById.get(p.id);
+      const status: "leave" | "in" | "out" | "absent" = leave
+        ? "leave"
+        : a?.punch_in_time && !a.punch_out_time ? "in"
+        : a?.punch_out_time ? "out" : "absent";
+      return { p, a, leave, status };
+    });
+    const order = { leave: 0, absent: 1, in: 2, out: 3 } as const;
+    rows.sort((x, y) => {
+      const s = order[x.status] - order[y.status];
+      if (s !== 0) return s;
+      return (x.p.full_name ?? x.p.email ?? "").localeCompare(y.p.full_name ?? y.p.email ?? "");
+    });
+    const q = overviewSearch.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => (r.p.full_name ?? "").toLowerCase().includes(q) || (r.p.email ?? "").toLowerCase().includes(q));
+  }, [overview, overviewSearch]);
+
+  const counts = useMemo(() => {
+    const total = overview?.people.length ?? 0;
+    const onLeave = overviewRows.filter((r) => r.status === "leave").length;
+    const punched = overviewRows.filter((r) => r.status === "in" || r.status === "out").length;
+    const notPunched = Math.max(0, total - onLeave - punched);
+    return { total, onLeave, punched, notPunched };
+  }, [overview, overviewRows]);
+
+  function exportOverviewCsv() {
+    const header = ["Employee", "Email", "Department", "Status", "Punch in", "Punch out", "Hours"];
+    const lines = [header.join(",")];
+    for (const r of overviewRows) {
+      const statusLabel = r.status === "leave"
+        ? `On leave (${r.leave?.leave_type ?? ""})`
+        : r.status === "in" ? "Punched in"
+        : r.status === "out" ? "Punched out" : "Absent";
+      const cells = [
+        r.p.full_name ?? "",
+        r.p.email ?? "",
+        r.p.department ?? "",
+        statusLabel,
+        r.a?.punch_in_time ? format(new Date(r.a.punch_in_time), "HH:mm") : "",
+        r.a?.punch_out_time ? format(new Date(r.a.punch_out_time), "HH:mm") : "",
+        r.a?.total_hours ? Number(r.a.total_hours).toFixed(2) : "",
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`);
+      lines.push(cells.join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `attendance-${overviewDateStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function decide(id: string, status: "approved" | "rejected", adminComment?: string) {
     const { error } = await supabase

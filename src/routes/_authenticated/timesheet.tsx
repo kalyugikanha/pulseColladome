@@ -175,7 +175,7 @@ function TimesheetPage() {
   }, [profiles]);
 
   // Build rows: employees (filtered) with their tasks for the day.
-  type EmpRow = { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number };
+  type EmpRow = { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number; approvedTotal: number };
   const empRows = useMemo<EmpRow[]>(() => {
     const src = (profiles ?? []).filter((p) => {
       if (deptSel.size > 0) {

@@ -198,7 +198,7 @@ function MyTimesheetPage() {
           <CardDescription>{totalHours.toFixed(1)} hrs across {uniqueDays} day{uniqueDays === 1 ? "" : "s"}</CardDescription>
         </CardHeader>
         <CardContent>
-          {rows.length === 0 ? (
+          {filteredRows.length === 0 ? (
             <div className="text-sm text-muted-foreground py-10 text-center">No entries in this period. Log time on any task from its detail panel to see it here.</div>
           ) : (
             <Table>
@@ -211,7 +211,7 @@ function MyTimesheetPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r, i) => (
+                {filteredRows.map((r, i) => (
                   <TableRow key={`${r.date}-${r.code}-${i}`}>
                     <TableCell className="text-xs">{format(new Date(r.date + "T00:00:00"), "d MMM")}</TableCell>
                     <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>

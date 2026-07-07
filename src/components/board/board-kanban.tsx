@@ -7,7 +7,7 @@ import { Workflow } from "lucide-react";
 import { format } from "date-fns";
 import {
   DndContext, PointerSensor, useSensor, useSensors, useDroppable, useDraggable,
-  type DragEndEvent,
+  DragOverlay, type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { toast } from "sonner";
@@ -48,6 +48,7 @@ export function BoardKanban({
   const qc = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const { data: tasks } = useQuery({ queryKey, queryFn: fetcher });
 
   const byCol = useMemo(() => {
@@ -56,7 +57,17 @@ export function BoardKanban({
     return map;
   }, [tasks]);
 
+  const activeCard = useMemo(
+    () => (activeId ? (tasks ?? []).find((t) => t.id === activeId) ?? null : null),
+    [activeId, tasks],
+  );
+
+  function onDragStart(e: DragStartEvent) {
+    setActiveId(String(e.active.id));
+  }
+
   async function onDragEnd(e: DragEndEvent) {
+    setActiveId(null);
     const over = e.over?.id as Status | undefined;
     if (!over) return;
     const card = (tasks ?? []).find((t) => t.id === e.active.id);
@@ -78,12 +89,19 @@ export function BoardKanban({
 
   return (
     <>
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(240px, 1fr))` }}>
           {COLUMNS.map((c) => (
             <Column key={c.key} col={c} cards={byCol[c.key]} onOpen={(id) => setOpenTaskId(id)} currentUserId={currentUserId} />
           ))}
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activeCard ? (
+            <div className="rotate-2 shadow-2xl ring-2 ring-primary/40 rounded-lg">
+              <CardPreview card={activeCard} />
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
       <TaskDetailSheet taskId={openTaskId} onClose={() => { setOpenTaskId(null); qc.invalidateQueries({ queryKey }); }} />
     </>
@@ -93,7 +111,14 @@ export function BoardKanban({
 function Column({ col, cards, onOpen, currentUserId }: { col: { key: Status; label: string }; cards: BoardCard[]; onOpen: (id: string) => void; currentUserId: string }) {
   const { setNodeRef, isOver } = useDroppable({ id: col.key });
   return (
-    <div ref={setNodeRef} className={`rounded-lg border p-2 space-y-2 min-h-[400px] ${isOver ? "border-primary bg-primary/5" : "border-border/60 bg-muted/20"}`}>
+    <div
+      ref={setNodeRef}
+      className={`rounded-lg border-2 p-2 space-y-2 min-h-[400px] transition-colors ${
+        isOver
+          ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+          : "border-border/60 bg-muted/20"
+      }`}
+    >
       <div className="flex items-center justify-between px-1">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{col.label}</span>
         <span className="text-xs text-muted-foreground">{cards.length}</span>
@@ -103,15 +128,9 @@ function Column({ col, cards, onOpen, currentUserId }: { col: { key: Status; lab
   );
 }
 
-function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => void; currentUserId: string }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id });
+function CardBody({ card }: { card: BoardCard }) {
   return (
-    <Card
-      ref={setNodeRef}
-      {...attributes} {...listeners}
-      onDoubleClick={() => onOpen(card.id)}
-      className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-50" : ""}`}
-    >
+    <>
       <div className="text-sm font-medium">{card.title}</div>
       <div className="flex flex-wrap gap-1 mt-2 items-center">
         <Badge variant="outline" className="capitalize text-[10px]">{card.priority}</Badge>
@@ -128,6 +147,28 @@ function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => v
           {card.assignee.full_name ?? card.assignee.email}
         </div>
       )}
+    </>
+  );
+}
+
+function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => void; currentUserId: string }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id });
+  return (
+    <Card
+      ref={setNodeRef}
+      {...attributes} {...listeners}
+      onDoubleClick={() => onOpen(card.id)}
+      className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-30 border-dashed" : ""}`}
+    >
+      <CardBody card={card} />
+    </Card>
+  );
+}
+
+function CardPreview({ card }: { card: BoardCard }) {
+  return (
+    <Card className="p-3 select-none bg-background">
+      <CardBody card={card} />
     </Card>
   );
 }

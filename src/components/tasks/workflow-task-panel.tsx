@@ -163,14 +163,6 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
   }, []);
 
   const hasBranches = stage.branch_options.length > 0;
-  const actingUserId = viewAsUserId ?? me?.id ?? null;
-  // Rating only meaningful when this close will auto-approve: no review required,
-  // or the assignee is also the reviewer (or no reviewer set).
-  const willAutoApprove =
-    !stage.requires_review ||
-    !task.reviewer_id ||
-    task.reviewer_id === actingUserId;
-  const canRate = willAutoApprove && !!task.assignee_id;
 
   async function submit() {
     setBusy(true);
@@ -182,7 +174,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
         requiredFieldValues: values,
-        rating: canRate && rating > 0 ? rating : null,
+        rating: null,
         viewAsUserId,
       }});
       toast.success("Stage closed");

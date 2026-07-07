@@ -299,6 +299,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
 
 function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: () => void; onDone: () => void | Promise<void> }) {
   const log = useServerFn(logTaskTime);
+  const { viewAsUserId } = useViewAs();
   const [hours, setHours] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -322,7 +323,7 @@ function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: (
             const h = Number(hours);
             if (!h || h <= 0) return toast.error("Enter valid hours");
             setBusy(true);
-            try { await log({ data: { taskId, hours: h, note: note || null } }); toast.success("Time logged"); await onDone(); }
+            try { await log({ data: { taskId, hours: h, note: note || null, viewAsUserId } }); toast.success("Time logged"); await onDone(); }
             catch (e) { toast.error((e as Error).message); }
             finally { setBusy(false); }
           }}>Log</Button>
@@ -330,4 +331,5 @@ function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: (
       </DialogContent>
     </Dialog>
   );
+
 }

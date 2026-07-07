@@ -334,9 +334,9 @@ export const reviewTask = createServerFn({ method: "POST" })
     // approve
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
 
-    // Optional rating: reviewer rating a different assignee
+    // Optional rating from reviewer
     const r = data.rating;
-    if (r != null && Number.isFinite(r) && r >= 1 && r <= 5 && task.assignee_id && task.assignee_id !== actingUserId) {
+    if (r != null && Number.isFinite(r) && r >= 1 && r <= 5 && task.assignee_id) {
       await supabase.from("task_ratings" as never).insert({
         task_id: task.id, ratee_id: task.assignee_id, rater_id: actingUserId,
         rating: Math.round(r),

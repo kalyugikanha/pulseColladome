@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Plus, FolderKanban, Clock, Pencil, Wallet, Search } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 
 export const Route = createFileRoute("/_authenticated/projects")({
   component: ProjectsPage,
@@ -26,6 +27,7 @@ function ProjectsPage() {
   const [openTask, setOpenTask] = useState<string | null>(null);
   const [logFor, setLogFor] = useState<{ id: string; code: string; name: string } | null>(null);
   const [editProject, setEditProject] = useState<any | null>(null);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const [pName, setPName] = useState(""); const [pCode, setPCode] = useState(""); const [pClient, setPClient] = useState(""); const [pDesc, setPDesc] = useState(""); const [pStatus, setPStatus] = useState<"active"|"on_hold"|"completed">("active");
@@ -202,13 +204,18 @@ function ProjectsPage() {
                     <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{col.replace("_"," ")}</div>
                     <div className="space-y-2">
                       {(p.tasks ?? []).filter((t: any) => t.status === col).map((t: any) => (
-                        <div key={t.id} className="rounded-md border border-border/60 bg-card p-2 text-sm">
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setOpenTaskId(t.id)}
+                          className="w-full text-left rounded-md border border-border/60 bg-card p-2 text-sm hover:bg-accent/40 transition-colors"
+                        >
                           <div className="font-medium">{t.title}</div>
                           <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                             <span>{t.assignee?.full_name ?? "Unassigned"}</span>
                             <Badge variant="outline" className="capitalize">{t.priority}</Badge>
                           </div>
-                        </div>
+                        </button>
                       ))}
                       {(p.tasks ?? []).filter((t: any) => t.status === col).length === 0 && <div className="text-xs text-muted-foreground">—</div>}
                     </div>
@@ -262,6 +269,14 @@ function ProjectsPage() {
       </Dialog>
 
       <EditProjectDialog project={editProject} onClose={() => setEditProject(null)} onSaved={() => qc.invalidateQueries({ queryKey: ["projects"] })} />
+
+      <TaskDetailSheet
+        taskId={openTaskId}
+        onClose={() => {
+          setOpenTaskId(null);
+          qc.invalidateQueries({ queryKey: ["projects"] });
+        }}
+      />
     </div>
   );
 }

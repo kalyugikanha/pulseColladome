@@ -242,6 +242,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
     const wf = r.workflow_instance_id ? wfMap.get(r.workflow_instance_id) : null;
     return {
       ...r,
+      creator: r.created_by ? creatorMap.get(r.created_by) ?? null : null,
       workflow_template: wf
         ? { id: wf.templateId, name: wf.templateName, department: wf.templateDepartment }
         : null,

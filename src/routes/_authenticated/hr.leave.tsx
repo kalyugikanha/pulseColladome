@@ -14,9 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CalendarRange, Plus, Check, X } from "lucide-react";
+import { CalendarRange, Plus, Check, X, Pencil, Trash2 } from "lucide-react";
 import { format, differenceInCalendarDays, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
-import { logLeaveForEmployee } from "@/lib/admin-users.functions";
+import { logLeaveForEmployee, updateLeaveForEmployee, deleteLeaveForEmployee } from "@/lib/admin-users.functions";
 
 export const Route = createFileRoute("/_authenticated/hr/leave")({
   beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "leaves" } }); },
@@ -121,7 +121,7 @@ export function HrLeavePage() {
         </TabsList>
 
         <TabsContent value="day" className="mt-4">
-          <DayView empMap={empMap} />
+          <DayView empMap={empMap} onChanged={() => qc.invalidateQueries()} />
         </TabsContent>
 
         <TabsContent value="timeline" className="mt-4">
@@ -147,7 +147,7 @@ function typeColor(t: LType) {
   return TYPES.find((x) => x.v === t)?.color ?? "bg-muted";
 }
 
-function DayView({ empMap }: { empMap: Map<string, Employee> }) {
+function DayView({ empMap, onChanged }: { empMap: Map<string, Employee>; onChanged: () => void }) {
   const { data: me } = useCurrentUser();
   const [day, setDay] = useState(() => format(new Date(), "yyyy-MM-dd"));
 
@@ -230,7 +230,11 @@ function DayView({ empMap }: { empMap: Map<string, Employee> }) {
                         </div>
                         {r.reason && <div className="text-xs mt-1 text-muted-foreground line-clamp-2">{r.reason}</div>}
                       </div>
-                      <Badge variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "secondary"} className="capitalize shrink-0">{r.status}</Badge>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "secondary"} className="capitalize">{r.status}</Badge>
+                        <EditLeaveDialog row={r} employee={p} onChanged={onChanged} />
+                        <DeleteLeaveButton row={r} onChanged={onChanged} />
+                      </div>
                     </div>
                   );
                 })}
@@ -437,20 +441,24 @@ function RequestsTable({ rows, empMap, onChanged }: { rows: LeaveRow[]; empMap: 
                 </div>
                 <Badge variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "secondary"} className="capitalize shrink-0">{r.status}</Badge>
               </div>
-              {(r.status === "pending") && (
-                <div className="mt-3 flex items-center gap-2 flex-wrap">
-                  <Input placeholder="Optional comment" value={comment[r.id] ?? ""} onChange={(e) => setComment((c) => ({ ...c, [r.id]: e.target.value }))} className="h-8 flex-1 min-w-48" />
-                  <Button size="sm" onClick={() => decide(r, "approved")} disabled={busy === r.id} className="gap-1"><Check className="h-3.5 w-3.5" /> Approve</Button>
-                  <Button size="sm" variant="outline" onClick={() => decide(r, "rejected")} disabled={busy === r.id} className="gap-1"><X className="h-3.5 w-3.5" /> Reject</Button>
-                </div>
-              )}
-              {r.status !== "pending" && (
-                <div className="mt-2 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                {r.status === "pending" && (
+                  <>
+                    <Input placeholder="Optional comment" value={comment[r.id] ?? ""} onChange={(e) => setComment((c) => ({ ...c, [r.id]: e.target.value }))} className="h-8 flex-1 min-w-48" />
+                    <Button size="sm" onClick={() => decide(r, "approved")} disabled={busy === r.id} className="gap-1"><Check className="h-3.5 w-3.5" /> Approve</Button>
+                    <Button size="sm" variant="outline" onClick={() => decide(r, "rejected")} disabled={busy === r.id} className="gap-1"><X className="h-3.5 w-3.5" /> Reject</Button>
+                  </>
+                )}
+                {r.status !== "pending" && (
                   <Button size="sm" variant="ghost" onClick={() => decide(r, r.status === "approved" ? "rejected" : "approved")} disabled={busy === r.id}>
                     Change to {r.status === "approved" ? "rejected" : "approved"}
                   </Button>
+                )}
+                <div className="ml-auto flex items-center gap-1.5">
+                  <EditLeaveDialog row={r} employee={p} onChanged={onChanged} />
+                  <DeleteLeaveButton row={r} onChanged={onChanged} />
                 </div>
-              )}
+              </div>
             </div>
           );
         })}
@@ -545,3 +553,125 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
     </Dialog>
   );
 }
+
+function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee?: Employee; onChanged: () => void }) {
+  const updateFn = useServerFn(updateLeaveForEmployee);
+  const [open, setOpen] = useState(false);
+  const [type, setType] = useState<LType>(row.leave_type);
+  const [start, setStart] = useState(row.start_date);
+  const [end, setEnd] = useState(row.end_date);
+  const [reason, setReason] = useState(row.reason ?? "");
+  const [status, setStatus] = useState<LStatus>(row.status);
+  const [adminComment, setAdminComment] = useState(row.admin_comment ?? "");
+  const [busy, setBusy] = useState(false);
+
+  function resetToRow() {
+    setType(row.leave_type);
+    setStart(row.start_date);
+    setEnd(row.end_date);
+    setReason(row.reason ?? "");
+    setStatus(row.status);
+    setAdminComment(row.admin_comment ?? "");
+  }
+
+  async function submit() {
+    if (!start || !end) return toast.error("Pick dates");
+    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (days <= 0) return toast.error("End must be on or after start");
+    setBusy(true);
+    try {
+      await updateFn({
+        data: {
+          id: row.id,
+          leave_type: type,
+          start_date: start,
+          end_date: end,
+          days,
+          reason: reason.trim() || null,
+          status,
+          admin_comment: adminComment.trim() || null,
+        },
+      });
+      toast.success("Leave updated");
+      setOpen(false);
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) resetToRow(); }}>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit leave"><Pencil className="h-3.5 w-3.5" /></Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-display">Edit leave</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="text-sm text-muted-foreground">
+            {employee?.full_name ?? employee?.email ?? row.user_id.slice(0, 8)}
+            {employee?.department ? ` · ${employee.department}` : ""}
+          </div>
+          <div className="space-y-1">
+            <Label>Type</Label>
+            <Select value={type} onValueChange={(v) => setType(v as LType)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{TYPES.map((t) => <SelectItem key={t.v} value={t.v}>{t.l}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+          </div>
+          <div className="space-y-1">
+            <Label>Status</Label>
+            <Select value={status} onValueChange={(v) => setStatus(v as LStatus)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1"><Label>Reason</Label><Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Admin comment</Label><Textarea rows={2} value={adminComment} onChange={(e) => setAdminComment(e.target.value)} /></div>
+          <p className="text-xs text-muted-foreground">Balances re-sync automatically when status changes.</p>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy} className="gradient-primary">{busy ? "Saving…" : "Save changes"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteLeaveButton({ row, onChanged }: { row: LeaveRow; onChanged: () => void }) {
+  const deleteFn = useServerFn(deleteLeaveForEmployee);
+  const [busy, setBusy] = useState(false);
+  async function onClick() {
+    if (!confirm("Delete this leave? If it was approved, the balance will be refunded.")) return;
+    setBusy(true);
+    try {
+      await deleteFn({ data: { id: row.id } });
+      toast.success("Leave deleted");
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={onClick} disabled={busy} title="Delete leave">
+      <Trash2 className="h-3.5 w-3.5" />
+    </Button>
+  );
+}
+

@@ -1,28 +1,35 @@
-Plan:
+## Goal
+Enable Admin / HR Admin to fully modify any employee's leave from the HR Admin → Leaves module — not just approve/reject.
 
-1. Fix Kanishka’s approved task hours in Team Timesheet
-- Treat approved task activity as a first-class day entry, not a separate/test panel.
-- Store/display task activity by the user’s selected/local work date so a task closed late evening does not land on the previous UTC date.
-- In the day panel, show the approved amount for approved task activity. Example: if Kanishka logged 2 hours and 1 hour was approved, the row should show 1.0 approved hour for that project/task, not 0 and not the full 2 unless all 2 were approved.
-- Make status per task-derived row reflect the task-hour approval status, instead of relying only on whether an attendance log day was approved.
-- Keep the same visibility rules as the pending approvals panel: admins/project managers see scoped/all rows; reporting managers see direct reports.
-- After approval/rejection, invalidate/refetch the team timesheet day rows so the below panel updates immediately.
+## Current state
+- `hr.leave.tsx` Requests tab lets admins Approve / Reject / flip status via a direct `supabase.from("leave_requests").update(...)` call.
+- No way to edit dates, type, days, reason, or delete a leave.
+- Log-leave dialog only creates new approved leaves via `logLeaveForEmployee` server fn.
 
-2. Update existing task-hour records date handling
-- Ensure new task-completion time logs use the intended work date consistently.
-- For already-created rows affected by the UTC/local mismatch, include a safe fallback in the Team Timesheet query so recently approved activity appears on the expected local day.
+## Changes
 
-3. Finance module: include Salaries and Project Burn clearly
-- Keep Salaries inside the Finance module.
-- Keep/add Project Burn inside Finance as an integrated section so finance admins can see salaries, salary pool, allocated burn, unallocated salary, and burn by project in one place.
-- Ensure the Finance sidebar entry is the primary place for these finance views; avoid making users hunt for Project Burn under Projects.
+### 1. New server fns in `src/lib/admin-users.functions.ts`
+Both gated on `isSuper || hr_admin` (same guard used by `logLeaveForEmployee`) and executed via `supabaseAdmin` so balance triggers run with full privileges.
 
-4. Workflow module: add Project ID / project picker
-- Add project selection where workflows are started, showing project code/ID plus project name.
-- Ensure workflow-created tasks and subsequent stages keep the selected project ID through the workflow chain.
-- If needed, also show the linked project code/ID in the workflow/task UI so it is clear which project the workflow belongs to.
+- `updateLeaveForEmployee({ id, leave_type?, start_date?, end_date?, days?, reason?, status?, admin_comment? })`
+  - Validates dates / days when supplied.
+  - Updates the row; sets `decided_by = context.userId`, `decided_at = now()` when status changes.
+  - Existing `handle_leave_status_change` trigger keeps `leave_balances.used` in sync automatically.
+- `deleteLeaveForEmployee({ id })`
+  - Deletes the row (trigger reverses balance if it was approved).
 
-Technical notes:
-- The main timesheet files to adjust are `src/routes/_authenticated/timesheet.tsx` and the task workflow time logging path in `src/lib/workflows.functions.ts` / `src/components/tasks/workflow-task-panel.tsx` if a work-date input is needed.
-- Finance changes are in `src/routes/_authenticated/finances.tsx`, with possible navigation cleanup in `src/routes/_authenticated/route.tsx`.
-- Workflow project picker changes are in `src/routes/_authenticated/tasks.tsx`; workflow persistence already accepts `projectId`, so this is mostly improving the UI and display.
+### 2. HR Leaves UI — `src/routes/_authenticated/hr.leave.tsx`
+In `RequestsTable`, replace the current per-row action row with:
+- **Edit** button → opens an `EditLeaveDialog` prefilled with the row (employee shown read-only, editable: type, start, end, reason, status, admin comment; days auto-recomputed from dates).
+- Keep **Approve / Reject** quick actions for pending rows.
+- Add **Delete** button with a confirm.
+- All actions call the new server fns, then `qc.invalidateQueries()` so Day / Timeline / Requests all refresh.
+
+Also add the same Edit / Delete affordance from the **Day view** row cards (small pencil / trash icon) so admins can act on today's leaves without switching tabs.
+
+### 3. No schema changes
+`leave_requests` already has all needed columns and the balance trigger.
+
+## Files touched
+- `src/lib/admin-users.functions.ts` — add two server fns.
+- `src/routes/_authenticated/hr.leave.tsx` — new `EditLeaveDialog`, wire Edit/Delete in Requests + Day view.

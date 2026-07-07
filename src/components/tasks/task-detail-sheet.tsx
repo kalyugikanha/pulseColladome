@@ -246,7 +246,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Reviewer</div>
                 <Select value={(task as { reviewer_id: string | null }).reviewer_id ?? "none"} onValueChange={async (v) => {
-                  await setReviewerFn({ data: { taskId: taskId!, reviewerId: v === "none" ? null : v } });
+                  await setReviewerFn({ data: { taskId: taskId!, reviewerId: v === "none" ? null : v, viewAsUserId } });
                   toast.success("Reviewer updated");
                   await refresh();
                 }}>

@@ -94,6 +94,36 @@ function TasksPage() {
       .order("due_date", { ascending: true, nullsFirst: false })).data ?? [],
   });
 
+  // Sum logged & approved hours per task from the current user's attendance logs (last 120 days).
+  const { data: hoursMap } = useQuery({
+    queryKey: ["my-tasks-hours", me?.id], enabled: !!me,
+    queryFn: async () => {
+      const from = new Date();
+      from.setDate(from.getDate() - 120);
+      const fromStr = from.toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("attendance_logs")
+        .select("tasks, approved_at")
+        .eq("user_id", me!.id)
+        .gte("date", fromStr);
+      const map = new Map<string, { logged: number; approved: number }>();
+      for (const row of data ?? []) {
+        const approved = !!(row as { approved_at: string | null }).approved_at;
+        const entries = Array.isArray((row as { tasks: unknown }).tasks) ? ((row as { tasks: Array<{ task_id?: string; hours?: number }> }).tasks) : [];
+        for (const e of entries) {
+          if (!e?.task_id) continue;
+          const h = Number(e.hours) || 0;
+          if (h <= 0) continue;
+          const cur = map.get(e.task_id) ?? { logged: 0, approved: 0 };
+          cur.logged += h;
+          if (approved) cur.approved += h;
+          map.set(e.task_id, cur);
+        }
+      }
+      return map;
+    },
+  });
+
   const awaitingFn = useServerFn(listAwaitingMyReview);
   const { data: awaiting } = useQuery({
     queryKey: ["awaiting-my-review", me?.id], enabled: !!me,

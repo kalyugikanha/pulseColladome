@@ -67,6 +67,12 @@ function initialsOf(name?: string | null, email?: string | null) {
 function MarketingKanbanPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
+  const search = useSearch({ from: "/_authenticated/marketing-kanban" });
+  const navigate = useNavigate({ from: "/_authenticated/marketing-kanban" });
+  const assigneeFilter = search.assignee ?? "all";
+  const setAssignee = (v: string) =>
+    navigate({ search: (prev) => ({ ...prev, assignee: v === "all" ? undefined : v }) });
+
   const [newOpen, setNewOpen] = useState(false);
   const [crossOpen, setCrossOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);

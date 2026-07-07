@@ -187,8 +187,9 @@ function AttendancePage() {
         <p className="text-muted-foreground text-sm mt-1">Today's punches, hours, and leave approvals.</p>
       </header>
 
-      <Tabs defaultValue="today">
+      <Tabs defaultValue="overview">
         <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="today">Today</TabsTrigger>
           <TabsTrigger value="leave">
             Leave approvals
@@ -197,6 +198,108 @@ function AttendancePage() {
             ) : null}
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+              <div>
+                <CardTitle className="font-display">Attendance overview</CardTitle>
+                <CardDescription>Pick any date to see who's in, on leave, or missing.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(overviewDate, "EEE, d MMM yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={overviewDate}
+                      onSelect={(d) => d && setOverviewDate(d)}
+                      disabled={(d) => d > new Date()}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button variant="outline" size="sm" onClick={exportOverviewCsv} disabled={overviewRows.length === 0}>
+                  <Download className="h-4 w-4 mr-1" /> Export CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <SummaryCard icon={<Users className="h-4 w-4" />} label="Total employees" value={counts.total} caption="in your scope" />
+                <SummaryCard icon={<Plane className="h-4 w-4" />} label="On leave" value={counts.onLeave} caption={`of ${counts.total}`} tone="amber" />
+                <SummaryCard icon={<LogIn className="h-4 w-4" />} label="Punched in" value={counts.punched} caption={`of ${counts.total}`} tone="green" />
+                <SummaryCard icon={<UserX className="h-4 w-4" />} label="Not punched in" value={counts.notPunched} caption="excluding leave" tone="red" />
+              </div>
+
+              <Input
+                placeholder="Search employee…"
+                value={overviewSearch}
+                onChange={(e) => setOverviewSearch(e.target.value)}
+                className="max-w-xs"
+              />
+
+              <div className="rounded-lg border border-border/60 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Punch in</TableHead>
+                      <TableHead>Punch out</TableHead>
+                      <TableHead className="text-right">Hours</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {overviewRows.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
+                          No employees to show.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {overviewRows.map(({ p, a, leave, status }) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.full_name ?? p.email}</TableCell>
+                        <TableCell className="text-muted-foreground">{p.department ?? "—"}</TableCell>
+                        <TableCell>
+                          {status === "leave" ? (
+                            <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 capitalize">
+                              On leave · {leave!.leave_type}
+                            </Badge>
+                          ) : status === "in" ? (
+                            <Badge className="gradient-primary">Punched in</Badge>
+                          ) : status === "out" ? (
+                            <Badge variant="secondary">Punched out</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-red-600 border-red-500/40">Not punched in</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {a?.punch_in_time ? format(new Date(a.punch_in_time), "HH:mm") : "—"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {a?.punch_out_time ? format(new Date(a.punch_out_time), "HH:mm") : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {a?.total_hours ? `${Number(a.total_hours).toFixed(2)}h` : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
         <TabsContent value="today" className="mt-4">
           <Card>

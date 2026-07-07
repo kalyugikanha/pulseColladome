@@ -150,7 +150,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
 
   function addStage() {
     const pos = stages.length + 1;
-    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null }]);
+    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null, project_id: null }]);
   }
   function moveStage(idx: number, dir: -1 | 1) {
     const target = idx + dir;

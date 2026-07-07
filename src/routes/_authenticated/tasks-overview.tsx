@@ -56,6 +56,12 @@ function Page() {
   }, [profileList]);
 
   const listFn = useServerFn(listTasksOverview);
+  const duplicateFn = useServerFn(duplicateTask);
+  const deleteFn = useServerFn(deleteTask);
+  const qc = useQueryClient();
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
   const { data: rows } = useQuery({
     queryKey: ["tasks-overview", employees, departments, projects, statuses, dateFrom, dateTo],
     enabled: !!canView,
@@ -64,6 +70,28 @@ function Page() {
       dateFrom: dateFrom || null, dateTo: dateTo || null,
     }}),
   });
+
+  async function onDuplicate(id: string) {
+    try {
+      await duplicateFn({ data: { id } });
+      toast.success("Task duplicated");
+      qc.invalidateQueries({ queryKey: ["tasks-overview"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Duplicate failed");
+    }
+  }
+  async function onDelete() {
+    if (!deleteId) return;
+    try {
+      await deleteFn({ data: { id: deleteId } });
+      toast.success("Task deleted");
+      qc.invalidateQueries({ queryKey: ["tasks-overview"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeleteId(null);
+    }
+  }
 
   function exportCsv() {
     const header = ["Task", "Assignee", "Department", "Project", "Domain", "Category", "Types", "Status", "Priority", "Due"].join(",");

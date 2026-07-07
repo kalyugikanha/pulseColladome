@@ -464,6 +464,14 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
     queryFn: async () => (await supabase.from("marketing_clients" as any).select("id,name").eq("active", true).order("name")).data ?? [],
   });
 
+  const { data: mktDeptId } = useQuery({
+    queryKey: ["taxonomy-dept-id", DEPT], enabled: open,
+    queryFn: async () => {
+      const { data } = await supabase.from("taxonomy_departments").select("id").ilike("name", DEPT).maybeSingle();
+      return (data as any)?.id ?? null;
+    },
+  });
+
   useEffect(() => {
     if (open) {
       setTitle(""); setDesc(""); setAssignee(me?.realId ?? ""); setDeadline(""); setPostDate("");
@@ -476,7 +484,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
     if (!assignee) return toast.error("Assignee required");
     setSaving(true);
     const brand = client === "__other__" ? clientOther.trim() || null : client || null;
-    const { error } = await supabase.from("tasks").insert({
+    const payload: Record<string, unknown> = {
       title: title.trim(),
       description: desc.trim() || null,
       priority,
@@ -485,11 +493,12 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
       client_brand: brand,
       marketing_stage: "script_writing",
       status: "todo",
-      department: DEPT,
       assignee_id: assignee,
       created_by: me!.realId,
       asset_links: links.filter((l) => l.url.trim()),
-    } as any);
+    };
+    if (mktDeptId) payload.department_id = mktDeptId;
+    const { error } = await supabase.from("tasks").insert(payload as any);
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Task created");

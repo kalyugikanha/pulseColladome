@@ -231,11 +231,11 @@ function ProjectBurnPage() {
       }
     }
     return totals;
-  }, [logs]);
+  }, [combinedLogs]);
 
   // Restrict logs to profiles in scope (dept-head only sees her team).
   const profileIdSet = useMemo(() => new Set((profiles ?? []).map((p) => p.id)), [profiles]);
-  const scopedLogs = useMemo(() => (logs ?? []).filter((r) => profileIdSet.size === 0 || profileIdSet.has(r.user_id)), [logs, profileIdSet]);
+  const scopedLogs = useMemo(() => combinedLogs.filter((r) => profileIdSet.size === 0 || profileIdSet.has(r.user_id)), [combinedLogs, profileIdSet]);
 
   // Daily rows: [date, project_code, user_id, hours, burn]
   type DailyRow = { date: string; code: string; name: string; user_id: string; hours: number; burn: number };

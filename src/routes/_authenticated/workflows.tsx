@@ -246,18 +246,33 @@ function StageEditor({ stage, index, totalStages, allStages, people, onChange, o
           <Input value={stage.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Stage name" />
           <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={stage.requires_review} onChange={(e) => onChange({ requires_review: e.target.checked })} /> Requires review before Done</label>
 
-          <div className="space-y-1">
-            <Label className="text-xs">Default assignee (optional)</Label>
-            <Select
-              value={stage.default_assignee_id ?? "__none__"}
-              onValueChange={(v) => onChange({ default_assignee_id: v === "__none__" ? null : v })}
-            >
-              <SelectTrigger className="h-8"><SelectValue placeholder="Unassigned" /></SelectTrigger>
-              <SelectContent className="max-h-72">
-                <SelectItem value="__none__">Unassigned</SelectItem>
-                {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Default assignee (optional)</Label>
+              <Select
+                value={stage.default_assignee_id ?? "__none__"}
+                onValueChange={(v) => onChange({ default_assignee_id: v === "__none__" ? null : v })}
+              >
+                <SelectTrigger className="h-8"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="__none__">Unassigned</SelectItem>
+                  {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Default reviewer (optional)</Label>
+              <Select
+                value={stage.default_reviewer_id ?? "__none__"}
+                onValueChange={(v) => onChange({ default_reviewer_id: v === "__none__" ? null : v })}
+              >
+                <SelectTrigger className="h-8"><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="__none__">None</SelectItem>
+                  {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
 

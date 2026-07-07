@@ -403,7 +403,8 @@ function MarketingKanbanPage() {
         }}
       />
       <MarkDoneDialog
-        task={markDone} onClose={() => setMarkDone(null)}
+        task={markDone ? { id: markDone.id, title: markDone.title, assigneeId: markDone.assignee_id, creatorId: markDone.requester_id } : null}
+        onClose={() => setMarkDone(null)}
         onConfirm={async ({ hours, note }) => {
           if (!markDone) return;
           await commitMove(markDone, "posted", markDone.assignee_id ?? me!.realId, {

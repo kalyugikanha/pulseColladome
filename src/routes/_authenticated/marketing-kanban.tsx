@@ -67,8 +67,8 @@ function initialsOf(name?: string | null, email?: string | null) {
 function MarketingKanbanPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
-  const search = useSearch({ from: "/_authenticated/marketing-kanban" });
-  const navigate = useNavigate({ from: "/_authenticated/marketing-kanban" });
+  const search = useSearch({ from: "/_authenticated/marketing-kanban" }) as { assignee?: string };
+  const navigate = useNavigate({ from: "/marketing-kanban" });
   const assigneeFilter = search.assignee ?? "all";
   const setAssignee = (v: string) =>
     navigate({ search: (prev: { assignee?: string }) => ({ ...prev, assignee: v === "all" ? undefined : v }) });

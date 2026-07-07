@@ -283,6 +283,24 @@ function StageEditor({ stage, index, totalStages, allStages, people, projects, o
             </div>
           </div>
 
+          <div className="space-y-1">
+            <Label className="text-xs">Project for this stage</Label>
+            <Select
+              value={stage.project_id ?? "__same__"}
+              onValueChange={(v) => onChange({ project_id: v === "__same__" ? null : v })}
+            >
+              <SelectTrigger className="h-8"><SelectValue placeholder="Same as workflow" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="__same__">Same as workflow</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.code} — {p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+
+
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">

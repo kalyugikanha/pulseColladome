@@ -97,6 +97,51 @@ function ProjectBurnPage() {
     },
   });
 
+  // Approved task_activity hours in this month, attributed to actor + linked project.
+  const { data: activityLogs } = useQuery({
+    queryKey: ["pb-activity", month, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      let q = supabase
+        .from("task_activity" as never)
+        .select("actor_id, hours, completion_date, created_at, approval_status, task:tasks(project:projects(code, name))")
+        .eq("approval_status", "approved")
+        .not("hours", "is", null)
+        .gte("completion_date", start)
+        .lt("completion_date", end);
+      if (hasScope) q = q.in("actor_id", visibleUserIds);
+      const { data, error } = await q;
+      if (error) throw error;
+      return ((data ?? []) as unknown as Array<{
+        actor_id: string; hours: number | null;
+        completion_date: string | null; created_at: string;
+        task: { project: { code: string | null; name: string | null } | null } | null;
+      }>);
+    },
+  });
+
+  // Combine attendance-log entries with approved task_activity, reshaped into LogRow form.
+  const combinedLogs = useMemo<LogRow[]>(() => {
+    const base = (logs ?? []).slice();
+    for (const a of activityLogs ?? []) {
+      const h = Number(a.hours) || 0;
+      if (h <= 0) continue;
+      const code = a.task?.project?.code?.trim();
+      if (!code) continue; // no project = can't attribute to a project's burn
+      const date = a.completion_date ?? a.created_at.slice(0, 10);
+      base.push({
+        user_id: a.actor_id,
+        date,
+        tasks: [{ project_code: code, project_name: a.task?.project?.name ?? code, hours: h }],
+      });
+    }
+    return base;
+  }, [logs, activityLogs]);
+
+
 
   // Latest effective raw monthly salary per user as of selected month.
   const rawSalaryByUser = useMemo(() => {
@@ -178,7 +223,7 @@ function ProjectBurnPage() {
   // Monthly totals: per-user, sum hours per project (for salary-share)
   const monthlyUserTotals = useMemo(() => {
     const totals = new Map<string, number>(); // user_id -> monthly total hours
-    for (const row of logs ?? []) {
+    for (const row of combinedLogs) {
       for (const t of row.tasks ?? []) {
         const h = Number(t.hours) || 0;
         if (h <= 0) continue;
@@ -186,11 +231,11 @@ function ProjectBurnPage() {
       }
     }
     return totals;
-  }, [logs]);
+  }, [combinedLogs]);
 
   // Restrict logs to profiles in scope (dept-head only sees her team).
   const profileIdSet = useMemo(() => new Set((profiles ?? []).map((p) => p.id)), [profiles]);
-  const scopedLogs = useMemo(() => (logs ?? []).filter((r) => profileIdSet.size === 0 || profileIdSet.has(r.user_id)), [logs, profileIdSet]);
+  const scopedLogs = useMemo(() => combinedLogs.filter((r) => profileIdSet.size === 0 || profileIdSet.has(r.user_id)), [combinedLogs, profileIdSet]);
 
   // Daily rows: [date, project_code, user_id, hours, burn]
   type DailyRow = { date: string; code: string; name: string; user_id: string; hours: number; burn: number };

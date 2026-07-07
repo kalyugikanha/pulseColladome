@@ -5,6 +5,7 @@ type PunchAllocationInput = {
   projectId: string;
   hours: number;
   comments: string;
+  taskId?: string | null;
 };
 
 type PunchInInput = {
@@ -20,6 +21,8 @@ export type PunchAllocation = {
   project_id: string;
   project_code: string | null;
   project_name: string | null;
+  task_id: string | null;
+  task_title: string | null;
   hours: number;
   comments: string;
 };
@@ -65,20 +68,16 @@ function normalizePunchOutInput(input: PunchOutInput) {
 
   const allocations = input.allocations.map((row, index) => {
     const projectId = typeof row.projectId === "string" ? row.projectId.trim() : "";
+    const taskId = typeof row.taskId === "string" && row.taskId.trim() !== "" ? row.taskId.trim() : null;
     const hours = Number(row.hours);
     const comments = typeof row.comments === "string" ? row.comments.trim() : "";
 
-    if (!projectId) throw new Error(`Row ${index + 1}: pick a project.`);
+    if (!projectId && !taskId) throw new Error(`Row ${index + 1}: pick a task or project.`);
     if (!Number.isFinite(hours) || hours <= 0) throw new Error(`Row ${index + 1}: enter hours (>0).`);
     if (!comments) throw new Error(`Row ${index + 1}: add a comment.`);
 
-    return { projectId, hours: Number(hours.toFixed(2)), comments };
+    return { projectId, taskId, hours: Number(hours.toFixed(2)), comments };
   });
-
-  const projectIds = allocations.map((row) => row.projectId);
-  if (new Set(projectIds).size !== projectIds.length) {
-    throw new Error("Same project listed twice — merge them.");
-  }
 
   return { sessionId: input.sessionId.trim(), allocations };
 }
@@ -89,6 +88,8 @@ function toPunchSession(row: any): PunchSessionResult {
     project_id: String(allocation?.project_id ?? ""),
     project_code: allocation?.project_code == null ? null : String(allocation.project_code),
     project_name: allocation?.project_name == null ? null : String(allocation.project_name),
+    task_id: allocation?.task_id == null ? null : String(allocation.task_id),
+    task_title: allocation?.task_title == null ? null : String(allocation.task_title),
     hours: Number(allocation?.hours ?? 0),
     comments: String(allocation?.comments ?? ""),
   })) ?? null;
@@ -165,7 +166,32 @@ export const punchOut = createServerFn({ method: "POST" })
   .inputValidator((input: PunchOutInput) => normalizePunchOutInput(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const projectIds = data.allocations.map((row) => row.projectId);
+
+    // Resolve any task-based rows to their project.
+    const taskIds = Array.from(new Set(data.allocations.map((r) => r.taskId).filter((v): v is string => !!v)));
+    const taskById = new Map<string, { id: string; title: string; project_id: string | null }>();
+    if (taskIds.length) {
+      const { data: taskRows, error: taskError } = await supabase
+        .from("tasks")
+        .select("id, title, project_id")
+        .in("id", taskIds);
+      if (taskError) throw new Error(taskError.message);
+      (taskRows ?? []).forEach((t: any) => taskById.set(t.id, { id: t.id, title: t.title, project_id: t.project_id ?? null }));
+    }
+
+    // Effective project id per row: task's project wins if a task was picked.
+    const effective = data.allocations.map((row, idx) => {
+      let projectId = row.projectId || "";
+      let task = row.taskId ? taskById.get(row.taskId) : null;
+      if (task) {
+        if (!task.project_id) throw new Error(`Row ${idx + 1}: this task has no project — set one on the task first.`);
+        projectId = task.project_id;
+      }
+      if (!projectId) throw new Error(`Row ${idx + 1}: pick a task or project.`);
+      return { ...row, projectId, task };
+    });
+
+    const projectIds = Array.from(new Set(effective.map((r) => r.projectId)));
     const { data: projects, error: projectsError } = await supabase
       .from("projects")
       .select("id, code, name")
@@ -173,13 +199,15 @@ export const punchOut = createServerFn({ method: "POST" })
     if (projectsError) throw new Error(projectsError.message);
 
     const projectById = new Map((projects ?? []).map((project: any) => [project.id as string, project]));
-    const allocations = data.allocations.map((row) => {
+    const allocations = effective.map((row) => {
       const project = projectById.get(row.projectId);
       if (!project) throw new Error("One of the selected projects is no longer available.");
       return {
         project_id: row.projectId,
         project_code: project.code ?? null,
         project_name: project.name ?? null,
+        task_id: row.taskId ?? null,
+        task_title: row.task?.title ?? null,
         hours: row.hours,
         comments: row.comments,
       };
@@ -195,6 +223,7 @@ export const punchOut = createServerFn({ method: "POST" })
         project_id: first.project_id,
         project_code: first.project_code,
         project_name: first.project_name,
+        primary_task_id: first.task_id,
         comments: allocations.length === 1
           ? first.comments
           : allocations.map((row) => `[${row.project_code ?? ""}] ${row.hours}h — ${row.comments}`).join("\n"),

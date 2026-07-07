@@ -856,6 +856,7 @@ export type Database = {
           created_at: string
           hours: number | null
           id: string
+          primary_task_id: string | null
           project_code: string | null
           project_id: string | null
           project_name: string | null
@@ -871,6 +872,7 @@ export type Database = {
           created_at?: string
           hours?: number | null
           id?: string
+          primary_task_id?: string | null
           project_code?: string | null
           project_id?: string | null
           project_name?: string | null
@@ -886,6 +888,7 @@ export type Database = {
           created_at?: string
           hours?: number | null
           id?: string
+          primary_task_id?: string | null
           project_code?: string | null
           project_id?: string | null
           project_name?: string | null
@@ -896,6 +899,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "punch_sessions_primary_task_id_fkey"
+            columns: ["primary_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "punch_sessions_project_id_fkey"
             columns: ["project_id"]

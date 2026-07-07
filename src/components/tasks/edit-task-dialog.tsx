@@ -134,8 +134,13 @@ export function EditTaskDialog({
             <div className="space-y-1"><Label>Deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
             <div className="space-y-1"><Label>Scheduled post date</Label><Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} /></div>
           </div>
-          <div className="space-y-1"><Label>Client / Brand</Label>
-            <Input value={client} onChange={(e) => setClient(e.target.value)} placeholder="Optional" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Client / Brand</Label>
+              <Input value={client} onChange={(e) => setClient(e.target.value)} placeholder="Optional" />
+            </div>
+            <div className="space-y-1"><Label>Estimated hours</Label>
+              <Input type="number" min={0} step={0.25} value={estimate} onChange={(e) => setEstimate(e.target.value)} placeholder="Optional" />
+            </div>
           </div>
           <div className="space-y-1">
             <Label>Asset links</Label>

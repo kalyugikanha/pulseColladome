@@ -67,11 +67,15 @@ function TasksPage() {
   const [tPri, setTPri] = useState<"low" | "medium" | "high">("medium");
   const [tAssignee, setTAssignee] = useState<string>("");
   const [tReviewer, setTReviewer] = useState<string>("");
+  const [tEstimate, setTEstimate] = useState<string>("");
   const [tax_, setTax] = useState<TaxonomyValue>({ domainId: null, departmentId: null, taskTypeIds: [] });
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [multiStage, setMultiStage] = useState(false);
   const [stages, setStages] = useState<StageInput[]>([]);
+  const [statusFilter, setStatusFilter] = useState<Set<"todo" | "in_progress" | "review" | "done">>(
+    () => new Set(["todo", "in_progress", "review"]),
+  );
 
   useEffect(() => {
     if (!open) return;

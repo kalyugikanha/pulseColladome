@@ -316,6 +316,9 @@ function TasksPage() {
                 const linkArr = (t.asset_links as { label: string; url: string }[] | null) ?? [];
                 const pct = (t as { completion_percent?: number }).completion_percent ?? 0;
                 const stage = (t as { current_stage?: { name: string; kind: string; status: string; owner: { full_name: string | null } | null } | null }).current_stage;
+                const est = (t as { estimated_hours?: number | null }).estimated_hours;
+                const h = hoursMap?.get(t.id) ?? { logged: 0, approved: 0 };
+                const overEst = est != null && h.logged > Number(est);
                 return (
                   <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3 hover:border-primary/40 cursor-pointer"
                     onClick={() => setOpenTaskId(t.id)}>
@@ -334,6 +337,10 @@ function TasksPage() {
                       {t.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</div>}
                       <div className="flex flex-wrap gap-2 mt-1 items-center">
                         {t.due_date && <span className="text-xs text-muted-foreground">Due {format(new Date(t.due_date), "MMM d, yyyy")}</span>}
+                        <span className={`text-xs ${overEst ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                          {h.logged.toFixed(1)}h logged · {h.approved.toFixed(1)}h approved
+                          {est != null && ` · est ${Number(est).toFixed(1)}h`}
+                        </span>
                         {linkArr.map((l, i) => (
                           <a key={i} href={l.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
                             className="text-xs inline-flex items-center gap-1 text-primary hover:underline">

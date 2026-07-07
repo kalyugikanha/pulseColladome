@@ -134,7 +134,7 @@ function TimesheetPage() {
     },
   });
 
-  async function decidePending(id: string, decide: "approved" | "rejected", reason?: string) {
+  async function decidePending(id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) {
     try {
       const { data: userRes } = await supabase.auth.getUser();
       const myId = userRes.user?.id ?? null;
@@ -142,6 +142,7 @@ function TimesheetPage() {
         approval_status: decide,
         approved_by: myId,
         approved_at: new Date().toISOString(),
+        approved_hours: decide === "approved" ? (approvedHours ?? null) : null,
       };
       if (decide === "rejected") patch.rejected_reason = reason ?? null;
       const { error } = await supabase.from("task_activity" as never).update(patch as never).eq("id", id);
@@ -149,10 +150,13 @@ function TimesheetPage() {
       toast.success(decide === "approved" ? "Approved" : "Rejected");
       await refetchPending();
       qc.invalidateQueries({ queryKey: ["my-ts-activity"] });
+      qc.invalidateQueries({ queryKey: ["my-performance"] });
+      qc.invalidateQueries({ queryKey: ["pb-activity"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     }
   }
+
   const projectByCode = useMemo(() => new Map((projectsAll ?? []).map((p) => [p.code, p])), [projectsAll]);
 
   const profileById = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p])), [profiles]);
@@ -457,7 +461,8 @@ function TimesheetPage() {
                     <TableHead>Employee</TableHead>
                     <TableHead>Task / Project</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Hours</TableHead>
+                    <TableHead className="text-right">Logged</TableHead>
+                    <TableHead className="text-right w-[110px]">Approve</TableHead>
                     <TableHead>Note</TableHead>
                     <TableHead className="w-[180px] text-right">Action</TableHead>
                   </TableRow>
@@ -466,38 +471,25 @@ function TimesheetPage() {
                   {pendingHours.map((r) => {
                     const date = r.completion_date ?? r.created_at.slice(0, 10);
                     const proj = r.task?.project;
+                    const logged = Number(r.hours ?? 0);
                     return (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-sm">{r.actor?.full_name ?? r.actor?.email ?? "—"}</TableCell>
-                        <TableCell className="text-sm">
-                          <div>{r.task?.title ?? "Task"}</div>
-                          {proj?.code && (
-                            <div className="text-[10px] text-muted-foreground font-mono">{proj.code} · {proj.name}</div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs">{format(new Date(date + "T00:00:00"), "d MMM")}</TableCell>
-                        <TableCell className="text-right font-mono">{Number(r.hours ?? 0).toFixed(2)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">{r.note ?? ""}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center gap-1 justify-end">
-                            <Button size="sm" variant="outline" className="h-7"
-                              onClick={() => decidePending(r.id, "approved")}>
-                              <Check className="h-3.5 w-3.5 mr-1" /> Approve
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-destructive"
-                              onClick={() => {
-                                const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
-                                decidePending(r.id, "rejected", reason || undefined);
-                              }}>
-                              <X className="h-3.5 w-3.5 mr-1" /> Reject
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      <PendingRow
+                        key={r.id}
+                        id={r.id}
+                        name={r.actor?.full_name ?? r.actor?.email ?? "—"}
+                        title={r.task?.title ?? "Task"}
+                        projCode={proj?.code ?? null}
+                        projName={proj?.name ?? null}
+                        date={date}
+                        logged={logged}
+                        note={r.note}
+                        onDecide={decidePending}
+                      />
                     );
                   })}
                 </TableBody>
               </Table>
+
             )}
           </CardContent>
         </Card>
@@ -693,3 +685,55 @@ function InlineText({ value, disabled, onCommit, placeholder }: { value: string;
     />
   );
 }
+
+function PendingRow({
+  id, name, title, projCode, projName, date, logged, note, onDecide,
+}: {
+  id: string; name: string; title: string;
+  projCode: string | null; projName: string | null;
+  date: string; logged: number; note: string | null;
+  onDecide: (id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) => void;
+}) {
+  const [approve, setApprove] = useState<string>(String(logged));
+  const approveNum = Number(approve);
+  const valid = !Number.isNaN(approveNum) && approveNum >= 0 && approveNum <= logged;
+  const reduced = valid && approveNum < logged;
+  return (
+    <TableRow>
+      <TableCell className="text-sm">{name}</TableCell>
+      <TableCell className="text-sm">
+        <div>{title}</div>
+        {projCode && <div className="text-[10px] text-muted-foreground font-mono">{projCode} · {projName}</div>}
+      </TableCell>
+      <TableCell className="text-xs">{format(new Date(date + "T00:00:00"), "d MMM")}</TableCell>
+      <TableCell className="text-right font-mono">{logged.toFixed(2)}</TableCell>
+      <TableCell className="text-right">
+        <Input
+          type="number" min={0} max={logged} step={0.25}
+          value={approve}
+          onChange={(e) => setApprove(e.target.value)}
+          className={`h-8 text-right font-mono ${!valid ? "border-destructive/60" : reduced ? "border-amber-500/60" : ""}`}
+        />
+        {reduced && <div className="text-[10px] text-amber-700 mt-0.5">Approving {approveNum} of {logged}</div>}
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">{note ?? ""}</TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center gap-1 justify-end">
+          <Button size="sm" variant="outline" className="h-7"
+            disabled={!valid}
+            onClick={() => onDecide(id, "approved", undefined, approveNum)}>
+            <Check className="h-3.5 w-3.5 mr-1" /> Approve
+          </Button>
+          <Button size="sm" variant="ghost" className="h-7 text-destructive"
+            onClick={() => {
+              const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
+              onDecide(id, "rejected", reason || undefined);
+            }}>
+            <X className="h-3.5 w-3.5 mr-1" /> Reject
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+

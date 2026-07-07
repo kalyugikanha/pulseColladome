@@ -55,7 +55,9 @@ function WorkflowsAdmin() {
             is_active: t.is_active,
             stages: t.stages.map((s) => ({
               position: s.position, name: s.name, requires_review: s.requires_review,
-              default_assignee_id: s.default_assignee_id, default_due_offset_days: s.default_due_offset_days,
+              default_assignee_id: s.default_assignee_id,
+              default_reviewer_id: (s as { default_reviewer_id?: string | null }).default_reviewer_id ?? null,
+              default_due_offset_days: s.default_due_offset_days,
               required_fields: s.required_fields as WorkflowRequiredField[],
               branch_options: s.branch_options as WorkflowBranchOption[],
               branch_target_map: s.branch_target_map as Record<string, number>,

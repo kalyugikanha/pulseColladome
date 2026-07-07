@@ -1,19 +1,50 @@
-# Fix: Team timesheet crash inside Attendance hub
+## Consolidate departments to 4 + assign people
 
-## Root cause
+### Departments (taxonomy_departments)
 
-`src/routes/_authenticated/timesheet.tsx` calls `useSearch()` bound to the `/_authenticated/timesheet` route. When `TimesheetPage` is rendered as a tab inside `/attendance`, that route is not the active match, so TanStack throws:
+Reduce to exactly 4:
+- Business Development
+- Tech Development
+- Marketing
+- Admin
 
-> Invariant failed: Could not find an active match from "/_authenticated/timesheet"
+Any other existing department rows get soft-removed (`is_active = false`) so historical task references stay intact. Their `name` is preserved.
 
-Same latent risk exists in every other panel we now render outside its own route (`PunchPage`, `MyTimesheetPage`, `LeavePage`, `CalendarPage`, `DirectoryPage`, `TaxonomyPage`) if any of them read `Route.useSearch` / `Route.useParams` / `Route.useLoaderData`. `timesheet.tsx` is the confirmed offender; I'll audit the others while fixing.
+### Profile department assignments
 
-## Fix
+Update `profiles.department` (free-text field used across the app) to the new canonical strings:
 
-1. In `timesheet.tsx`, replace the route-bound `useSearch()` call at line ~48 with a route-agnostic read:
-   - `useSearch({ strict: false })` (returns partial/unknown, safe under any parent route), or
-   - `useRouterState({ select: (s) => s.location.search })` and cast.
-2. Grep the other extracted panels for `Route.use*` / `useSearch({ from: … })` / `useParams({ from: … })` / `useLoaderData({ from: … })`. Apply the same `strict: false` swap wherever they exist.
-3. Reload `/attendance?tab=team-timesheet` — panel renders without the invariant error.
+- **Business Development**: Jagjeet Singh Jassal, Sarita Kumari, Riyanshi Sharma (= Rishita), Chirag Bansal, Juhi Nagar, Neetu Rauniyar
+- **Tech Development**: Arpit Kast, Akash Jangid
+- **Marketing**: Kanishka Khunteta, Sweksha Jadon (= Shweksha), Sandeep Kumar Mandal, Deepak Patel, Anjali, Trisha Panday, Manvi Bansal, Addala Hemanth Sridhar (= Sridhar), Sandhya
+- **Admin**: Shraddha Saxena
+- **No department** (super admins): Arti Kumawat, Shubham Saxena
 
-No schema or permission changes; no other files touched.
+Anyone not listed above (none currently) — no change.
+
+### Roles
+
+Already correct:
+- Arti & Shubham are in `super_admins` with `admin` role.
+- Shraddha has `hr_admin` role.
+
+No role changes needed.
+
+### Employee Directory UI
+
+Update the directory (`src/routes/_authenticated/directory.tsx` or the directory tab under `/team`) so each person's card/row shows their role badge alongside department:
+- Super Admin (from `super_admins` table)
+- Admin / HR Admin / Manager / Employee (from `user_roles`)
+
+Roles rendered as small colored badges next to name; department shown as-is.
+
+### Technical section
+
+1. **Migration** (`supabase--migration`):
+   - `UPDATE taxonomy_departments SET is_active = false WHERE name NOT IN ('Business Development','Tech Development','Marketing','Admin');`
+   - `INSERT ... ON CONFLICT` to ensure the 4 canonical rows exist and are active.
+   - Bulk `UPDATE profiles SET department = ... WHERE id IN (...)` for each of the 4 groups, plus `SET department = NULL` for the two super admins.
+
+2. **Directory component**: fetch `user_roles` + `super_admins` for the listed profiles (single query joining), render role badges. No schema changes for this — data already exists.
+
+No changes to tasks, RLS, or auth. Server functions untouched.

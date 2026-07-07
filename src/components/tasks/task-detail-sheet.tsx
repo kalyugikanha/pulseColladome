@@ -50,6 +50,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const watchFn = useServerFn(toggleWatcher);
   const addDepFn = useServerFn(addDependency);
   const rmDepFn = useServerFn(removeDependency);
+  const duplicateFn = useServerFn(duplicateTask);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["task-detail", taskId], enabled: !!taskId,

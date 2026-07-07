@@ -556,8 +556,7 @@ function AutoSaveStatusPill({
 }) {
   if (status === "idle") return null;
   const title = lastSavedAt ? `Last saved ${formatDistanceToNow(lastSavedAt, { addSuffix: true })}` : undefined;
-  const config: Record<typeof status, { icon: React.ReactNode; label: string; className: string }> = {
-    idle:     { icon: null, label: "", className: "" },
+  const config: Record<"unsaved" | "saving" | "saved" | "error", { icon: React.ReactNode; label: string; className: string }> = {
     unsaved:  { icon: <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />, label: "Unsaved changes", className: "text-amber-600 border-amber-400/40 bg-amber-500/10" },
     saving:   { icon: <Loader2 className="h-3 w-3 animate-spin" />, label: "Saving…", className: "text-muted-foreground border-border/60 bg-muted/40" },
     saved:    { icon: <CheckCircle2 className="h-3 w-3 text-green-500" />, label: "Saved", className: "text-muted-foreground border-border/60 bg-muted/40" },

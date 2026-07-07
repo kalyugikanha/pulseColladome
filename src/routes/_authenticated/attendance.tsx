@@ -334,10 +334,12 @@ function AttendancePage() {
                     )}
                     {sortedPeople.map((p) => {
                       const a = data?.todayAtt.find((x) => x.user_id === p.id);
+                      const open = data?.todayOpenSessions.find((x) => x.user_id === p.id);
+                      const punchInTime = open?.punch_in_time ?? a?.punch_in_time ?? null;
                       const leave = onLeaveById.get(p.id);
                       const status = leave
                         ? "leave"
-                        : a?.punch_in_time && !a.punch_out_time ? "in" : a?.punch_out_time ? "out" : "absent";
+                        : open || (a?.punch_in_time && !a.punch_out_time) ? "in" : a?.punch_out_time ? "out" : "absent";
                       return (
                         <div key={p.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
                           <div className="flex items-center gap-3">
@@ -353,7 +355,7 @@ function AttendancePage() {
                                   ? `On approved leave · ${format(new Date(leave.start_date), "d MMM")} – ${format(new Date(leave.end_date), "d MMM")}`
                                   : (
                                     <>
-                                      {a?.punch_in_time ? `In at ${format(new Date(a.punch_in_time), "HH:mm")}` : "Not punched in"}
+                                      {punchInTime ? `In at ${format(new Date(punchInTime), "HH:mm")}` : "Not punched in"}
                                       {a?.punch_out_time ? ` · Out ${format(new Date(a.punch_out_time), "HH:mm")}` : ""}
                                     </>
                                   )}

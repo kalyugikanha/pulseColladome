@@ -116,7 +116,21 @@ function DirectoryPage() {
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (profiles ?? []).filter((p) => {
+    // Defensive de-dup by id, then by lower(email). If two entries collide,
+    // prefer the active, non-placeholder one.
+    const score = (p: Profile) =>
+      (p.is_active === false ? 0 : 2) +
+      ((p as unknown as { is_placeholder?: boolean }).is_placeholder ? 0 : 1);
+    const byKey = new Map<string, Profile>();
+    for (const p of profiles ?? []) {
+      const keys = [p.id, (p.email ?? "").toLowerCase()].filter(Boolean) as string[];
+      const existing = keys.map((k) => byKey.get(k)).find(Boolean);
+      if (!existing || score(p) > score(existing)) {
+        for (const k of keys) byKey.set(k, p);
+      }
+    }
+    const unique = Array.from(new Set(Array.from(byKey.values())));
+    return unique.filter((p) => {
       if (activeFilter === "active" && p.is_active === false) return false;
       if (activeFilter === "inactive" && p.is_active !== false) return false;
       if (deptFilter !== "all" && (p.department ?? "") !== deptFilter) return false;

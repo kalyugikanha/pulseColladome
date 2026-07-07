@@ -15,6 +15,7 @@ export type WorkflowStageInput = {
   name: string;
   requires_review: boolean;
   default_assignee_id: string | null;
+  default_reviewer_id: string | null;
   default_due_offset_days: number | null;
   required_fields: WorkflowRequiredField[];
   branch_options: WorkflowBranchOption[];

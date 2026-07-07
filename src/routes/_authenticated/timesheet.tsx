@@ -169,31 +169,6 @@ export function TimesheetPage() {
     },
   });
 
-  const { data: approvedHoursList, refetch: refetchApproved } = useQuery({
-    queryKey: ["ts-approved-task-hours", dateIso, me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
-    enabled: pendingEnabled,
-    queryFn: async () => {
-      let q = supabase
-        .from("task_activity" as never)
-        .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approved_at, approved_by, kind, task:tasks(id, title, project:projects(id, code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email), approver:profiles!task_activity_approved_by_fkey(id, full_name, email)")
-        .in("approval_status", ["approved", "auto"])
-        .not("hours", "is", null)
-        .gte("completion_date", dateIso).lt("completion_date", nextDayIso)
-        .order("approved_at", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false });
-      if (pendingActorIds && pendingActorIds.length > 0) q = q.in("actor_id", pendingActorIds);
-      const { data, error } = await q;
-      if (error) throw error;
-      return ((data ?? []) as unknown as Array<{
-        id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
-        note: string | null; completion_date: string | null; created_at: string;
-        approved_at: string | null; approved_by: string | null; kind: string;
-        task: { id: string; title: string | null; project: { code: string | null; name: string | null } | null } | null;
-        actor: { id: string; full_name: string | null; email: string | null } | null;
-        approver: { id: string; full_name: string | null; email: string | null } | null;
-      }>);
-    },
-  });
 
   async function decidePending(id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) {
     try {

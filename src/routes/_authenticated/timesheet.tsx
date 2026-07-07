@@ -197,15 +197,31 @@ export function TimesheetPage() {
   const profileById = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p])), [profiles]);
   const logByUser = useMemo(() => new Map((logs ?? []).map((r) => [r.user_id, r])), [logs]);
 
-  // Projects that actually appear in the day (for filter list).
+  // Group activity rows by actor for merging into empRows.
+  const activityByUser = useMemo(() => {
+    const m = new Map<string, ActivityRow[]>();
+    for (const a of activityRows ?? []) {
+      if (!a.actor_id) continue;
+      const arr = m.get(a.actor_id) ?? [];
+      arr.push(a);
+      m.set(a.actor_id, arr);
+    }
+    return m;
+  }, [activityRows]);
+
+  // Projects that actually appear in the day (for filter list) — from both sources.
   const projectsInDay = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of logs ?? []) for (const t of r.tasks ?? []) {
       const code = t.project_code?.trim();
       if (code && !m.has(code)) m.set(code, t.project_name || code);
     }
+    for (const a of activityRows ?? []) {
+      const code = a.task?.project?.code?.trim();
+      if (code && !m.has(code)) m.set(code, a.task?.project?.name || code);
+    }
     return Array.from(m.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
-  }, [logs]);
+  }, [logs, activityRows]);
 
   const allDepts = useMemo(() => {
     const s = new Set<string>();
@@ -213,7 +229,7 @@ export function TimesheetPage() {
     return Array.from(s).sort();
   }, [profiles]);
 
-  // Build rows: employees (filtered) with their tasks for the day.
+  // Build rows: employees (filtered) with their tasks for the day (log + activity).
   type EmpRow = { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number; approvedTotal: number };
   const empRows = useMemo<EmpRow[]>(() => {
     const src = (profiles ?? []).filter((p) => {
@@ -226,20 +242,42 @@ export function TimesheetPage() {
     });
     const out: EmpRow[] = src.map((p) => {
       const log = logByUser.get(p.id) ?? null;
-      let tasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t }));
+      const logTasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t, source: "log" as const }));
+      const acts = activityByUser.get(p.id) ?? [];
+      const actTasks: Task[] = acts.map((a) => {
+        const proj = a.task?.project;
+        const code = proj?.code?.trim() || "—";
+        const name = proj?.name || a.task?.title || "Task";
+        const hrs = Number(a.hours) || 0;
+        const approved = a.approval_status === "approved" || a.approval_status === "auto";
+        return {
+          project_code: code,
+          project_name: name,
+          hours: hrs,
+          approved_hours: approved ? Number(a.approved_hours ?? hrs) : undefined,
+          comments: a.note ?? a.task?.title ?? undefined,
+          source: "activity" as const,
+        };
+      });
+      let tasks: Task[] = [...logTasks, ...actTasks];
       if (projSel.size > 0) tasks = tasks.filter((t) => t.project_code && projSel.has(t.project_code));
       const total = tasks.reduce((s, t) => s + (Number(t.hours) || 0), 0);
-      const approvedTotal = !!log?.approved_at
-        ? tasks.reduce((s, t) => s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0)), 0)
-        : 0;
-      return { profile: p, log, tasks, approved: !!log?.approved_at, total, approvedTotal };
+      const dayApproved = !!log?.approved_at;
+      const approvedTotal = tasks.reduce((s, t) => {
+        if (t.source === "activity") return s + (t.approved_hours != null ? Number(t.approved_hours) : 0);
+        // log-sourced task: day-approval stamps everything
+        if (!dayApproved) return s;
+        return s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0));
+      }, 0);
+      return { profile: p, log, tasks, approved: dayApproved, total, approvedTotal };
     });
     return out
       .filter((r) => showEmpty || r.tasks.length > 0)
       .sort((a, b) =>
         (a.profile.full_name ?? a.profile.email ?? "").localeCompare(b.profile.full_name ?? b.profile.email ?? "")
       );
-  }, [profiles, logByUser, deptSel, empSel, projSel, showEmpty]);
+  }, [profiles, logByUser, activityByUser, deptSel, empSel, projSel, showEmpty]);
+
 
   const dayTotal = useMemo(() => empRows.reduce((s, r) => s + r.total, 0), [empRows]);
   const dayApprovedTotal = useMemo(() => empRows.reduce((s, r) => s + r.approvedTotal, 0), [empRows]);

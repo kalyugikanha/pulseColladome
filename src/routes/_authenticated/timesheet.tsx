@@ -49,7 +49,7 @@ function addDays(d: Date, n: number) {
 export function TimesheetPage() {
   const { data: me, isLoading: meLoading } = useCurrentUser();
   const navigate = useNavigate({ from: "/timesheet" });
-  const search = useSearch({ from: "/_authenticated/timesheet" });
+  const search = useSearch({ strict: false }) as { userId?: string; date?: string };
   const qc = useQueryClient();
 
   const day = useMemo(() => (search.date ? parseYmd(search.date) : new Date()), [search.date]);

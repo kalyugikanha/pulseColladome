@@ -482,7 +482,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                   };
                   for (const a of (detail?.activity ?? [])) {
                     const aa = a as { id: string; kind: string; actor: { full_name?: string } | null; from_value: string | null; to_value: string | null; note: string | null; created_at: string; hours: number | string | null };
-                    let text: React.ReactNode;
+                    let text: ReactNode;
                     if (aa.kind === "assignee_changed") {
                       text = aa.from_value
                         ? <span><span className="text-muted-foreground">reassigned from </span><span className="font-medium">{nameFor(aa.from_value)}</span><span className="text-muted-foreground"> to </span><span className="font-medium">{nameFor(aa.to_value)}</span></span>

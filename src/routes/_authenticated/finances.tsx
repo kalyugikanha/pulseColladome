@@ -98,7 +98,7 @@ function FinancesPage() {
         .gte("created_at", startIso)
         .lt("created_at", endIso);
       if (error) throw error;
-      return (data ?? []) as Array<{ actor_id: string; hours: number | string | null; task: { id: string; title: string; project: { id: string; code: string; name: string } | null } | null }>;
+      return (data ?? []) as unknown as Array<{ actor_id: string; hours: number | string | null; task: { id: string; title: string; project: { id: string; code: string; name: string } | null } | null }>;
     },
   });
 

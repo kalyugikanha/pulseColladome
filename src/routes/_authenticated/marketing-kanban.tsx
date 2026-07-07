@@ -395,7 +395,7 @@ function DraggableCard({ task, children, onOpen }: { task: KanbanTask; children:
   );
 }
 
-function KanbanCardView({ task, dragging }: { task: KanbanTask; dragging?: boolean }) {
+function KanbanCardView({ task, dragging, burnHours }: { task: KanbanTask; dragging?: boolean; burnHours?: number }) {
   const internalOverdue = task.due_date && task.marketing_stage !== "posted" && isPast(parseISO(task.due_date));
   return (
     <div className={dragging ? "rounded-md border border-primary bg-card p-2 shadow-lg" : ""}>
@@ -410,6 +410,11 @@ function KanbanCardView({ task, dragging }: { task: KanbanTask; dragging?: boole
       </div>
       <div className="flex flex-wrap items-center gap-1 mt-2">
         <Badge variant="outline" className="capitalize text-[10px] h-5">{task.priority}</Badge>
+        {burnHours != null && burnHours > 0 && (
+          <Badge variant="outline" className="text-[10px] h-5 gap-1">
+            <Clock className="h-2.5 w-2.5" />{burnHours}h
+          </Badge>
+        )}
         {task.client_brand && <Badge variant="secondary" className="text-[10px] h-5">{task.client_brand}</Badge>}
         {task.origin_department && (
           <Badge className="text-[10px] h-5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30" variant="outline">

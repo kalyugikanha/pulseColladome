@@ -22,6 +22,7 @@ import {
   type DragEndEvent, type DragStartEvent, DragOverlay,
 } from "@dnd-kit/core";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
+import { MarkDoneDialog } from "@/components/tasks/mark-done-dialog";
 
 const searchSchema = z.object({ assignee: z.string().optional() });
 

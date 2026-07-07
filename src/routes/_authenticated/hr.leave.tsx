@@ -121,7 +121,7 @@ export function HrLeavePage() {
         </TabsList>
 
         <TabsContent value="day" className="mt-4">
-          <DayView empMap={empMap} />
+          <DayView empMap={empMap} onChanged={() => qc.invalidateQueries()} />
         </TabsContent>
 
         <TabsContent value="timeline" className="mt-4">

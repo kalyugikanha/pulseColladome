@@ -169,6 +169,15 @@ export const startWorkflow = createServerFn({ method: "POST" })
     return { taskId, instanceId };
   });
 
+/** Resolve the acting user id (super admin can act as an impersonated user). */
+async function resolveActingUser(
+  supabase: any, userId: string, viewAsUserId?: string | null,
+): Promise<string> {
+  if (!viewAsUserId || viewAsUserId === userId) return userId;
+  const { data: sa } = await supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle();
+  return sa ? viewAsUserId : userId;
+}
+
 /** Assignee closes a task. If a branching stage, they pick branch + next assignee. */
 export const closeTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -178,9 +187,11 @@ export const closeTask = createServerFn({ method: "POST" })
     branchKey?: string | null;
     nextAssigneeId?: string | null;
     requiredFieldValues?: Record<string, unknown>;
+    viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
     const { data: taskRow, error: tErr } = await supabase
       .from("tasks")
       .select("*")
@@ -192,7 +203,8 @@ export const closeTask = createServerFn({ method: "POST" })
       workflow_instance_id: string | null; stage_index: number | null;
       stage_snapshot: WorkflowStageInput | null; project_id: string;
     };
-    if (task.assignee_id !== userId) throw new Error("Only the assignee can close this task.");
+    if (task.assignee_id !== actingUserId) throw new Error("Only the assignee can close this task.");
+
     const stage = task.stage_snapshot;
 
     // Validate required fields

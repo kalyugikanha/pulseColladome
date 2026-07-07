@@ -38,10 +38,18 @@ const employeeItems: EmployeeItem[] = [
   { title: "Business Development", url: "/bd", icon: Briefcase },
 ];
 
-function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; userId: string; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();
+
+  const { data: myDept } = useQuery({
+    queryKey: ["my-dept", userId], staleTime: 5 * 60_000,
+    queryFn: async () => (await supabase.from("profiles").select("department").eq("id", userId).maybeSingle()).data?.department ?? null,
+  });
+  const isMarketing = (myDept ?? "").toLowerCase() === "marketing"
+    || headOfDepartments.some((d) => d.toLowerCase() === "marketing")
+    || isAdmin || isSuperAdmin;
 
   async function signOut() {
     await qc.cancelQueries();

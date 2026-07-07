@@ -263,9 +263,11 @@ export const reviewTask = createServerFn({ method: "POST" })
     body?: string | null;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
+    viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
     const { data: taskRow, error: tErr } = await supabase.from("tasks").select("*").eq("id", data.taskId).single();
     if (tErr) throw tErr;
     const task = taskRow as unknown as {
@@ -274,7 +276,7 @@ export const reviewTask = createServerFn({ method: "POST" })
     };
 
     await supabase.from("task_review_comments" as never).insert({
-      task_id: task.id, author_id: userId,
+      task_id: task.id, author_id: actingUserId,
       body: data.body ?? null, kind: data.action,
     } as never);
 
@@ -282,7 +284,7 @@ export const reviewTask = createServerFn({ method: "POST" })
 
     if (data.action === "request_changes") {
       await supabase.from("tasks").update({ status: "in_progress" } as never).eq("id", task.id);
-      if (task.assignee_id && task.assignee_id !== userId) {
+      if (task.assignee_id && task.assignee_id !== actingUserId) {
         await supabase.from("notifications").insert({
           user_id: task.assignee_id, kind: "changes_requested", task_id: task.id,
           body: `Changes requested on "${task.title}"${data.body ? `: ${data.body}` : ""}`,
@@ -293,9 +295,10 @@ export const reviewTask = createServerFn({ method: "POST" })
 
     // approve
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
-    await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, userId);
+    await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
     return { ok: true };
   });
+
 
 /** Log time from a task (self, on own task). */
 export const logTaskTime = createServerFn({ method: "POST" })

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { impersonationMiddleware } from "./impersonation.middleware";
 
 type TaskStatus = "todo" | "in_progress" | "review" | "done";
 
@@ -29,14 +30,6 @@ async function notify(
   });
 }
 
-/** Resolve the acting user id (super admin can act as an impersonated user). */
-async function resolveActingUser(
-  supabase: any, userId: string, viewAsUserId?: string | null,
-): Promise<string> {
-  if (!viewAsUserId || viewAsUserId === userId) return userId;
-  const { data: sa } = await supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle();
-  return sa ? viewAsUserId : userId;
-}
 
 /* ============ Task detail read ============ */
 export const getTaskDetail = createServerFn({ method: "POST" })

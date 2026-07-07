@@ -1,23 +1,28 @@
-## Goal
-Approved task hours should appear inside the existing **day-breakdown card** on Team Timesheet using the same visibility rules as the Pending panel. Remove the separate "Approved task hours" panel added previously — it's redundant.
+Plan:
 
-## Why the just-approved row isn't visible today
-- Kanishka's approved rows have `completion_date = 2026-07-07`, but the selected day is **8 July 2026**. Selecting 7 July shows them in the day-breakdown table (activity rows are already merged).
-- Additionally, a non-admin manager viewing team-timesheet without any dept/user scope selected wouldn't see direct-report activity, because the `ts-profiles` + `ts-activity` queries only scope by dept/user filters — unlike the Pending panel which falls back to `directReportIds`.
+1. Fix Kanishka’s approved task hours in Team Timesheet
+- Treat approved task activity as a first-class day entry, not a separate/test panel.
+- Store/display task activity by the user’s selected/local work date so a task closed late evening does not land on the previous UTC date.
+- In the day panel, show the approved amount for approved task activity. Example: if Kanishka logged 2 hours and 1 hour was approved, the row should show 1.0 approved hour for that project/task, not 0 and not the full 2 unless all 2 were approved.
+- Make status per task-derived row reflect the task-hour approval status, instead of relying only on whether an attendance log day was approved.
+- Keep the same visibility rules as the pending approvals panel: admins/project managers see scoped/all rows; reporting managers see direct reports.
+- After approval/rejection, invalidate/refetch the team timesheet day rows so the below panel updates immediately.
 
-## Changes (frontend only, `src/routes/_authenticated/timesheet.tsx`)
+2. Update existing task-hour records date handling
+- Ensure new task-completion time logs use the intended work date consistently.
+- For already-created rows affected by the UTC/local mismatch, include a safe fallback in the Team Timesheet query so recently approved activity appears on the expected local day.
 
-1. **Remove the "Approved task hours" panel** (approx. lines ~540–620) and its `ts-approved-task-hours` query + `refetchApproved` call.
+3. Finance module: include Salaries and Project Burn clearly
+- Keep Salaries inside the Finance module.
+- Keep/add Project Burn inside Finance as an integrated section so finance admins can see salaries, salary pool, allocated burn, unallocated salary, and burn by project in one place.
+- Ensure the Finance sidebar entry is the primary place for these finance views; avoid making users hunt for Project Burn under Projects.
 
-2. **Align day-breakdown scope with Pending panel permissions:**
-   - Compute `mergedVisibleIds` = union of `visibleUserIds` (dept/user scope) and `pendingActorIds` (direct reports for managers, all for admins).
-   - `ts-profiles`: when no scope selected but user is a manager, fetch profiles for their direct reports so those employees render as rows.
-   - `ts-activity`: filter by `mergedVisibleIds` when set, so approved/pending activity for direct reports loads even without an explicit dept/user filter.
-   - Leave existing `logs` query as-is (attendance logs remain scoped to profiles list — same behavior).
+4. Workflow module: add Project ID / project picker
+- Add project selection where workflows are started, showing project code/ID plus project name.
+- Ensure workflow-created tasks and subsequent stages keep the selected project ID through the workflow chain.
+- If needed, also show the linked project code/ID in the workflow/task UI so it is clear which project the workflow belongs to.
 
-3. **Invalidations in `decidePending`:** drop the `ts-approved-task-hours` invalidation; keep `ts-activity`, `ts-logs`, and the personal keys so the day-breakdown card refreshes when Approve is clicked.
-
-## Result
-- Approving a task's hours immediately shows a new row in the day-breakdown card for that employee under the corresponding `completion_date`, with Project, Approved hrs, Notes, and Approved status — matching the existing "activity" row rendering.
-- Managers see direct-report approvals without needing to select a dept/user filter.
-- No separate approved-hours panel; single source of truth.
+Technical notes:
+- The main timesheet files to adjust are `src/routes/_authenticated/timesheet.tsx` and the task workflow time logging path in `src/lib/workflows.functions.ts` / `src/components/tasks/workflow-task-panel.tsx` if a work-date input is needed.
+- Finance changes are in `src/routes/_authenticated/finances.tsx`, with possible navigation cleanup in `src/routes/_authenticated/route.tsx`.
+- Workflow project picker changes are in `src/routes/_authenticated/tasks.tsx`; workflow persistence already accepts `projectId`, so this is mostly improving the UI and display.

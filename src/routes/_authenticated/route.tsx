@@ -45,9 +45,14 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
     queryKey: ["my-dept", userId], staleTime: 5 * 60_000,
     queryFn: async () => (await supabase.from("profiles").select("department").eq("id", userId).maybeSingle()).data?.department ?? null,
   });
-  const isMarketing = (myDept ?? "").toLowerCase() === "marketing"
+  const deptLower = (myDept ?? "").toLowerCase();
+  const isMarketing = deptLower === "marketing"
     || headOfDepartments.some((d) => d.toLowerCase() === "marketing")
     || isAdmin || isSuperAdmin;
+  const isBd = deptLower === "business development"
+    || headOfDepartments.some((d) => d.toLowerCase() === "business development")
+    || isAdmin || isSuperAdmin
+    || isReportingManager;
 
   async function signOut() {
     await qc.cancelQueries();

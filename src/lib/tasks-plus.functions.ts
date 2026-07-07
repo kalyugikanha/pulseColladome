@@ -199,6 +199,7 @@ export const updateTaskFull = createServerFn({ method: "POST" })
       asset_links: AssetLink[];
       domain_id: string | null;
       department_id: string | null;
+      estimated_hours: number | null;
     }> = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.description !== undefined) patch.description = data.description || null;
@@ -209,6 +210,7 @@ export const updateTaskFull = createServerFn({ method: "POST" })
     if (data.assetLinks !== undefined) patch.asset_links = data.assetLinks;
     if (data.domainId !== undefined) patch.domain_id = data.domainId;
     if (data.departmentId !== undefined) patch.department_id = data.departmentId;
+    if (data.estimatedHours !== undefined) patch.estimated_hours = data.estimatedHours;
     if (Object.keys(patch).length > 0) {
       const { error } = await supabase.from("tasks").update(patch).eq("id", data.id);
       if (error) throw error;

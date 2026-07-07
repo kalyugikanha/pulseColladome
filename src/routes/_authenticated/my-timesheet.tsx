@@ -155,6 +155,15 @@ function MyTimesheetPage() {
               <SelectItem value="day">Day</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="All projects" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All projects</SelectItem>
+              {distinctProjects.map(([code, name]) => (
+                <SelectItem key={code} value={code}><span className="font-mono text-xs mr-1 text-muted-foreground">{code}</span>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {view === "month" && (() => {
             const [yr, mo] = month.split("-");
             const now = new Date();

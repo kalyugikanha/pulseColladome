@@ -28,10 +28,12 @@ export type BoardCard = {
   due_date: string | null;
   assignee_id: string | null;
   assignee: { id: string; full_name: string | null; email: string | null } | null;
+  project_id: string | null;
+  project: { id: string; name: string } | null;
   workflow_instance_id: string | null;
   stage_index: number | null;
   stage_snapshot: { name: string; requires_review: boolean } | null;
-  workflow_template: { id: string; name: string } | null;
+  workflow_template: { id: string; name: string; department: string | null } | null;
   workflow_total_stages: number;
 };
 

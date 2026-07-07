@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock, Link as LinkIcon, ExternalLink, Copy, Star } from "lucide-react";
 import { EditTaskDialog } from "./edit-task-dialog";
+import { MarkDoneDialog } from "./mark-done-dialog";
 import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
 import {
@@ -24,16 +25,17 @@ import {
   addSubtask, toggleSubtask, deleteSubtask, addComment, resolveComment,
   toggleWatcher, addDependency, removeDependency, rateTask,
 } from "@/lib/tasks-workflow.functions";
+import { logTaskTime } from "@/lib/workflows.functions";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
 
-type Props = { taskId: string | null; onClose: (nextTaskId?: string) => void };
+type Props = { taskId: string | null; onClose: (nextTaskId?: string) => void; initialAction?: "mark-done" | null };
 
 const STATUS: Array<"todo" | "in_progress" | "review" | "done"> = ["todo", "in_progress", "review", "done"];
 const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In Progress", review: "In Review", done: "Done" };
 
-export function TaskDetailSheet({ taskId, onClose }: Props) {
+export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props) {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   const { viewAsUserId } = useViewAs();
@@ -52,6 +54,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const rmDepFn = useServerFn(removeDependency);
   const duplicateFn = useServerFn(duplicateTask);
   const rateFn = useServerFn(rateTask);
+  const logTimeFn = useServerFn(logTaskTime);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["task-detail", taskId ?? null], enabled: !!taskId,
@@ -75,7 +78,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const [refLabel, setRefLabel] = useState("");
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
-
+  const [markDoneOpen, setMarkDoneOpen] = useState(false);
 
 
   useEffect(() => {
@@ -83,6 +86,20 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
     supabase.from("profiles").select("department").eq("id", me.realId).maybeSingle()
       .then(({ data }) => setMyDept((data?.department as string | null) ?? null));
   }, [me?.realId]);
+
+  // Auto-open mark-done when the sheet is opened with initialAction="mark-done"
+  // (e.g. dropping a non-workflow card onto Done). Only fires once per taskId.
+  const [autoTriggeredFor, setAutoTriggeredFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (initialAction !== "mark-done" || !taskId || !detail?.task) return;
+    if (autoTriggeredFor === taskId) return;
+    const t = detail.task as { assignee_id: string | null; status: string; workflow_instance_id: string | null };
+    if (t.workflow_instance_id) return; // workflow tasks use CloseStageDialog instead
+    if (t.status === "done") return;
+    if (t.assignee_id !== me?.id) return;
+    setMarkDoneOpen(true);
+    setAutoTriggeredFor(taskId);
+  }, [initialAction, taskId, detail?.task, me?.id, autoTriggeredFor]);
 
   const task = detail?.task;
   const isAssignee = !!task && me?.id === task.assignee_id;
@@ -126,9 +143,26 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
 
   async function doStatus(s: "todo" | "in_progress" | "review" | "done") {
+    // When the assignee marks a task done, prompt for actual hours first.
+    // Applies to both plain and workflow tasks; workflow tasks whose "close stage"
+    // dialog is used instead never come through this code path.
+    if (s === "done" && isAssignee && task?.status !== "done" && !task?.workflow_instance_id) {
+      setMarkDoneOpen(true);
+      return;
+    }
     try {
       await setStatusFn({ data: { taskId: taskId!, status: s } });
       toast.success("Status updated");
+      await refresh();
+    } catch (e) { toast.error((e as Error).message); }
+  }
+
+  async function confirmMarkDone(v: { hours: number; note?: string }) {
+    try {
+      await logTimeFn({ data: { taskId: taskId!, hours: v.hours, note: v.note ?? null } });
+      await setStatusFn({ data: { taskId: taskId!, status: "done" } });
+      setMarkDoneOpen(false);
+      toast.success("Marked done — hours sent for approval");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
   }
@@ -637,6 +671,15 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <MarkDoneDialog
+          task={markDoneOpen && task ? {
+            id: task.id, title: task.title,
+            assigneeId: (task as { assignee_id?: string | null }).assignee_id ?? null,
+            creatorId: (task as { created_by?: string | null }).created_by ?? null,
+          } : null}
+          onClose={() => setMarkDoneOpen(false)}
+          onConfirm={(v) => confirmMarkDone({ hours: v.hours, note: v.note })}
+        />
       </SheetContent>
     </Sheet>
   );

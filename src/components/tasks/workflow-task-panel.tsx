@@ -186,8 +186,9 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         <DialogHeader><DialogTitle>Close: {stage.name}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label className="text-xs">Actual hours (optional)</Label>
-            <Input type="number" min={0} step={0.25} value={hours} onChange={(e) => setHours(e.target.value)} />
+            <Label className="text-xs">Actual hours *</Label>
+            <Input type="number" min={0.25} step={0.25} value={hours} onChange={(e) => setHours(e.target.value)} placeholder="e.g. 3.5" autoFocus />
+            <p className="text-[10px] text-muted-foreground">Hours land in your timesheet once approved.</p>
           </div>
           {(stage.required_fields ?? []).map((f) => (
             <div key={f.key} className="space-y-1">
@@ -222,7 +223,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="gradient-primary" onClick={submit}
-            disabled={busy || (hasBranches && !branchKey)}
+            disabled={busy || (hasBranches && !branchKey) || !(Number(hours) > 0)}
           >Close stage</Button>
         </DialogFooter>
       </DialogContent>

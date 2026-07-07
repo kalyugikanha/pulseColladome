@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.create_task_full(uuid, text, text, date, public.task_priority, uuid, jsonb, uuid, uuid, uuid[]);

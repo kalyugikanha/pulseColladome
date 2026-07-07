@@ -423,6 +423,75 @@ function TimesheetPage() {
         </CardContent>
       </Card>
 
+      {directReportIds.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Task hours awaiting your approval
+              {pendingHours && pendingHours.length > 0 && (
+                <Badge variant="outline" className="ml-1">{pendingHours.length}</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>Hours logged on tasks by people who report to you. Approve or reject each entry.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!pendingHours || pendingHours.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending. Nice.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Task / Project</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Hours</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="w-[180px] text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingHours.map((r) => {
+                    const date = r.completion_date ?? r.created_at.slice(0, 10);
+                    const proj = r.task?.project;
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-sm">{r.actor?.full_name ?? r.actor?.email ?? "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          <div>{r.task?.title ?? "Task"}</div>
+                          {proj?.code && (
+                            <div className="text-[10px] text-muted-foreground font-mono">{proj.code} · {proj.name}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">{format(new Date(date + "T00:00:00"), "d MMM")}</TableCell>
+                        <TableCell className="text-right font-mono">{Number(r.hours ?? 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">{r.note ?? ""}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button size="sm" variant="outline" className="h-7"
+                              onClick={() => decidePending(r.id, "approved")}>
+                              <Check className="h-3.5 w-3.5 mr-1" /> Approve
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-destructive"
+                              onClick={() => {
+                                const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
+                                decidePending(r.id, "rejected", reason || undefined);
+                              }}>
+                              <X className="h-3.5 w-3.5 mr-1" /> Reject
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+
       {editor && (
         <DayEditorSheet
           open={!!editor}

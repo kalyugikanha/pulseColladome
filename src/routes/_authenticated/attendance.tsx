@@ -34,7 +34,7 @@ function AttendancePage() {
   const [overviewSearch, setOverviewSearch] = useState("");
   const overviewDateStr = format(overviewDate, "yyyy-MM-dd");
 
-  const canView = !!me && (me.isAdmin || me.isReportingManager);
+  const canView = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin || me.isReportingManager);
   const { userScope } = useVisibilityScope(me);
 
   const { data } = useQuery({

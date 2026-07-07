@@ -28,6 +28,8 @@ export type BoardCard = {
   due_date: string | null;
   assignee_id: string | null;
   assignee: { id: string; full_name: string | null; email: string | null } | null;
+  created_by: string | null;
+  creator: { id: string; full_name: string | null; email: string | null } | null;
   project_id: string | null;
   project: { id: string; name: string } | null;
   workflow_instance_id: string | null;

@@ -54,8 +54,8 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const rateFn = useServerFn(rateTask);
 
   const { data: detail, isLoading } = useQuery({
-    queryKey: ["task-detail", taskId, viewAsUserId ?? null], enabled: !!taskId,
-    queryFn: () => detailFn({ data: { taskId: taskId!, viewAsUserId } }),
+    queryKey: ["task-detail", taskId ?? null], enabled: !!taskId,
+    queryFn: () => detailFn({ data: { taskId: taskId! } }),
   });
 
   const { data: peopleAll } = useQuery({
@@ -127,7 +127,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
   async function doStatus(s: "todo" | "in_progress" | "review" | "done") {
     try {
-      await setStatusFn({ data: { taskId: taskId!, status: s, viewAsUserId } });
+      await setStatusFn({ data: { taskId: taskId!, status: s } });
       toast.success("Status updated");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
@@ -135,7 +135,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
   async function doReview(decision: "approve" | "request_changes" | "reject") {
     try {
-      await reviewFn({ data: { taskId: taskId!, decision, note: reviewNote.trim() || undefined, viewAsUserId } });
+      await reviewFn({ data: { taskId: taskId!, decision, note: reviewNote.trim() || undefined } });
       setReviewNote("");
       toast.success("Review submitted");
       await refresh();
@@ -276,7 +276,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Reviewer</div>
                 <Select value={(task as { reviewer_id: string | null }).reviewer_id ?? "none"} onValueChange={async (v) => {
-                  await setReviewerFn({ data: { taskId: taskId!, reviewerId: v === "none" ? null : v, viewAsUserId } });
+                  await setReviewerFn({ data: { taskId: taskId!, reviewerId: v === "none" ? null : v } });
                   toast.success("Reviewer updated");
                   await refresh();
                 }}>
@@ -316,7 +316,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                         onClick={async () => {
                           const next = current === n ? null : n;
                           try {
-                            await rateFn({ data: { taskId: task.id, rating: next, viewAsUserId } });
+                            await rateFn({ data: { taskId: task.id, rating: next } });
                             toast.success(next == null ? "Rating cleared" : `Rated ${next}/5`);
                             await refresh();
                             await qc.invalidateQueries({ queryKey: ["my-performance"] });

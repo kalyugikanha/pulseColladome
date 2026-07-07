@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { impersonationMiddleware } from "./impersonation.middleware";
 
 /** Types shared with the client */
 export type WorkflowRequiredField = {
@@ -25,7 +26,7 @@ export type WorkflowStageInput = {
 
 /** List all templates + stages. */
 export const listWorkflowTemplates = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const [t, s] = await Promise.all([
@@ -42,7 +43,7 @@ export const listWorkflowTemplates = createServerFn({ method: "GET" })
 
 /** Admin CRUD. Replaces the template's stages atomically. */
 export const saveWorkflowTemplate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: {
     id?: string; name: string; description?: string | null; department?: string | null;
     is_active?: boolean; stages: WorkflowStageInput[];
@@ -101,7 +102,7 @@ export const saveWorkflowTemplate = createServerFn({ method: "POST" })
   });
 
 export const deleteWorkflowTemplate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("workflow_templates" as never).delete().eq("id", data.id);
@@ -111,7 +112,7 @@ export const deleteWorkflowTemplate = createServerFn({ method: "POST" })
 
 /** Start a workflow: create instance + first-stage task. */
 export const startWorkflow = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: {
     templateId: string; projectId: string; title: string;
     description?: string | null; dueDate?: string | null;
@@ -173,18 +174,11 @@ export const startWorkflow = createServerFn({ method: "POST" })
     return { taskId, instanceId };
   });
 
-/** Resolve the acting user id (super admin can act as an impersonated user). */
-async function resolveActingUser(
-  supabase: any, userId: string, viewAsUserId?: string | null,
-): Promise<string> {
-  if (!viewAsUserId || viewAsUserId === userId) return userId;
-  const { data: sa } = await supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle();
-  return sa ? viewAsUserId : userId;
-}
+
 
 /** Assignee closes a task. If a branching stage, they pick branch + next assignee. */
 export const closeTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: {
     taskId: string;
     actualHours?: number | null;
@@ -192,11 +186,10 @@ export const closeTask = createServerFn({ method: "POST" })
     nextAssigneeId?: string | null;
     requiredFieldValues?: Record<string, unknown>;
     rating?: number | null;
-    viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const { data: taskRow, error: tErr } = await supabase
       .from("tasks")
       .select("*")
@@ -287,7 +280,7 @@ export const closeTask = createServerFn({ method: "POST" })
 
 /** Reviewer approves / requests changes / just comments. */
 export const reviewTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: {
     taskId: string;
     action: "approve" | "request_changes" | "comment";
@@ -295,11 +288,10 @@ export const reviewTask = createServerFn({ method: "POST" })
     branchKey?: string | null;
     nextAssigneeId?: string | null;
     rating?: number | null;
-    viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const { data: taskRow, error: tErr } = await supabase.from("tasks").select("*").eq("id", data.taskId).single();
     if (tErr) throw tErr;
     const task = taskRow as unknown as {
@@ -347,11 +339,11 @@ export const reviewTask = createServerFn({ method: "POST" })
 
 /** Log time from a task (self, on own task). */
 export const logTaskTime = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; hours: number; note?: string | null; date?: string | null; viewAsUserId?: string | null }) => d)
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string; hours: number; note?: string | null; date?: string | null}) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const { data: t, error: tErr } = await supabase.from("tasks").select("assignee_id").eq("id", data.taskId).single();
     if (tErr) throw tErr;
     if ((t as { assignee_id: string | null }).assignee_id !== actingUserId) {
@@ -441,7 +433,7 @@ async function spawnNextStage(
 
 /** List review comments for a task (client convenience). */
 export const listTaskReviewComments = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { taskId: string }) => d)
   .handler(async ({ data, context }) => {
     const { data: rows, error } = await context.supabase

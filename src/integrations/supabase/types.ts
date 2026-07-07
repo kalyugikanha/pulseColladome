@@ -501,6 +501,30 @@ export type Database = {
         }
         Relationships: []
       }
+      impersonation_audit: {
+        Row: {
+          acting_user_id: string
+          created_at: string
+          function_name: string | null
+          id: string
+          real_user_id: string
+        }
+        Insert: {
+          acting_user_id: string
+          created_at?: string
+          function_name?: string | null
+          id?: string
+          real_user_id: string
+        }
+        Update: {
+          acting_user_id?: string
+          created_at?: string
+          function_name?: string | null
+          id?: string
+          real_user_id?: string
+        }
+        Relationships: []
+      }
       leave_balances: {
         Row: {
           allocated: number
@@ -2242,6 +2266,16 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      list_all_profiles_for_super_admin: {
+        Args: never
+        Returns: {
+          department: string
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean
+        }[]
       }
       request_task_from_manager: {
         Args: { _note?: string; _project_id?: string; _title: string }

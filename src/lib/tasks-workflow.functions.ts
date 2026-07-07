@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { impersonationMiddleware } from "./impersonation.middleware";
 
 type TaskStatus = "todo" | "in_progress" | "review" | "done";
 
@@ -29,22 +30,14 @@ async function notify(
   });
 }
 
-/** Resolve the acting user id (super admin can act as an impersonated user). */
-async function resolveActingUser(
-  supabase: any, userId: string, viewAsUserId?: string | null,
-): Promise<string> {
-  if (!viewAsUserId || viewAsUserId === userId) return userId;
-  const { data: sa } = await supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle();
-  return sa ? viewAsUserId : userId;
-}
 
 /* ============ Task detail read ============ */
 export const getTaskDetail = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; viewAsUserId?: string | null }) => d)
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string}) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const [task, subtasks, activity, comments, attachments, watchers, deps, myRating] = await Promise.all([
       supabase.from("tasks").select(`
         *,
@@ -70,11 +63,11 @@ export const getTaskDetail = createServerFn({ method: "POST" })
 
 /* ============ Rate a task ============ */
 export const rateTask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; rating: number | null; viewAsUserId?: string | null }) => d)
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string; rating: number | null}) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const { data: t, error: tErr } = await supabase
       .from("tasks")
       .select("id, assignee_id, reviewer_id, created_by")
@@ -113,11 +106,11 @@ export const rateTask = createServerFn({ method: "POST" })
 
 /* ============ Status / review workflow ============ */
 export const setTaskStatus = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; status: TaskStatus; viewAsUserId?: string | null }) => d)
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string; status: TaskStatus}) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const { data: task } = await supabase.from("tasks").select("id, status, reviewer_id, assignee_id, review_state, created_by").eq("id", data.taskId).maybeSingle();
     if (!task) throw new Error("Task not found");
 
@@ -165,11 +158,11 @@ export const setTaskStatus = createServerFn({ method: "POST" })
   });
 
 export const submitReviewDecision = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; decision: "approve" | "request_changes" | "reject"; note?: string; viewAsUserId?: string | null }) => d)
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string; decision: "approve" | "request_changes" | "reject"; note?: string}) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const { data: task } = await supabase.from("tasks").select("id, status, reviewer_id, assignee_id").eq("id", data.taskId).maybeSingle();
     if (!task) throw new Error("Task not found");
     if (task.reviewer_id !== actingUserId) throw new Error("Not the reviewer");
@@ -190,11 +183,11 @@ export const submitReviewDecision = createServerFn({ method: "POST" })
   });
 
 export const setReviewer = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string; reviewerId: string | null; viewAsUserId?: string | null }) => d)
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string; reviewerId: string | null}) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const { data: prev } = await supabase.from("tasks").select("reviewer_id").eq("id", data.taskId).maybeSingle();
     const { error } = await supabase.from("tasks").update({ reviewer_id: data.reviewerId }).eq("id", data.taskId);
     if (error) throw error;
@@ -205,7 +198,7 @@ export const setReviewer = createServerFn({ method: "POST" })
 
 /** Update editable task fields; logs assignee_changed to task_activity when it changes. */
 export const updateTaskFields = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: {
     taskId: string;
     patch: {
@@ -220,11 +213,10 @@ export const updateTaskFields = createServerFn({ method: "POST" })
       asset_links?: { label: string; url: string }[];
       estimated_hours?: number | null;
     };
-    viewAsUserId?: string | null;
   }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const actingUserId = context.actingUserId;
     const { data: prev } = await supabase.from("tasks").select("assignee_id, title").eq("id", data.taskId).maybeSingle();
     if (!prev) throw new Error("Task not found");
     const { error } = await supabase.from("tasks").update(data.patch as never).eq("id", data.taskId);
@@ -243,7 +235,7 @@ export const updateTaskFields = createServerFn({ method: "POST" })
 
 /* ============ Completion percent ============ */
 export const setCompletionPercent = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { taskId: string; percent: number }) => d)
   .handler(async ({ data, context }) => {
     const p = Math.max(0, Math.min(100, Math.round(data.percent)));
@@ -257,7 +249,7 @@ export const setCompletionPercent = createServerFn({ method: "POST" })
 
 /* ============ Subtasks ============ */
 export const addSubtask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { taskId: string; title: string }) => d)
   .handler(async ({ data, context }) => {
     const title = data.title.trim();
@@ -273,7 +265,7 @@ export const addSubtask = createServerFn({ method: "POST" })
   });
 
 export const toggleSubtask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string; done: boolean }) => d)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("task_subtasks").update({ done: data.done }).eq("id", data.id);
@@ -282,7 +274,7 @@ export const toggleSubtask = createServerFn({ method: "POST" })
   });
 
 export const deleteSubtask = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("task_subtasks").delete().eq("id", data.id);
@@ -292,7 +284,7 @@ export const deleteSubtask = createServerFn({ method: "POST" })
 
 /* ============ Comments ============ */
 export const addComment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { taskId: string; body: string; parentId?: string | null; mentionUserIds?: string[]; attachments?: { url: string; label?: string; kind: "file" | "link" }[] }) => d)
   .handler(async ({ data, context }) => {
     const body = data.body.trim();
@@ -321,7 +313,7 @@ export const addComment = createServerFn({ method: "POST" })
   });
 
 export const resolveComment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { commentId: string; resolved: boolean }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -335,7 +327,7 @@ export const resolveComment = createServerFn({ method: "POST" })
 
 /* ============ Watchers ============ */
 export const toggleWatcher = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { taskId: string; watching: boolean }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -350,7 +342,7 @@ export const toggleWatcher = createServerFn({ method: "POST" })
 
 /* ============ Dependencies ============ */
 export const addDependency = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { taskId: string; dependsOnTaskId: string }) => d)
   .handler(async ({ data, context }) => {
     if (data.taskId === data.dependsOnTaskId) throw new Error("Cannot depend on itself");
@@ -366,7 +358,7 @@ export const addDependency = createServerFn({ method: "POST" })
   });
 
 export const removeDependency = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("task_dependencies").delete().eq("id", data.id);
@@ -376,7 +368,7 @@ export const removeDependency = createServerFn({ method: "POST" })
 
 /* ============ Awaiting-my-review list ============ */
 export const listAwaitingMyReview = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .handler(async ({ context }) => {
     const { data } = await context.supabase
       .from("tasks")
@@ -389,7 +381,7 @@ export const listAwaitingMyReview = createServerFn({ method: "GET" })
 
 /* ============ Notifications ============ */
 export const listMyNotifications = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .handler(async ({ context }) => {
     const { data } = await context.supabase
       .from("notifications")
@@ -401,7 +393,7 @@ export const listMyNotifications = createServerFn({ method: "GET" })
   });
 
 export const markNotificationsRead = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([impersonationMiddleware])
   .inputValidator((d: { ids?: string[]; all?: boolean }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;

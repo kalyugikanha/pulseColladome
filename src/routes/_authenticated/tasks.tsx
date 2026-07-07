@@ -19,6 +19,8 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { StageEditor } from "@/components/tasks/stage-editor";
+import { MarkDoneDialog } from "@/components/tasks/mark-done-dialog";
+import { closeMarketingTask } from "@/lib/marketing-close";
 import { TaxonomyPicker, AssetLinksEditor, useTaxonomy, type TaxonomyValue } from "@/components/taxonomy-picker";
 import {
   createTaskFull, listUserPresets, bumpUserPreset, listRolePresets,

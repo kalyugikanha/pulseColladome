@@ -116,7 +116,7 @@ function Dashboard() {
         </div>
         {punchedIn ? (
           <Button asChild size="lg" className="gradient-primary shadow-glow">
-            <Link to="/punch">Punch out</Link>
+            <Link to="/attendance" search={{ tab: "my" }}>Punch out</Link>
           </Button>
         ) : (
           <Button size="lg" className="gradient-primary shadow-glow" onClick={punchInFromDashboard} disabled={!me || punchingIn}>

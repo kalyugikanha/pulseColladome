@@ -219,7 +219,7 @@ export const closeTask = createServerFn({ method: "POST" })
     if (data.actualHours && data.actualHours > 0) {
       const today = new Date().toISOString().slice(0, 10);
       await supabase.from("task_activity" as never).insert({
-        task_id: task.id, actor_id: userId, kind: "task_completed",
+        task_id: task.id, actor_id: actingUserId, kind: "task_completed",
         hours: data.actualHours, approval_status: "auto", completion_date: today,
       } as never);
     }
@@ -237,7 +237,7 @@ export const closeTask = createServerFn({ method: "POST" })
         const { data: inst } = await supabase.from("workflow_instances" as never)
           .select("started_by").eq("id", task.workflow_instance_id).single();
         const reviewer = (inst as unknown as { started_by: string } | null)?.started_by;
-        if (reviewer && reviewer !== userId) {
+        if (reviewer && reviewer !== actingUserId) {
           await supabase.from("notifications").insert({
             user_id: reviewer, kind: "review_requested", task_id: task.id,
             body: `"${task.title}" is ready for your review.`,
@@ -249,9 +249,10 @@ export const closeTask = createServerFn({ method: "POST" })
 
     // Done + optional next stage
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
-    await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, userId);
+    await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
     return { ok: true, status: "done" };
   });
+
 
 /** Reviewer approves / requests changes / just comments. */
 export const reviewTask = createServerFn({ method: "POST" })

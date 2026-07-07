@@ -37,7 +37,7 @@ function BDRecurringPage() {
   const [editing, setEditing] = useState<Recurring | null>(null);
   const [open, setOpen] = useState(false);
 
-  const isAdmin = !!(me?.isAdmin || me?.isSuperAdmin);
+  const isManager = !!(me?.isAdmin || me?.isSuperAdmin || me?.isReportingManager);
 
   const { data: items } = useQuery({
     queryKey: ["bd-recurring-all"],
@@ -48,12 +48,14 @@ function BDRecurringPage() {
     },
   });
 
+  // Scope: pulls me + full reporting tree (admins get everyone) via SECURITY DEFINER RPC
   const { data: profiles } = useQuery({
-    queryKey: ["bd-profiles"],
+    queryKey: ["bd-visible-users"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("id, full_name, email").eq("is_active", true).order("full_name");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc("bd_list_visible_users");
       if (error) throw error;
-      return (data ?? []) as Profile[];
+      return (data ?? []) as Array<Profile & { department: string | null; is_direct_report: boolean }>;
     },
   });
 
@@ -66,7 +68,7 @@ function BDRecurringPage() {
     },
   });
 
-  if (!isAdmin) return <p className="text-sm text-muted-foreground">Admins only.</p>;
+  if (!isManager) return <p className="text-sm text-muted-foreground">Only managers can manage recurring items.</p>;
 
   const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
   const typeById = new Map((types ?? []).map((t) => [t.id, t]));

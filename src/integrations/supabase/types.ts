@@ -2087,106 +2087,56 @@ export type Database = {
         }[]
       }
       can_view_task: { Args: { _task_id: string }; Returns: boolean }
-      create_task_full:
-        | {
-            Args: {
-              _asset_links?: Json
-              _assignee_id?: string
-              _department_id?: string
-              _description?: string
-              _domain_id?: string
-              _due_date?: string
-              _priority?: Database["public"]["Enums"]["task_priority"]
-              _project_id: string
-              _task_type_ids?: string[]
-              _title: string
-            }
-            Returns: {
-              asset_links: Json
-              assignee_id: string | null
-              client_brand: string | null
-              completion_percent: number
-              created_at: string
-              created_by: string | null
-              department_id: string | null
-              description: string | null
-              domain_id: string | null
-              due_date: string | null
-              estimated_hours: number | null
-              id: string
-              origin_department: string | null
-              priority: Database["public"]["Enums"]["task_priority"]
-              project_id: string | null
-              requester_id: string | null
-              required_fields_values: Json | null
-              review_state: string
-              reviewer_id: string | null
-              scheduled_post_date: string | null
-              stage_index: number | null
-              stage_snapshot: Json | null
-              status: Database["public"]["Enums"]["task_status"]
-              title: string
-              updated_at: string
-              workflow_instance_id: string | null
-              workflow_template_id: string | null
-            }
-            SetofOptions: {
-              from: "*"
-              to: "tasks"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
-        | {
-            Args: {
-              _asset_links?: Json
-              _assignee_id?: string
-              _department_id?: string
-              _description?: string
-              _domain_id?: string
-              _due_date?: string
-              _estimated_hours?: number
-              _priority?: Database["public"]["Enums"]["task_priority"]
-              _project_id: string
-              _task_type_ids?: string[]
-              _title: string
-            }
-            Returns: {
-              asset_links: Json
-              assignee_id: string | null
-              client_brand: string | null
-              completion_percent: number
-              created_at: string
-              created_by: string | null
-              department_id: string | null
-              description: string | null
-              domain_id: string | null
-              due_date: string | null
-              estimated_hours: number | null
-              id: string
-              origin_department: string | null
-              priority: Database["public"]["Enums"]["task_priority"]
-              project_id: string | null
-              requester_id: string | null
-              required_fields_values: Json | null
-              review_state: string
-              reviewer_id: string | null
-              scheduled_post_date: string | null
-              stage_index: number | null
-              stage_snapshot: Json | null
-              status: Database["public"]["Enums"]["task_status"]
-              title: string
-              updated_at: string
-              workflow_instance_id: string | null
-              workflow_template_id: string | null
-            }
-            SetofOptions: {
-              from: "*"
-              to: "tasks"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
+      create_task_full: {
+        Args: {
+          _asset_links?: Json
+          _assignee_id?: string
+          _department_id?: string
+          _description?: string
+          _domain_id?: string
+          _due_date?: string
+          _estimated_hours?: number
+          _priority?: Database["public"]["Enums"]["task_priority"]
+          _project_id: string
+          _task_type_ids?: string[]
+          _title: string
+        }
+        Returns: {
+          asset_links: Json
+          assignee_id: string | null
+          client_brand: string | null
+          completion_percent: number
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          description: string | null
+          domain_id: string | null
+          due_date: string | null
+          estimated_hours: number | null
+          id: string
+          origin_department: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
+          project_id: string | null
+          requester_id: string | null
+          required_fields_values: Json | null
+          review_state: string
+          reviewer_id: string | null
+          scheduled_post_date: string | null
+          stage_index: number | null
+          stage_snapshot: Json | null
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+          workflow_instance_id: string | null
+          workflow_template_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tasks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       find_auth_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_my_leave_requests: {
         Args: never

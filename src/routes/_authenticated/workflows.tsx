@@ -164,8 +164,9 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
   );
 }
 
-function StageEditor({ stage, index, totalStages, allStages, onChange, onMoveUp, onMoveDown, onRemove }: {
+function StageEditor({ stage, index, totalStages, allStages, people, onChange, onMoveUp, onMoveDown, onRemove }: {
   stage: WorkflowStageInput; index: number; totalStages: number; allStages: WorkflowStageInput[];
+  people: Array<{ id: string; full_name: string | null; email: string | null }>;
   onChange: (patch: Partial<WorkflowStageInput>) => void;
   onMoveUp: () => void; onMoveDown: () => void; onRemove: () => void;
 }) {

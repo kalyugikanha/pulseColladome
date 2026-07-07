@@ -43,7 +43,7 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from("tasks")
-        .select("id, title, status, assignee_id, workflow_instance_id, stage_index, stage_snapshot")
+        .select("id, title, status, assignee_id, reviewer_id, workflow_instance_id, stage_index, stage_snapshot")
         .eq("id", taskId).single();
       setTask(data as unknown as TaskInfo);
       if (data?.workflow_instance_id) {

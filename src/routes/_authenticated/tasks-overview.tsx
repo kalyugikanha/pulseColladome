@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -8,10 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ExternalLink, MoreVertical, Pencil, Copy, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { MultiSelectFilter } from "@/components/multi-select-filter";
-import { listTasksOverview } from "@/lib/tasks-plus.functions";
+import { listTasksOverview, duplicateTask, deleteTask } from "@/lib/tasks-plus.functions";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 
 export const Route = createFileRoute("/_authenticated/tasks-overview")({ component: Page });
 

@@ -228,6 +228,20 @@ function PunchPage() {
     }
   }
 
+  async function submitTaskRequest() {
+    if (!reqTitle.trim()) { toast.error("Task title is required."); return; }
+    setReqSubmitting(true);
+    try {
+      await requestTaskServer({ data: { title: reqTitle.trim(), projectId: reqProjectId || null, note: reqNote.trim() || null } });
+      toast.success("Request sent — your manager has been notified.");
+      setRequestOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not send request.");
+    } finally {
+      setReqSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header>

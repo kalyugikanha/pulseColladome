@@ -680,6 +680,7 @@ function NewMarketingTaskDialog({ open, onClose, roster, me, onCreated }: {
       assignee_id: assignee,
       created_by: me!.realId,
       asset_links: links.filter((l) => l.url.trim()),
+      estimated_hours: estHours,
     };
     if (mktDeptId) payload.department_id = mktDeptId;
     const { error } = await supabase.from("tasks").insert(payload as any);

@@ -204,13 +204,18 @@ function ProjectsPage() {
                     <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{col.replace("_"," ")}</div>
                     <div className="space-y-2">
                       {(p.tasks ?? []).filter((t: any) => t.status === col).map((t: any) => (
-                        <div key={t.id} className="rounded-md border border-border/60 bg-card p-2 text-sm">
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setOpenTaskId(t.id)}
+                          className="w-full text-left rounded-md border border-border/60 bg-card p-2 text-sm hover:bg-accent/40 transition-colors"
+                        >
                           <div className="font-medium">{t.title}</div>
                           <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                             <span>{t.assignee?.full_name ?? "Unassigned"}</span>
                             <Badge variant="outline" className="capitalize">{t.priority}</Badge>
                           </div>
-                        </div>
+                        </button>
                       ))}
                       {(p.tasks ?? []).filter((t: any) => t.status === col).length === 0 && <div className="text-xs text-muted-foreground">—</div>}
                     </div>

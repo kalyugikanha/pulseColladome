@@ -68,6 +68,11 @@ export function EditTaskDialog({
     if (!title.trim()) return toast.error("Title required");
     if (!projectId) return toast.error("Project required");
     setSaving(true);
+    const estNum = estimate.trim() === "" ? null : Number(estimate);
+    if (estNum !== null && (!Number.isFinite(estNum) || estNum < 0)) {
+      setSaving(false);
+      return toast.error("Estimated hours must be a positive number.");
+    }
     const patch: Record<string, unknown> = {
       title: title.trim(),
       description: desc.trim() || null,
@@ -78,6 +83,7 @@ export function EditTaskDialog({
       project_id: projectId,
       assignee_id: assignee || null,
       asset_links: links.filter((l) => l.url.trim()),
+      estimated_hours: estNum,
     };
     const { error } = await supabase.from("tasks").update(patch as never).eq("id", task.id);
     setSaving(false);

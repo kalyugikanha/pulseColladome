@@ -1,20 +1,11 @@
-## Restore Data-API GRANTs on attendance tables
+Add `isHrAdmin` (and `isSuperAdmin`) to the Attendance sidebar link gate in `src/routes/_authenticated/route.tsx` line 88, so HR admins like Shraddha see the Attendance nav item alongside admins and reporting managers.
 
-Both `public.attendance_logs` and `public.punch_sessions` currently have no GRANTs to `authenticated` / `service_role`, so PostgREST rejects every request — including punch-in inserts — with a permission error. RLS is fine; only the grants are missing.
-
-### Migration
-
-```sql
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.punch_sessions TO authenticated;
-GRANT ALL ON public.punch_sessions TO service_role;
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance_logs TO authenticated;
-GRANT ALL ON public.attendance_logs TO service_role;
+```tsx
+{(isAdmin || isSuperAdmin || isHrAdmin || isDepartmentHead || isReportingManager) && (
+  <SidebarMenuButton ...>
+    <Link to="/attendance">...</Link>
+  </SidebarMenuButton>
+)}
 ```
 
-No `anon` grants — both tables are auth-scoped.
-
-### Verify
-
-- Re-query `information_schema.role_table_grants` to confirm the rows exist.
-- Have a signed-in user hit Punch In → row appears in `punch_sessions` and `attendance_logs`.
+No other changes.

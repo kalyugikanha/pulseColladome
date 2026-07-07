@@ -116,11 +116,22 @@ function MyTimesheetPage() {
     return out.sort((a, b) => b.date.localeCompare(a.date));
   }, [logs, activityRows]);
 
-  const totalHours = rows.reduce((s, r) => s + r.hours, 0);
-  const uniqueDays = new Set(rows.map((r) => r.date)).size;
+  const distinctProjects = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of rows) map.set(r.code, r.name);
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    if (projectFilter === "__all__") return rows;
+    return rows.filter((r) => r.code === projectFilter);
+  }, [rows, projectFilter]);
+
+  const totalHours = filteredRows.reduce((s, r) => s + r.hours, 0);
+  const uniqueDays = new Set(filteredRows.map((r) => r.date)).size;
 
   // Unique dates in period (for quick add / edit chips)
-  const dateList = useMemo(() => Array.from(new Set(rows.map((r) => r.date))), [rows]);
+  const dateList = useMemo(() => Array.from(new Set(filteredRows.map((r) => r.date))), [filteredRows]);
 
   if (isLoading || !me) return <div className="text-muted-foreground">Loading…</div>;
 

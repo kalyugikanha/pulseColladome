@@ -16,9 +16,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, Workflow, MoreVertical, Pencil } from "lucide-react";
-import { TaskStagesPanel } from "./task-stages-panel";
+import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock } from "lucide-react";
 import { EditTaskDialog } from "./edit-task-dialog";
+import { WorkflowTaskPanel } from "./workflow-task-panel";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
   addSubtask, toggleSubtask, deleteSubtask, addComment, resolveComment,
@@ -233,9 +233,14 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
 
             {task.description && <p className="text-sm text-muted-foreground mb-4 whitespace-pre-wrap">{task.description}</p>}
 
-            <Tabs defaultValue={(task as { is_multi_stage?: boolean }).is_multi_stage ? "workflow" : "comments"}>
+            {task.workflow_instance_id && (
+              <div className="mb-4">
+                <WorkflowTaskPanel taskId={task.id} onChanged={refresh} />
+              </div>
+            )}
+
+            <Tabs defaultValue="comments">
               <TabsList className="w-full flex-wrap h-auto">
-                <TabsTrigger value="workflow"><Workflow className="h-3.5 w-3.5 mr-1" />Workflow</TabsTrigger>
                 <TabsTrigger value="comments"><MessageSquare className="h-3.5 w-3.5 mr-1" />Comments</TabsTrigger>
                 <TabsTrigger value="checklist"><ListChecks className="h-3.5 w-3.5 mr-1" />Checklist</TabsTrigger>
                 <TabsTrigger value="deps"><GitBranch className="h-3.5 w-3.5 mr-1" />Dependencies</TabsTrigger>
@@ -243,19 +248,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                 <TabsTrigger value="history"><HistoryIcon className="h-3.5 w-3.5 mr-1" />History</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="workflow">
-                <TaskStagesPanel
-                  taskId={taskId!}
-                  canManage={
-                    !!me && (
-                      me.isAdmin || me.isSuperAdmin || me.canManageProjects ||
-                      me.isDepartmentHead || me.isReportingManager ||
-                      me.id === (task as { created_by?: string }).created_by ||
-                      isAssignee
-                    )
-                  }
-                />
-              </TabsContent>
+
 
 
               <TabsContent value="comments" className="space-y-3">

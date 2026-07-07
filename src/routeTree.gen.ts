@@ -15,11 +15,10 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as AuthenticatedWorkflowsRouteImport } from './routes/_authenticated/workflows'
 import { Route as AuthenticatedVendorsRouteImport } from './routes/_authenticated/vendors'
 import { Route as AuthenticatedTimesheetRouteImport } from './routes/_authenticated/timesheet'
-import { Route as AuthenticatedTasksOverviewRouteImport } from './routes/_authenticated/tasks-overview'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
-import { Route as AuthenticatedTaskTemplatesRouteImport } from './routes/_authenticated/task-templates'
 import { Route as AuthenticatedResourcesRouteImport } from './routes/_authenticated/resources'
 import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/punch'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
@@ -29,7 +28,6 @@ import { Route as AuthenticatedOnboardingPendingRouteImport } from './routes/_au
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMyTimesheetRouteImport } from './routes/_authenticated/my-timesheet'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
-import { Route as AuthenticatedMarketingKanbanRouteImport } from './routes/_authenticated/marketing-kanban'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
@@ -38,13 +36,13 @@ import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_a
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedBdRouteImport } from './routes/_authenticated/bd'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
-import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
 import { Route as AuthenticatedBdIndexRouteImport } from './routes/_authenticated/bd.index'
 import { Route as ApiAssistantTranscribeRouteImport } from './routes/api/assistant/transcribe'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as AuthenticatedHrOnboardingRouteImport } from './routes/_authenticated/hr.onboarding'
 import { Route as AuthenticatedHrLeaveRouteImport } from './routes/_authenticated/hr.leave'
+import { Route as AuthenticatedBoardDeptRouteImport } from './routes/_authenticated/board.$dept'
 import { Route as AuthenticatedBdTeamRouteImport } from './routes/_authenticated/bd.team'
 import { Route as AuthenticatedBdReportsRouteImport } from './routes/_authenticated/bd.reports'
 import { Route as AuthenticatedBdRecurringRouteImport } from './routes/_authenticated/bd.recurring'
@@ -81,6 +79,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthenticatedWorkflowsRoute = AuthenticatedWorkflowsRouteImport.update({
+  id: '/workflows',
+  path: '/workflows',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedVendorsRoute = AuthenticatedVendorsRouteImport.update({
   id: '/vendors',
   path: '/vendors',
@@ -91,23 +94,11 @@ const AuthenticatedTimesheetRoute = AuthenticatedTimesheetRouteImport.update({
   path: '/timesheet',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedTasksOverviewRoute =
-  AuthenticatedTasksOverviewRouteImport.update({
-    id: '/tasks-overview',
-    path: '/tasks-overview',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedTaskTemplatesRoute =
-  AuthenticatedTaskTemplatesRouteImport.update({
-    id: '/task-templates',
-    path: '/task-templates',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedResourcesRoute = AuthenticatedResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
@@ -157,12 +148,6 @@ const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
   path: '/meetings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedMarketingKanbanRoute =
-  AuthenticatedMarketingKanbanRouteImport.update({
-    id: '/marketing-kanban',
-    path: '/marketing-kanban',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedLeaveRoute = AuthenticatedLeaveRouteImport.update({
   id: '/leave',
   path: '/leave',
@@ -204,11 +189,6 @@ const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
   path: '/attendance',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
   id: '/access',
   path: '/access',
@@ -238,6 +218,11 @@ const AuthenticatedHrOnboardingRoute =
 const AuthenticatedHrLeaveRoute = AuthenticatedHrLeaveRouteImport.update({
   id: '/hr/leave',
   path: '/hr/leave',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedBoardDeptRoute = AuthenticatedBoardDeptRouteImport.update({
+  id: '/board/$dept',
+  path: '/board/$dept',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedBdTeamRoute = AuthenticatedBdTeamRouteImport.update({
@@ -280,7 +265,6 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/access': typeof AuthenticatedAccessRoute
-  '/analytics': typeof AuthenticatedAnalyticsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/bd': typeof AuthenticatedBdRouteWithChildren
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -289,7 +273,6 @@ export interface FileRoutesByFullPath {
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
-  '/marketing-kanban': typeof AuthenticatedMarketingKanbanRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -299,17 +282,17 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
-  '/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/tasks': typeof AuthenticatedTasksRoute
-  '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
+  '/workflows': typeof AuthenticatedWorkflowsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
   '/bd/recurring': typeof AuthenticatedBdRecurringRoute
   '/bd/reports': typeof AuthenticatedBdReportsRoute
   '/bd/team': typeof AuthenticatedBdTeamRoute
+  '/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -323,7 +306,6 @@ export interface FileRoutesByTo {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/access': typeof AuthenticatedAccessRoute
-  '/analytics': typeof AuthenticatedAnalyticsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
@@ -331,7 +313,6 @@ export interface FileRoutesByTo {
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/leave': typeof AuthenticatedLeaveRoute
-  '/marketing-kanban': typeof AuthenticatedMarketingKanbanRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -341,17 +322,17 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
-  '/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/tasks': typeof AuthenticatedTasksRoute
-  '/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
   '/vendors': typeof AuthenticatedVendorsRoute
+  '/workflows': typeof AuthenticatedWorkflowsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
   '/bd/recurring': typeof AuthenticatedBdRecurringRoute
   '/bd/reports': typeof AuthenticatedBdReportsRoute
   '/bd/team': typeof AuthenticatedBdTeamRoute
+  '/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -367,7 +348,6 @@ export interface FileRoutesById {
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
-  '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/bd': typeof AuthenticatedBdRouteWithChildren
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
@@ -376,7 +356,6 @@ export interface FileRoutesById {
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
-  '/_authenticated/marketing-kanban': typeof AuthenticatedMarketingKanbanRoute
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/my-timesheet': typeof AuthenticatedMyTimesheetRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
@@ -386,17 +365,17 @@ export interface FileRoutesById {
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/punch': typeof AuthenticatedPunchRoute
   '/_authenticated/resources': typeof AuthenticatedResourcesRoute
-  '/_authenticated/task-templates': typeof AuthenticatedTaskTemplatesRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
-  '/_authenticated/tasks-overview': typeof AuthenticatedTasksOverviewRoute
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
+  '/_authenticated/workflows': typeof AuthenticatedWorkflowsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/_authenticated/bd/activity-types': typeof AuthenticatedBdActivityTypesRoute
   '/_authenticated/bd/recurring': typeof AuthenticatedBdRecurringRoute
   '/_authenticated/bd/reports': typeof AuthenticatedBdReportsRoute
   '/_authenticated/bd/team': typeof AuthenticatedBdTeamRoute
+  '/_authenticated/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/_authenticated/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
@@ -412,7 +391,6 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-connect'
     | '/access'
-    | '/analytics'
     | '/attendance'
     | '/bd'
     | '/calendar'
@@ -421,7 +399,6 @@ export interface FileRouteTypes {
     | '/directory'
     | '/finances'
     | '/leave'
-    | '/marketing-kanban'
     | '/meetings'
     | '/my-timesheet'
     | '/onboarding'
@@ -431,17 +408,17 @@ export interface FileRouteTypes {
     | '/projects'
     | '/punch'
     | '/resources'
-    | '/task-templates'
     | '/tasks'
-    | '/tasks-overview'
     | '/timesheet'
     | '/vendors'
+    | '/workflows'
     | '/auth/callback'
     | '/admin/taxonomy'
     | '/bd/activity-types'
     | '/bd/recurring'
     | '/bd/reports'
     | '/bd/team'
+    | '/board/$dept'
     | '/hr/leave'
     | '/hr/onboarding'
     | '/api/assistant/chat'
@@ -455,7 +432,6 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-connect'
     | '/access'
-    | '/analytics'
     | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
@@ -463,7 +439,6 @@ export interface FileRouteTypes {
     | '/directory'
     | '/finances'
     | '/leave'
-    | '/marketing-kanban'
     | '/meetings'
     | '/my-timesheet'
     | '/onboarding'
@@ -473,17 +448,17 @@ export interface FileRouteTypes {
     | '/projects'
     | '/punch'
     | '/resources'
-    | '/task-templates'
     | '/tasks'
-    | '/tasks-overview'
     | '/timesheet'
     | '/vendors'
+    | '/workflows'
     | '/auth/callback'
     | '/admin/taxonomy'
     | '/bd/activity-types'
     | '/bd/recurring'
     | '/bd/reports'
     | '/bd/team'
+    | '/board/$dept'
     | '/hr/leave'
     | '/hr/onboarding'
     | '/api/assistant/chat'
@@ -498,7 +473,6 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/google-calendar-connect'
     | '/_authenticated/access'
-    | '/_authenticated/analytics'
     | '/_authenticated/attendance'
     | '/_authenticated/bd'
     | '/_authenticated/calendar'
@@ -507,7 +481,6 @@ export interface FileRouteTypes {
     | '/_authenticated/directory'
     | '/_authenticated/finances'
     | '/_authenticated/leave'
-    | '/_authenticated/marketing-kanban'
     | '/_authenticated/meetings'
     | '/_authenticated/my-timesheet'
     | '/_authenticated/onboarding'
@@ -517,17 +490,17 @@ export interface FileRouteTypes {
     | '/_authenticated/projects'
     | '/_authenticated/punch'
     | '/_authenticated/resources'
-    | '/_authenticated/task-templates'
     | '/_authenticated/tasks'
-    | '/_authenticated/tasks-overview'
     | '/_authenticated/timesheet'
     | '/_authenticated/vendors'
+    | '/_authenticated/workflows'
     | '/auth/callback'
     | '/_authenticated/admin/taxonomy'
     | '/_authenticated/bd/activity-types'
     | '/_authenticated/bd/recurring'
     | '/_authenticated/bd/reports'
     | '/_authenticated/bd/team'
+    | '/_authenticated/board/$dept'
     | '/_authenticated/hr/leave'
     | '/_authenticated/hr/onboarding'
     | '/api/assistant/chat'
@@ -591,6 +564,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_authenticated/workflows': {
+      id: '/_authenticated/workflows'
+      path: '/workflows'
+      fullPath: '/workflows'
+      preLoaderRoute: typeof AuthenticatedWorkflowsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/vendors': {
       id: '/_authenticated/vendors'
       path: '/vendors'
@@ -605,25 +585,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTimesheetRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/tasks-overview': {
-      id: '/_authenticated/tasks-overview'
-      path: '/tasks-overview'
-      fullPath: '/tasks-overview'
-      preLoaderRoute: typeof AuthenticatedTasksOverviewRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/tasks': {
       id: '/_authenticated/tasks'
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof AuthenticatedTasksRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/task-templates': {
-      id: '/_authenticated/task-templates'
-      path: '/task-templates'
-      fullPath: '/task-templates'
-      preLoaderRoute: typeof AuthenticatedTaskTemplatesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/resources': {
@@ -689,13 +655,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeetingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/marketing-kanban': {
-      id: '/_authenticated/marketing-kanban'
-      path: '/marketing-kanban'
-      fullPath: '/marketing-kanban'
-      preLoaderRoute: typeof AuthenticatedMarketingKanbanRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/leave': {
       id: '/_authenticated/leave'
       path: '/leave'
@@ -752,13 +711,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAttendanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/analytics': {
-      id: '/_authenticated/analytics'
-      path: '/analytics'
-      fullPath: '/analytics'
-      preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/access': {
       id: '/_authenticated/access'
       path: '/access'
@@ -799,6 +751,13 @@ declare module '@tanstack/react-router' {
       path: '/hr/leave'
       fullPath: '/hr/leave'
       preLoaderRoute: typeof AuthenticatedHrLeaveRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/board/$dept': {
+      id: '/_authenticated/board/$dept'
+      path: '/board/$dept'
+      fullPath: '/board/$dept'
+      preLoaderRoute: typeof AuthenticatedBoardDeptRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/bd/team': {
@@ -868,7 +827,6 @@ const AuthenticatedBdRouteWithChildren = AuthenticatedBdRoute._addFileChildren(
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccessRoute: typeof AuthenticatedAccessRoute
-  AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
   AuthenticatedBdRoute: typeof AuthenticatedBdRouteWithChildren
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
@@ -877,7 +835,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
-  AuthenticatedMarketingKanbanRoute: typeof AuthenticatedMarketingKanbanRoute
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedMyTimesheetRoute: typeof AuthenticatedMyTimesheetRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
@@ -887,19 +844,18 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedPunchRoute: typeof AuthenticatedPunchRoute
   AuthenticatedResourcesRoute: typeof AuthenticatedResourcesRoute
-  AuthenticatedTaskTemplatesRoute: typeof AuthenticatedTaskTemplatesRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
-  AuthenticatedTasksOverviewRoute: typeof AuthenticatedTasksOverviewRoute
   AuthenticatedTimesheetRoute: typeof AuthenticatedTimesheetRoute
   AuthenticatedVendorsRoute: typeof AuthenticatedVendorsRoute
+  AuthenticatedWorkflowsRoute: typeof AuthenticatedWorkflowsRoute
   AuthenticatedAdminTaxonomyRoute: typeof AuthenticatedAdminTaxonomyRoute
+  AuthenticatedBoardDeptRoute: typeof AuthenticatedBoardDeptRoute
   AuthenticatedHrLeaveRoute: typeof AuthenticatedHrLeaveRoute
   AuthenticatedHrOnboardingRoute: typeof AuthenticatedHrOnboardingRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccessRoute: AuthenticatedAccessRoute,
-  AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
   AuthenticatedBdRoute: AuthenticatedBdRouteWithChildren,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
@@ -908,7 +864,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
-  AuthenticatedMarketingKanbanRoute: AuthenticatedMarketingKanbanRoute,
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedMyTimesheetRoute: AuthenticatedMyTimesheetRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
@@ -918,12 +873,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedPunchRoute: AuthenticatedPunchRoute,
   AuthenticatedResourcesRoute: AuthenticatedResourcesRoute,
-  AuthenticatedTaskTemplatesRoute: AuthenticatedTaskTemplatesRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
-  AuthenticatedTasksOverviewRoute: AuthenticatedTasksOverviewRoute,
   AuthenticatedTimesheetRoute: AuthenticatedTimesheetRoute,
   AuthenticatedVendorsRoute: AuthenticatedVendorsRoute,
+  AuthenticatedWorkflowsRoute: AuthenticatedWorkflowsRoute,
   AuthenticatedAdminTaxonomyRoute: AuthenticatedAdminTaxonomyRoute,
+  AuthenticatedBoardDeptRoute: AuthenticatedBoardDeptRoute,
   AuthenticatedHrLeaveRoute: AuthenticatedHrLeaveRoute,
   AuthenticatedHrOnboardingRoute: AuthenticatedHrOnboardingRoute,
 }

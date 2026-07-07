@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { TableProperties, CalendarIcon, Pencil, CheckCircle2, Lock, Plus } from "lucide-react";
+import { TableProperties, CalendarIcon, Pencil, CheckCircle2, Lock } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DayEditorSheet } from "@/components/day-editor-sheet";
@@ -168,9 +168,6 @@ function MyTimesheetPage() {
             </>
           )}
           {view === "day" && <DatePickerButton value={day} onChange={setDay} label="Day" />}
-          <Button size="sm" onClick={() => setEditor({ date: view === "day" ? ymd(day) : ymd(new Date()) })}>
-            <Plus className="h-4 w-4 mr-1" /> Log time
-          </Button>
         </div>
       </header>
 
@@ -181,7 +178,7 @@ function MyTimesheetPage() {
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-10 text-center">No entries in this period. Click "Log time" to add one.</div>
+            <div className="text-sm text-muted-foreground py-10 text-center">No entries in this period. Log time on any task from its detail panel to see it here.</div>
           ) : (
             <Table>
               <TableHeader>

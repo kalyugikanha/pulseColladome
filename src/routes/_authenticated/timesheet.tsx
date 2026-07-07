@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, Check, X, Clock } from "lucide-react";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DayEditorSheet } from "@/components/day-editor-sheet";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
@@ -169,6 +169,32 @@ export function TimesheetPage() {
     },
   });
 
+  const { data: approvedHoursList, refetch: refetchApproved } = useQuery({
+    queryKey: ["ts-approved-task-hours", dateIso, me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
+    enabled: pendingEnabled,
+    queryFn: async () => {
+      let q = supabase
+        .from("task_activity" as never)
+        .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approved_at, approved_by, kind, task:tasks(id, title, project:projects(id, code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email), approver:profiles!task_activity_approved_by_fkey(id, full_name, email)")
+        .in("approval_status", ["approved", "auto"])
+        .not("hours", "is", null)
+        .gte("completion_date", dateIso).lt("completion_date", nextDayIso)
+        .order("approved_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      if (pendingActorIds && pendingActorIds.length > 0) q = q.in("actor_id", pendingActorIds);
+      const { data, error } = await q;
+      if (error) throw error;
+      return ((data ?? []) as unknown as Array<{
+        id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
+        note: string | null; completion_date: string | null; created_at: string;
+        approved_at: string | null; approved_by: string | null; kind: string;
+        task: { id: string; title: string | null; project: { code: string | null; name: string | null } | null } | null;
+        actor: { id: string; full_name: string | null; email: string | null } | null;
+        approver: { id: string; full_name: string | null; email: string | null } | null;
+      }>);
+    },
+  });
+
   async function decidePending(id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) {
     try {
       const { data: userRes } = await supabase.auth.getUser();
@@ -184,8 +210,10 @@ export function TimesheetPage() {
       if (error) throw error;
       toast.success(decide === "approved" ? "Approved" : "Rejected");
       await refetchPending();
+      await refetchApproved();
       qc.invalidateQueries({ queryKey: ["ts-activity"] });
       qc.invalidateQueries({ queryKey: ["ts-logs"] });
+      qc.invalidateQueries({ queryKey: ["ts-approved-task-hours"] });
       qc.invalidateQueries({ queryKey: ["my-ts-activity"] });
       qc.invalidateQueries({ queryKey: ["my-performance"] });
       qc.invalidateQueries({ queryKey: ["pb-activity"] });
@@ -514,7 +542,74 @@ export function TimesheetPage() {
         </Card>
       )}
 
+      {pendingEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              Approved task hours
+              {approvedHoursList && approvedHoursList.length > 0 && (
+                <Badge variant="outline" className="ml-1">{approvedHoursList.length}</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>Task hours you (or another approver) have approved for this day.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!approvedHoursList || approvedHoursList.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-6 text-center">No approved task hours for this day.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Task / Project</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Approved</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead>Approved by</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {approvedHoursList.map((r) => {
+                    const proj = r.task?.project;
+                    const approved = Number(r.approved_hours ?? r.hours ?? 0);
+                    const logged = Number(r.hours ?? 0);
+                    const date = r.completion_date ?? r.created_at.slice(0, 10);
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-sm">{r.actor?.full_name ?? r.actor?.email ?? "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          <div className="font-medium">{r.task?.title ?? "Task"}</div>
+                          {proj && (proj.code || proj.name) && (
+                            <div className="text-xs text-muted-foreground">{proj.code ? `${proj.code} · ` : ""}{proj.name ?? ""}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">{date}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          <div className="font-semibold">{approved.toFixed(2)}</div>
+                          {logged && approved !== logged ? (
+                            <div className="text-[10px] text-muted-foreground">logged {logged.toFixed(2)}</div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate" title={r.note ?? ""}>{r.note ?? "—"}</TableCell>
+                        <TableCell className="text-xs">
+                          <div>{r.approver?.full_name ?? r.approver?.email ?? "—"}</div>
+                          {r.approved_at && (
+                            <div className="text-muted-foreground">{formatDistanceToNow(new Date(r.approved_at), { addSuffix: true })}</div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
+
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
             <CardTitle>{dateLabel}</CardTitle>

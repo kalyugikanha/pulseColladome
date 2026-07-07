@@ -23,7 +23,19 @@ type TaskInfo = {
   workflow_instance_id: string | null;
   stage_index: number | null;
   stage_snapshot: WorkflowStageInput | null;
+  project: { code: string | null; name: string | null } | null;
 };
+
+function todayInIndia() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
 
 export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onChanged?: () => void | Promise<void> }) {
   const { data: me } = useCurrentUser();
@@ -43,7 +55,7 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
   useEffect(() => {
     (async () => {
       const { data } = await supabase.from("tasks")
-        .select("id, title, status, assignee_id, reviewer_id, workflow_instance_id, stage_index, stage_snapshot")
+        .select("id, title, status, assignee_id, reviewer_id, workflow_instance_id, stage_index, stage_snapshot, project:projects(code, name)")
         .eq("id", taskId).single();
       setTask(data as unknown as TaskInfo);
       if (data?.workflow_instance_id) {
@@ -83,6 +95,7 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
         <Workflow className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium">{instance.template_name}</span>
         <Badge variant="outline">Stage {task.stage_index} of {instance.total_stages}: {stage.name}</Badge>
+        {task.project && <Badge variant="outline" className="font-mono">{task.project.code ?? "Project"} · {task.project.name}</Badge>}
         {stage.requires_review && <Badge variant="secondary">Review required</Badge>}
       </div>
 
@@ -152,6 +165,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
   const [hours, setHours] = useState("");
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
+  const [date, setDate] = useState(todayInIndia);
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
@@ -169,6 +183,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
       await close({ data: {
         taskId: task.id,
         actualHours: h && !Number.isNaN(h) ? h : null,
+        date,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
         requiredFieldValues: values,
@@ -189,6 +204,10 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
             <Label className="text-xs">Actual hours *</Label>
             <Input type="number" min={0.25} step={0.25} value={hours} onChange={(e) => setHours(e.target.value)} placeholder="e.g. 3.5" autoFocus />
             <p className="text-[10px] text-muted-foreground">Hours land in your timesheet once approved.</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Work date</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           {(stage.required_fields ?? []).map((f) => (
             <div key={f.key} className="space-y-1">
@@ -337,6 +356,7 @@ function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: (
   const log = useServerFn(logTaskTime);
   const { viewAsUserId } = useViewAs();
   const [hours, setHours] = useState("");
+  const [date, setDate] = useState(todayInIndia);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   return (
@@ -349,6 +369,10 @@ function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: (
             <Input type="number" min={0.25} step={0.25} value={hours} onChange={(e) => setHours(e.target.value)} autoFocus />
           </div>
           <div className="space-y-1">
+            <Label className="text-xs">Work date</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
             <Label className="text-xs">Note</Label>
             <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
@@ -359,7 +383,7 @@ function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: (
             const h = Number(hours);
             if (!h || h <= 0) return toast.error("Enter valid hours");
             setBusy(true);
-            try { await log({ data: { taskId, hours: h, note: note || null } }); toast.success("Time logged"); await onDone(); }
+            try { await log({ data: { taskId, hours: h, note: note || null, date } }); toast.success("Time logged"); await onDone(); }
             catch (e) { toast.error((e as Error).message); }
             finally { setBusy(false); }
           }}>Log</Button>

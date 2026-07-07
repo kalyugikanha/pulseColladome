@@ -310,7 +310,21 @@ function StageEditor({ stage, index, totalStages, allStages, people, onChange, o
                 <button onClick={() => removeBranch(b.key)}><Trash2 className="h-3 w-3 text-muted-foreground" /></button>
               </div>
             ))}
-            {stage.branch_options.length === 0 && <p className="text-[11px] text-muted-foreground">No branches — auto-moves to next stage.</p>}
+            {stage.branch_options.length === 0 && (
+              <div className="flex items-center gap-2 pt-1">
+                <Label className="text-[11px] text-muted-foreground shrink-0">Next stage</Label>
+                <select
+                  className="h-8 text-sm rounded border border-input px-2 flex-1"
+                  value={stage.next_stage_position == null ? "__auto__" : String(stage.next_stage_position)}
+                  onChange={(e) => onChange({ next_stage_position: e.target.value === "__auto__" ? null : Number(e.target.value) })}
+                >
+                  <option value="__auto__">Auto (next in order)</option>
+                  {allStages.filter((s) => s.position !== stage.position).map((s) => (
+                    <option key={s.position} value={s.position}>→ #{s.position} {s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-1">

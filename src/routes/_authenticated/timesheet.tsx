@@ -383,7 +383,7 @@ function TimesheetPage() {
           <div>
             <CardTitle>{dateLabel}</CardTitle>
             <CardDescription>
-              {empRows.length} employee{empRows.length === 1 ? "" : "s"} · {entryCount} entr{entryCount === 1 ? "y" : "ies"} · {dayTotal.toFixed(1)} total hrs
+              {empRows.length} employee{empRows.length === 1 ? "" : "s"} · {entryCount} entr{entryCount === 1 ? "y" : "ies"} · Logged {dayTotal.toFixed(1)} hrs · Approved {dayApprovedTotal.toFixed(1)} hrs{dayApprovedTotal < dayTotal ? ` · Gap ${(dayTotal - dayApprovedTotal).toFixed(1)} hrs` : ""}
             </CardDescription>
           </div>
           <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">

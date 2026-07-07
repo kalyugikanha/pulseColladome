@@ -288,6 +288,21 @@ function ProjectBurnPage() {
   }, [filteredDaily, month, daysInMonth, showCosts]);
   const trendMax = Math.max(1, ...dailyTrend.map((d) => d.total));
 
+  // Burn by project rollup (respects month/dept/employee/project filters).
+  const projectRollup = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; hours: number; burn: number; contributors: Set<string> }>();
+    for (const r of filteredDaily) {
+      const cur = map.get(r.code) ?? { code: r.code, name: r.name, hours: 0, burn: 0, contributors: new Set<string>() };
+      cur.hours += r.hours;
+      cur.burn += r.burn;
+      cur.contributors.add(r.user_id);
+      map.set(r.code, cur);
+    }
+    return Array.from(map.values())
+      .map((v) => ({ code: v.code, name: v.name, hours: v.hours, burn: v.burn, contributors: v.contributors.size }))
+      .sort((a, b) => (showCosts ? b.burn - a.burn : b.hours - a.hours));
+  }, [filteredDaily, showCosts]);
+
 
   if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!canView) throw redirect({ to: "/dashboard" });
@@ -405,6 +420,45 @@ function ProjectBurnPage() {
           )}
         </CardContent>
 
+      </Card>
+
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Burn by project / category</CardTitle>
+          <CardDescription>
+            Totals for {month} grouped by project across every department in view.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {projectRollup.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">No entries.</div>
+          ) : (
+            <div className="max-h-[480px] overflow-y-auto">
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>Project</TableHead>
+                  <TableHead className="text-right">Hours</TableHead>
+                  <TableHead className="text-right">Contributors</TableHead>
+                  {showCosts && <TableHead className="text-right">Burn</TableHead>}
+                </TableRow></TableHeader>
+                <TableBody>
+                  {projectRollup.map((r) => (
+                    <TableRow key={r.code}>
+                      <TableCell>
+                        <span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>
+                        {r.name}
+                      </TableCell>
+                      <TableCell className="text-right">{r.hours.toFixed(1)}</TableCell>
+                      <TableCell className="text-right">{r.contributors}</TableCell>
+                      {showCosts && <TableCell className="text-right">{inr(r.burn)}</TableCell>}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
 

@@ -44,7 +44,7 @@ function WorkflowsAdmin() {
         </div>
         <Button className="gradient-primary" onClick={() => setEditing({
           name: "", description: "", department: "", is_active: true,
-          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {} }],
+          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {} }],
         })}><Plus className="h-4 w-4 mr-1" /> New template</Button>
       </header>
 
@@ -55,7 +55,9 @@ function WorkflowsAdmin() {
             is_active: t.is_active,
             stages: t.stages.map((s) => ({
               position: s.position, name: s.name, requires_review: s.requires_review,
-              default_assignee_id: s.default_assignee_id, default_due_offset_days: s.default_due_offset_days,
+              default_assignee_id: s.default_assignee_id,
+              default_reviewer_id: (s as { default_reviewer_id?: string | null }).default_reviewer_id ?? null,
+              default_due_offset_days: s.default_due_offset_days,
               required_fields: s.required_fields as WorkflowRequiredField[],
               branch_options: s.branch_options as WorkflowBranchOption[],
               branch_target_map: s.branch_target_map as Record<string, number>,
@@ -84,6 +86,7 @@ function WorkflowsAdmin() {
                             name: s.name,
                             requires_review: s.requires_review,
                             default_assignee_id: s.default_assignee_id,
+                            default_reviewer_id: (s as { default_reviewer_id?: string | null }).default_reviewer_id ?? null,
                             default_due_offset_days: s.default_due_offset_days,
                             required_fields: s.required_fields as WorkflowRequiredField[],
                             branch_options: s.branch_options as WorkflowBranchOption[],
@@ -143,7 +146,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
 
   function addStage() {
     const pos = stages.length + 1;
-    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {} }]);
+    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {} }]);
   }
   function moveStage(idx: number, dir: -1 | 1) {
     const target = idx + dir;
@@ -243,18 +246,33 @@ function StageEditor({ stage, index, totalStages, allStages, people, onChange, o
           <Input value={stage.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Stage name" />
           <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={stage.requires_review} onChange={(e) => onChange({ requires_review: e.target.checked })} /> Requires review before Done</label>
 
-          <div className="space-y-1">
-            <Label className="text-xs">Default assignee (optional)</Label>
-            <Select
-              value={stage.default_assignee_id ?? "__none__"}
-              onValueChange={(v) => onChange({ default_assignee_id: v === "__none__" ? null : v })}
-            >
-              <SelectTrigger className="h-8"><SelectValue placeholder="Unassigned" /></SelectTrigger>
-              <SelectContent className="max-h-72">
-                <SelectItem value="__none__">Unassigned</SelectItem>
-                {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Default assignee (optional)</Label>
+              <Select
+                value={stage.default_assignee_id ?? "__none__"}
+                onValueChange={(v) => onChange({ default_assignee_id: v === "__none__" ? null : v })}
+              >
+                <SelectTrigger className="h-8"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="__none__">Unassigned</SelectItem>
+                  {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Default reviewer (optional)</Label>
+              <Select
+                value={stage.default_reviewer_id ?? "__none__"}
+                onValueChange={(v) => onChange({ default_reviewer_id: v === "__none__" ? null : v })}
+              >
+                <SelectTrigger className="h-8"><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="__none__">None</SelectItem>
+                  {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name ?? p.email}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
 

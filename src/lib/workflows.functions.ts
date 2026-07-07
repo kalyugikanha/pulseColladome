@@ -15,6 +15,7 @@ export type WorkflowStageInput = {
   name: string;
   requires_review: boolean;
   default_assignee_id: string | null;
+  default_reviewer_id: string | null;
   default_due_offset_days: number | null;
   required_fields: WorkflowRequiredField[];
   branch_options: WorkflowBranchOption[];
@@ -87,6 +88,7 @@ export const saveWorkflowTemplate = createServerFn({ method: "POST" })
         name: s.name.trim() || `Stage ${s.position}`,
         requires_review: s.requires_review,
         default_assignee_id: s.default_assignee_id,
+        default_reviewer_id: s.default_reviewer_id,
         default_due_offset_days: s.default_due_offset_days,
         required_fields: s.required_fields,
         branch_options: s.branch_options,
@@ -232,9 +234,14 @@ export const closeTask = createServerFn({ method: "POST" })
 
     // Stage requires a review? Move to review, do NOT spawn next stage yet.
     if (stage?.requires_review) {
-      // Reviewer default = ORIGINAL CREATOR of the workflow's root task.
-      // Only apply as a default — do NOT overwrite an explicitly-set reviewer.
+      // Reviewer priority:
+      //   1. Task's explicitly-set reviewer_id (never overwritten).
+      //   2. Stage's configured default_reviewer_id (if any).
+      //   3. Original creator of the workflow's root task / workflow starter.
       let reviewer: string | null = task.reviewer_id ?? null;
+      if (!reviewer && stage.default_reviewer_id) {
+        reviewer = stage.default_reviewer_id;
+      }
       if (!reviewer && task.workflow_instance_id) {
         const { data: inst } = await supabase.from("workflow_instances" as never)
           .select("started_by, root_task_id").eq("id", task.workflow_instance_id).single();
@@ -245,9 +252,9 @@ export const closeTask = createServerFn({ method: "POST" })
         } else {
           reviewer = instRow?.started_by ?? null;
         }
-        if (reviewer) {
-          await supabase.from("tasks").update({ reviewer_id: reviewer } as never).eq("id", task.id);
-        }
+      }
+      if (reviewer && reviewer !== task.reviewer_id) {
+        await supabase.from("tasks").update({ reviewer_id: reviewer } as never).eq("id", task.id);
       }
       await supabase.from("tasks").update({ status: "review" } as never).eq("id", task.id);
       if (reviewer && reviewer !== actingUserId) {

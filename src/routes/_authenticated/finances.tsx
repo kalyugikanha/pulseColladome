@@ -226,6 +226,22 @@ function FinancesPage() {
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
 
+  const taskHoursByProject = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; hours: number; users: Set<string>; entries: number }>();
+    for (const r of taskLoggedHours ?? []) {
+      const p = r.task?.project;
+      if (!p) continue;
+      const hrs = Number(r.hours) || 0;
+      if (hrs <= 0) continue;
+      const cur = map.get(p.code) ?? { code: p.code, name: p.name, hours: 0, users: new Set<string>(), entries: 0 };
+      cur.hours += hrs;
+      cur.entries += 1;
+      if (r.actor_id) cur.users.add(r.actor_id);
+      map.set(p.code, cur);
+    }
+    return map;
+  }, [taskLoggedHours]);
+
   const userHoursThisMonth = useMemo(() => {
     const m = new Map<string, number>();
     for (const row of logs ?? []) {

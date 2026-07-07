@@ -134,19 +134,31 @@ export function TimesheetPage() {
     },
   });
 
-  // Direct reports of the current user — they can approve their reports' task-hour logs.
+  // Approvers of pending task-hour entries:
+  // - Managers see only their direct reports (existing behavior).
+  // - Admins / PMs / super admins see all pending entries in the visible scope.
   const directReportIds = me?.directReportIds ?? [];
+  const pendingIsAdmin = !!me && (me.isAdmin || me.canManageProjects || me.isSuperAdmin);
+  const pendingActorIds = pendingIsAdmin
+    ? (hasScope ? visibleUserIds : null) // null = unscoped, no in() filter
+    : directReportIds;
+  const pendingEnabled = !!me?.id && (
+    pendingIsAdmin
+      ? (!hasScope || visibleUserIds.length > 0)
+      : directReportIds.length > 0
+  );
   const { data: pendingHours, refetch: refetchPending } = useQuery({
-    queryKey: ["ts-pending-task-hours", me?.id, directReportIds.join(",")],
-    enabled: !!me?.id && directReportIds.length > 0,
+    queryKey: ["ts-pending-task-hours", me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
+    enabled: pendingEnabled,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("task_activity" as never)
         .select("id, task_id, actor_id, hours, note, completion_date, created_at, kind, task:tasks(id, title, project:projects(id, code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email)")
         .eq("approval_status", "pending")
         .not("hours", "is", null)
-        .in("actor_id", directReportIds)
         .order("created_at", { ascending: false });
+      if (pendingActorIds && pendingActorIds.length > 0) q = q.in("actor_id", pendingActorIds);
+      const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as unknown as Array<{
         id: string; task_id: string; actor_id: string; hours: number | null; note: string | null;

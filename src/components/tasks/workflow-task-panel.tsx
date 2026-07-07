@@ -228,6 +228,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
   onClose: () => void; onDone: () => void | Promise<void>;
 }) {
   const review = useServerFn(reviewTask);
+  const { viewAsUserId } = useViewAs();
   const [body, setBody] = useState("");
   const [branchKey, setBranchKey] = useState("");
   const [nextAssignee, setNextAssignee] = useState("");
@@ -248,6 +249,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
         body: body.trim() || null,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
+        viewAsUserId,
       }});
       toast.success(action === "approve" ? "Approved" : action === "request_changes" ? "Sent back" : "Comment added");
       await onDone();

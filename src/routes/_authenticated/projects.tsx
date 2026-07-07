@@ -272,8 +272,8 @@ function ProjectsPage() {
 
       <TaskDetailSheet
         taskId={openTaskId}
-        onClose={() => {
-          setOpenTaskId(null);
+        onClose={(next) => {
+          setOpenTaskId(next ?? null);
           qc.invalidateQueries({ queryKey: ["projects"] });
         }}
       />

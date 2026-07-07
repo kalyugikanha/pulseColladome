@@ -143,12 +143,12 @@ export const duplicateTask = createServerFn({ method: "POST" })
     const typeIds = ((src.task_types as { task_type_id: string }[] | null) ?? []).map((t) => t.task_type_id);
     const { data: task, error } = await supabase.rpc("create_task_full", {
       _project_id: src.project_id,
-      _title: `${src.title} (copy)`,
+      _title: `Copy of ${src.title}`,
       _description: src.description ?? undefined,
       _due_date: src.due_date ?? undefined,
       _priority: src.priority,
       _assignee_id: src.assignee_id ?? context.userId,
-      _asset_links: (src.asset_links as AssetLink[] | null) ?? [],
+      _asset_links: [],
       _domain_id: src.domain_id ?? undefined,
       _department_id: src.department_id ?? undefined,
       _task_type_ids: typeIds,

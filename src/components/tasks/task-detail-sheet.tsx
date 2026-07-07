@@ -16,8 +16,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock, Link as LinkIcon, ExternalLink } from "lucide-react";
+import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock, Link as LinkIcon, ExternalLink, Copy } from "lucide-react";
 import { EditTaskDialog } from "./edit-task-dialog";
+import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
@@ -27,7 +28,7 @@ import {
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
 
-type Props = { taskId: string | null; onClose: () => void };
+type Props = { taskId: string | null; onClose: (nextTaskId?: string) => void };
 
 const STATUS: Array<"todo" | "in_progress" | "review" | "done"> = ["todo", "in_progress", "review", "done"];
 const STATUS_LABEL: Record<string, string> = { todo: "To Do", in_progress: "In Progress", review: "In Review", done: "Done" };
@@ -49,6 +50,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const watchFn = useServerFn(toggleWatcher);
   const addDepFn = useServerFn(addDependency);
   const rmDepFn = useServerFn(removeDependency);
+  const duplicateFn = useServerFn(duplicateTask);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["task-detail", taskId], enabled: !!taskId,
@@ -164,21 +166,39 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
     await qc.invalidateQueries({ queryKey: ["my-tasks"] });
   }
 
+  async function doDuplicate() {
+    if (!task) return;
+    try {
+      const created = (await duplicateFn({ data: { id: task.id } })) as { id: string } | null;
+      const newId = created?.id;
+      if (!newId) throw new Error("Duplicate failed");
+      toast.success("Task duplicated");
+      await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
+      await qc.invalidateQueries({ queryKey: ["my-tasks"] });
+      onClose(newId);
+    } catch (e) { toast.error((e as Error).message); }
+  }
+
   return (
     <Sheet open={!!taskId} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader className="mb-4">
           <div className="flex items-start justify-between gap-2 pr-8">
             <SheetTitle className="font-display">{task?.title ?? (isLoading ? "Loading…" : "Task")}</SheetTitle>
-            {canEditDelete && (
+            {!!task && !!me && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1"><MoreVertical className="h-4 w-4" /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+                  {canEditDelete && (
+                    <DropdownMenuItem onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={doDuplicate}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
+                  {canEditDelete && <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
+                  </>}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}

@@ -177,7 +177,14 @@ export const duplicateTask = createServerFn({ method: "POST" })
     if (newId && context.isImpersonating && context.actingUserId !== context.userId) {
       await supabase.from("tasks").update({ created_by: context.actingUserId } as never).eq("id", newId);
     }
+    const dupCreator = context.actingUserId;
+    const dupAssignee = src.assignee_id ?? context.actingUserId;
+    if (newId && dupCreator && dupAssignee && dupCreator !== dupAssignee) {
+      await supabase.from("tasks").update({ reviewer_id: dupCreator } as never)
+        .eq("id", newId).is("reviewer_id", null);
+    }
     return task;
+
 
   });
 

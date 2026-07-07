@@ -121,6 +121,7 @@ export const startWorkflow = createServerFn({ method: "POST" })
   }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const creatorId = context.actingUserId ?? userId;
     const { data: stagesRaw, error: stagesErr } = await supabase
       .from("workflow_template_stages" as never)
       .select("*")
@@ -136,7 +137,7 @@ export const startWorkflow = createServerFn({ method: "POST" })
       .from("workflow_instances" as never)
       .insert({
         template_id: data.templateId, project_id: data.projectId,
-        started_by: userId, current_stage_position: first.position,
+        started_by: creatorId, current_stage_position: first.position,
       } as never)
       .select("id")
       .single();
@@ -156,28 +157,34 @@ export const startWorkflow = createServerFn({ method: "POST" })
     if (taskErr) throw taskErr;
     const taskId = (task as unknown as { id: string }).id;
 
+    // Resolve reviewer: creator first (if not the assignee), else stage default.
+    const resolvedReviewer =
+      (creatorId && creatorId !== assignee ? creatorId : null) ?? first.default_reviewer_id ?? null;
+
     await supabase.from("tasks").update({
       workflow_template_id: data.templateId,
       workflow_instance_id: instanceId,
       stage_index: first.position,
       stage_snapshot: first as never,
-      reviewer_id: first.default_reviewer_id ?? null,
+      reviewer_id: resolvedReviewer,
+      ...(context.isImpersonating && creatorId !== userId ? { created_by: creatorId } : {}),
     } as never).eq("id", taskId);
 
     await supabase.from("workflow_instances" as never).update({ root_task_id: taskId } as never).eq("id", instanceId);
 
-    if (assignee && assignee !== userId) {
+    if (assignee && assignee !== creatorId) {
       await supabase.from("notifications").insert({
         user_id: assignee, kind: "task_assigned", task_id: taskId,
         body: `New task: "${data.title}" — ${first.name}`,
       });
     }
-    if (first.default_reviewer_id && first.default_reviewer_id !== assignee && first.default_reviewer_id !== userId) {
+    if (resolvedReviewer && resolvedReviewer !== assignee && resolvedReviewer !== creatorId) {
       await supabase.from("notifications").insert({
-        user_id: first.default_reviewer_id, kind: "reviewer_assigned", task_id: taskId,
+        user_id: resolvedReviewer, kind: "reviewer_assigned", task_id: taskId,
         body: `You were added as reviewer on "${data.title}".`,
       });
     }
+
 
     return { taskId, instanceId };
   });
@@ -416,12 +423,17 @@ async function spawnNextStage(
   });
   if (error) throw error;
   const newTaskId = (newTask as unknown as { id: string }).id;
+  // Reviewer defaults to whoever moved the workflow forward (actor), unless
+  // they are also the new assignee. Falls back to the stage's default reviewer.
+  const nextReviewer =
+    (actorId && actorId !== assignee ? actorId : null) ?? nextStage.default_reviewer_id ?? null;
   await supabase.from("tasks").update({
     workflow_template_id: instance.template_id,
     workflow_instance_id: task.workflow_instance_id,
     stage_index: nextStage.position,
     stage_snapshot: nextStage as never,
-    reviewer_id: nextStage.default_reviewer_id ?? null,
+    reviewer_id: nextReviewer,
+    ...(actorId ? { created_by: actorId } : {}),
   } as never).eq("id", newTaskId);
   await supabase.from("workflow_instances" as never).update({ current_stage_position: nextStage.position } as never).eq("id", task.workflow_instance_id);
   // Log the initial stage assignment so history shows the handoff.
@@ -437,7 +449,14 @@ async function spawnNextStage(
       body: `New task: "${task.title}" — ${nextStage.name}`,
     });
   }
+  if (nextReviewer && nextReviewer !== assignee && nextReviewer !== actorId) {
+    await supabase.from("notifications").insert({
+      user_id: nextReviewer, kind: "reviewer_assigned", task_id: newTaskId,
+      body: `You were added as reviewer on "${task.title}".`,
+    });
+  }
 }
+
 
 /** List review comments for a task (client convenience). */
 export const listTaskReviewComments = createServerFn({ method: "GET" })

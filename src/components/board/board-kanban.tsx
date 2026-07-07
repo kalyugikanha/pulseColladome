@@ -7,7 +7,7 @@ import { Workflow } from "lucide-react";
 import { format } from "date-fns";
 import {
   DndContext, PointerSensor, useSensor, useSensors, useDroppable, useDraggable,
-  type DragEndEvent,
+  DragOverlay, type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { toast } from "sonner";

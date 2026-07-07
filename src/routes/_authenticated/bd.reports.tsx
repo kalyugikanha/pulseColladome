@@ -132,7 +132,7 @@ function BDReportsPage() {
     setTo(format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd"));
   }
 
-  if (!isAdmin) return <p className="text-sm text-muted-foreground">Admins only.</p>;
+  if (!isManager) return <p className="text-sm text-muted-foreground">Managers only.</p>;
 
   return (
     <div className="space-y-6">

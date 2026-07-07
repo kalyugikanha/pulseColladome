@@ -376,7 +376,7 @@ async function spawnNextStage(
     _title: task.title,
     _priority: "medium",
     _assignee_id: assignee,
-    _asset_links: [],
+    _asset_links: task.asset_links ?? [],
     _task_type_ids: [],
   });
   if (error) throw error;

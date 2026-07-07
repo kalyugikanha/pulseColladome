@@ -216,12 +216,12 @@ export const closeTask = createServerFn({ method: "POST" })
       }
     }
 
-    // Log actual hours to task_activity as auto-approved (self-log on own task).
+    // Log actual hours to task_activity as pending manager approval.
     if (data.actualHours && data.actualHours > 0) {
       const today = new Date().toISOString().slice(0, 10);
       await supabase.from("task_activity" as never).insert({
         task_id: task.id, actor_id: actingUserId, kind: "task_completed",
-        hours: data.actualHours, approval_status: "auto", completion_date: today,
+        hours: data.actualHours, approval_status: "pending", completion_date: today,
       } as never);
     }
 

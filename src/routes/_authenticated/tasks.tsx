@@ -225,7 +225,37 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
               </Select>
             </div>
           </div>
+          <div className="space-y-1 rounded-md border border-dashed p-2">
+            <Label className="text-xs">Repeat</Label>
+            <Select value={repeat} onValueChange={(v) => setRepeat(v as "none" | "daily" | "weekly")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly on specific days</SelectItem>
+              </SelectContent>
+            </Select>
+            {repeat === "weekly" && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {[
+                  { d: 1, l: "Mon" }, { d: 2, l: "Tue" }, { d: 3, l: "Wed" },
+                  { d: 4, l: "Thu" }, { d: 5, l: "Fri" }, { d: 6, l: "Sat" }, { d: 7, l: "Sun" },
+                ].map(({ d, l }) => (
+                  <button
+                    key={d} type="button" onClick={() => toggleDay(d)}
+                    className={`h-7 px-2 rounded text-xs border ${repeatDays.has(d) ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
+                  >{l}</button>
+                ))}
+              </div>
+            )}
+            {repeat !== "none" && (
+              <p className="text-[11px] text-muted-foreground pt-1">
+                Occurrences are generated automatically on each matching day. The due date field above is ignored for recurring tasks.
+              </p>
+            )}
+          </div>
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="gradient-primary" onClick={submit} disabled={busy}>Create</Button>

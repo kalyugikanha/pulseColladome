@@ -391,7 +391,30 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                 </div>
               </TabsContent>
 
+              <TabsContent value="refs" className="space-y-2">
+                {assetLinks.length === 0 && <p className="text-xs text-muted-foreground">No references yet.</p>}
+                {assetLinks.map((r, i) => (
+                  <div key={`${r.url}-${i}`} className="flex items-center gap-2 rounded-md border border-border/60 p-2 text-sm">
+                    <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <a href={r.url} target="_blank" rel="noreferrer" className="flex-1 truncate text-primary hover:underline inline-flex items-center gap-1">
+                      {r.label || r.url}
+                      <ExternalLink className="h-3 w-3 opacity-60" />
+                    </a>
+                    <button className="text-muted-foreground hover:text-destructive" onClick={() => removeReference(i)} aria-label="Remove reference">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-2 pt-1">
+                  <Input placeholder="Label (e.g. Storyboard)" value={refLabel} onChange={(e) => setRefLabel(e.target.value)} className="w-40" />
+                  <Input placeholder="https://…" value={refUrl} onChange={(e) => setRefUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addReference(); }} />
+                  <Button size="sm" onClick={addReference} disabled={refBusy}>Add</Button>
+                </div>
+              </TabsContent>
+
               <TabsContent value="watchers" className="space-y-1">
+
                 {(detail?.watchers ?? []).map((w) => {
                   const ww = w as { id: string; user: { full_name?: string; email?: string } | null };
                   return <div key={ww.id} className="text-sm">{ww.user?.full_name ?? ww.user?.email ?? "—"}</div>;

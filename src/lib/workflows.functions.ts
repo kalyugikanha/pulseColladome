@@ -197,6 +197,7 @@ export const closeTask = createServerFn({ method: "POST" })
   .inputValidator((d: {
     taskId: string;
     actualHours?: number | null;
+    date?: string | null;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
     requiredFieldValues?: Record<string, unknown>;
@@ -231,7 +232,12 @@ export const closeTask = createServerFn({ method: "POST" })
 
     // Log actual hours to task_activity as pending manager approval.
     if (data.actualHours && data.actualHours > 0) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = data.date ?? new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
       await supabase.from("task_activity" as never).insert({
         task_id: task.id, actor_id: actingUserId, kind: "task_completed",
         hours: data.actualHours, approval_status: "pending", completion_date: today,
@@ -364,7 +370,12 @@ export const logTaskTime = createServerFn({ method: "POST" })
     if ((t as { assignee_id: string | null }).assignee_id !== actingUserId) {
       throw new Error("You can only log time on tasks assigned to you.");
     }
-    const date = data.date ?? new Date().toISOString().slice(0, 10);
+    const date = data.date ?? new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
     const { error } = await supabase.from("task_activity" as never).insert({
       task_id: data.taskId, actor_id: actingUserId, kind: "time_logged",
       hours: data.hours, note: data.note ?? null,

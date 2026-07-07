@@ -30,7 +30,16 @@ export const Route = createFileRoute("/_authenticated/timesheet")({
 });
 
 type Profile = { id: string; full_name: string | null; email: string | null; department: string | null };
-type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string; source?: "log" | "activity" };
+type Task = {
+  project_code?: string;
+  project_name?: string;
+  hours?: number;
+  approved_hours?: number;
+  logged_hours?: number;
+  comments?: string;
+  source?: "log" | "activity";
+  approval_status?: string;
+};
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
 type ActivityRow = {
@@ -49,6 +58,24 @@ function addDays(d: Date, n: number) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
   return x;
+}
+
+function ymdInTimeZone(d: Date, timeZone = "Asia/Kolkata") {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function activityWorkDate(row: Pick<ActivityRow, "completion_date" | "created_at">) {
+  const createdUtcDay = row.created_at.slice(0, 10);
+  const createdLocalDay = ymdInTimeZone(new Date(row.created_at));
+  if (row.completion_date && row.completion_date !== createdUtcDay) return row.completion_date;
+  return createdLocalDay || row.completion_date || createdUtcDay;
 }
 
 export function TimesheetPage() {

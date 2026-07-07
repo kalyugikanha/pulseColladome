@@ -165,15 +165,20 @@ function Page() {
                 <th className="text-left p-3">Priority</th>
                 <th className="text-left p-3">Due</th>
                 <th className="text-left p-3">Links</th>
+                <th className="text-right p-3 w-12"></th>
               </tr>
             </thead>
             <tbody>
               {(rows ?? []).map((r) => {
                 const types = (r.task_types as { task_type: { id: string; name: string } | null }[] | null)?.map((x) => x.task_type).filter(Boolean) ?? [];
                 const links = (r.asset_links as { label: string; url: string }[] | null) ?? [];
+                const rowCreatedBy = (r as unknown as { created_by?: string | null }).created_by ?? null;
+                const canModify = !!me && (me.isAdmin || me.isSuperAdmin || me.canManageProjects || rowCreatedBy === me.id);
                 return (
                   <tr key={r.id} className="border-t border-border/50">
-                    <td className="p-3 font-medium">{r.title}</td>
+                    <td className="p-3 font-medium">
+                      <button className="text-left hover:underline" onClick={() => setOpenTaskId(r.id)}>{r.title}</button>
+                    </td>
                     <td className="p-3">{(r.assignee as { full_name?: string } | null)?.full_name ?? "—"}</td>
                     <td className="p-3 text-muted-foreground">{(r.assignee as { department?: string } | null)?.department ?? "—"}</td>
                     <td className="p-3">{(r.project as { name?: string } | null)?.name ?? "—"}</td>
@@ -192,16 +197,58 @@ function Page() {
                         ))}
                       </div>
                     </td>
+                    <td className="p-3 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canModify && (
+                            <DropdownMenuItem onClick={() => setOpenTaskId(r.id)}>
+                              <Pencil className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => onDuplicate(r.id)}>
+                            <Copy className="h-4 w-4 mr-2" /> Duplicate
+                          </DropdownMenuItem>
+                          {canModify && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(r.id)}>
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 );
               })}
               {(rows?.length ?? 0) === 0 && (
-                <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">No tasks match these filters.</td></tr>
+                <tr><td colSpan={10} className="p-8 text-center text-muted-foreground">No tasks match these filters.</td></tr>
               )}
             </tbody>
           </table>
         </CardContent>
       </Card>
+
+      {openTaskId && <TaskDetailSheet taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>This can't be undone. Comments, subtasks, and logged hours tied to it will also be removed.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={onDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

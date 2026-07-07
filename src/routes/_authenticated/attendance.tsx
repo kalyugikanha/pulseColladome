@@ -40,6 +40,8 @@ function AttendancePage() {
   const { data } = useQuery({
     queryKey: ["attendance", me?.id, today, userScope?.join(",") ?? "all"],
     enabled: canView,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
@@ -85,6 +87,8 @@ function AttendancePage() {
   const { data: overview } = useQuery({
     queryKey: ["attendance-overview", overviewDateStr, userScope?.join(",") ?? "all"],
     enabled: canView,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       let peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
       if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);

@@ -16,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock } from "lucide-react";
+import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock, Link as LinkIcon, ExternalLink } from "lucide-react";
 import { EditTaskDialog } from "./edit-task-dialog";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
 import {
@@ -66,6 +66,11 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [myDept, setMyDept] = useState<string | null>(null);
+  const [refLabel, setRefLabel] = useState("");
+  const [refUrl, setRefUrl] = useState("");
+  const [refBusy, setRefBusy] = useState(false);
+
+
 
   useEffect(() => {
     if (!me?.realId) { setMyDept(null); return; }
@@ -87,6 +92,32 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
     await qc.invalidateQueries({ queryKey: ["my-tasks"] });
     await qc.invalidateQueries({ queryKey: ["awaiting-my-review"] });
   }
+
+  const assetLinks = ((task as { asset_links?: { label: string; url: string }[] | null } | undefined)?.asset_links) ?? [];
+
+  async function saveAssetLinks(next: { label: string; url: string }[]) {
+    if (!task) return;
+    const { error } = await supabase.from("tasks").update({ asset_links: next as never } as never).eq("id", task.id);
+    if (error) throw new Error(error.message);
+    await refresh();
+  }
+  async function addReference() {
+    const label = refLabel.trim();
+    let url = refUrl.trim();
+    if (!label || !url) return toast.error("Label and URL required");
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    setRefBusy(true);
+    try {
+      await saveAssetLinks([...assetLinks, { label, url }]);
+      setRefLabel(""); setRefUrl("");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setRefBusy(false); }
+  }
+  async function removeReference(idx: number) {
+    try { await saveAssetLinks(assetLinks.filter((_, i) => i !== idx)); }
+    catch (e) { toast.error((e as Error).message); }
+  }
+
 
   async function doStatus(s: "todo" | "in_progress" | "review" | "done") {
     try {
@@ -244,9 +275,11 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                 <TabsTrigger value="comments"><MessageSquare className="h-3.5 w-3.5 mr-1" />Comments</TabsTrigger>
                 <TabsTrigger value="checklist"><ListChecks className="h-3.5 w-3.5 mr-1" />Checklist</TabsTrigger>
                 <TabsTrigger value="deps"><GitBranch className="h-3.5 w-3.5 mr-1" />Dependencies</TabsTrigger>
+                <TabsTrigger value="refs"><LinkIcon className="h-3.5 w-3.5 mr-1" />References</TabsTrigger>
                 <TabsTrigger value="watchers"><Users className="h-3.5 w-3.5 mr-1" />Watchers</TabsTrigger>
                 <TabsTrigger value="history"><HistoryIcon className="h-3.5 w-3.5 mr-1" />History</TabsTrigger>
               </TabsList>
+
 
 
 
@@ -358,7 +391,30 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
                 </div>
               </TabsContent>
 
+              <TabsContent value="refs" className="space-y-2">
+                {assetLinks.length === 0 && <p className="text-xs text-muted-foreground">No references yet.</p>}
+                {assetLinks.map((r, i) => (
+                  <div key={`${r.url}-${i}`} className="flex items-center gap-2 rounded-md border border-border/60 p-2 text-sm">
+                    <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <a href={r.url} target="_blank" rel="noreferrer" className="flex-1 truncate text-primary hover:underline inline-flex items-center gap-1">
+                      {r.label || r.url}
+                      <ExternalLink className="h-3 w-3 opacity-60" />
+                    </a>
+                    <button className="text-muted-foreground hover:text-destructive" onClick={() => removeReference(i)} aria-label="Remove reference">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex gap-2 pt-1">
+                  <Input placeholder="Label (e.g. Storyboard)" value={refLabel} onChange={(e) => setRefLabel(e.target.value)} className="w-40" />
+                  <Input placeholder="https://…" value={refUrl} onChange={(e) => setRefUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addReference(); }} />
+                  <Button size="sm" onClick={addReference} disabled={refBusy}>Add</Button>
+                </div>
+              </TabsContent>
+
               <TabsContent value="watchers" className="space-y-1">
+
                 {(detail?.watchers ?? []).map((w) => {
                   const ww = w as { id: string; user: { full_name?: string; email?: string } | null };
                   return <div key={ww.id} className="text-sm">{ww.user?.full_name ?? ww.user?.email ?? "—"}</div>;

@@ -1,70 +1,26 @@
+## 1. Stop assignees from rating themselves
 
-## What's broken today
+**Problem:** When Sweksha closes her own task, the Close dialog shows a 1–5 star input and `closeTask` writes a `task_ratings` row with `rater_id = ratee_id = Sweksha`. This happens whenever the task has no reviewer OR the reviewer is the assignee — which is exactly the situation after Kanishka reassigns her own task to Sweksha without updating the reviewer.
 
-1. **Timesheets** — Approvers can only Approve / Unapprove a day as-is. There's no way to approve fewer hours than an employee logged (e.g. someone logs 9h but the reviewer thinks only 7h are billable). Once approved, the `hours` field itself becomes the "official" number, so HR can't see a Logged-vs-Approved gap per person.
+**Rule going forward:** A rating can only be recorded by a *different* person acting as reviewer. Self-close never produces a rating.
 
-2. **Ratings** — When the reviewer is the same person as the assignee (Kanishka's self-close flow), no rating is ever recorded, because both rating entry points block it:
-   - `reviewTask` guards with `task.assignee_id !== actingUserId`.
-   - `closeTask` (the auto-approve path for reviewer=assignee) has no rating input at all.
-   So the "Average rating this month" card on **My Performance** stays empty.
+**Changes**
+- `src/components/tasks/workflow-task-panel.tsx` — in both close-dialog blocks, tighten `canRate` to `task.reviewer_id && task.reviewer_id === actingUserId && task.assignee_id !== actingUserId`. When the acting user is the assignee, hide the star row entirely and stop passing `rating` in the `closeTask` payload.
+- `src/lib/workflows.functions.ts` — in `closeTask`, remove the two `await maybeRecordRating(task.assignee_id)` calls (auto-approve branch and no-review branch). Keep `maybeRecordRating` unused or delete it. Ratings continue to be written only by `reviewTask` when a distinct reviewer approves.
+- Reviewer auto-resolution stays: if no reviewer is set, we still fall back to the stage's default reviewer / workflow starter as today, but never write a rating on that self-approve path.
 
----
+## 2. Log assignment / reassignment in task history
 
-## Changes
+**Problem:** `edit-task-dialog.tsx` updates `tasks.assignee_id` directly via `supabase.from("tasks").update(...)`. No `task_activity` row is written, so Sweksha's history view shows nothing about the task being created for Kanishka and later handed to her.
 
-### A. Approve fewer hours (Timesheets)
+**Changes**
+- New server function `updateTaskFields` in `src/lib/tasks-workflow.functions.ts` (co-located with existing `logActivity` helper). Accepts the same patch shape edit-task-dialog uses, loads the current row first, applies the update, and — when `assignee_id` changed — inserts a `task_activity` row with `kind: 'assignee_changed'`, `from_value` = old assignee id, `to_value` = new assignee id. Also notifies the new assignee.
+- `src/components/tasks/edit-task-dialog.tsx` — replace the direct `supabase.from("tasks").update(...)` call with `useServerFn(updateTaskFields)` so every edit goes through the logging path.
+- `src/lib/workflows.functions.ts` — inside `spawnNextStage`, when a new stage task inherits a different assignee than the previous stage, also insert an `assignee_changed` activity row on the new task so the workflow handoff shows up in history.
+- Task detail view already reads `task_activity` and renders rows generically; add a friendly label for `assignee_changed` (`"Reassigned from X to Y"`) in whichever component formats activity entries (locate via `rg "kind" src/components/tasks | rg activity`), resolving names from the profiles the detail loader already fetches (extend the activity select if needed to join actor + from/to profiles, or fetch profile names on the fly).
 
-**Data**
-- Extend each row inside `attendance_logs.tasks` (JSON) with an optional `approved_hours: number`.
-  - Absent / null while pending. Defaults to `hours` on approval if reviewer doesn't override.
-- Add two rollup columns to `attendance_logs`:
-  - `logged_hours numeric` — sum of row `hours`
-  - `approved_hours numeric` — sum of row `approved_hours` (only meaningful when `approved_at is not null`)
-- Backfill: `logged_hours = total_hours`, `approved_hours = total_hours` where `approved_at is not null`.
+## 3. Verify
 
-**Day editor sheet** (`src/components/day-editor-sheet.tsx`)
-- Add an "Approved hrs" column next to "Hours", editable only for `canApprove` users.
-- Rewrite `toggleApproval`:
-  - On Approve: for any row where reviewer didn't set an override, set `approved_hours = hours`. Recompute row rollups, write `approved_hours`/`logged_hours` back to the row.
-  - On Unapprove: clear `approved_hours` on the log record (keep per-row values for audit).
-- Save flow keeps `logged_hours` in sync with row `hours`.
-
-**My Timesheet** (`src/routes/_authenticated/my-timesheet.tsx`)
-- Show both `Hours` and `Approved` columns. If `approved_hours < hours`, badge reads "Approved (reduced)" with a tooltip showing the delta.
-- Header stats: "Logged 42.5 · Approved 40.0".
-
-**Admin Timesheet** (`src/routes/_authenticated/timesheet.tsx`)
-- Same two-column display per row.
-- Add a per-person summary row (or a small side card): Logged total, Approved total, Gap.
-
-**HR view**
-- Add a small "Logged vs Approved (this month)" card on `hr.leave.tsx` OR reuse the existing timesheet page with a month-range picker and a per-person summary table (Logged / Approved / Gap / Approval %). Simpler: put it inside the existing admin timesheet page as a "Month summary" toggle so we don't create a new route.
-
-Task-level `task_activity.hours` (Kanban-logged hours that flow into My Timesheet as "Awaiting approval") gets the same treatment: add `approved_hours` column, and in `workflow-task-panel`'s Approve dialog let the reviewer override the logged number before saving. `approval_status='approved'|'auto'` continues to gate what shows as approved.
-
-### B. Ratings on self-close + counted in monthly avg
-
-**Server** (`src/lib/workflows.functions.ts`)
-- `reviewTask.inputValidator` already accepts `rating`. Drop the `task.assignee_id !== actingUserId` guard in the insert — reviewer=assignee is a legitimate rating (Kanishka rating her own work when she's both). Keep the 1–5 bounds check.
-- `closeTask`: add optional `rating?: number` to the validator. When the auto-approve branch fires (reviewer missing OR reviewer === actingUserId), insert into `task_ratings` with `ratee_id = assignee_id`, `rater_id = actingUserId`.
-
-**Client**
-- `mark-done-dialog.tsx`: add a 1–5 star row (optional) shown only when the current user is the reviewer or no reviewer exists. Pass `rating` through `onConfirm`.
-- Wire the caller of `MarkDoneDialog` (task detail sheet) to forward `rating` into `closeTask`.
-- Reviewer's Approve dialog (`workflow-task-panel.tsx`) — allow rating even when `assignee === actingUserId` by relaxing the `canRate` guard.
-
-**My Performance** — no code change needed; the query already reads `ratee_id = me`. Once inserts are unblocked, ratings will appear.
-
----
-
-## Technical notes
-
-- Migration is additive (two nullable columns on `attendance_logs`, one on `task_activity`); no existing reads break.
-- All existing filters (`.eq("user_id", ...)`, RLS) unchanged.
-- `logged_hours`/`approved_hours` are convenience columns for HR reporting — the JSON row-level values remain authoritative.
-- Ratings write path stays server-side (`createServerFn` with `requireSupabaseAuth`).
-
-## Out of scope
-
-- No new HR route or export CSV in this pass — the month-summary lives inline on the existing admin Timesheet page.
-- No rating history UI on tasks (just the number continues to feed My Performance).
+- Sign in as Sweksha, close a task where reviewer = Sweksha (or null): confirm no star input appears and no `task_ratings` row is created.
+- Sign in as Kanishka, review-approve a task assigned to Sweksha with a rating: confirm rating persists and shows in Sweksha's monthly average.
+- Edit a task and change the assignee: reopen the task and confirm the history shows "Reassigned from … to …" with actor + timestamp.

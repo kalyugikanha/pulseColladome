@@ -127,7 +127,7 @@ function TasksPage() {
         .select("task_id, hours, approval_status")
         .eq("actor_id", me!.id)
         .not("hours", "is", null);
-      for (const a of (acts ?? []) as Array<{ task_id: string; hours: number | null; approval_status: string }>) {
+      for (const a of ((acts ?? []) as unknown as Array<{ task_id: string; hours: number | null; approval_status: string }>)) {
         const h = Number(a.hours) || 0;
         if (h <= 0) continue;
         if (a.approval_status === "rejected") continue;

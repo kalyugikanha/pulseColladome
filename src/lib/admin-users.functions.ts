@@ -666,7 +666,7 @@ export const updateLeaveForEmployee = createServerFn({ method: "POST" })
       patch.decided_at = new Date().toISOString();
     }
 
-    const { error } = await supabaseAdmin
+    const { error } = await (supabaseAdmin as any)
       .from("leave_requests")
       .update(patch)
       .eq("id", data.id);

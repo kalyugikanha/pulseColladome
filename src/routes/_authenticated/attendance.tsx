@@ -268,7 +268,7 @@ function AttendancePage() {
                         </TableCell>
                       </TableRow>
                     )}
-                    {overviewRows.map(({ p, a, leave, status }) => (
+                    {overviewRows.map(({ p, a, open, leave, status }) => (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.full_name ?? p.email}</TableCell>
                         <TableCell className="text-muted-foreground">{p.department ?? "—"}</TableCell>
@@ -286,7 +286,7 @@ function AttendancePage() {
                           )}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
-                          {a?.punch_in_time ? format(new Date(a.punch_in_time), "HH:mm") : "—"}
+                          {open?.punch_in_time || a?.punch_in_time ? format(new Date(open?.punch_in_time ?? a!.punch_in_time), "HH:mm") : "—"}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {a?.punch_out_time ? format(new Date(a.punch_out_time), "HH:mm") : "—"}

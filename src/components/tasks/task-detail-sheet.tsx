@@ -226,7 +226,7 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
               {subtasksExist && <p className="text-xs text-muted-foreground">Auto-computed from checklist</p>}
             </div>
 
-            {isReviewer && task.status === "review" && (
+            {isReviewer && task.status === "review" && !task.workflow_instance_id && (
               <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 mb-4 space-y-2">
                 <div className="font-medium text-sm">Waiting for your review</div>
                 <Textarea placeholder="Note to assignee (optional)" rows={2} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />

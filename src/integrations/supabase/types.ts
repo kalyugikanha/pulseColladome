@@ -1993,6 +1993,7 @@ export type Database = {
           default_reviewer_id: string | null
           id: string
           name: string
+          next_stage_position: number | null
           position: number
           required_fields: Json
           requires_review: boolean
@@ -2007,6 +2008,7 @@ export type Database = {
           default_reviewer_id?: string | null
           id?: string
           name: string
+          next_stage_position?: number | null
           position: number
           required_fields?: Json
           requires_review?: boolean
@@ -2021,6 +2023,7 @@ export type Database = {
           default_reviewer_id?: string | null
           id?: string
           name?: string
+          next_stage_position?: number | null
           position?: number
           required_fields?: Json
           requires_review?: boolean

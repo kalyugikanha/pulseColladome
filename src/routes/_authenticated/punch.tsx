@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -50,6 +50,8 @@ function PunchPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>([{ projectId: "", hours: "", comments: "" }]);
   const [submitting, setSubmitting] = useState(false);
+  const [punchingIn, setPunchingIn] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["punch-sessions-today", me?.id],
@@ -82,10 +84,17 @@ function PunchPage() {
   const closedSessions = (sessions ?? []).filter((s) => s.punch_out_time);
   const totalToday = closedSessions.reduce((s, r) => s + Number(r.hours ?? 0), 0);
 
+  useEffect(() => {
+    if (!openSession) return;
+    setNowTick(Date.now());
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [openSession?.id]);
+
   const sessionDurationHours = useMemo(() => {
     if (!openSession) return 0;
-    return Number((differenceInMinutes(new Date(), new Date(openSession.punch_in_time)) / 60).toFixed(2));
-  }, [openSession, dialogOpen]);
+    return Number((differenceInMinutes(new Date(nowTick), new Date(openSession.punch_in_time)) / 60).toFixed(2));
+  }, [openSession, nowTick]);
 
   const allocatedTotal = rows.reduce((s, r) => s + (Number(r.hours) || 0), 0);
 
@@ -121,21 +130,30 @@ function PunchPage() {
   }
 
   async function punchIn() {
+    if (!me || punchingIn) return;
     if (openSession) { toast.error("You already have an open session. Punch out first."); return; }
+    setPunchingIn(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any).from("punch_sessions").insert({
-      user_id: me!.id,
+      user_id: me.id,
       session_date: today,
       punch_in_time: new Date().toISOString(),
     });
-    if (error) { toast.error(error.message); return; }
-    const existing = (await supabase.from("attendance_logs").select("punch_in_time").eq("user_id", me!.id).eq("date", today).maybeSingle()).data;
-    if (!existing?.punch_in_time) {
-      await supabase.from("attendance_logs").upsert({ user_id: me!.id, date: today, punch_in_time: new Date().toISOString() }, { onConflict: "user_id,date" });
+    if (error) {
+      setPunchingIn(false);
+      toast.error(error.message);
+      return;
     }
     toast.success("Punched in");
     await refetchSessions();
-    qc.invalidateQueries();
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
+      qc.invalidateQueries({ queryKey: ["punch-history"] }),
+      qc.invalidateQueries({ queryKey: ["dashboard"] }),
+      qc.invalidateQueries({ queryKey: ["attendance"] }),
+      qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
+    ]);
+    setPunchingIn(false);
   }
 
   function openPunchOut() {
@@ -200,7 +218,13 @@ function PunchPage() {
     await refreshDailyRollup();
     toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);
     setDialogOpen(false);
-    qc.invalidateQueries();
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
+      qc.invalidateQueries({ queryKey: ["punch-history"] }),
+      qc.invalidateQueries({ queryKey: ["dashboard"] }),
+      qc.invalidateQueries({ queryKey: ["attendance"] }),
+      qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
+    ]);
   }
 
   return (
@@ -227,7 +251,9 @@ function PunchPage() {
             {openSession ? (
               <Button size="lg" onClick={openPunchOut} className="gradient-primary shadow-glow text-base h-12 px-8">Punch out</Button>
             ) : (
-              <Button size="lg" onClick={punchIn} className="gradient-primary shadow-glow text-base h-12 px-8">Punch in</Button>
+              <Button size="lg" onClick={punchIn} disabled={!me || punchingIn} className="gradient-primary shadow-glow text-base h-12 px-8">
+                {punchingIn ? "Punching in…" : "Punch in"}
+              </Button>
             )}
           </div>
         </div>

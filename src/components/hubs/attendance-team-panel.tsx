@@ -103,7 +103,7 @@ export function AttendanceTeamPanel() {
   });
 
   if (me && !canView) {
-    throw redirect({ to: "/dashboard" });
+    return <div className="text-sm text-muted-foreground">You don't have permission to view team attendance.</div>;
   }
 
   const sortedPeople = useMemo(() => {

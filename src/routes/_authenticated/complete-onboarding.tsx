@@ -261,45 +261,23 @@ function CompleteOnboardingPage() {
   const filledItems = filledProfile + filledBank + filledDocs;
   const completionPct = Math.round((filledItems / totalItems) * 100);
 
-  async function saveDraft() {
+  async function saveDraft(silent = false) {
     setSaving(true);
+    setAutoStatus("saving");
     try {
-      await saveOnboarding({ data: {
-        profile: {
-          full_name: fullName.trim() || null,
-          personal_email: personalEmail.trim() || null,
-          phone: phone.trim() || null,
-          permanent_address: address.trim() || null,
-          date_of_birth: dob || null,
-          marriage_anniversary: anniversary || null,
-          linkedin_url: linkedin.trim() || null,
-          github_url: github.trim() || null,
-          facebook_url: facebook.trim() || null,
-          instagram_url: instagram.trim() || null,
-          twitter_url: twitter.trim() || null,
-          youtube_url: youtube.trim() || null,
-          pinterest_url: pinterest.trim() || null,
-          department: department.trim() || null,
-          day_start_time: dayStart || null,
-          standup_time: standup || null,
-          hobbies: hobbies.trim() || null,
-        },
-        bank: {
-          account_holder_name: holder.trim(),
-          account_number: account.trim(),
-          bank_branch: branch.trim(),
-          ifsc_code: ifsc.trim().toUpperCase(),
-          pan_number: pan.trim().toUpperCase(),
-        },
-      } });
-      toast.success("Progress saved");
+      await saveOnboarding({ data: autoSavePayload });
+      setLastSavedAt(new Date());
+      setAutoStatus("saved");
+      if (!silent) toast.success("Progress saved");
       qc.invalidateQueries({ queryKey: ["my-onboarding"] });
     } catch (e: unknown) {
+      setAutoStatus("error");
       toast.error(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }
   }
+
 
   async function uploadDoc(spec: DocSpec, file: File) {
     if (file.size > 10 * 1024 * 1024) { toast.error("File must be under 10 MB"); return; }

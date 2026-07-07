@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil } from "lucide-react";
+import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, Check, X, Clock } from "lucide-react";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -110,6 +110,49 @@ function TimesheetPage() {
     enabled: canView,
     queryFn: async () => (await supabase.from("projects").select("code, name").order("code")).data as Project[] ?? [],
   });
+
+  // Direct reports of the current user — they can approve their reports' task-hour logs.
+  const directReportIds = me?.directReportIds ?? [];
+  const { data: pendingHours, refetch: refetchPending } = useQuery({
+    queryKey: ["ts-pending-task-hours", me?.id, directReportIds.join(",")],
+    enabled: !!me?.id && directReportIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_activity" as never)
+        .select("id, task_id, actor_id, hours, note, completion_date, created_at, kind, task:tasks(id, title, project:projects(id, code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email)")
+        .eq("approval_status", "pending")
+        .not("hours", "is", null)
+        .in("actor_id", directReportIds)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return ((data ?? []) as unknown as Array<{
+        id: string; task_id: string; actor_id: string; hours: number | null; note: string | null;
+        completion_date: string | null; created_at: string; kind: string;
+        task: { id: string; title: string | null; project: { code: string | null; name: string | null } | null } | null;
+        actor: { id: string; full_name: string | null; email: string | null } | null;
+      }>);
+    },
+  });
+
+  async function decidePending(id: string, decide: "approved" | "rejected", reason?: string) {
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const myId = userRes.user?.id ?? null;
+      const patch: Record<string, unknown> = {
+        approval_status: decide,
+        approved_by: myId,
+        approved_at: new Date().toISOString(),
+      };
+      if (decide === "rejected") patch.rejected_reason = reason ?? null;
+      const { error } = await supabase.from("task_activity" as never).update(patch as never).eq("id", id);
+      if (error) throw error;
+      toast.success(decide === "approved" ? "Approved" : "Rejected");
+      await refetchPending();
+      qc.invalidateQueries({ queryKey: ["my-ts-activity"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
+  }
   const projectByCode = useMemo(() => new Map((projectsAll ?? []).map((p) => [p.code, p])), [projectsAll]);
 
   const profileById = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p])), [profiles]);
@@ -379,6 +422,75 @@ function TimesheetPage() {
           )}
         </CardContent>
       </Card>
+
+      {directReportIds.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              Task hours awaiting your approval
+              {pendingHours && pendingHours.length > 0 && (
+                <Badge variant="outline" className="ml-1">{pendingHours.length}</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>Hours logged on tasks by people who report to you. Approve or reject each entry.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!pendingHours || pendingHours.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending. Nice.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Task / Project</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Hours</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="w-[180px] text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingHours.map((r) => {
+                    const date = r.completion_date ?? r.created_at.slice(0, 10);
+                    const proj = r.task?.project;
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-sm">{r.actor?.full_name ?? r.actor?.email ?? "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          <div>{r.task?.title ?? "Task"}</div>
+                          {proj?.code && (
+                            <div className="text-[10px] text-muted-foreground font-mono">{proj.code} · {proj.name}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">{format(new Date(date + "T00:00:00"), "d MMM")}</TableCell>
+                        <TableCell className="text-right font-mono">{Number(r.hours ?? 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">{r.note ?? ""}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button size="sm" variant="outline" className="h-7"
+                              onClick={() => decidePending(r.id, "approved")}>
+                              <Check className="h-3.5 w-3.5 mr-1" /> Approve
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-destructive"
+                              onClick={() => {
+                                const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
+                                decidePending(r.id, "rejected", reason || undefined);
+                              }}>
+                              <X className="h-3.5 w-3.5 mr-1" /> Reject
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
 
       {editor && (
         <DayEditorSheet

@@ -166,6 +166,19 @@ export function TaskDetailSheet({ taskId, onClose }: Props) {
     await qc.invalidateQueries({ queryKey: ["my-tasks"] });
   }
 
+  async function doDuplicate() {
+    if (!task) return;
+    try {
+      const created = (await duplicateFn({ data: { id: task.id } })) as { id: string } | null;
+      const newId = created?.id;
+      if (!newId) throw new Error("Duplicate failed");
+      toast.success("Task duplicated");
+      await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
+      await qc.invalidateQueries({ queryKey: ["my-tasks"] });
+      onClose(newId);
+    } catch (e) { toast.error((e as Error).message); }
+  }
+
   return (
     <Sheet open={!!taskId} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">

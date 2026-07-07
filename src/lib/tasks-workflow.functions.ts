@@ -41,10 +41,11 @@ async function resolveActingUser(
 /* ============ Task detail read ============ */
 export const getTaskDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { taskId: string }) => d)
+  .inputValidator((d: { taskId: string; viewAsUserId?: string | null }) => d)
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const [task, subtasks, activity, comments, attachments, watchers, deps] = await Promise.all([
+    const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const [task, subtasks, activity, comments, attachments, watchers, deps, myRating] = await Promise.all([
       supabase.from("tasks").select(`
         *,
         assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email),
@@ -57,13 +58,58 @@ export const getTaskDetail = createServerFn({ method: "POST" })
       supabase.from("task_comment_attachments").select("*, comment:task_comments!inner(task_id)").eq("comment.task_id", data.taskId),
       supabase.from("task_watchers").select("*, user:profiles!task_watchers_user_id_fkey(id, full_name, email)").eq("task_id", data.taskId),
       supabase.from("task_dependencies").select("*, dep:tasks!task_dependencies_depends_on_task_id_fkey(id, title, status)").eq("task_id", data.taskId),
+      supabase.from("task_ratings").select("rating").eq("task_id", data.taskId).eq("rater_id", actingUserId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     return {
       task: task.data, subtasks: subtasks.data ?? [], activity: activity.data ?? [],
       comments: comments.data ?? [], attachments: attachments.data ?? [],
       watchers: watchers.data ?? [], dependencies: deps.data ?? [],
+      myRating: (myRating.data as { rating: number } | null)?.rating ?? null,
     };
   });
+
+/* ============ Rate a task ============ */
+export const rateTask = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { taskId: string; rating: number | null; viewAsUserId?: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const actingUserId = await resolveActingUser(supabase, userId, data.viewAsUserId);
+    const { data: t, error: tErr } = await supabase
+      .from("tasks")
+      .select("id, assignee_id, reviewer_id, created_by")
+      .eq("id", data.taskId)
+      .maybeSingle();
+    if (tErr) throw tErr;
+    if (!t) throw new Error("Task not found");
+    const task = t as { id: string; assignee_id: string | null; reviewer_id: string | null; created_by: string };
+    if (!task.assignee_id) throw new Error("Task has no assignee to rate.");
+    if (task.assignee_id === actingUserId) throw new Error("You can't rate your own work.");
+
+    // Authorisation: reviewer, creator, or the assignee's reporting manager.
+    let allowed = task.reviewer_id === actingUserId || task.created_by === actingUserId;
+    if (!allowed) {
+      const { data: prof } = await supabase.from("profiles").select("reporting_manager_id").eq("id", task.assignee_id).maybeSingle();
+      if ((prof as { reporting_manager_id: string | null } | null)?.reporting_manager_id === actingUserId) allowed = true;
+    }
+    if (!allowed) throw new Error("You are not allowed to rate this task.");
+
+    // Clear any previous rating from this rater, then insert (or leave cleared if rating is null).
+    const { error: delErr } = await supabase.from("task_ratings").delete()
+      .eq("task_id", task.id).eq("rater_id", actingUserId);
+    if (delErr) throw delErr;
+
+    if (data.rating != null) {
+      const r = Math.round(data.rating);
+      if (r < 1 || r > 5) throw new Error("Rating must be 1–5.");
+      const { error: insErr } = await supabase.from("task_ratings").insert({
+        task_id: task.id, ratee_id: task.assignee_id, rater_id: actingUserId, rating: r,
+      });
+      if (insErr) throw insErr;
+    }
+    return { ok: true, rating: data.rating };
+  });
+
 
 /* ============ Status / review workflow ============ */
 export const setTaskStatus = createServerFn({ method: "POST" })

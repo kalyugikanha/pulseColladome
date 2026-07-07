@@ -296,8 +296,17 @@ export function DirectoryPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="text-sm font-medium flex items-center gap-2">
+                        <div className="text-sm font-medium flex items-center gap-1.5 flex-wrap">
                           {p.full_name ?? "—"}
+                          {(rolesByUser?.get(p.id) ?? []).map((r) => (
+                            <Badge
+                              key={r}
+                              variant={r === "super_admin" ? "default" : r === "admin" || r === "hr_admin" ? "secondary" : "outline"}
+                              className="text-[10px] px-1.5 py-0 capitalize"
+                            >
+                              {r.replace("_", " ")}
+                            </Badge>
+                          ))}
                           {p.is_active === false && (
                             <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Inactive</Badge>
                           )}

@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, Check, X, Clock } from "lucide-react";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DayEditorSheet } from "@/components/day-editor-sheet";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
@@ -81,29 +81,42 @@ export function TimesheetPage() {
   const nextDayIso = ymd(addDays(day, 1));
   const dateLabel = format(day, "EEEE, d MMM yyyy");
 
+  // Visibility model shared with the Pending panel:
+  // - Admins / PMs / super admins: use dept/user scope, else all.
+  // - Managers: use dept/user scope, else fall back to direct reports.
+  const directReportIds = me?.directReportIds ?? [];
+  const pendingIsAdmin = !!me && (me.isAdmin || me.canManageProjects || me.isSuperAdmin);
+  const hasScope = !!deptScope || !!userScope;
+  // IDs to restrict profiles/activity to when no dept/user scope is set.
+  const fallbackActorIds: string[] | null = pendingIsAdmin ? null : directReportIds;
+  const fallbackKey = fallbackActorIds ? fallbackActorIds.join(",") : "all";
+
   const { data: profiles } = useQuery({
-    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],
-    enabled: canView,
+    queryKey: ["ts-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all", hasScope ? "scoped" : fallbackKey],
+    enabled: canView && !!me?.id,
     queryFn: async () => {
       let q = supabase.from("profiles").select("id, full_name, email, department");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
       if (userScope && userScope.length) q = q.in("id", userScope);
+      if (!hasScope && fallbackActorIds) {
+        if (fallbackActorIds.length === 0) return [] as Profile[];
+        q = q.in("id", fallbackActorIds);
+      }
       return (await q).data as Profile[] ?? [];
     },
   });
 
   const visibleUserIds = useMemo(() => (profiles ?? []).map((p) => p.id), [profiles]);
-  const hasScope = !!deptScope || !!userScope;
 
   const { data: logs, refetch: refetchLogs } = useQuery({
-    queryKey: ["ts-logs", dateIso, hasScope ? visibleUserIds.join(",") : "all"],
-    enabled: canView && (!hasScope || visibleUserIds.length > 0),
+    queryKey: ["ts-logs", dateIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
+    enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
     queryFn: async () => {
       let q = supabase
         .from("attendance_logs")
         .select("id, user_id, date, tasks, approved_at, approved_by")
         .gte("date", dateIso).lt("date", nextDayIso);
-      if (hasScope) q = q.in("user_id", visibleUserIds);
+      if (hasScope || fallbackActorIds) q = q.in("user_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as LogRow[];
@@ -118,8 +131,8 @@ export function TimesheetPage() {
 
   // Kanban-logged task hours (task_activity) for the visible team on the selected day.
   const { data: activityRows } = useQuery({
-    queryKey: ["ts-activity", dateIso, hasScope ? visibleUserIds.join(",") : "all"],
-    enabled: canView && (!hasScope || visibleUserIds.length > 0),
+    queryKey: ["ts-activity", dateIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
+    enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
     queryFn: async () => {
       let q = supabase
         .from("task_activity" as never)
@@ -127,18 +140,13 @@ export function TimesheetPage() {
         .not("hours", "is", null)
         .neq("approval_status", "rejected")
         .gte("completion_date", dateIso).lt("completion_date", nextDayIso);
-      if (hasScope) q = q.in("actor_id", visibleUserIds);
+      if (hasScope || fallbackActorIds) q = q.in("actor_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
       return ((data ?? []) as unknown as ActivityRow[]);
     },
   });
 
-  // Approvers of pending task-hour entries:
-  // - Managers see only their direct reports (existing behavior).
-  // - Admins / PMs / super admins see all pending entries in the visible scope.
-  const directReportIds = me?.directReportIds ?? [];
-  const pendingIsAdmin = !!me && (me.isAdmin || me.canManageProjects || me.isSuperAdmin);
   const pendingActorIds = pendingIsAdmin
     ? (hasScope ? visibleUserIds : null) // null = unscoped, no in() filter
     : directReportIds;
@@ -147,6 +155,7 @@ export function TimesheetPage() {
       ? (!hasScope || visibleUserIds.length > 0)
       : directReportIds.length > 0
   );
+
   const { data: pendingHours, refetch: refetchPending } = useQuery({
     queryKey: ["ts-pending-task-hours", me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
     enabled: pendingEnabled,
@@ -169,31 +178,6 @@ export function TimesheetPage() {
     },
   });
 
-  const { data: approvedHoursList, refetch: refetchApproved } = useQuery({
-    queryKey: ["ts-approved-task-hours", dateIso, me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
-    enabled: pendingEnabled,
-    queryFn: async () => {
-      let q = supabase
-        .from("task_activity" as never)
-        .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approved_at, approved_by, kind, task:tasks(id, title, project:projects(id, code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email), approver:profiles!task_activity_approved_by_fkey(id, full_name, email)")
-        .in("approval_status", ["approved", "auto"])
-        .not("hours", "is", null)
-        .gte("completion_date", dateIso).lt("completion_date", nextDayIso)
-        .order("approved_at", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false });
-      if (pendingActorIds && pendingActorIds.length > 0) q = q.in("actor_id", pendingActorIds);
-      const { data, error } = await q;
-      if (error) throw error;
-      return ((data ?? []) as unknown as Array<{
-        id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
-        note: string | null; completion_date: string | null; created_at: string;
-        approved_at: string | null; approved_by: string | null; kind: string;
-        task: { id: string; title: string | null; project: { code: string | null; name: string | null } | null } | null;
-        actor: { id: string; full_name: string | null; email: string | null } | null;
-        approver: { id: string; full_name: string | null; email: string | null } | null;
-      }>);
-    },
-  });
 
   async function decidePending(id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) {
     try {
@@ -210,10 +194,8 @@ export function TimesheetPage() {
       if (error) throw error;
       toast.success(decide === "approved" ? "Approved" : "Rejected");
       await refetchPending();
-      await refetchApproved();
       qc.invalidateQueries({ queryKey: ["ts-activity"] });
       qc.invalidateQueries({ queryKey: ["ts-logs"] });
-      qc.invalidateQueries({ queryKey: ["ts-approved-task-hours"] });
       qc.invalidateQueries({ queryKey: ["my-ts-activity"] });
       qc.invalidateQueries({ queryKey: ["my-performance"] });
       qc.invalidateQueries({ queryKey: ["pb-activity"] });
@@ -542,71 +524,6 @@ export function TimesheetPage() {
         </Card>
       )}
 
-      {pendingEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              Approved task hours
-              {approvedHoursList && approvedHoursList.length > 0 && (
-                <Badge variant="outline" className="ml-1">{approvedHoursList.length}</Badge>
-              )}
-            </CardTitle>
-            <CardDescription>Task hours you (or another approver) have approved for this day.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!approvedHoursList || approvedHoursList.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-6 text-center">No approved task hours for this day.</div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Task / Project</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Approved</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead>Approved by</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {approvedHoursList.map((r) => {
-                    const proj = r.task?.project;
-                    const approved = Number(r.approved_hours ?? r.hours ?? 0);
-                    const logged = Number(r.hours ?? 0);
-                    const date = r.completion_date ?? r.created_at.slice(0, 10);
-                    return (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-sm">{r.actor?.full_name ?? r.actor?.email ?? "—"}</TableCell>
-                        <TableCell className="text-sm">
-                          <div className="font-medium">{r.task?.title ?? "Task"}</div>
-                          {proj && (proj.code || proj.name) && (
-                            <div className="text-xs text-muted-foreground">{proj.code ? `${proj.code} · ` : ""}{proj.name ?? ""}</div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">{date}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          <div className="font-semibold">{approved.toFixed(2)}</div>
-                          {logged && approved !== logged ? (
-                            <div className="text-[10px] text-muted-foreground">logged {logged.toFixed(2)}</div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate" title={r.note ?? ""}>{r.note ?? "—"}</TableCell>
-                        <TableCell className="text-xs">
-                          <div>{r.approver?.full_name ?? r.approver?.email ?? "—"}</div>
-                          {r.approved_at && (
-                            <div className="text-muted-foreground">{formatDistanceToNow(new Date(r.approved_at), { addSuffix: true })}</div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
 

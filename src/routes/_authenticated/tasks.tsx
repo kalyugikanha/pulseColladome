@@ -79,10 +79,11 @@ function TasksPage() {
   const fetcherArgs = useMemo(() => {
     if (effectiveScope === "mine") return { assigneeId: me.id };
     if (effectiveScope === "dept") return { department: dept };
+    if (effectiveScope === "all" && personFilter) return { assigneeId: personFilter };
     return {};
-  }, [effectiveScope, me.id, dept]);
+  }, [effectiveScope, me.id, dept, personFilter]);
 
-  const queryKey = ["tasks-unified", effectiveScope, dept, me.id];
+  const queryKey = ["tasks-unified", effectiveScope, dept, me.id, personFilter];
 
   return (
     <div className="space-y-4">

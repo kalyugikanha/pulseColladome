@@ -1,36 +1,36 @@
-## Grant workflow access to anyone with at least one direct report
 
-Right now, only admin / super admin can see and manage workflows (both the sidebar link and the RLS policies on `workflow_templates`, `workflow_template_stages`, and `workflow_instances`). Extend that to any user who is listed as `reporting_manager_id` for at least one active profile.
+## Problem
 
-### 1. DB helper
-Add a security-definer function in the `private` schema:
-```sql
-create or replace function private.has_direct_reports(_user_id uuid)
-returns boolean language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from public.profiles
-    where reporting_manager_id = _user_id
-      and coalesce(is_active, true) = true
-      and id <> _user_id
-  );
-$$;
-```
+For June the "Proposed salary pool" card shows ₹2,76,000 but adding up the "Proposed salary" column in the table below gives ₹2,96,000 (₹20,000 gap).
 
-### 2. RLS updates
-Drop-and-recreate the write policies on the three workflow tables so they allow admin OR super_admin OR `private.has_direct_reports(auth.uid())`:
-- `workflow_templates.wf_templates_admin_write` (ALL)
-- `workflow_template_stages.wf_stages_admin_write` (ALL)
-- `workflow_instances.wf_instances_delete_admin` (DELETE)
-- `workflow_instances.wf_instances_update_owner_or_admin` (UPDATE) — keep owner clause, add has_direct_reports
+Looking at the two calculations:
 
-SELECT policies stay open (already `true` for authenticated); INSERT on instances stays scoped to `started_by = auth.uid()`.
+- **Card total** (`totalProposedPool`) — sums only users who have a row in the `salaries` table.
+- **Table row** — shows the salaries value if present, and **falls back to the invite's default salary** (`role_grants.default_monthly_salary`, labelled "(from invite)") when no salaries row exists yet.
 
-### 3. Sidebar
-`src/routes/_authenticated/route.tsx`: the "Workflows" link condition changes from `(isAdmin || isSuperAdmin)` to `(isAdmin || isSuperAdmin || isReportingManager)`. `isReportingManager` is already computed and passed in — no new query needed.
+Any active employee whose compensation lives only on the invite (no salaries row yet) is displayed in the column but silently dropped from the card total. That is the source of the mismatch, and by construction the card can never be trusted to equal the visible column.
 
-### Files
-- 1 migration for the function + 4 policy replacements.
-- `src/routes/_authenticated/route.tsx`: one condition update.
+## Fix
 
-### Assumption
-"Single reporting person" = "someone whose reporting_manager_id points at this user" (i.e. this user is the manager of at least one active teammate). Tell me if you meant the inverse (users who themselves have a reporting manager assigned) — that would be nearly everyone and I want to double-check before granting broad workflow write access.
+Rewrite `totalProposedPool` so it iterates the exact same rows the table renders and adds the exact same number the "Proposed salary" cell shows. In `src/routes/_authenticated/finances.tsx`:
+
+1. For each `p` in `visibleProfiles`:
+   - If `currentSalaryByUser.get(p.id)` exists and `comp_type = 'monthly'`, add `monthly_salary`.
+   - Else if `comp_type = 'hourly'`, add `hourly_rate * userHoursThisMonth(p.id)` (unchanged).
+   - **Else** look up `grantByEmail.get(p.email)` and, mirroring the table:
+     - `monthly` grant → add `default_monthly_salary ?? 0`
+     - `hourly` grant → add `(default_hourly_rate ?? 0) * userHoursThisMonth(p.id)`
+   - "Not set" rows contribute 0 (same as the "—" cell).
+2. Keep the existing "active employees only" scope — do not include Pending signup rows in this total (the user confirmed they're excluded).
+3. Add a short comment above the memo noting: "Must match the Proposed salary cell in the table below — same fallback order."
+
+No changes to the table rendering, RLS, DB, or any other card.
+
+## Verification
+
+- Open Finances → June, add the Proposed salary column by hand, confirm it equals the card.
+- Repeat for a month where at least one active employee has no salaries row but has an invite default; the card should now include that amount.
+
+## Follow-up question I'll ask after the fix ships
+
+If the June total still reads ₹2,76,000 after this change, that means every active June employee already has a salaries row and no invite fallback is contributing — in that case the ₹20,000 you're expecting is coming from a person you believe should be in June that the system doesn't show as active/effective in June. I'll ask you for the name so I can check their `is_active`, `joined_on`, and salary `effective_from`.

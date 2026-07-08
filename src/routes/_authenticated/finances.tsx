@@ -365,16 +365,28 @@ function FinancesPage() {
     [visibleProfiles, currentSalaryByUser],
   );
 
+  // Must match the Proposed salary cell in the table below — same fallback order:
+  // salaries row → invite (role_grants) default → 0.
   const totalProposedPool = useMemo(() => {
     let sum = 0;
     for (const p of visibleProfiles) {
       const s = currentSalaryByUser.get(p.id);
-      if (!s) continue;
-      if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
-      else sum += Number(s.monthly_salary ?? 0);
+      if (s) {
+        if (s.comp_type === "hourly") sum += Number(s.hourly_rate ?? 0) * (userHoursThisMonth.get(p.id) ?? 0);
+        else sum += Number(s.monthly_salary ?? 0);
+        continue;
+      }
+      const grant = p.email ? grantByEmail.get(p.email.toLowerCase()) : undefined;
+      if (!grant) continue;
+      if (grant.comp_type === "hourly") {
+        if (grant.default_hourly_rate != null) sum += Number(grant.default_hourly_rate) * (userHoursThisMonth.get(p.id) ?? 0);
+      } else if (grant.default_monthly_salary != null) {
+        sum += Number(grant.default_monthly_salary);
+      }
     }
     return sum;
-  }, [visibleProfiles, currentSalaryByUser, userHoursThisMonth]);
+  }, [visibleProfiles, currentSalaryByUser, grantByEmail, userHoursThisMonth]);
+
 
   const totalConfiguredPool = useMemo(() => {
     let sum = 0;

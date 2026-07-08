@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as GoogleCalendarConnectRouteImport } from './routes/google-calendar-connect'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -52,6 +54,16 @@ import { Route as AuthenticatedBdActivityTypesRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GoogleCalendarConnectRoute = GoogleCalendarConnectRouteImport.update({
   id: '/google-calendar-connect',
   path: '/google-calendar-connect',
@@ -276,6 +288,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/access': typeof AuthenticatedAccessRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/bd': typeof AuthenticatedBdRouteWithChildren
@@ -319,6 +333,8 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/access': typeof AuthenticatedAccessRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -363,6 +379,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/bd': typeof AuthenticatedBdRouteWithChildren
@@ -408,6 +426,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/google-calendar-connect'
+    | '/privacy'
+    | '/terms'
     | '/access'
     | '/attendance'
     | '/bd'
@@ -451,6 +471,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/google-calendar-connect'
+    | '/privacy'
+    | '/terms'
     | '/access'
     | '/attendance'
     | '/calendar'
@@ -494,6 +516,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/google-calendar-connect'
+    | '/privacy'
+    | '/terms'
     | '/_authenticated/access'
     | '/_authenticated/attendance'
     | '/_authenticated/bd'
@@ -539,6 +563,8 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   ChangePasswordRoute: typeof ChangePasswordRoute
   GoogleCalendarConnectRoute: typeof GoogleCalendarConnectRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiAssistantTranscribeRoute: typeof ApiAssistantTranscribeRoute
   ApiPublicGoogleCallbackRoute: typeof ApiPublicGoogleCallbackRoute
@@ -546,6 +572,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/google-calendar-connect': {
       id: '/google-calendar-connect'
       path: '/google-calendar-connect'
@@ -944,6 +984,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   ChangePasswordRoute: ChangePasswordRoute,
   GoogleCalendarConnectRoute: GoogleCalendarConnectRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiAssistantTranscribeRoute: ApiAssistantTranscribeRoute,
   ApiPublicGoogleCallbackRoute: ApiPublicGoogleCallbackRoute,

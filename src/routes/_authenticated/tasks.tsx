@@ -391,12 +391,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Project</Label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger><SelectValue placeholder="Pick project" /></SelectTrigger>
-                <SelectContent>
-                  {(projects ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.code ? `${p.code} · ` : ""}{p.name ?? "Untitled project"}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ProjectCombobox projects={projects ?? []} value={projectId} onChange={setProjectId} />
               {projectId && (() => {
                 const p = (projects ?? []).find((project) => project.id === projectId);
                 return p ? <div className="text-[10px] text-muted-foreground font-mono">Project ID: {p.code ?? p.id}</div> : null;

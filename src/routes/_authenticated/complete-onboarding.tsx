@@ -8,9 +8,15 @@ import {
   getMyOnboarding,
   saveMyOnboarding,
   recordMyDocument,
-  completeMyOnboarding,
+  submitOnboardingSection,
   type OnboardingDocType,
 } from "@/lib/onboarding.functions";
+import {
+  ONBOARDING_SECTIONS,
+  SECTION_LABELS,
+  type OnboardingSection,
+  type SectionRow,
+} from "@/lib/onboarding-sections";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,12 +24,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star, Linkedin } from "lucide-react";
+import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star, Linkedin, Send } from "lucide-react";
 import { DepartmentSelect } from "@/components/department-select";
 
 export const Route = createFileRoute("/_authenticated/complete-onboarding")({
   component: CompleteOnboardingPage,
 });
+
 
 type DocSpec = { key: OnboardingDocType; label: string; required: boolean; accept: string; link?: string };
 
@@ -71,7 +78,7 @@ function CompleteOnboardingPage() {
   const getOnboarding = useServerFn(getMyOnboarding);
   const saveOnboarding = useServerFn(saveMyOnboarding);
   const recordDoc = useServerFn(recordMyDocument);
-  const finalize = useServerFn(completeMyOnboarding);
+  const submitSection = useServerFn(submitOnboardingSection);
 
   const { data, isLoading } = useQuery({
     queryKey: ["my-onboarding"],
@@ -230,13 +237,34 @@ function CompleteOnboardingPage() {
 
 
   const uploaded = new Set((data?.documents ?? []).map((d) => d.doc_type));
-  const profileAny = (data?.profile ?? {}) as Record<string, unknown>;
-  const submittedAt = profileAny.onboarding_submitted_at as string | null | undefined;
-  const approvedAt = profileAny.onboarding_approved_at as string | null | undefined;
-  const rejectedAt = profileAny.onboarding_rejected_at as string | null | undefined;
-  const rejectionReason = profileAny.onboarding_rejection_reason as string | null | undefined;
-  const isApproved = !!approvedAt;
-  const isPendingReview = !!submittedAt && !isApproved;
+  const sections = (data?.sections ?? []) as SectionRow[];
+  const sectionMap = new Map(sections.map((s) => [s.section, s]));
+  const sectionOf = (s: OnboardingSection) => sectionMap.get(s);
+
+  async function handleSubmitSection(section: OnboardingSection) {
+    setSubmitting(true);
+    try {
+      await saveDraft(true);
+      const res = await submitSection({ data: { section } });
+      if (!res.ok) {
+        if (res.reason === "already_submitted") {
+          toast.info("Already submitted");
+        } else {
+          const missing = (res.missing ?? []).slice(0, 3).join(", ");
+          toast.error(`Please complete: ${missing}${(res.missing?.length ?? 0) > 3 ? "…" : ""}`);
+        }
+        return;
+      }
+      toast.success(`${SECTION_LABELS[section]} submitted for HR approval`);
+      qc.invalidateQueries({ queryKey: ["current-user"] });
+      qc.invalidateQueries({ queryKey: ["my-onboarding"] });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Submission failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
 
   // ---- Profile completion % ----
   const profileFieldValues: Record<string, string> = {

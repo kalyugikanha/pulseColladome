@@ -179,17 +179,21 @@ function AuthenticatedLayout() {
       return;
     }
     const bypassOnboarding = user.isSuperAdmin || user.isHrAdmin;
-    if (!user.mustChangePassword && !bypassOnboarding && user.onboardingRequired && !user.onboardingApprovedAt) {
-      if (!user.onboardingSubmittedAt) {
-        if (pathname !== "/complete-onboarding" && pathname !== "/change-password") {
-          router.navigate({ to: "/complete-onboarding", replace: true });
-        }
-      } else {
-        if (pathname !== "/onboarding-pending" && pathname !== "/complete-onboarding" && pathname !== "/change-password") {
-          router.navigate({ to: "/onboarding-pending", replace: true });
-        }
+    if (!user.mustChangePassword && !bypassOnboarding && user.onboardingGateBlocked) {
+      // Needs to fill/fix something → complete-onboarding.
+      // Everything required is already submitted (nothing rejected, nothing draft) → pending.
+      const needsInput = user.onboardingAnyRejected
+        || !user.onboardingAnySubmitted
+        || (user.onboardingGateBlocked && !user.onboardingAnySubmitted);
+      const target = needsInput ? "/complete-onboarding" : "/onboarding-pending";
+      if (pathname !== "/complete-onboarding" && pathname !== "/onboarding-pending" && pathname !== "/change-password") {
+        router.navigate({ to: target, replace: true });
+      } else if (pathname === "/onboarding-pending" && needsInput) {
+        router.navigate({ to: "/complete-onboarding", replace: true });
       }
     }
+
+
   }, [user, pathname, router]);
 
   if (isLoading || !user) {

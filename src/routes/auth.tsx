@@ -21,6 +21,7 @@ function AuthPage() {
 
   async function handleGoogle() {
     setLoading(true);
+    try { sessionStorage.setItem("pulse:welcome", "1"); } catch {}
     const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: `${window.location.origin}/auth/callback`,
       extraParams: { prompt: "select_account" },

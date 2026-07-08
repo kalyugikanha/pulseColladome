@@ -154,6 +154,8 @@ export function PunchPage() {
     setPunchingIn(true);
     try {
       const result = await punchInServer({ data: { sessionDate: today } }) as PunchInResult;
+      setUnlogged({ balance: Number(result.unloggedBalance ?? 0), since: result.unloggedSince ?? null });
+      setUnloggedDismissed(false);
       if (result.session.session_date === today) {
         qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => {
           const next = old.some((row) => row.id === result.session.id)

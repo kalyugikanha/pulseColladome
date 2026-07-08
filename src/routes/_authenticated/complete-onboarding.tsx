@@ -603,19 +603,20 @@ function StatusPill({ label, row }: { label: string; row?: SectionRow }) {
 }
 
 function SectionCard({
-  row, title, description, icon, submitting, onSubmit, children,
+  row, title, description, icon, submitting, readOnly, onSubmit, children,
 }: {
   row?: SectionRow;
   title: string;
   description?: string;
   icon?: React.ReactNode;
   submitting: boolean;
+  readOnly?: boolean;
   onSubmit: () => void;
   children: React.ReactNode;
 }) {
   const status = row?.status ?? "draft";
   const required = row?.required !== false;
-  const canSubmit = required && (status === "draft" || status === "rejected");
+  const canSubmit = !readOnly && required && (status === "draft" || status === "rejected");
   const statusMap: Record<string, { label: string; className: string }> = {
     approved: { label: "Approved", className: "text-green-600 border-green-600/40 bg-green-500/10" },
     submitted: { label: "Awaiting HR review", className: "text-amber-600 border-amber-500/40 bg-amber-500/10" },
@@ -627,9 +628,16 @@ function SectionCard({
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="font-display text-lg flex items-center gap-2">{icon}{title}</CardTitle>
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            {icon}{title}
+            {required && (
+              <Badge className="text-[10px] bg-amber-500/15 text-amber-700 border-amber-500/40 hover:bg-amber-500/15" variant="outline">
+                Required by HR
+              </Badge>
+            )}
+          </CardTitle>
           <div className="flex items-center gap-2">
-            {!required && <Badge variant="outline" className="text-[10px]">Not required</Badge>}
+            {!required && <Badge variant="outline" className="text-[10px]">Optional</Badge>}
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${s.className}`}>{s.label}</span>
           </div>
         </div>
@@ -662,7 +670,8 @@ function SectionCard({
 }
 
 
-function UploadRow({ spec, uploaded, busy, onUpload }: { spec: DocSpec; uploaded: boolean; busy: boolean; onUpload: (f: File) => void }) {
+function UploadRow({ spec, uploaded, busy, readOnly, onUpload }: { spec: DocSpec; uploaded: boolean; busy: boolean; readOnly?: boolean; onUpload: (f: File) => void }) {
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2">
       <div className="flex items-center gap-2 text-sm min-w-0">

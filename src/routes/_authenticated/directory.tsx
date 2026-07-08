@@ -592,6 +592,11 @@ export function DirectoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <EmployeeProfileSheet
+        userId={profileSheetId}
+        open={!!profileSheetId}
+        onOpenChange={(o) => { if (!o) setProfileSheetId(null); }}
+      />
     </div>
   );
 }

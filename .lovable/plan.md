@@ -1,29 +1,36 @@
-## Why the version isn't changing
+## Grant workflow access to anyone with at least one direct report
 
-`src/lib/version.ts` is a hand-edited constant (`APP_VERSION = "1.0.1"`). Nothing in the build or publish flow bumps it — publishing just deploys whatever string is in the file. So unless I edit it, publishing won't change what you see.
+Right now, only admin / super admin can see and manage workflows (both the sidebar link and the RLS policies on `workflow_templates`, `workflow_template_stages`, and `workflow_instances`). Extend that to any user who is listed as `reporting_manager_id` for at least one active profile.
 
-Two things to fix that:
-
-### 1. Auto-inject a build ID at build time
-Add a `define` in `vite.config.ts` so every build stamps in a fresh identifier:
-
-```ts
-define: {
-  __BUILD_ID__: JSON.stringify(new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12)),
-}
+### 1. DB helper
+Add a security-definer function in the `private` schema:
+```sql
+create or replace function private.has_direct_reports(_user_id uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.profiles
+    where reporting_manager_id = _user_id
+      and coalesce(is_active, true) = true
+      and id <> _user_id
+  );
+$$;
 ```
 
-Expose it from `src/lib/version.ts` as `BUILD_ID` (typed via `src/vite-env.d.ts`). The footer in `src/routes/_authenticated/route.tsx` renders `v{APP_VERSION} · {BUILD_ID}` — e.g. `v1.0.2 · 202607081345`. Now every publish visibly changes even without a manual bump.
+### 2. RLS updates
+Drop-and-recreate the write policies on the three workflow tables so they allow admin OR super_admin OR `private.has_direct_reports(auth.uid())`:
+- `workflow_templates.wf_templates_admin_write` (ALL)
+- `workflow_template_stages.wf_stages_admin_write` (ALL)
+- `workflow_instances.wf_instances_delete_admin` (DELETE)
+- `workflow_instances.wf_instances_update_owner_or_admin` (UPDATE) — keep owner clause, add has_direct_reports
 
-### 2. Bump the semver now
-Set `APP_VERSION` to `"1.0.2"` so the visible number moves too.
+SELECT policies stay open (already `true` for authenticated); INSERT on instances stays scoped to `started_by = auth.uid()`.
 
-Going forward: the build ID auto-changes on every publish (no action needed). Say "bump version" when you want the semver to move — I'll do a patch bump by default, or you can say "bump minor/major".
+### 3. Sidebar
+`src/routes/_authenticated/route.tsx`: the "Workflows" link condition changes from `(isAdmin || isSuperAdmin)` to `(isAdmin || isSuperAdmin || isReportingManager)`. `isReportingManager` is already computed and passed in — no new query needed.
 
 ### Files
-- `vite.config.ts`: add `vite.define` for `__BUILD_ID__`.
-- `src/vite-env.d.ts`: declare `const __BUILD_ID__: string`.
-- `src/lib/version.ts`: bump to `1.0.2`, export `BUILD_ID = __BUILD_ID__`.
-- `src/routes/_authenticated/route.tsx`: render `v{APP_VERSION} · {BUILD_ID}`.
+- 1 migration for the function + 4 policy replacements.
+- `src/routes/_authenticated/route.tsx`: one condition update.
 
-Also quietly fixing the hydration warning on `/` caused by locale-dependent date formatting ("Wednesday 8 July" vs "Wednesday, July 8") by rendering the formatted date only after mount.
+### Assumption
+"Single reporting person" = "someone whose reporting_manager_id points at this user" (i.e. this user is the manager of at least one active teammate). Tell me if you meant the inverse (users who themselves have a reporting manager assigned) — that would be nearly everyone and I want to double-check before granting broad workflow write access.

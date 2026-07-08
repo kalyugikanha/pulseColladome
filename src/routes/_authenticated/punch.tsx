@@ -605,8 +605,24 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
               </CommandGroup>
             )}
             {(() => {
-              const active = tasks.filter((t) => t.status !== "done");
-              const done = tasks.filter((t) => t.status === "done");
+              const byStatus: Record<string, TaskComboTask[]> = {};
+              for (const t of tasks) {
+                const s = t.status ?? "todo";
+                (byStatus[s] ??= []).push(t);
+              }
+              const STATUS_ORDER = ["todo", "in_progress", "review", "done"] as const;
+              const STATUS_LABELS: Record<string, string> = {
+                todo: "To Do",
+                in_progress: "In Progress",
+                review: "Review",
+                done: "Done",
+              };
+              const STATUS_COLORS: Record<string, string> = {
+                todo: "text-muted-foreground",
+                in_progress: "text-primary",
+                review: "text-warning",
+                done: "text-success",
+              };
               const renderItem = (t: TaskComboTask) => (
                 <CommandItem
                   key={t.id}
@@ -616,17 +632,24 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
                   <Check className={`h-4 w-4 mr-2 ${value === t.id ? "opacity-100" : "opacity-0"}`} />
                   {t.project?.code && <span className="font-mono text-xs mr-2">{t.project.code}</span>}
                   <span className="truncate">{t.title}</span>
-                  {t.status === "done" && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">Done</span>}
+                  {t.status && (
+                    <span className={`ml-2 text-[10px] uppercase tracking-wide ${STATUS_COLORS[t.status] ?? "text-muted-foreground"}`}>
+                      {STATUS_LABELS[t.status] ?? t.status}
+                    </span>
+                  )}
                 </CommandItem>
               );
               return (
                 <>
-                  {active.length > 0 && (
-                    <CommandGroup heading="Active">{active.map(renderItem)}</CommandGroup>
-                  )}
-                  {done.length > 0 && (
-                    <CommandGroup heading="Recently completed">{done.map(renderItem)}</CommandGroup>
-                  )}
+                  {STATUS_ORDER.map((status) => {
+                    const group = byStatus[status];
+                    if (!group || group.length === 0) return null;
+                    return (
+                      <CommandGroup key={status} heading={STATUS_LABELS[status]}>
+                        {group.map(renderItem)}
+                      </CommandGroup>
+                    );
+                  })}
                 </>
               );
             })()}

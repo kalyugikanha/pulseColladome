@@ -1,36 +1,46 @@
+# Super Admin: Full Employee Profile view + edit
 
-## Problem
+## Where it lives today
+- **Directory** (`/directory`) — Super Admin can edit only a small subset: name, department, reporting manager, employment type, phone, and (bank) account number + IFSC. No view of documents or other profile fields.
+- **HR Admin → Onboarding Approvals** (`/hr-admin?tab=approvals`) — has a rich read-only review sheet with all profile fields, bank, and documents (Aadhar, PAN, screenshots, review proofs, etc.). But it's **read-only**, only lists people with a pending/approved submission, and doesn't let Super Admin change anything.
 
-For June the "Proposed salary pool" card shows ₹2,76,000 but adding up the "Proposed salary" column in the table below gives ₹2,96,000 (₹20,000 gap).
+So there is no single place to fully inspect + edit an already-onboarded employee.
 
-Looking at the two calculations:
+## What to build
+Add a **"View full profile"** action to every row in the Employee Directory (Super Admin only). Opens a full-width Sheet with two modes: **View** (default) and **Edit** (toggle).
 
-- **Card total** (`totalProposedPool`) — sums only users who have a row in the `salaries` table.
-- **Table row** — shows the salaries value if present, and **falls back to the invite's default salary** (`role_grants.default_monthly_salary`, labelled "(from invite)") when no salaries row exists yet.
+### Sheet contents (all fields currently captured during onboarding)
+Grouped sections, mirroring the onboarding form:
 
-Any active employee whose compensation lives only on the invite (no salaries row yet) is displayed in the column but silently dropped from the card total. That is the source of the mismatch, and by construction the card can never be trusted to equal the visible column.
+1. **Identity** — full_name, email (read-only), personal_email, phone, date_of_birth, marriage_anniversary, permanent_address, hobbies, profile_picture_url (with preview)
+2. **Work** — department, employment_type, joined_on, reporting_manager_id, day_start_time, standup_time, is_active, onboarding_required
+3. **Social & links** — linkedin_url, github_url, facebook_url, instagram_url, twitter_url, youtube_url, pinterest_url
+4. **Bank details** (`employee_bank_details`) — account_holder_name, account_number, ifsc_code, bank_branch, pan_number
+5. **Salary** — current active row from `salaries` (monthly_salary, currency, effective_from) with a "Manage in Finances" link. Read-only here to avoid duplicating the Finances flow.
+6. **Roles** — badges for user_roles + super_admin (read-only; role changes stay in HR Admin → Access & Roles).
+7. **Documents & proofs** — every `OnboardingDocType` from `hr.onboarding.tsx` (offer letter, Aadhar, PAN, cancelled cheque, marksheets, graduation, masters, resume, profile picture, 7 social-follow screenshots, 4 review screenshots, LinkedIn employment proof). Each row shows Uploaded/Missing, an "Open" button (signed URL via existing `getEmployeeDocumentUrl` server fn), and — in Edit mode — a "Replace" upload button that uses the existing `employee-documents` bucket and `recordMyDocument` pattern (new server fn `adminReplaceEmployeeDocument`).
 
-## Fix
+### Edit behaviour
+- Toggle "Edit" enters an editable form for sections 1–4. Save button persists via a new server function `adminUpdateEmployeeProfile` (Super Admin gate) that updates `profiles` + upserts `employee_bank_details`.
+- Document Replace uploads to the same storage path convention and upserts `employee_documents`.
+- Reuse existing destructive actions (deactivate / hard delete) that already live in the Directory row.
 
-Rewrite `totalProposedPool` so it iterates the exact same rows the table renders and adds the exact same number the "Proposed salary" cell shows. In `src/routes/_authenticated/finances.tsx`:
+### Access control
+- Trigger button visible only to Super Admins (`me.isSuperAdmin`). HR Admin keeps today's limited edit dialog; nothing changes for lower roles.
+- All new server functions gate on super_admin membership.
 
-1. For each `p` in `visibleProfiles`:
-   - If `currentSalaryByUser.get(p.id)` exists and `comp_type = 'monthly'`, add `monthly_salary`.
-   - Else if `comp_type = 'hourly'`, add `hourly_rate * userHoursThisMonth(p.id)` (unchanged).
-   - **Else** look up `grantByEmail.get(p.email)` and, mirroring the table:
-     - `monthly` grant → add `default_monthly_salary ?? 0`
-     - `hourly` grant → add `(default_hourly_rate ?? 0) * userHoursThisMonth(p.id)`
-   - "Not set" rows contribute 0 (same as the "—" cell).
-2. Keep the existing "active employees only" scope — do not include Pending signup rows in this total (the user confirmed they're excluded).
-3. Add a short comment above the memo noting: "Must match the Proposed salary cell in the table below — same fallback order."
+## Files
 
-No changes to the table rendering, RLS, DB, or any other card.
+**New**
+- `src/components/directory/employee-profile-sheet.tsx` — the Sheet UI (view/edit modes, document grid, replace upload).
+- `src/lib/admin-employee.functions.ts` — server functions:
+  - `adminGetEmployeeFull({ user_id })` — returns profile + bank + documents + active salary + roles.
+  - `adminUpdateEmployeeProfile({ user_id, profile, bank })` — Super Admin only.
+  - `adminReplaceEmployeeDocument({ user_id, doc_type, storage_path })` — Super Admin only.
 
-## Verification
+**Edited**
+- `src/routes/_authenticated/directory.tsx` — add a "Profile" button in the actions column (Super Admin only) that opens the new Sheet. Keep the existing lightweight Edit dialog for HR Admin.
 
-- Open Finances → June, add the Proposed salary column by hand, confirm it equals the card.
-- Repeat for a month where at least one active employee has no salaries row but has an invite default; the card should now include that amount.
-
-## Follow-up question I'll ask after the fix ships
-
-If the June total still reads ₹2,76,000 after this change, that means every active June employee already has a salaries row and no invite fallback is contributing — in that case the ₹20,000 you're expecting is coming from a person you believe should be in June that the system doesn't show as active/effective in June. I'll ask you for the name so I can check their `is_active`, `joined_on`, and salary `effective_from`.
+## Out of scope
+- Changing roles, salary rows, or leave balances (already have dedicated screens).
+- Bulk edits.

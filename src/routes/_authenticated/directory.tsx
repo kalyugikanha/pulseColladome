@@ -15,8 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Pencil, Users, Search, UserX, UserCheck, Trash2 } from "lucide-react";
+import { Pencil, Users, Search, UserX, UserCheck, Trash2, IdCard } from "lucide-react";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
+import { EmployeeProfileSheet } from "@/components/directory/employee-profile-sheet";
 
 
 export const Route = createFileRoute("/_authenticated/directory")({
@@ -52,6 +53,7 @@ export function DirectoryPage() {
   const [busy, setBusy] = useState(false);
   const [bankAcct, setBankAcct] = useState("");
   const [bankIfsc, setBankIfsc] = useState("");
+  const [profileSheetId, setProfileSheetId] = useState<string | null>(null);
 
   const setActiveFn = useServerFn(setUserActive);
   const deleteFn = useServerFn(deleteUserPermanently);
@@ -407,6 +409,11 @@ export function DirectoryPage() {
                   {canEdit && (
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {me?.isSuperAdmin && (
+                          <Button variant="ghost" size="sm" onClick={() => setProfileSheetId(p.id)}>
+                            <IdCard className="h-3.5 w-3.5 mr-1" /> Profile
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
                           <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                         </Button>
@@ -585,6 +592,11 @@ export function DirectoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <EmployeeProfileSheet
+        userId={profileSheetId}
+        open={!!profileSheetId}
+        onOpenChange={(o) => { if (!o) setProfileSheetId(null); }}
+      />
     </div>
   );
 }

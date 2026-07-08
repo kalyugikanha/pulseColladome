@@ -145,23 +145,8 @@ export const setTaskStatus = createServerFn({ method: "POST" })
       reviewState = "none";
     }
 
-    // Hours-before-review gate: when the assignee is sending the task into review
-    // (either explicitly picking "In Review" or marking done with a distinct reviewer),
-    // require at least one logged time entry from them on this task.
-    const goingToReview = nextStatus === "review";
-    const isAssignee = task.assignee_id === actingUserId;
-    if (goingToReview && isAssignee && !task.workflow_instance_id) {
-      const { data: logs } = await supabase
-        .from("task_activity")
-        .select("hours")
-        .eq("task_id", data.taskId)
-        .eq("actor_id", actingUserId)
-        .eq("kind", "time_logged");
-      const total = (logs ?? []).reduce((sum: number, r: { hours: number | null }) => sum + (Number(r.hours) || 0), 0);
-      if (total <= 0) {
-        throw new Error("Log the hours you worked on this task before sending it for review.");
-      }
-    }
+    // Hours-before-review gate REMOVED: hours are captured in the punch-out dialog now.
+    // Status transitions between todo / in_progress / review are self-service.
 
     const { error } = await supabase.from("tasks").update({
       status: nextStatus, review_state: reviewState,

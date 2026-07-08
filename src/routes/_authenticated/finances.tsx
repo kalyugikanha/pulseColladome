@@ -340,9 +340,12 @@ function FinancesPage() {
 
   const isProfileEffectiveInMonth = (p: Profile) => {
     const earliest = earliestEffectiveByUser.get(p.id);
-    if (!earliest) return false;
+    // Missing both salaries row and joined_on: still surface active employees
+    // so they're never silently dropped from the roster/totals.
+    if (!earliest) return true;
     return new Date(earliest) <= monthEnd;
   };
+
 
   // Active + department-filtered + effective-in-month roster
   const visibleProfiles = useMemo(() => {
@@ -522,7 +525,11 @@ function FinancesPage() {
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.email}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/40">Active</Badge></TableCell>
+                    <TableCell>
+                      {!s && !(grant && (grant.comp_type === "hourly" ? grant.default_hourly_rate != null : grant.default_monthly_salary != null))
+                        ? <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Missing salary</Badge>
+                        : <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/40">Active</Badge>}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] capitalize">{effType}</Badge>
                     </TableCell>

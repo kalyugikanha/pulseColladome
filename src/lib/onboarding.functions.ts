@@ -376,3 +376,54 @@ export const getEmployeeOnboarding = createServerFn({ method: "POST" })
       sections,
     };
   });
+
+// Returns the same shape as getMyOnboarding, but for an arbitrary user.
+// - If user_id === caller: same code path (user-scoped, RLS applies).
+// - Else: super admin / HR admin only, loaded via service role so all fields are visible.
+export const getOnboardingForUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { user_id: string }) => input)
+  .handler(async ({ data, context }) => {
+    const uid = data.user_id;
+    if (uid === context.userId) {
+      const supabase = context.supabase as unknown as SupabaseLoose;
+      const [{ data: profile }, { data: bank }, { data: docs }, sections] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
+        supabase.from("employee_bank_details").select("*").eq("user_id", uid).maybeSingle(),
+        supabase.from("employee_documents").select("doc_type, storage_path, uploaded_at").eq("user_id", uid),
+        loadSections(supabase, uid),
+      ]);
+      return {
+        profile: profile ?? null,
+        bank: bank ?? null,
+        documents: (docs ?? []) as { doc_type: OnboardingDocType; storage_path: string; uploaded_at: string }[],
+        sections,
+      };
+    }
+
+    // Cross-user: authorize as super/HR admin, then use service role for full visibility.
+    const supabase = context.supabase as unknown as SupabaseLoose;
+    const [{ data: sa }, { data: roles }] = await Promise.all([
+      supabase.from("super_admins").select("user_id").eq("user_id", context.userId).maybeSingle(),
+      supabase.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    if (!sa && !(roles as Array<{ role: string }> | null)?.some((r) => r.role === "hr_admin")) {
+      throw new Error("Forbidden");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const admin = supabaseAdmin as unknown as SupabaseLoose;
+    const [{ data: profile }, { data: bank }, { data: docs }, sections] = await Promise.all([
+      admin.from("profiles").select("*").eq("id", uid).maybeSingle(),
+      admin.from("employee_bank_details").select("*").eq("user_id", uid).maybeSingle(),
+      admin.from("employee_documents").select("doc_type, storage_path, uploaded_at").eq("user_id", uid),
+      loadSections(admin, uid),
+    ]);
+    return {
+      profile: profile ?? null,
+      bank: bank ?? null,
+      documents: (docs ?? []) as { doc_type: OnboardingDocType; storage_path: string; uploaded_at: string }[],
+      sections,
+    };
+  });
+

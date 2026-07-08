@@ -229,8 +229,9 @@ function CompleteOnboardingPage() {
   }, [autoSavePayload, saveOnboarding, readOnly]);
 
 
-  // Best-effort flush on tab close / hide
+  // Best-effort flush on tab close / hide (skipped in read-only view)
   useEffect(() => {
+    if (readOnly) return;
     const flush = () => {
       if (!hydratedRef.current) return;
       // Fire-and-forget; not guaranteed to reach server during unload.
@@ -243,7 +244,8 @@ function CompleteOnboardingPage() {
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [autoSavePayload, saveOnboarding]);
+  }, [autoSavePayload, saveOnboarding, readOnly]);
+
 
 
   const uploaded = new Set((data?.documents ?? []).map((d) => d.doc_type));

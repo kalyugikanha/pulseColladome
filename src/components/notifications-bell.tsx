@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bell, CheckCheck, ClipboardList, MessageSquare, AtSign, GitPullRequest } from "lucide-react";
+import { Bell, CheckCheck, ClipboardList, MessageSquare, AtSign, GitPullRequest, ClipboardCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 
@@ -23,6 +23,7 @@ function iconFor(kind: string) {
   if (kind === "task_request") return <ClipboardList className="h-3.5 w-3.5 text-primary" />;
   if (kind.startsWith("mention")) return <AtSign className="h-3.5 w-3.5 text-primary" />;
   if (kind.startsWith("stage")) return <GitPullRequest className="h-3.5 w-3.5 text-primary" />;
+  if (kind.startsWith("onboarding")) return <ClipboardCheck className="h-3.5 w-3.5 text-primary" />;
   return <MessageSquare className="h-3.5 w-3.5 text-primary" />;
 }
 

@@ -307,6 +307,7 @@ function CompleteOnboardingPage() {
   const completionPct = Math.round((filledItems / totalItems) * 100);
 
   async function saveDraft(silent = false) {
+    if (readOnly) return;
     setSaving(true);
     setAutoStatus("saving");
     try {
@@ -325,6 +326,7 @@ function CompleteOnboardingPage() {
 
 
   async function uploadDoc(spec: DocSpec, file: File) {
+    if (readOnly) return;
     if (file.size > 10 * 1024 * 1024) { toast.error("File must be under 10 MB"); return; }
     setUploading(spec.key);
     try {
@@ -345,6 +347,7 @@ function CompleteOnboardingPage() {
       setUploading(null);
     }
   }
+
 
   const approvedCount = sections.filter((s) => s.required && s.status === "approved").length;
   const requiredCount = sections.filter((s) => s.required).length;

@@ -351,6 +351,15 @@ export function DirectoryPage() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{p.joined_on ?? "—"}</TableCell>
                   {canEdit && (
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={p.onboarding_required !== false}
+                        onCheckedChange={(v) => setOnboardingRequired(p, v === true)}
+                        aria-label="Onboarding required"
+                      />
+                    </TableCell>
+                  )}
+                  {canEdit && (
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
@@ -373,7 +382,7 @@ export function DirectoryPage() {
               ))}
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={canEdit ? 6 : 5} className="text-center text-sm text-muted-foreground py-8">
+                  <TableCell colSpan={canEdit ? 7 : 5} className="text-center text-sm text-muted-foreground py-8">
                     No teammates match.
                   </TableCell>
                 </TableRow>

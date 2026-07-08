@@ -72,6 +72,8 @@ export function NotificationsBell({ userId }: { userId: string }) {
       setOpenTaskId(n.task_id);
     } else if (n.kind === "task_request") {
       navigate({ to: "/tasks" });
+    } else if (n.kind.startsWith("onboarding")) {
+      navigate({ to: "/complete-onboarding" });
     }
     setOpen(false);
   }

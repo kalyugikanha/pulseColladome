@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Plus, Trash2, Check, ChevronsUpDown, Send } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Clock, Plus, Trash2, Check, ChevronsUpDown, Send, AlertTriangle, X } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
 

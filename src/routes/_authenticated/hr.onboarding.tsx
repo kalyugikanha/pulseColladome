@@ -133,12 +133,17 @@ export function HrOnboardingPage() {
                         <th className="text-left px-3 py-2">Employee</th>
                         <th className="text-left px-3 py-2">Department</th>
                         <th className="text-left px-3 py-2">Sections</th>
-                        <th className="text-left px-3 py-2">Progress</th>
+                        <th className="text-left px-3 py-2">Completion</th>
+                        <th className="text-left px-3 py-2">Still pending</th>
                         <th className="text-right px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((r) => (
+                      {rows.map((r) => {
+                        const denom = r.required_count > 0 ? r.required_count : r.sections.length;
+                        const pct = denom > 0 ? Math.round((r.approved_count / denom) * 100) : 100;
+                        const pendingSections = r.sections.filter((s) => s.required && s.status !== "approved");
+                        return (
                         <tr key={r.user_id} className="border-t border-border/40 hover:bg-muted/30 cursor-pointer" onClick={() => setOpenId(r.user_id)}>
                           <td className="px-3 py-2">
                             <div className="font-medium">{r.full_name ?? "—"}</div>
@@ -153,15 +158,31 @@ export function HrOnboardingPage() {
                             </div>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">
-                            <span className={r.fully_approved ? "text-green-600" : "text-muted-foreground"}>
-                              {r.approved_count}/{r.required_count} approved
-                            </span>
-                            {r.pending_count > 0 && <span className="ml-2 text-amber-600">· {r.pending_count} pending</span>}
-                            {r.rejected_count > 0 && <span className="ml-2 text-destructive">· {r.rejected_count} sent back</span>}
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 w-24 rounded-full bg-muted overflow-hidden">
+                                <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-xs tabular-nums text-muted-foreground">{pct}%</span>
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">{r.approved_count}/{denom} sections confirmed</div>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs">
+                            {pendingSections.length === 0 ? (
+                              <span className="text-green-600">Nothing pending</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {pendingSections.map((s) => (
+                                  <span key={s.section} className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700">
+                                    {SECTION_SHORT[s.section]}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2 text-right"><Button size="sm" variant="ghost">Review</Button></td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

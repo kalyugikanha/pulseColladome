@@ -703,6 +703,27 @@ export type Database = {
           },
         ]
       }
+      payroll_settings: {
+        Row: {
+          debit_account_number: string
+          id: string
+          pay_date_offset_days: number
+          updated_at: string
+        }
+        Insert: {
+          debit_account_number?: string
+          id?: string
+          pay_date_offset_days?: number
+          updated_at?: string
+        }
+        Update: {
+          debit_account_number?: string
+          id?: string
+          pay_date_offset_days?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

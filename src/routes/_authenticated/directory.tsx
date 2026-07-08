@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,12 +50,15 @@ export function DirectoryPage() {
   const [confirmDelete, setConfirmDelete] = useState<Profile | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [bankAcct, setBankAcct] = useState("");
+  const [bankIfsc, setBankIfsc] = useState("");
 
   const setActiveFn = useServerFn(setUserActive);
   const deleteFn = useServerFn(deleteUserPermanently);
 
   const canView = !!me && (me.isSuperAdmin || me.isAdmin || me.isHrAdmin || me.isDepartmentHead || me.isReportingManager);
   const canEdit = !!me && (me.isSuperAdmin || me.isHrAdmin);
+  const canEditBank = !!me && me.isSuperAdmin;
   const canHardDelete = !!me && me.isSuperAdmin;
 
 
@@ -125,6 +128,25 @@ export function DirectoryPage() {
     },
   });
 
+  const { data: editingBank } = useQuery({
+    queryKey: ["directory-bank", editing?.id],
+    enabled: !!editing && canEditBank,
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("employee_bank_details")
+        .select("user_id, account_number, ifsc_code, account_holder_name, bank_branch, pan_number")
+        .eq("user_id", editing!.id)
+        .maybeSingle();
+      return data as { user_id: string; account_number: string | null; ifsc_code: string | null; account_holder_name: string | null; bank_branch: string | null; pan_number: string | null } | null;
+    },
+  });
+
+  useEffect(() => {
+    setBankAcct(editingBank?.account_number ?? "");
+    setBankIfsc(editingBank?.ifsc_code ?? "");
+  }, [editingBank, editing?.id]);
+
+
 
   const nameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -184,9 +206,32 @@ export function DirectoryPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any).from("profiles").update(payload).eq("id", editing.id);
     if (error) return toast.error(error.message);
+
+    if (canEditBank) {
+      const acct = bankAcct.trim();
+      const ifsc = bankIfsc.trim().toUpperCase();
+      const hasAny = acct || ifsc;
+      const hadExisting = !!editingBank;
+      if (hasAny || hadExisting) {
+        // Bank table requires all fields NOT NULL — preserve existing values and default missing ones.
+        const merged = {
+          user_id: editing.id,
+          account_number: acct || editingBank?.account_number || "",
+          ifsc_code: ifsc || editingBank?.ifsc_code || "",
+          account_holder_name: editingBank?.account_holder_name || editing.full_name || "",
+          bank_branch: editingBank?.bank_branch || "",
+          pan_number: editingBank?.pan_number || "",
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: bErr } = await (supabase as any).from("employee_bank_details").upsert(merged, { onConflict: "user_id" });
+        if (bErr) return toast.error(`Bank details: ${bErr.message}`);
+      }
+    }
+
     toast.success("Updated");
     setEditing(null);
     qc.invalidateQueries({ queryKey: ["directory-profiles"] });
+    qc.invalidateQueries({ queryKey: ["salary-export-banks"] });
   }
 
   async function toggleActive(p: Profile, active: boolean) {
@@ -459,8 +504,23 @@ export function DirectoryPage() {
                   onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
                 />
               </Field>
+              {canEditBank && (
+                <div className="pt-2 border-t border-border/60 space-y-3">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Bank details (payroll NEFT)</div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Bank account number">
+                      <Input value={bankAcct} onChange={(e) => setBankAcct(e.target.value)} placeholder="e.g. 1234567890" inputMode="numeric" />
+                    </Field>
+                    <Field label="IFSC code">
+                      <Input value={bankIfsc} onChange={(e) => setBankIfsc(e.target.value.toUpperCase())} placeholder="e.g. HDFC0001234" />
+                    </Field>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Used by the Finances → Bank NEFT upload export.</p>
+                </div>
+              )}
             </div>
           )}
+
           <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
             <div className="flex items-center gap-2">
               {editing && editing.id !== me?.id && (

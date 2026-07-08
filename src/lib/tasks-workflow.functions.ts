@@ -340,6 +340,65 @@ export const toggleWatcher = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/* ============ Task attachments ============ */
+export const listTaskAttachments = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: rows, error } = await supabase
+      .from("task_attachments")
+      .select("*, uploader:profiles!task_attachments_uploader_id_fkey(id, full_name, email)")
+      .eq("task_id", data.taskId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    const items = rows ?? [];
+    const withUrls = await Promise.all(
+      items.map(async (r: any) => {
+        const { data: signed } = await supabase.storage
+          .from("task-attachments")
+          .createSignedUrl(r.file_path as string, 60 * 10);
+        return { ...r, url: signed?.signedUrl ?? null };
+      }),
+    );
+    return withUrls;
+  });
+
+export const insertTaskAttachment = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string; filePath: string; fileName: string; contentType?: string | null; sizeBytes?: number | null }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const actingUserId = context.actingUserId;
+    const { data: row, error } = await supabase.from("task_attachments").insert({
+      task_id: data.taskId,
+      uploader_id: actingUserId,
+      file_path: data.filePath,
+      file_name: data.fileName,
+      content_type: data.contentType ?? null,
+      size_bytes: data.sizeBytes ?? null,
+    }).select("*").single();
+    if (error) throw error;
+    await logActivity(supabase, data.taskId, actingUserId, "attachment_added", null, data.fileName);
+    return row;
+  });
+
+export const deleteTaskAttachment = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const actingUserId = context.actingUserId;
+    const { data: row, error: rErr } = await supabase.from("task_attachments").select("*").eq("id", data.id).maybeSingle();
+    if (rErr) throw rErr;
+    if (!row) throw new Error("Attachment not found");
+    const { error: dErr } = await supabase.from("task_attachments").delete().eq("id", data.id);
+    if (dErr) throw dErr;
+    await supabase.storage.from("task-attachments").remove([row.file_path as string]);
+    await logActivity(supabase, row.task_id as string, actingUserId, "attachment_removed", row.file_name as string, null);
+    return { ok: true };
+  });
+
 /* ============ Dependencies ============ */
 export const addDependency = createServerFn({ method: "POST" })
   .middleware([impersonationMiddleware])

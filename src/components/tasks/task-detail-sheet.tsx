@@ -454,6 +454,64 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                   </div>
                 )}
 
+                {/* Attachments */}
+                <div className="space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-xs font-medium">Attachments</span>
+                    <div className="flex-1" />
+                    <label className="inline-flex">
+                      <input
+                        type="file" multiple className="hidden"
+                        disabled={uploadBusy}
+                        onChange={(e) => { void handleUploadFiles(e.target.files); e.currentTarget.value = ""; }}
+                      />
+                      <span className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs cursor-pointer hover:bg-accent">
+                        {uploadBusy ? "Uploading…" : "Upload files"}
+                      </span>
+                    </label>
+                  </div>
+                  {(attachmentsList?.length ?? 0) === 0 ? (
+                    <p className="pl-6 text-[11px] text-muted-foreground">No attachments yet.</p>
+                  ) : (
+                    <div className="pl-6 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {(attachmentsList ?? []).map((a) => {
+                        const isImg = (a.content_type ?? "").startsWith("image/");
+                        const isVid = (a.content_type ?? "").startsWith("video/");
+                        const canDelete = a.uploader_id === me?.id
+                          || (task as { created_by?: string }).created_by === me?.realId
+                          || !!me?.isAdmin || !!me?.isSuperAdmin;
+                        return (
+                          <div key={a.id} className="group relative rounded-md border border-border/60 overflow-hidden bg-muted/20 flex flex-col">
+                            {isImg && a.url ? (
+                              <a href={a.url} target="_blank" rel="noreferrer" className="block bg-black/5">
+                                <img src={a.url} alt={a.file_name} className="w-full h-24 object-cover" />
+                              </a>
+                            ) : isVid && a.url ? (
+                              <video src={a.url} controls className="w-full h-24 object-cover bg-black" />
+                            ) : (
+                              <a href={a.url ?? "#"} target="_blank" rel="noreferrer" className="flex items-center justify-center h-24 bg-muted/40">
+                                <Paperclip className="h-6 w-6 text-muted-foreground" />
+                              </a>
+                            )}
+                            <div className="px-2 py-1 text-[10px] flex items-center gap-1">
+                              <a href={a.url ?? "#"} target="_blank" rel="noreferrer" className="flex-1 truncate hover:underline" title={a.file_name}>{a.file_name}</a>
+                              {canDelete && (
+                                <button className="text-muted-foreground hover:text-destructive" onClick={() => handleDeleteAttachment(a.id)} aria-label="Delete attachment">
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                            <div className="px-2 pb-1 text-[10px] text-muted-foreground truncate">
+                              {a.uploader?.full_name ?? a.uploader?.email ?? "Someone"} · {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 {/* Add reference */}
                 <div className="flex gap-2 items-center">
                   <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />

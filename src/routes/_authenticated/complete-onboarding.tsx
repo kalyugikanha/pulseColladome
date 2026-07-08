@@ -688,22 +688,25 @@ function UploadRow({ spec, uploaded, busy, readOnly, onUpload }: { spec: DocSpec
             </a>
           </Button>
         )}
-        <label className="cursor-pointer">
-          <input
-            type="file"
-            accept={spec.accept}
-            className="hidden"
-            disabled={busy}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onUpload(f);
-              e.currentTarget.value = "";
-            }}
-          />
-          <Button asChild size="sm" variant="outline" disabled={busy}>
-            <span>{busy ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading…</> : uploaded ? "Replace" : "Upload"}</span>
-          </Button>
-        </label>
+        {!readOnly && (
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept={spec.accept}
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onUpload(f);
+                e.currentTarget.value = "";
+              }}
+            />
+            <Button asChild size="sm" variant="outline" disabled={busy}>
+              <span>{busy ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading…</> : uploaded ? "Replace" : "Upload"}</span>
+            </Button>
+          </label>
+        )}
+
       </div>
     </div>
   );

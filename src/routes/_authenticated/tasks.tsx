@@ -112,6 +112,37 @@ function TasksPage() {
               </SelectContent>
             </Select>
           )}
+          {effectiveScope === "all" && (
+            <Select value={personFilter || "__all__"} onValueChange={(v) => setPersonFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="h-9 w-56"><SelectValue placeholder="All people" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <div className="p-1 sticky top-0 bg-popover z-10">
+                  <Input
+                    placeholder="Search name, email, department…"
+                    value={personSearch}
+                    onChange={(e) => setPersonSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <SelectItem value="__all__">All people</SelectItem>
+                {(allPeople ?? [])
+                  .filter((p) => {
+                    if (!personSearch.trim()) return true;
+                    const q = personSearch.toLowerCase();
+                    return (
+                      (p.full_name ?? "").toLowerCase().includes(q) ||
+                      (p.email ?? "").toLowerCase().includes(q) ||
+                      (p.department ?? "").toLowerCase().includes(q)
+                    );
+                  })
+                  .map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {(p.full_name ?? p.email)}{p.department ? ` · ${p.department}` : ""}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
           <div className="inline-flex rounded-md border overflow-hidden">
             <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className="rounded-none h-9" onClick={() => setSearch({ view: "kanban" })}>
               <LayoutGrid className="h-4 w-4 mr-1" /> Kanban

@@ -102,18 +102,20 @@ export function PunchPage() {
   const requireTask = ((myDept ?? "").toLowerCase() === "marketing" || (myDept ?? "").toLowerCase() === "business development" || (myDept ?? "").toLowerCase() === "bd");
 
   const { data: myTasks } = useQuery({
-    queryKey: ["my-open-tasks", punchUserId],
+    queryKey: ["my-punch-tasks", punchUserId],
     enabled: !!punchUserId,
     queryFn: async () => {
       const { data } = await supabase
         .from("tasks")
-        .select("id, title, status, project_id, project:projects(id, code, name)")
+        .select("id, title, status, project_id, updated_at, project:projects(id, code, name)")
         .eq("assignee_id", punchUserId!)
-        
+        .in("status", ["todo", "in_progress", "review", "done"])
         .not("project_id", "is", null)
-        .order("created_at", { ascending: false })
+        .order("updated_at", { ascending: false })
         .limit(200);
-      return (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; project: { id: string; code: string; name: string } | null }>;
+      const rows = (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; updated_at: string | null; project: { id: string; code: string; name: string } | null }>;
+      // Active tasks first, then Done — each group ordered by most recent update.
+      return [...rows.filter((t) => t.status !== "done"), ...rows.filter((t) => t.status === "done")];
     },
     staleTime: 60_000,
   });
@@ -407,7 +409,7 @@ export function PunchPage() {
                       <Send className="h-3 w-3" /> Can't find your task? Request one from your manager
                     </button>
                     {requireTask && !myTasks?.length && (
-                      <p className="text-[11px] text-warning">No open tasks assigned to you yet — request one above and your manager will get it in their notifications.</p>
+                      <p className="text-[11px] text-warning">No active or recently completed tasks — request one above or pick a project below.</p>
                     )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
@@ -538,14 +540,18 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
           <CommandInput placeholder="Search by task or project code…" />
           <CommandList>
             <CommandEmpty>No tasks found.</CommandEmpty>
-            <CommandGroup>
-              {allowNone && (
+            {allowNone && (
+              <CommandGroup>
                 <CommandItem value="__none__" onSelect={() => { onChange("", null); setOpen(false); }}>
                   <Check className={`h-4 w-4 mr-2 ${!value ? "opacity-100" : "opacity-0"}`} />
                   — No task —
                 </CommandItem>
-              )}
-              {tasks.map((t) => (
+              </CommandGroup>
+            )}
+            {(() => {
+              const active = tasks.filter((t) => t.status !== "done");
+              const done = tasks.filter((t) => t.status === "done");
+              const renderItem = (t: TaskComboTask) => (
                 <CommandItem
                   key={t.id}
                   value={`${t.project?.code ?? ""} ${t.title}`}
@@ -556,8 +562,18 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
                   <span className="truncate">{t.title}</span>
                   {t.status === "done" && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">Done</span>}
                 </CommandItem>
-              ))}
-            </CommandGroup>
+              );
+              return (
+                <>
+                  {active.length > 0 && (
+                    <CommandGroup heading="Active">{active.map(renderItem)}</CommandGroup>
+                  )}
+                  {done.length > 0 && (
+                    <CommandGroup heading="Recently completed">{done.map(renderItem)}</CommandGroup>
+                  )}
+                </>
+              );
+            })()}
           </CommandList>
         </Command>
       </PopoverContent>

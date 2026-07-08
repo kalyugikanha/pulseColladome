@@ -215,9 +215,18 @@ export function PunchPage() {
     }));
     const totalHours = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
 
+    let punchOutIso: string | null = null;
+    if (punchOutAt) {
+      const d = new Date(punchOutAt);
+      if (Number.isNaN(d.getTime())) { toast.error("Invalid punch-out time."); return; }
+      if (d.getTime() <= new Date(openSession.punch_in_time).getTime()) { toast.error("Punch-out must be after punch-in."); return; }
+      if (d.getTime() > Date.now() + 60_000) { toast.error("Punch-out can't be in the future."); return; }
+      punchOutIso = d.toISOString();
+    }
+
     setSubmitting(true);
     try {
-      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations } }) as PunchOutResult;
+      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations, punchOutTime: punchOutIso } }) as PunchOutResult;
       qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => old.map((row) => row.id === result.session.id ? result.session as Session : row));
       await refetchSessions();
       toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);

@@ -110,6 +110,7 @@ function toPunchSession(row: any): PunchSessionResult {
     task_title: allocation?.task_title == null ? null : String(allocation.task_title),
     hours: Number(allocation?.hours ?? 0),
     comments: String(allocation?.comments ?? ""),
+    at_risk: !!allocation?.at_risk,
   })) ?? null;
 
   return {
@@ -124,6 +125,18 @@ function toPunchSession(row: any): PunchSessionResult {
     project_name: (row.project_name as string | null) ?? null,
     comments: (row.comments as string | null) ?? null,
     allocations,
+  };
+}
+
+async function readUnlogged(supabase: any, userId: string) {
+  const { data } = await supabase
+    .from("profiles")
+    .select("unlogged_hours_balance, unlogged_hours_since")
+    .eq("id", userId)
+    .maybeSingle();
+  return {
+    balance: Number((data as any)?.unlogged_hours_balance ?? 0),
+    since: (data as any)?.unlogged_hours_since ?? null,
   };
 }
 
@@ -144,8 +157,10 @@ export const punchIn = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existingError) throw new Error(existingError.message);
 
+    const unlogged = await readUnlogged(supabase, userId);
+
     if (existingToday) {
-      return { status: "already_open" as const, session: toPunchSession(existingToday) } satisfies PunchInResult;
+      return { status: "already_open" as const, session: toPunchSession(existingToday), unloggedBalance: unlogged.balance, unloggedSince: unlogged.since } satisfies PunchInResult;
     }
 
     const { data: inserted, error } = await supabase
@@ -173,10 +188,10 @@ export const punchIn = createServerFn({ method: "POST" })
       if (openError) throw new Error(openError.message);
       if (!openSession) throw new Error("You already have an open session. Please refresh and try again.");
 
-      return { status: "already_open" as const, session: toPunchSession(openSession) } satisfies PunchInResult;
+      return { status: "already_open" as const, session: toPunchSession(openSession), unloggedBalance: unlogged.balance, unloggedSince: unlogged.since } satisfies PunchInResult;
     }
 
-    return { status: "punched_in" as const, session: toPunchSession(inserted) } satisfies PunchInResult;
+    return { status: "punched_in" as const, session: toPunchSession(inserted), unloggedBalance: unlogged.balance, unloggedSince: unlogged.since } satisfies PunchInResult;
   });
 
 export const punchOut = createServerFn({ method: "POST" })

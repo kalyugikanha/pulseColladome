@@ -224,10 +224,28 @@ export const punchOut = createServerFn({ method: "POST" })
 
     const totalHours = Number(allocations.reduce((sum, row) => sum + row.hours, 0).toFixed(2));
     const first = allocations[0];
+
+    let punchOutIso = data.punchOutTime ?? new Date().toISOString();
+    if (data.punchOutTime) {
+      const { data: openRow, error: openErr } = await supabase
+        .from("punch_sessions")
+        .select("punch_in_time")
+        .eq("id", data.sessionId)
+        .eq("user_id", userId)
+        .is("punch_out_time", null)
+        .maybeSingle();
+      if (openErr) throw new Error(openErr.message);
+      if (!openRow) throw new Error("No open punch session found. Please refresh and try again.");
+      if (new Date(data.punchOutTime).getTime() <= new Date(openRow.punch_in_time as string).getTime()) {
+        throw new Error("Punch-out time must be after punch-in time.");
+      }
+      punchOutIso = data.punchOutTime;
+    }
+
     const { data: updated, error } = await supabase
       .from("punch_sessions")
       .update({
-        punch_out_time: new Date().toISOString(),
+        punch_out_time: punchOutIso,
         hours: totalHours,
         project_id: first.project_id,
         project_code: first.project_code,

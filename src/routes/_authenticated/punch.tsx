@@ -102,18 +102,20 @@ export function PunchPage() {
   const requireTask = ((myDept ?? "").toLowerCase() === "marketing" || (myDept ?? "").toLowerCase() === "business development" || (myDept ?? "").toLowerCase() === "bd");
 
   const { data: myTasks } = useQuery({
-    queryKey: ["my-open-tasks", punchUserId],
+    queryKey: ["my-punch-tasks", punchUserId],
     enabled: !!punchUserId,
     queryFn: async () => {
       const { data } = await supabase
         .from("tasks")
-        .select("id, title, status, project_id, project:projects(id, code, name)")
+        .select("id, title, status, project_id, updated_at, project:projects(id, code, name)")
         .eq("assignee_id", punchUserId!)
-        
+        .in("status", ["todo", "in_progress", "review", "done"])
         .not("project_id", "is", null)
-        .order("created_at", { ascending: false })
+        .order("updated_at", { ascending: false })
         .limit(200);
-      return (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; project: { id: string; code: string; name: string } | null }>;
+      const rows = (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; updated_at: string | null; project: { id: string; code: string; name: string } | null }>;
+      // Active tasks first, then Done — each group ordered by most recent update.
+      return [...rows.filter((t) => t.status !== "done"), ...rows.filter((t) => t.status === "done")];
     },
     staleTime: 60_000,
   });

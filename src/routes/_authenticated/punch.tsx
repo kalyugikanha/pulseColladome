@@ -540,14 +540,18 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
           <CommandInput placeholder="Search by task or project code…" />
           <CommandList>
             <CommandEmpty>No tasks found.</CommandEmpty>
-            <CommandGroup>
-              {allowNone && (
+            {allowNone && (
+              <CommandGroup>
                 <CommandItem value="__none__" onSelect={() => { onChange("", null); setOpen(false); }}>
                   <Check className={`h-4 w-4 mr-2 ${!value ? "opacity-100" : "opacity-0"}`} />
                   — No task —
                 </CommandItem>
-              )}
-              {tasks.map((t) => (
+              </CommandGroup>
+            )}
+            {(() => {
+              const active = tasks.filter((t) => t.status !== "done");
+              const done = tasks.filter((t) => t.status === "done");
+              const renderItem = (t: TaskComboTask) => (
                 <CommandItem
                   key={t.id}
                   value={`${t.project?.code ?? ""} ${t.title}`}
@@ -558,8 +562,18 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
                   <span className="truncate">{t.title}</span>
                   {t.status === "done" && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">Done</span>}
                 </CommandItem>
-              ))}
-            </CommandGroup>
+              );
+              return (
+                <>
+                  {active.length > 0 && (
+                    <CommandGroup heading="Active">{active.map(renderItem)}</CommandGroup>
+                  )}
+                  {done.length > 0 && (
+                    <CommandGroup heading="Recently completed">{done.map(renderItem)}</CommandGroup>
+                  )}
+                </>
+              );
+            })()}
           </CommandList>
         </Command>
       </PopoverContent>

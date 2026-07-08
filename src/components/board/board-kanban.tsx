@@ -26,6 +26,7 @@ export type BoardCard = {
   status: Status;
   priority: "low" | "medium" | "high";
   due_date: string | null;
+  created_at?: string | null;
   assignee_id: string | null;
   assignee: { id: string; full_name: string | null; email: string | null } | null;
   created_by: string | null;
@@ -38,6 +39,34 @@ export type BoardCard = {
   workflow_template: { id: string; name: string; department: string | null } | null;
   workflow_total_stages: number;
 };
+
+type SortKey = "due_asc" | "due_desc" | "priority" | "created_desc";
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "due_asc", label: "Due date (soonest)" },
+  { key: "due_desc", label: "Due date (latest)" },
+  { key: "priority", label: "Priority (high → low)" },
+  { key: "created_desc", label: "Recently created" },
+];
+const PRIORITY_RANK: Record<BoardCard["priority"], number> = { high: 0, medium: 1, low: 2 };
+const SORT_STORAGE_KEY = "kanban.sort";
+
+function compareCards(a: BoardCard, b: BoardCard, key: SortKey): number {
+  const dueA = a.due_date ? new Date(a.due_date).getTime() : null;
+  const dueB = b.due_date ? new Date(b.due_date).getTime() : null;
+  const prA = PRIORITY_RANK[a.priority] ?? 99;
+  const prB = PRIORITY_RANK[b.priority] ?? 99;
+  const cA = a.created_at ? new Date(a.created_at).getTime() : 0;
+  const cB = b.created_at ? new Date(b.created_at).getTime() : 0;
+  if (key === "due_asc" || key === "due_desc") {
+    if (dueA === null && dueB === null) return prA - prB || cB - cA;
+    if (dueA === null) return 1;
+    if (dueB === null) return -1;
+    const diff = key === "due_asc" ? dueA - dueB : dueB - dueA;
+    return diff || prA - prB || cB - cA;
+  }
+  if (key === "priority") return prA - prB || (dueA ?? Infinity) - (dueB ?? Infinity) || cB - cA;
+  return cB - cA;
+}
 
 export function BoardKanban({
   queryKey, fetcher, canMoveTask, currentUserId,

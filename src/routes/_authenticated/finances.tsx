@@ -340,9 +340,12 @@ function FinancesPage() {
 
   const isProfileEffectiveInMonth = (p: Profile) => {
     const earliest = earliestEffectiveByUser.get(p.id);
-    if (!earliest) return false;
+    // Missing both salaries row and joined_on: still surface active employees
+    // so they're never silently dropped from the roster/totals.
+    if (!earliest) return true;
     return new Date(earliest) <= monthEnd;
   };
+
 
   // Active + department-filtered + effective-in-month roster
   const visibleProfiles = useMemo(() => {

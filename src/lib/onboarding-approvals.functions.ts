@@ -232,6 +232,43 @@ export const setOnboardingSectionRequired = createServerFn({ method: "POST" })
       .eq("user_id", data.user_id)
       .eq("section", data.section);
     if (error) throw new Error(error.message);
+
+    // Notify employee when a section they didn't have becomes required,
+    // or when an approved section was reset because HR re-required it.
+    if (data.required && (before?.required === false || didReset)) {
+      const msg = didReset
+        ? `${SECTION_LABELS[data.section]} was reopened by HR. Please review and re-submit.`
+        : `HR now requires "${SECTION_LABELS[data.section]}". Please complete it and submit for approval.`;
+      await notifyEmployee(supabase, data.user_id, "onboarding_required", msg);
+    }
+    return { ok: true as const, didReset };
+  });
+
+export const resetOnboardingSection = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { user_id: string; section: OnboardingSection; reason?: string }) => input)
+  .handler(async ({ data, context }) => {
+    await assertHrOrSuper(context as unknown as { supabase: unknown; userId: string });
+    const supabase = context.supabase as unknown as SupabaseLoose;
+    const { error } = await supabase.from("onboarding_section_state")
+      .update({
+        status: "draft",
+        approved_at: null,
+        approved_by: null,
+        submitted_at: null,
+        rejected_at: null,
+        rejection_reason: null,
+      })
+      .eq("user_id", data.user_id)
+      .eq("section", data.section);
+    if (error) throw new Error(error.message);
+    const suffix = data.reason?.trim() ? `\nReason: ${data.reason.trim()}` : "";
+    await notifyEmployee(
+      supabase,
+      data.user_id,
+      "onboarding_required",
+      `HR reopened "${SECTION_LABELS[data.section]}". Please review and re-submit.${suffix}`,
+    );
     return { ok: true as const };
   });
 

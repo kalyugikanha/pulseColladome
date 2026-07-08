@@ -348,17 +348,23 @@ export const listTaskAttachments = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: rows, error } = await supabase
       .from("task_attachments")
-      .select("*, uploader:profiles!task_attachments_uploader_id_fkey(id, full_name, email)")
+      .select("*")
       .eq("task_id", data.taskId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    const items = rows ?? [];
+    const items = (rows ?? []) as any[];
+    const uploaderIds = Array.from(new Set(items.map((r) => r.uploader_id).filter(Boolean)));
+    const profilesMap = new Map<string, { id: string; full_name: string | null; email: string | null }>();
+    if (uploaderIds.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", uploaderIds);
+      (profs ?? []).forEach((p: any) => profilesMap.set(p.id, p));
+    }
     const withUrls = await Promise.all(
       items.map(async (r: any) => {
         const { data: signed } = await supabase.storage
           .from("task-attachments")
           .createSignedUrl(r.file_path as string, 60 * 10);
-        return { ...r, url: signed?.signedUrl ?? null };
+        return { ...r, url: signed?.signedUrl ?? null, uploader: profilesMap.get(r.uploader_id) ?? null };
       }),
     );
     return withUrls;

@@ -200,6 +200,29 @@ export const punchOut = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
+    // Fetch open session up front so we can compute duration for both allocation and skip modes.
+    const { data: openRow, error: openErr } = await supabase
+      .from("punch_sessions")
+      .select("punch_in_time")
+      .eq("id", data.sessionId)
+      .eq("user_id", userId)
+      .is("punch_out_time", null)
+      .maybeSingle();
+    if (openErr) throw new Error(openErr.message);
+    if (!openRow) throw new Error("No open punch session found. Please refresh and try again.");
+
+    let punchOutIso = data.punchOutTime ?? new Date().toISOString();
+    if (data.punchOutTime) {
+      if (new Date(data.punchOutTime).getTime() <= new Date(openRow.punch_in_time as string).getTime()) {
+        throw new Error("Punch-out time must be after punch-in time.");
+      }
+      punchOutIso = data.punchOutTime;
+    }
+
+    const sessionDurationHours = Number(
+      (Math.max(0, (new Date(punchOutIso).getTime() - new Date(openRow.punch_in_time as string).getTime()) / 3_600_000)).toFixed(2)
+    );
+
     // Resolve any task-based rows to their project.
     const taskIds = Array.from(new Set(data.allocations.map((r) => r.taskId).filter((v): v is string => !!v)));
     const taskById = new Map<string, { id: string; title: string; project_id: string | null }>();
@@ -215,7 +238,7 @@ export const punchOut = createServerFn({ method: "POST" })
     // Effective project id per row: task's project wins if a task was picked.
     const effective = data.allocations.map((row, idx) => {
       let projectId = row.projectId || "";
-      let task = row.taskId ? taskById.get(row.taskId) : null;
+      const task = row.taskId ? taskById.get(row.taskId) : null;
       if (task) {
         if (!task.project_id) throw new Error(`Row ${idx + 1}: this task has no project — set one on the task first.`);
         projectId = task.project_id;
@@ -225,13 +248,16 @@ export const punchOut = createServerFn({ method: "POST" })
     });
 
     const projectIds = Array.from(new Set(effective.map((r) => r.projectId)));
-    const { data: projects, error: projectsError } = await supabase
-      .from("projects")
-      .select("id, code, name")
-      .in("id", projectIds);
-    if (projectsError) throw new Error(projectsError.message);
+    let projectById = new Map<string, any>();
+    if (projectIds.length) {
+      const { data: projects, error: projectsError } = await supabase
+        .from("projects")
+        .select("id, code, name")
+        .in("id", projectIds);
+      if (projectsError) throw new Error(projectsError.message);
+      projectById = new Map((projects ?? []).map((project: any) => [project.id as string, project]));
+    }
 
-    const projectById = new Map((projects ?? []).map((project: any) => [project.id as string, project]));
     const allocations = effective.map((row) => {
       const project = projectById.get(row.projectId);
       if (!project) throw new Error("One of the selected projects is no longer available.");
@@ -243,41 +269,29 @@ export const punchOut = createServerFn({ method: "POST" })
         task_title: row.task?.title ?? null,
         hours: row.hours,
         comments: row.comments,
+        at_risk: !!row.atRisk,
       };
     });
 
-    const totalHours = Number(allocations.reduce((sum, row) => sum + row.hours, 0).toFixed(2));
+    const loggedHours = Number(allocations.reduce((sum, row) => sum + row.hours, 0).toFixed(2));
+    const shortfall = Number(Math.max(0, sessionDurationHours - loggedHours).toFixed(2));
     const first = allocations[0];
-
-    let punchOutIso = data.punchOutTime ?? new Date().toISOString();
-    if (data.punchOutTime) {
-      const { data: openRow, error: openErr } = await supabase
-        .from("punch_sessions")
-        .select("punch_in_time")
-        .eq("id", data.sessionId)
-        .eq("user_id", userId)
-        .is("punch_out_time", null)
-        .maybeSingle();
-      if (openErr) throw new Error(openErr.message);
-      if (!openRow) throw new Error("No open punch session found. Please refresh and try again.");
-      if (new Date(data.punchOutTime).getTime() <= new Date(openRow.punch_in_time as string).getTime()) {
-        throw new Error("Punch-out time must be after punch-in time.");
-      }
-      punchOutIso = data.punchOutTime;
-    }
 
     const { data: updated, error } = await supabase
       .from("punch_sessions")
       .update({
         punch_out_time: punchOutIso,
-        hours: totalHours,
-        project_id: first.project_id,
-        project_code: first.project_code,
-        project_name: first.project_name,
-        primary_task_id: first.task_id,
-        comments: allocations.length === 1
-          ? first.comments
-          : allocations.map((row) => `[${row.project_code ?? ""}] ${row.hours}h — ${row.comments}`).join("\n"),
+        // Session hours always reflect elapsed time; per-task allocations are independent.
+        hours: sessionDurationHours,
+        project_id: first?.project_id ?? null,
+        project_code: first?.project_code ?? null,
+        project_name: first?.project_name ?? null,
+        primary_task_id: first?.task_id ?? null,
+        comments: allocations.length === 0
+          ? null
+          : allocations.length === 1
+            ? first.comments
+            : allocations.map((row) => `[${row.project_code ?? ""}] ${row.hours}h — ${row.comments}`).join("\n"),
         allocations,
       })
       .eq("id", data.sessionId)
@@ -289,5 +303,39 @@ export const punchOut = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!updated) throw new Error("No open punch session found. Please refresh and try again.");
 
-    return { status: "punched_out" as const, session: toPunchSession(updated) } satisfies PunchOutResult;
+    // Propagate at-risk to the tasks so the assignee's reporting manager can see it.
+    const atRiskTaskIds = allocations.filter((a) => a.at_risk && a.task_id).map((a) => a.task_id as string);
+    if (atRiskTaskIds.length) {
+      await supabase.from("tasks").update({ at_risk: true } as never).in("id", atRiskTaskIds);
+    }
+
+    // Update the user's rolling unlogged-hours balance.
+    const prior = await readUnlogged(supabase, userId);
+    const newBalance = Number((prior.balance + shortfall).toFixed(2));
+    const newSince = prior.since ?? (shortfall > 0 ? (updated as any).session_date : null);
+    if (shortfall > 0) {
+      await supabase.from("profiles").update({
+        unlogged_hours_balance: newBalance,
+        unlogged_hours_since: newSince,
+      } as never).eq("id", userId);
+    }
+
+    return {
+      status: "punched_out" as const,
+      session: toPunchSession(updated),
+      unloggedBalance: shortfall > 0 ? newBalance : prior.balance,
+      unloggedSince: shortfall > 0 ? newSince : prior.since,
+    } satisfies PunchOutResult;
+  });
+
+/** Clear the user's unlogged-hours reminder. */
+export const clearUnloggedHours = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    await supabase.from("profiles").update({
+      unlogged_hours_balance: 0,
+      unlogged_hours_since: null,
+    } as never).eq("id", userId);
+    return { ok: true };
   });

@@ -204,6 +204,17 @@ export function DirectoryPage() {
     }
   }
 
+
+  async function setOnboardingRequired(p: Profile, required: boolean) {
+    if (!canEdit) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("profiles").update({ onboarding_required: required }).eq("id", p.id);
+    if (error) return toast.error(error.message);
+    toast.success(required ? "Onboarding required" : "Onboarding skipped for this user");
+    qc.invalidateQueries({ queryKey: ["directory-profiles"] });
+    qc.invalidateQueries({ queryKey: ["current-user"] });
+  }
+
   async function hardDelete() {
     if (!confirmDelete || !canHardDelete) return;
     if (deleteConfirmText.trim().toLowerCase() !== (confirmDelete.email ?? "").toLowerCase()) {
@@ -284,6 +295,7 @@ export function DirectoryPage() {
                 <TableHead>Reporting manager</TableHead>
                 <TableHead>Employment</TableHead>
                 <TableHead>Joined</TableHead>
+                {canEdit && <TableHead className="text-center">Onboarding required</TableHead>}
                 {canEdit && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>

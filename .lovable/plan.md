@@ -1,47 +1,41 @@
-## Part 1 — Default every section to "not required"; surface HR-marked sections first
+# Auto-route reviews to reporting managers + require hours on submit
 
-Right now every new profile gets all 7 sections seeded with `required = true`. Employees are blocked until HR approves everything. Flip the default so nothing is required until HR explicitly turns it on.
+## What changes
 
-### Migration
-- Change the `seed_onboarding_sections` trigger: `_required := false` (was `COALESCE(NEW.onboarding_required, true)`). New employees start with all 7 sections as `required = false`, `status = draft` → portal is unblocked by default.
-- Backfill existing rows: `UPDATE public.onboarding_section_state SET required = false WHERE status <> 'approved'`. Already-approved rows keep `required` as-is so the historical record stays intact.
-- No DB-level default change beyond the trigger; the column default stays `true` but the trigger overrides it.
+### 1. Reviewer = assignee's reporting manager (all managers, all reports)
 
-### Employee page (`src/routes/_authenticated/complete-onboarding.tsx`)
-- Sort sections into two groups: **Required by HR** (rendered first, in the canonical order), then **Optional** (rendered below, muted and collapsed by default with a "Show" toggle).
-- Each required card gets a small orange "Required by HR" tag next to the section title so it's unambiguous.
-- Optional cards keep the existing "Not required" grey badge; Submit button is hidden on optional cards (users can still save their info via auto-save).
-- Banner logic already prefers rejected → submitted → approved → newly-required; unchanged, but the "Please complete these sections" case now lists only HR-required sections in draft.
+- **DB trigger** `tasks_auto_reviewer` (BEFORE INSERT OR UPDATE OF assignee_id) on `public.tasks`:
+  - When `assignee_id` is set/changed and the assignee has a `reporting_manager_id`, set `reviewer_id = <that manager>` (overwrites any prior value).
+  - If the assignee has no reporting manager, fall back to existing behavior (leave `reviewer_id` alone; `setTaskStatus` still defaults to `created_by` on submit).
+  - Skips when the assignee IS their own manager (edge case) or when assignee_id is null.
+- **One-time backfill** in the same migration: for every task where `status <> 'done'`, set `reviewer_id = profiles.reporting_manager_id` of the assignee whenever that manager exists — overwrites current reviewer_id per your choice.
+- New tasks created via `create_task_full` / duplication / recurring generation automatically pick up the trigger, so no app-code change needed for routing.
 
-### Hook (`src/hooks/use-current-user.ts`)
-- No code change needed — `onboardingGateBlocked` already keys off `required && status !== 'approved'`. With all rows starting `required=false`, no employee is auto-blocked until HR turns on a section.
+### 2. Require hours before "Submit for Review"
 
-## Part 2 — Impersonation shows the full employee onboarding view
+- **New column** `tasks.hours_worked numeric` (nullable; only meaningful once submitted).
+- **Server fn** `setTaskStatus` (`src/lib/tasks-workflow.functions.ts`):
+  - When transitioning to `done` and reviewer routing kicks in (status becomes `review`), require `hours_worked > 0` in the payload; otherwise throw `"Log hours before submitting for review."`.
+  - Save `hours_worked` on the task and log a `hours_logged` entry into `task_activity` (kind + numeric).
+- **UI** (`src/components/tasks/task-detail-sheet.tsx`):
+  - When the assignee changes status to `done` and a reviewer exists, open a small "Log hours" dialog (number input, min 0.25, step 0.25, required note optional) instead of firing the mutation immediately.
+  - Submit calls `setTaskStatus({ taskId, status: "done", hours_worked })`.
+  - Show the logged hours in the task header once set (e.g. "Logged: 3.5h").
+- Reviewer-side approval flow unchanged.
 
-When a super admin picks a user via "View as", `/complete-onboarding` currently still shows the super admin's own record because `getMyOnboarding` uses `context.userId` (the real signed-in user). Impersonation only shifts the frontend; it doesn't rewrite server-fn identity.
+### 3. Keeping the manager in the loop
 
-### New server function (`src/lib/onboarding.functions.ts`)
-- Add `getOnboardingForUser({ user_id })`:
-  - `.middleware([requireSupabaseAuth])`
-  - If `user_id === context.userId` → same code path as `getMyOnboarding`.
-  - Else assert caller is a super admin (existing `super_admins` check pattern; HR admin also allowed, matching `getEmployeeOnboarding`). Load target user's profile, bank, documents, and section state via `supabaseAdmin` so RLS doesn't hide fields.
-  - Returns the same shape `getMyOnboarding` returns today.
-
-### Employee page (`complete-onboarding.tsx`)
-- Read `viewingAs` and `me.id` from `useCurrentUser`.
-- Replace `getMyOnboarding` with `getOnboardingForUser({ user_id: me.id })` and add `me.id` to the query key so the page swaps correctly on impersonation toggle.
-- When `viewingAs === true`:
-  - Show a top banner: "Viewing as <name> — read-only. Use HR › Onboarding Approvals to make changes."
-  - Disable all field inputs, all upload buttons, all "Submit for approval" and "Save progress" buttons (auto-save also skipped — early-return in the debounced effect when `viewingAs`).
-  - Section pills, banner, and status timestamps render normally so the super admin sees exactly what the employee sees.
-
-## Technical notes
-- No RLS or GRANT changes: `getOnboardingForUser` uses `supabaseAdmin` in the cross-user branch and authorizes via the existing super/HR check.
-- No new tables or enums.
-- The Directory-side super-admin "Profile" sheet already handles cross-user editing; impersonation view stays read-only to avoid two write paths for the same data.
-- Backfill runs once; safe to re-run (idempotent — only touches non-approved rows).
+- Existing `notify(..., "review_requested", ...)` already pings the reviewer — no change; the routing change means Shubham (and every other manager) automatically receives review pings for their reports.
 
 ## Out of scope
-- Editing employee data through impersonation (already covered by the Super Admin profile sheet on `/directory`).
-- Changing the historical `required=true` on already-approved rows.
-- Notifications about "HR turned on a section" — already handled by the previous change.
+
+- No change to how timesheet/daily allocations work — hours logged on the task are independent of the daily timesheet approval flow (we can wire them together later if you want a single source of truth).
+- No change to reviewer for already-`done` tasks (historical integrity).
+- No new "reassign reviewer" UI — the manager can still manually override on a task if needed.
+
+## Technical notes
+
+- New enum value for `task_activity.kind`: `hours_logged` (if the column is an enum; otherwise plain text).
+- Migration order: add column → create trigger → backfill reviewer_id.
+- Trigger is `SECURITY DEFINER` with `search_path=public` and reads `public.profiles.reporting_manager_id`.
+- Server-fn validator extended to accept optional `hours_worked: number`; guarded so non-review status changes ignore it.

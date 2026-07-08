@@ -363,7 +363,22 @@ export function PunchPage() {
             </DialogDescription>
           </DialogHeader>
 
+          {openSession && (
+            <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-1.5">
+              <Label className="text-xs">Punch-out date & time</Label>
+              <Input
+                type="datetime-local"
+                value={punchOutAt}
+                min={toLocalDatetimeInput(new Date(openSession.punch_in_time))}
+                max={toLocalDatetimeInput(new Date())}
+                onChange={(e) => setPunchOutAt(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">Default is now. Change it if you're logging a session from a previous day or an earlier time.</p>
+            </div>
+          )}
+
           <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+
             {rows.map((r, idx) => {
               const pickedTask = r.taskId ? (myTasks ?? []).find((t) => t.id === r.taskId) : null;
               return (

@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getMyOnboarding,
+  getOnboardingForUser,
   saveMyOnboarding,
   recordMyDocument,
   submitOnboardingSection,
@@ -24,12 +24,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star, Linkedin, Send } from "lucide-react";
+import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star, Linkedin, Send, Eye } from "lucide-react";
 import { DepartmentSelect } from "@/components/department-select";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/complete-onboarding")({
   component: CompleteOnboardingPage,
 });
+
 
 
 type DocSpec = { key: OnboardingDocType; label: string; required: boolean; accept: string; link?: string };
@@ -75,15 +77,21 @@ const LINKEDIN_EMPLOYMENT: DocSpec = {
 function CompleteOnboardingPage() {
   const router = useRouter();
   const qc = useQueryClient();
-  const getOnboarding = useServerFn(getMyOnboarding);
+  const { data: me } = useCurrentUser();
+  const viewingAs = !!me?.viewingAs;
+  const targetUserId = me?.id ?? null;
+  const readOnly = viewingAs;
+  const getOnboarding = useServerFn(getOnboardingForUser);
   const saveOnboarding = useServerFn(saveMyOnboarding);
   const recordDoc = useServerFn(recordMyDocument);
   const submitSection = useServerFn(submitOnboardingSection);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["my-onboarding"],
-    queryFn: () => getOnboarding(),
+    queryKey: ["my-onboarding", targetUserId],
+    enabled: !!targetUserId,
+    queryFn: () => getOnboarding({ data: { user_id: targetUserId! } }),
   });
+
 
   const [fullName, setFullName] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");
@@ -186,9 +194,10 @@ function CompleteOnboardingPage() {
     },
   }), [fullName, personalEmail, phone, address, dob, anniversary, linkedin, github, facebook, instagram, twitter, youtube, pinterest, department, dayStart, standup, hobbies, holder, account, branch, ifsc, pan]);
 
-  // Debounced auto-save on any field change
+  // Debounced auto-save on any field change (disabled in read-only impersonation view)
   useEffect(() => {
     if (!hydratedRef.current) return;
+    if (readOnly) return;
     setAutoStatus((prev) => (prev === "saving" ? prev : "unsaved"));
     const t = setTimeout(async () => {
       if (inFlightRef.current) { pendingRef.current = true; return; }
@@ -217,10 +226,12 @@ function CompleteOnboardingPage() {
       await runSave();
     }, 800);
     return () => clearTimeout(t);
-  }, [autoSavePayload, saveOnboarding]);
+  }, [autoSavePayload, saveOnboarding, readOnly]);
 
-  // Best-effort flush on tab close / hide
+
+  // Best-effort flush on tab close / hide (skipped in read-only view)
   useEffect(() => {
+    if (readOnly) return;
     const flush = () => {
       if (!hydratedRef.current) return;
       // Fire-and-forget; not guaranteed to reach server during unload.
@@ -233,15 +244,19 @@ function CompleteOnboardingPage() {
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [autoSavePayload, saveOnboarding]);
+  }, [autoSavePayload, saveOnboarding, readOnly]);
 
 
-  const uploaded = new Set((data?.documents ?? []).map((d) => d.doc_type));
+
+  type DocRow = { doc_type: OnboardingDocType; storage_path?: string; uploaded_at: string };
+  const uploaded = new Set(((data?.documents ?? []) as DocRow[]).map((d) => d.doc_type));
   const sections = (data?.sections ?? []) as SectionRow[];
   const sectionMap = new Map(sections.map((s) => [s.section, s]));
   const sectionOf = (s: OnboardingSection) => sectionMap.get(s);
 
+
   async function handleSubmitSection(section: OnboardingSection) {
+    if (readOnly) return;
     setSubmitting(true);
     try {
       await saveDraft(true);
@@ -264,6 +279,7 @@ function CompleteOnboardingPage() {
       setSubmitting(false);
     }
   }
+
 
 
   // ---- Profile completion % ----
@@ -291,6 +307,7 @@ function CompleteOnboardingPage() {
   const completionPct = Math.round((filledItems / totalItems) * 100);
 
   async function saveDraft(silent = false) {
+    if (readOnly) return;
     setSaving(true);
     setAutoStatus("saving");
     try {
@@ -309,6 +326,7 @@ function CompleteOnboardingPage() {
 
 
   async function uploadDoc(spec: DocSpec, file: File) {
+    if (readOnly) return;
     if (file.size > 10 * 1024 * 1024) { toast.error("File must be under 10 MB"); return; }
     setUploading(spec.key);
     try {
@@ -329,6 +347,7 @@ function CompleteOnboardingPage() {
       setUploading(null);
     }
   }
+
 
   const approvedCount = sections.filter((s) => s.required && s.status === "approved").length;
   const requiredCount = sections.filter((s) => s.required).length;
@@ -376,6 +395,10 @@ function CompleteOnboardingPage() {
     return <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading…</div>;
   }
 
+  const isReq = (s: OnboardingSection) => sectionOf(s)?.required !== false;
+  // Required-first ordering via CSS order (required=0, optional=1).
+  const orderOf = (s: OnboardingSection) => (isReq(s) ? 0 : 1);
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <header>
@@ -388,6 +411,18 @@ function CompleteOnboardingPage() {
             : "Fill each section, then submit it for HR approval. Portal access unlocks once every required section is approved."}
         </p>
       </header>
+
+      {readOnly && (
+        <div className="rounded-lg border border-primary/40 bg-primary/10 text-primary p-3 flex items-start gap-2">
+          <Eye className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <div className="font-medium">Viewing as {me?.fullName ?? me?.email ?? "employee"} — read-only</div>
+            <div className="text-xs mt-0.5 opacity-90">
+              You're impersonating this employee. To approve, send back, or toggle required, use HR › Onboarding Approvals.
+            </div>
+          </div>
+        </div>
+      )}
 
       {banner && (
         <div className={`rounded-lg border p-3 ${bannerClass[banner.tone]}`}>
@@ -422,7 +457,9 @@ function CompleteOnboardingPage() {
         </CardContent>
       </Card>
 
-      <SectionCard row={sectionOf("personal")} title="Personal details" submitting={submitting} onSubmit={() => handleSubmitSection("personal")}>
+      <fieldset disabled={readOnly} className={`flex flex-col gap-6 ${readOnly ? "opacity-95" : ""}`}>
+      <div style={{ order: orderOf("personal") }}>
+      <SectionCard row={sectionOf("personal")} title="Personal details" submitting={submitting} readOnly={readOnly} onSubmit={() => handleSubmitSection("personal")}>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Full name *"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field>
           <Field label="Official email"><Input value={data?.profile?.email ?? ""} readOnly disabled /></Field>
@@ -443,8 +480,10 @@ function CompleteOnboardingPage() {
           </Field>
         </div>
       </SectionCard>
+      </div>
 
-      <SectionCard row={sectionOf("work")} title="Work preferences" submitting={submitting} onSubmit={() => handleSubmitSection("work")}>
+      <div style={{ order: orderOf("work") }}>
+      <SectionCard row={sectionOf("work")} title="Work preferences" submitting={submitting} readOnly={readOnly} onSubmit={() => handleSubmitSection("work")}>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Job department *"><DepartmentSelect value={department} onChange={setDepartment} allowClear={false} /></Field>
           <Field label="Joining date"><Input type="date" value={data?.profile?.joined_on ?? ""} readOnly disabled /></Field>
@@ -452,8 +491,10 @@ function CompleteOnboardingPage() {
           <Field label="Preferred standup time *"><Input type="time" value={standup} onChange={(e) => setStandup(e.target.value)} /></Field>
         </div>
       </SectionCard>
+      </div>
 
-      <SectionCard row={sectionOf("bank")} title="Bank details" submitting={submitting} onSubmit={() => handleSubmitSection("bank")}>
+      <div style={{ order: orderOf("bank") }}>
+      <SectionCard row={sectionOf("bank")} title="Bank details" submitting={submitting} readOnly={readOnly} onSubmit={() => handleSubmitSection("bank")}>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Account holder name *" className="md:col-span-2"><Input value={holder} onChange={(e) => setHolder(e.target.value)} /></Field>
           <Field label="Account number *"><Input value={account} onChange={(e) => setAccount(e.target.value)} /></Field>
@@ -462,68 +503,83 @@ function CompleteOnboardingPage() {
           <Field label="PAN card number *"><Input value={pan} onChange={(e) => setPan(e.target.value.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} /></Field>
         </div>
       </SectionCard>
+      </div>
 
+      <div style={{ order: orderOf("documents") }}>
       <SectionCard
         row={sectionOf("documents")}
         title="Documents"
         description="Upload each file (PDF or image, max 10 MB). You can replace a file by re-uploading it."
         submitting={submitting}
+        readOnly={readOnly}
         onSubmit={() => handleSubmitSection("documents")}
       >
         <div className="space-y-2">
           {DOCS.map((doc) => (
-            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} readOnly={readOnly} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
         </div>
       </SectionCard>
+      </div>
 
+      <div style={{ order: orderOf("follow") }}>
       <SectionCard
         row={sectionOf("follow")}
         title="Follow Colladome — upload screenshot proof"
         icon={<Heart className="h-5 w-5 text-primary" />}
         description="Open each link, follow / subscribe / join, then upload a screenshot showing you're following. All items are required."
         submitting={submitting}
+        readOnly={readOnly}
         onSubmit={() => handleSubmitSection("follow")}
       >
         <div className="space-y-2">
           {FOLLOW_PROOFS.map((doc) => (
-            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} readOnly={readOnly} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
         </div>
       </SectionCard>
+      </div>
 
+      <div style={{ order: orderOf("reviews") }}>
       <SectionCard
         row={sectionOf("reviews")}
         title="Leave a review — upload screenshot proof"
         icon={<Star className="h-5 w-5 text-primary" />}
         description="Open each platform, leave an honest review, then upload a screenshot of your published review. All items are required."
         submitting={submitting}
+        readOnly={readOnly}
         onSubmit={() => handleSubmitSection("reviews")}
       >
         <div className="space-y-2">
           {REVIEW_PROOFS.map((doc) => (
-            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} readOnly={readOnly} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
         </div>
       </SectionCard>
+      </div>
 
+      <div style={{ order: orderOf("linkedin_employment") }}>
       <SectionCard
         row={sectionOf("linkedin_employment")}
         title="Update your LinkedIn employment"
         icon={<Linkedin className="h-5 w-5 text-primary" />}
         description={`Add Colladome as your current employer on LinkedIn, then upload a screenshot of your LinkedIn profile showing "Works at Colladome".`}
         submitting={submitting}
+        readOnly={readOnly}
         onSubmit={() => handleSubmitSection("linkedin_employment")}
       >
         <div className="space-y-2">
-          <UploadRow spec={LINKEDIN_EMPLOYMENT} uploaded={uploaded.has(LINKEDIN_EMPLOYMENT.key)} busy={uploading === LINKEDIN_EMPLOYMENT.key} onUpload={(f) => uploadDoc(LINKEDIN_EMPLOYMENT, f)} />
+          <UploadRow spec={LINKEDIN_EMPLOYMENT} uploaded={uploaded.has(LINKEDIN_EMPLOYMENT.key)} busy={uploading === LINKEDIN_EMPLOYMENT.key} readOnly={readOnly} onUpload={(f) => uploadDoc(LINKEDIN_EMPLOYMENT, f)} />
         </div>
       </SectionCard>
+      </div>
+      </fieldset>
 
       <div className="flex items-center justify-end gap-2 pb-8">
         <AutoSaveStatusPill status={autoStatus} lastSavedAt={lastSavedAt} />
-        <Button variant="outline" onClick={() => saveDraft()} disabled={saving || submitting}>
+        <Button variant="outline" onClick={() => saveDraft()} disabled={readOnly || saving || submitting}>
           {saving ? "Saving…" : "Save progress"}
+
         </Button>
       </div>
 
@@ -547,19 +603,20 @@ function StatusPill({ label, row }: { label: string; row?: SectionRow }) {
 }
 
 function SectionCard({
-  row, title, description, icon, submitting, onSubmit, children,
+  row, title, description, icon, submitting, readOnly, onSubmit, children,
 }: {
   row?: SectionRow;
   title: string;
   description?: string;
   icon?: React.ReactNode;
   submitting: boolean;
+  readOnly?: boolean;
   onSubmit: () => void;
   children: React.ReactNode;
 }) {
   const status = row?.status ?? "draft";
   const required = row?.required !== false;
-  const canSubmit = required && (status === "draft" || status === "rejected");
+  const canSubmit = !readOnly && required && (status === "draft" || status === "rejected");
   const statusMap: Record<string, { label: string; className: string }> = {
     approved: { label: "Approved", className: "text-green-600 border-green-600/40 bg-green-500/10" },
     submitted: { label: "Awaiting HR review", className: "text-amber-600 border-amber-500/40 bg-amber-500/10" },
@@ -571,9 +628,16 @@ function SectionCard({
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="font-display text-lg flex items-center gap-2">{icon}{title}</CardTitle>
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            {icon}{title}
+            {required && (
+              <Badge className="text-[10px] bg-amber-500/15 text-amber-700 border-amber-500/40 hover:bg-amber-500/15" variant="outline">
+                Required by HR
+              </Badge>
+            )}
+          </CardTitle>
           <div className="flex items-center gap-2">
-            {!required && <Badge variant="outline" className="text-[10px]">Not required</Badge>}
+            {!required && <Badge variant="outline" className="text-[10px]">Optional</Badge>}
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${s.className}`}>{s.label}</span>
           </div>
         </div>
@@ -606,7 +670,8 @@ function SectionCard({
 }
 
 
-function UploadRow({ spec, uploaded, busy, onUpload }: { spec: DocSpec; uploaded: boolean; busy: boolean; onUpload: (f: File) => void }) {
+function UploadRow({ spec, uploaded, busy, readOnly, onUpload }: { spec: DocSpec; uploaded: boolean; busy: boolean; readOnly?: boolean; onUpload: (f: File) => void }) {
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2">
       <div className="flex items-center gap-2 text-sm min-w-0">
@@ -623,22 +688,25 @@ function UploadRow({ spec, uploaded, busy, onUpload }: { spec: DocSpec; uploaded
             </a>
           </Button>
         )}
-        <label className="cursor-pointer">
-          <input
-            type="file"
-            accept={spec.accept}
-            className="hidden"
-            disabled={busy}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onUpload(f);
-              e.currentTarget.value = "";
-            }}
-          />
-          <Button asChild size="sm" variant="outline" disabled={busy}>
-            <span>{busy ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading…</> : uploaded ? "Replace" : "Upload"}</span>
-          </Button>
-        </label>
+        {!readOnly && (
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept={spec.accept}
+              className="hidden"
+              disabled={busy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onUpload(f);
+                e.currentTarget.value = "";
+              }}
+            />
+            <Button asChild size="sm" variant="outline" disabled={busy}>
+              <span>{busy ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading…</> : uploaded ? "Replace" : "Upload"}</span>
+            </Button>
+          </label>
+        )}
+
       </div>
     </div>
   );

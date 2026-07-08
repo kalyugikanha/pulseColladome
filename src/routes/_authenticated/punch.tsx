@@ -105,21 +105,32 @@ export function PunchPage() {
   });
   const requireTask = ((myDept ?? "").toLowerCase() === "marketing" || (myDept ?? "").toLowerCase() === "business development" || (myDept ?? "").toLowerCase() === "bd");
 
+  // Task picker follows the viewed user (me.id) so impersonation shows their tasks.
+  // Sessions still use realId because punches belong to the real authenticated user.
+  const taskOwnerId = me?.id;
   const { data: myTasks } = useQuery({
-    queryKey: ["my-punch-tasks", punchUserId],
-    enabled: !!punchUserId,
+    queryKey: ["my-punch-tasks", taskOwnerId],
+    enabled: !!taskOwnerId,
     queryFn: async () => {
       const { data } = await supabase
         .from("tasks")
         .select("id, title, status, project_id, updated_at, project:projects(id, code, name)")
-        .eq("assignee_id", punchUserId!)
+        .eq("assignee_id", taskOwnerId!)
         .in("status", ["todo", "in_progress", "review", "done"])
         .not("project_id", "is", null)
         .order("updated_at", { ascending: false })
-        .limit(200);
+        .limit(500);
       const rows = (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; updated_at: string | null; project: { id: string; code: string; name: string } | null }>;
+      // Hide Done tasks last updated more than ~3 days ago — pure visibility filter,
+      // the underlying task/status/history/hours are untouched.
+      const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+      const visible = rows.filter((t) => {
+        if (t.status !== "done") return true;
+        if (!t.updated_at) return true;
+        return new Date(t.updated_at).getTime() >= threeDaysAgo;
+      });
       // Active tasks first, then Done — each group ordered by most recent update.
-      return [...rows.filter((t) => t.status !== "done"), ...rows.filter((t) => t.status === "done")];
+      return [...visible.filter((t) => t.status !== "done"), ...visible.filter((t) => t.status === "done")];
     },
     staleTime: 60_000,
   });

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,18 +27,13 @@ export function MarkDoneDialog({
   roster?: MarkDoneRoster[];
   defaultHandoffId?: string | null;
 }) {
-  const [hours, setHours] = useState<string>("");
   const [note, setNote] = useState<string>("");
   const [handoff, setHandoff] = useState<string>("");
 
   useEffect(() => {
-    setHours("");
     setNote("");
     setHandoff(defaultHandoffId ?? task?.creatorId ?? task?.assigneeId ?? "");
   }, [task, defaultHandoffId]);
-
-  const hoursNum = Number(hours);
-  const hoursValid = hours === "" || (!Number.isNaN(hoursNum) && hoursNum >= 0);
 
   return (
     <Dialog open={!!task} onOpenChange={(o) => !o && onClose()}>
@@ -47,14 +41,6 @@ export function MarkDoneDialog({
         <DialogHeader><DialogTitle className="font-display">Mark done</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="text-xs text-muted-foreground">{task?.title}</div>
-          <div className="space-y-1">
-            <Label>Actual hours spent (optional)</Label>
-            <Input
-              type="number" min={0} step={0.25} value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              placeholder="Leave blank to skip — you can log time at punch-out" autoFocus
-            />
-          </div>
           {roster && roster.length > 0 && (
             <div className="space-y-1">
               <Label>Hand off to (for approval / next step)</Label>
@@ -76,19 +62,19 @@ export function MarkDoneDialog({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Hours are optional here — they're captured in the punch-out dialog. When you do log them,
-            the task creator reviews before they land in your timesheet.
+            Hours are never captured here — log them in the punch-out dialog. Moving tasks between
+            To Do, In Progress, Review, and Done never asks for or records hours.
           </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" disabled={!hoursValid}
+          <Button className="gradient-primary"
             onClick={() => onConfirm({
-              hours: hours === "" ? 0 : hoursNum,
+              hours: 0,
               note: note || undefined,
               handoffId: handoff || null,
             })}>
-            {hours === "" ? "Mark done" : "Send for approval"}
+            Mark done
           </Button>
         </DialogFooter>
       </DialogContent>

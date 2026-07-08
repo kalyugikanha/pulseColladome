@@ -26,6 +26,7 @@ export type BoardCard = {
   status: Status;
   priority: "low" | "medium" | "high";
   due_date: string | null;
+  created_at?: string | null;
   assignee_id: string | null;
   assignee: { id: string; full_name: string | null; email: string | null } | null;
   created_by: string | null;
@@ -38,6 +39,34 @@ export type BoardCard = {
   workflow_template: { id: string; name: string; department: string | null } | null;
   workflow_total_stages: number;
 };
+
+type SortKey = "due_asc" | "due_desc" | "priority" | "created_desc";
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "due_asc", label: "Due date (soonest)" },
+  { key: "due_desc", label: "Due date (latest)" },
+  { key: "priority", label: "Priority (high → low)" },
+  { key: "created_desc", label: "Recently created" },
+];
+const PRIORITY_RANK: Record<BoardCard["priority"], number> = { high: 0, medium: 1, low: 2 };
+const SORT_STORAGE_KEY = "kanban.sort";
+
+function compareCards(a: BoardCard, b: BoardCard, key: SortKey): number {
+  const dueA = a.due_date ? new Date(a.due_date).getTime() : null;
+  const dueB = b.due_date ? new Date(b.due_date).getTime() : null;
+  const prA = PRIORITY_RANK[a.priority] ?? 99;
+  const prB = PRIORITY_RANK[b.priority] ?? 99;
+  const cA = a.created_at ? new Date(a.created_at).getTime() : 0;
+  const cB = b.created_at ? new Date(b.created_at).getTime() : 0;
+  if (key === "due_asc" || key === "due_desc") {
+    if (dueA === null && dueB === null) return prA - prB || cB - cA;
+    if (dueA === null) return 1;
+    if (dueB === null) return -1;
+    const diff = key === "due_asc" ? dueA - dueB : dueB - dueA;
+    return diff || prA - prB || cB - cA;
+  }
+  if (key === "priority") return prA - prB || (dueA ?? Infinity) - (dueB ?? Infinity) || cB - cA;
+  return cB - cA;
+}
 
 export function BoardKanban({
   queryKey, fetcher, canMoveTask, currentUserId,
@@ -52,13 +81,23 @@ export function BoardKanban({
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openAction, setOpenAction] = useState<"mark-done" | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    if (typeof window === "undefined") return "due_asc";
+    const stored = window.localStorage.getItem(SORT_STORAGE_KEY) as SortKey | null;
+    return stored && SORT_OPTIONS.some((o) => o.key === stored) ? stored : "due_asc";
+  });
+  function updateSort(next: SortKey) {
+    setSortKey(next);
+    try { window.localStorage.setItem(SORT_STORAGE_KEY, next); } catch { /* noop */ }
+  }
   const { data: tasks } = useQuery({ queryKey, queryFn: fetcher });
 
   const byCol = useMemo(() => {
     const map: Record<Status, BoardCard[]> = { todo: [], in_progress: [], review: [], done: [] };
     for (const t of tasks ?? []) map[t.status].push(t);
+    for (const k of Object.keys(map) as Status[]) map[k].sort((a, b) => compareCards(a, b, sortKey));
     return map;
-  }, [tasks]);
+  }, [tasks, sortKey]);
 
   const activeCard = useMemo(
     () => (activeId ? (tasks ?? []).find((t) => t.id === activeId) ?? null : null),
@@ -99,6 +138,16 @@ export function BoardKanban({
 
   return (
     <>
+      <div className="flex items-center justify-end gap-2 mb-2">
+        <label className="text-xs text-muted-foreground">Sort</label>
+        <select
+          value={sortKey}
+          onChange={(e) => updateSort(e.target.value as SortKey)}
+          className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+        >
+          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+      </div>
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(240px, 1fr))` }}>
           {COLUMNS.map((c) => (
@@ -193,7 +242,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
   // Materialize today's recurring occurrences (idempotent, safe to call every load).
   try { await supabase.rpc("generate_recurring_task_occurrences" as never); } catch { /* noop */ }
   let q = supabase.from("tasks").select(`
-    id, title, status, priority, due_date, assignee_id, reviewer_id, project_id, created_by,
+    id, title, status, priority, due_date, created_at, assignee_id, reviewer_id, project_id, created_by,
     workflow_instance_id, stage_index, stage_snapshot,
     assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
     project:projects(id, name)

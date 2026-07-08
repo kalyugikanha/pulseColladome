@@ -172,10 +172,17 @@ export function PunchPage() {
     }
   }
 
+  function toLocalDatetimeInput(d: Date) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   function openPunchOut() {
     if (!openSession) return;
-    const suggested = Number((differenceInMinutes(new Date(), new Date(openSession.punch_in_time)) / 60).toFixed(2));
+    const now = new Date();
+    const suggested = Number((differenceInMinutes(now, new Date(openSession.punch_in_time)) / 60).toFixed(2));
     setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "" }]);
+    setPunchOutAt(toLocalDatetimeInput(now));
     setDialogOpen(true);
   }
 

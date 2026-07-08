@@ -343,12 +343,12 @@ function CompleteOnboardingPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <header>
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-          <ClipboardCheck className="h-6 w-6 text-primary" /> {isApproved ? "My profile" : "Complete your onboarding"}
+          <ClipboardCheck className="h-6 w-6 text-primary" /> {allApproved ? "My profile" : "Complete your onboarding"}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {isApproved
-            ? "Update your details, documents, and social links anytime."
-            : "Fill in your details, upload every document and screenshot proof, then submit for HR approval. Portal access unlocks once HR approves."}
+          {allApproved
+            ? "Update your details anytime. Any edit to an approved section goes back to HR for re-approval."
+            : "Fill each section, then submit it for HR approval. Portal access unlocks once every required section is approved."}
         </p>
       </header>
 
@@ -356,45 +356,28 @@ function CompleteOnboardingPage() {
         <CardContent className="p-4 flex items-center gap-4">
           <div
             className="relative h-16 w-16 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold"
-            style={{ background: `conic-gradient(hsl(var(--primary)) ${completionPct * 3.6}deg, hsl(var(--muted)) 0deg)` }}
+            style={{ background: `conic-gradient(hsl(var(--primary)) ${requiredCount ? (approvedCount / requiredCount) * 360 : 0}deg, hsl(var(--muted)) 0deg)` }}
           >
-            <div className="absolute inset-1 rounded-full bg-background flex items-center justify-center">
-              {completionPct}%
+            <div className="absolute inset-1 rounded-full bg-background flex items-center justify-center text-xs">
+              {approvedCount}/{requiredCount}
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium">Profile completion</div>
+            <div className="text-sm font-medium">Sections approved</div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              {filledProfile}/{Object.keys(profileFieldValues).length} personal · {filledBank}/{Object.keys(bankFieldValues).length} bank · {filledDocs}/{requiredDocKeys.length} documents
+              {completionPct}% of fields filled · {filledDocs}/{requiredDocKeys.length} documents uploaded
             </div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">
-              {isApproved
-                ? "HR has approved your onboarding — keep this up to date."
-                : completionPct >= 100
-                  ? "All set. Submit for HR approval."
-                  : "Complete every section to unlock the Submit button."}
+            <div className="mt-1 flex flex-wrap gap-1">
+              {sections.map((s) => (
+                <StatusPill key={s.section} label={SECTION_LABELS[s.section]} row={s} />
+              ))}
             </div>
           </div>
         </CardContent>
       </Card>
 
-
-      {isPendingReview && (
-        <div className="rounded-md border border-amber-400/40 bg-amber-500/10 p-3 text-sm">
-          Your submission is waiting for HR approval. You can still edit and re-upload if needed.
-        </div>
-      )}
-      {rejectedAt && !isApproved && !isPendingReview && (
-        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
-          <div className="font-medium">HR sent your submission back.</div>
-          {rejectionReason && <div className="mt-1 text-muted-foreground whitespace-pre-wrap">Reason: {rejectionReason}</div>}
-          <div className="mt-1 text-muted-foreground">Please fix the items below and submit again.</div>
-        </div>
-      )}
-
-      <Card>
-        <CardHeader><CardTitle className="font-display text-lg">Personal details</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
+      <SectionCard row={sectionOf("personal")} title="Personal details" submitting={submitting} onSubmit={() => handleSubmitSection("personal")}>
+        <div className="grid gap-3 md:grid-cols-2">
           <Field label="Full name *"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field>
           <Field label="Official email"><Input value={data?.profile?.email ?? ""} readOnly disabled /></Field>
           <Field label="Personal email *"><Input type="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} /></Field>
@@ -412,101 +395,170 @@ function CompleteOnboardingPage() {
           <Field label="About you — hobbies, interests, fun facts (used for your welcome post)" className="md:col-span-2">
             <Textarea rows={3} value={hobbies} onChange={(e) => setHobbies(e.target.value)} placeholder="e.g. I love hiking on weekends, board games, and photography." />
           </Field>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
-      <Card>
-        <CardHeader><CardTitle className="font-display text-lg">Work preferences</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
+      <SectionCard row={sectionOf("work")} title="Work preferences" submitting={submitting} onSubmit={() => handleSubmitSection("work")}>
+        <div className="grid gap-3 md:grid-cols-2">
           <Field label="Job department *"><DepartmentSelect value={department} onChange={setDepartment} allowClear={false} /></Field>
           <Field label="Joining date"><Input type="date" value={data?.profile?.joined_on ?? ""} readOnly disabled /></Field>
           <Field label="When do you start your day? *"><Input type="time" value={dayStart} onChange={(e) => setDayStart(e.target.value)} /></Field>
           <Field label="Preferred standup time *"><Input type="time" value={standup} onChange={(e) => setStandup(e.target.value)} /></Field>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
-      <Card>
-        <CardHeader><CardTitle className="font-display text-lg">Bank details</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
+      <SectionCard row={sectionOf("bank")} title="Bank details" submitting={submitting} onSubmit={() => handleSubmitSection("bank")}>
+        <div className="grid gap-3 md:grid-cols-2">
           <Field label="Account holder name *" className="md:col-span-2"><Input value={holder} onChange={(e) => setHolder(e.target.value)} /></Field>
           <Field label="Account number *"><Input value={account} onChange={(e) => setAccount(e.target.value)} /></Field>
           <Field label="Bank branch *"><Input value={branch} onChange={(e) => setBranch(e.target.value)} /></Field>
           <Field label="IFSC code *"><Input value={ifsc} onChange={(e) => setIfsc(e.target.value.toUpperCase())} placeholder="ABCD0123456" maxLength={11} /></Field>
           <Field label="PAN card number *"><Input value={pan} onChange={(e) => setPan(e.target.value.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} /></Field>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg">Documents</CardTitle>
-          <CardDescription>Upload each file (PDF or image, max 10 MB). You can replace a file by re-uploading it.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <SectionCard
+        row={sectionOf("documents")}
+        title="Documents"
+        description="Upload each file (PDF or image, max 10 MB). You can replace a file by re-uploading it."
+        submitting={submitting}
+        onSubmit={() => handleSubmitSection("documents")}
+      >
+        <div className="space-y-2">
           {DOCS.map((doc) => (
             <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg flex items-center gap-2">
-            <Heart className="h-5 w-5 text-primary" /> Follow Colladome — upload screenshot proof
-          </CardTitle>
-          <CardDescription>
-            Open each link, follow / subscribe / join, then upload a screenshot showing you're following. All items are required.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <SectionCard
+        row={sectionOf("follow")}
+        title="Follow Colladome — upload screenshot proof"
+        icon={<Heart className="h-5 w-5 text-primary" />}
+        description="Open each link, follow / subscribe / join, then upload a screenshot showing you're following. All items are required."
+        submitting={submitting}
+        onSubmit={() => handleSubmitSection("follow")}
+      >
+        <div className="space-y-2">
           {FOLLOW_PROOFS.map((doc) => (
             <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg flex items-center gap-2">
-            <Star className="h-5 w-5 text-primary" /> Leave a review — upload screenshot proof
-          </CardTitle>
-          <CardDescription>
-            Open each platform, leave an honest review, then upload a screenshot of your published review. All items are required.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <SectionCard
+        row={sectionOf("reviews")}
+        title="Leave a review — upload screenshot proof"
+        icon={<Star className="h-5 w-5 text-primary" />}
+        description="Open each platform, leave an honest review, then upload a screenshot of your published review. All items are required."
+        submitting={submitting}
+        onSubmit={() => handleSubmitSection("reviews")}
+      >
+        <div className="space-y-2">
           {REVIEW_PROOFS.map((doc) => (
             <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-lg flex items-center gap-2">
-            <Linkedin className="h-5 w-5 text-primary" /> Update your LinkedIn employment
-          </CardTitle>
-          <CardDescription>
-            Add Colladome as your current employer on LinkedIn, then upload a screenshot of your LinkedIn profile showing "Works at Colladome".
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <SectionCard
+        row={sectionOf("linkedin_employment")}
+        title="Update your LinkedIn employment"
+        icon={<Linkedin className="h-5 w-5 text-primary" />}
+        description={`Add Colladome as your current employer on LinkedIn, then upload a screenshot of your LinkedIn profile showing "Works at Colladome".`}
+        submitting={submitting}
+        onSubmit={() => handleSubmitSection("linkedin_employment")}
+      >
+        <div className="space-y-2">
           <UploadRow spec={LINKEDIN_EMPLOYMENT} uploaded={uploaded.has(LINKEDIN_EMPLOYMENT.key)} busy={uploading === LINKEDIN_EMPLOYMENT.key} onUpload={(f) => uploadDoc(LINKEDIN_EMPLOYMENT, f)} />
-        </CardContent>
-      </Card>
+        </div>
+      </SectionCard>
 
-      <div className="flex flex-wrap items-center justify-end gap-2 pb-8">
+      <div className="flex items-center justify-end gap-2 pb-8">
         <AutoSaveStatusPill status={autoStatus} lastSavedAt={lastSavedAt} />
         <Button variant="outline" onClick={() => saveDraft()} disabled={saving || submitting}>
           {saving ? "Saving…" : "Save progress"}
-        </Button>
-        <Button className="gradient-primary" onClick={submit} disabled={submitting}>
-          {submitting ? "Submitting…" : isApproved ? "Save changes" : isPendingReview ? "Re-submit for HR approval" : "Submit for HR approval"}
         </Button>
       </div>
 
     </div>
   );
 }
+
+function StatusPill({ label, row }: { label: string; row?: SectionRow }) {
+  const status = row?.status ?? "draft";
+  const map: Record<string, string> = {
+    approved: "text-green-600 border-green-600/40 bg-green-500/10",
+    submitted: "text-amber-600 border-amber-500/40 bg-amber-500/10",
+    rejected: "text-destructive border-destructive/40 bg-destructive/10",
+    draft: "text-muted-foreground border-border/60 bg-muted/40",
+  };
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] ${map[status]}`}>
+      {label} · {status}
+    </span>
+  );
+}
+
+function SectionCard({
+  row, title, description, icon, submitting, onSubmit, children,
+}: {
+  row?: SectionRow;
+  title: string;
+  description?: string;
+  icon?: React.ReactNode;
+  submitting: boolean;
+  onSubmit: () => void;
+  children: React.ReactNode;
+}) {
+  const status = row?.status ?? "draft";
+  const required = row?.required !== false;
+  const canSubmit = required && (status === "draft" || status === "rejected");
+  const statusMap: Record<string, { label: string; className: string }> = {
+    approved: { label: "Approved", className: "text-green-600 border-green-600/40 bg-green-500/10" },
+    submitted: { label: "Awaiting HR review", className: "text-amber-600 border-amber-500/40 bg-amber-500/10" },
+    rejected: { label: "Sent back — please fix", className: "text-destructive border-destructive/40 bg-destructive/10" },
+    draft: { label: "Not submitted", className: "text-muted-foreground border-border/60 bg-muted/40" },
+  };
+  const s = statusMap[status];
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="font-display text-lg flex items-center gap-2">{icon}{title}</CardTitle>
+          <div className="flex items-center gap-2">
+            {!required && <Badge variant="outline" className="text-[10px]">Not required</Badge>}
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${s.className}`}>{s.label}</span>
+          </div>
+        </div>
+        {description && <CardDescription>{description}</CardDescription>}
+        {status === "rejected" && row?.rejection_reason && (
+          <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs whitespace-pre-wrap">
+            <span className="font-medium">HR note:</span> {row.rejection_reason}
+          </div>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {children}
+        {required && (
+          <div className="flex items-center justify-end pt-1">
+            <Button
+              size="sm"
+              className={canSubmit ? "gradient-primary" : ""}
+              variant={canSubmit ? "default" : "outline"}
+              disabled={!canSubmit || submitting}
+              onClick={onSubmit}
+            >
+              <Send className="h-3.5 w-3.5 mr-1" />
+              {status === "approved" ? "Approved" : status === "submitted" ? "Awaiting review" : status === "rejected" ? "Re-submit" : "Submit for approval"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 
 function UploadRow({ spec, uploaded, busy, onUpload }: { spec: DocSpec; uploaded: boolean; busy: boolean; onUpload: (f: File) => void }) {
   return (

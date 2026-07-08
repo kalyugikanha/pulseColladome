@@ -1570,6 +1570,7 @@ export type Database = {
           estimated_hours: number | null
           id: string
           is_recurring_template: boolean
+          manual_rank: number | null
           origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
@@ -1603,6 +1604,7 @@ export type Database = {
           estimated_hours?: number | null
           id?: string
           is_recurring_template?: boolean
+          manual_rank?: number | null
           origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
@@ -1636,6 +1638,7 @@ export type Database = {
           estimated_hours?: number | null
           id?: string
           is_recurring_template?: boolean
+          manual_rank?: number | null
           origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
@@ -2292,6 +2295,7 @@ export type Database = {
           estimated_hours: number | null
           id: string
           is_recurring_template: boolean
+          manual_rank: number | null
           origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null

@@ -1,38 +1,41 @@
-## Fixes: version bump on publish + Chirag can't delete tasks he created
+## Kanban: drag-to-reorder within a column (assignee + managers)
 
-### 1. Task deletion (root cause)
-The `tasks` table has only three DELETE-capable policies:
-- `manager manage` — project managers
-- `dept head delete` — the assignee's department head
-- `reporting manager delete` — the assignee's reporting manager
+Add manual prioritization on top of the existing sort dropdown. Default view still auto-sorts by soonest due date; when someone drags a card within a column, that manual order takes over.
 
-There's **no policy that lets the creator (or the assignee) delete their own task**. So when Chirag creates a task and hits Delete, Postgres returns success with 0 rows changed (RLS silently filters it out) and the row stays. Same "silent no-op" pattern we just fixed for asset_links.
+### 1. Schema
+Add one nullable column `manual_rank double precision` on `public.tasks`.
+- `NULL` → card sorted by the current sort mode (existing behavior).
+- Non-null → card is manually ranked; lower value = higher on the board.
 
-Also both delete call sites (`tasks-plus.functions.ts` `deleteTask` and the inline `supabase.from("tasks").delete()` in `task-detail-sheet.tsx` line 241) don't check rows-affected, so the UI shows success even when nothing was deleted.
+New index: `create index tasks_status_manual_rank_idx on public.tasks(status, manual_rank);`
 
-**Fix (migration + tiny client tweak):**
-- Add a DELETE policy on `public.tasks` allowing `created_by = auth.uid()` (task creator can delete their own tasks).
-- Add a DELETE policy allowing `assignee_id = auth.uid()` (assignee can delete tasks assigned to them) — this matches how the UI already offers Delete to the assignee.
-- Admins/super admins already covered via `manager manage` / `has_role`; no widening needed there.
-- Harden `deleteTask` server fn to select the row first and throw a clear "You don't have permission to delete this task" if the caller can't see or the delete returns 0 rows, so future silent-drop bugs surface immediately.
+No new RLS. Assignee/reviewer/manager/dept-head/reporting-manager/project-manager already have UPDATE on `tasks`, which is exactly the set of people we want to let reorder — the assignee themselves and their managers. Non-managers cannot reorder someone else's task; that's the correct behavior.
 
-### 2. Version number not bumping on publish
-The version is a static string in `src/lib/version.ts` (`APP_VERSION = "1.0.0"`). **There is no automatic bump on publish** — Lovable's publish just deploys the current build; it does not edit source files. The version has stayed at 1.0.0 since it was added.
+### 2. Sort mode
+Add a new option **"Manual (drag to reorder)"** to the existing sort dropdown, and make it the default (persist in `localStorage`; existing users keep whatever they had). In every mode:
+- Sort primary: `manual_rank` ascending, `NULL`s go to the end.
+- Sort secondary: whatever the current sort key is (due date / priority / recently created).
+- So even in "Due date" mode, a card someone dragged to the top stays on top; the rest sort by date underneath.
 
-Two ways to make it move going forward — pick one:
+If the user prefers pure sort (no manual override), a small "Clear manual order" button in the header wipes `manual_rank` for all their visible cards in this board (only cards they can UPDATE).
 
-**Option A (recommended, zero infra): I bump the file every time you ask me to publish.**
-- I'll edit `APP_VERSION` right before calling publish (patch by default, minor/major on request), so the deployed build shows the new number.
-- Right now I'll bump it to `1.0.1` to reflect the recent publish that shipped the asset-links fix.
+### 3. Drag behavior
+- Existing cross-column DnD stays. Add within-column drop targets (drop between cards).
+- On drop: compute new rank as midpoint between the ranks of the cards above and below the drop position (standard fractional-index approach). If dropped at the top, `above.rank - 1`; at the bottom, `below.rank + 1`. Guarantees O(1) writes without renumbering.
+- If the dragged card doesn't have UPDATE permission, disable drag and show tooltip.
+- Optimistic update via existing React Query cache; call a new server fn `reorderKanbanCard({ taskId, newRank })` that updates `manual_rank` (and `status` if the column changed — merge with existing cross-column move).
 
-**Option B (auto, but changes what "version" means): show a build ID instead of a semver.**
-- Inject a build timestamp via Vite `define` (e.g. `v1.0.0-2607081432`). Increments automatically on every build, but it's no longer a hand-tuned semver.
+### 4. Files
+- Migration: add `manual_rank` column + index on `public.tasks`.
+- `src/lib/tasks-workflow.functions.ts`: add `reorderKanbanCard` server fn (auth via existing RLS — errors clearly if 0 rows updated, same pattern we just applied).
+- `src/components/board/board-kanban.tsx`:
+  - Extend `BoardCard` type with `manual_rank: number | null`.
+  - Add `manual_rank` to the SELECT projection (fetcher).
+  - Add "Manual" to `SortKey`, make it default.
+  - Update `compareCards` so `manual_rank` (asc, nulls last) is always primary.
+  - Add within-column droppable slots and `onDragEnd` handling that computes fractional rank and calls the new server fn.
+  - Reuse existing `canMoveTask` for drag gating.
+- No changes to workflow logic.
 
-The plan assumes **Option A** unless you tell me otherwise. Bump on this turn: `1.0.0` → `1.0.1`.
-
-### Files touched
-- New migration: two DELETE policies on `public.tasks` (creator, assignee).
-- `src/lib/tasks-plus.functions.ts` — `deleteTask` returns a "not permitted" error when 0 rows are affected.
-- `src/lib/version.ts` — bump to `1.0.1`.
-
-No schema changes to other tables, no RLS changes outside `tasks`, no changes to workflow logic.
+### Assumption
+Manual order is **shared** across viewers (stored on the task), not per-viewer. So if a manager drags a card up for their report, the report sees the same order in their own Kanban — matching how "priority" already behaves. Tell me if you'd rather have per-user order (that would need a separate table and different plan).

@@ -38,14 +38,18 @@ const QUOTES: { text: string; author: string }[] = [
 ];
 
 function useDailyQuote() {
-  return useMemo(() => {
+  const [dateLabel, setDateLabel] = useState<string>("");
+  const quote = useMemo(() => {
     const now = new Date();
     const start = Date.UTC(now.getFullYear(), 0, 0);
     const day = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - start) / 86400000);
-    const idx = day % QUOTES.length;
-    const dateLabel = now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-    return { ...QUOTES[idx], dateLabel };
+    return QUOTES[day % QUOTES.length];
   }, []);
+  useEffect(() => {
+    // Locale-dependent; compute on client only to avoid SSR hydration mismatch.
+    setDateLabel(new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }));
+  }, []);
+  return { ...quote, dateLabel };
 }
 
 function LandingPage() {

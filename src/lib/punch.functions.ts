@@ -6,6 +6,7 @@ type PunchAllocationInput = {
   hours: number;
   comments: string;
   taskId?: string | null;
+  atRisk?: boolean;
 };
 
 type PunchInInput = {
@@ -16,6 +17,7 @@ type PunchOutInput = {
   sessionId: string;
   allocations: PunchAllocationInput[];
   punchOutTime?: string | null;
+  skip?: boolean;
 };
 
 export type PunchAllocation = {
@@ -26,6 +28,7 @@ export type PunchAllocation = {
   task_title: string | null;
   hours: number;
   comments: string;
+  at_risk?: boolean;
 };
 
 export type PunchSessionResult = {
@@ -45,11 +48,15 @@ export type PunchSessionResult = {
 export type PunchInResult = {
   status: "punched_in" | "already_open";
   session: PunchSessionResult;
+  unloggedBalance: number;
+  unloggedSince: string | null;
 };
 
 export type PunchOutResult = {
   status: "punched_out";
   session: PunchSessionResult;
+  unloggedBalance: number;
+  unloggedSince: string | null;
 };
 
 function requireIsoDate(value: unknown) {
@@ -63,21 +70,23 @@ function normalizePunchOutInput(input: PunchOutInput) {
   if (!input || typeof input.sessionId !== "string" || input.sessionId.trim() === "") {
     throw new Error("Missing punch session.");
   }
-  if (!Array.isArray(input.allocations) || input.allocations.length === 0) {
-    throw new Error("Add at least one project.");
+  const skip = !!input.skip;
+  const rawAllocs = Array.isArray(input.allocations) ? input.allocations : [];
+  if (!skip && rawAllocs.length === 0) {
+    // Empty allocations without skip flag → treat as skip too, non-blocking.
   }
 
-  const allocations = input.allocations.map((row, index) => {
+  const allocations = rawAllocs.map((row, index) => {
     const projectId = typeof row.projectId === "string" ? row.projectId.trim() : "";
     const taskId = typeof row.taskId === "string" && row.taskId.trim() !== "" ? row.taskId.trim() : null;
     const hours = Number(row.hours);
     const comments = typeof row.comments === "string" ? row.comments.trim() : "";
+    const atRisk = !!row.atRisk;
 
     if (!projectId && !taskId) throw new Error(`Row ${index + 1}: pick a task or project.`);
-    if (!Number.isFinite(hours) || hours <= 0) throw new Error(`Row ${index + 1}: enter hours (>0).`);
-    if (!comments) throw new Error(`Row ${index + 1}: add a comment.`);
+    if (!Number.isFinite(hours) || hours < 0) throw new Error(`Row ${index + 1}: hours can't be negative.`);
 
-    return { projectId, taskId, hours: Number(hours.toFixed(2)), comments };
+    return { projectId, taskId, hours: Number(hours.toFixed(2)), comments, atRisk };
   });
 
   let punchOutTime: string | null = null;
@@ -88,7 +97,7 @@ function normalizePunchOutInput(input: PunchOutInput) {
     punchOutTime = d.toISOString();
   }
 
-  return { sessionId: input.sessionId.trim(), allocations, punchOutTime };
+  return { sessionId: input.sessionId.trim(), allocations, punchOutTime, skip };
 }
 
 function toPunchSession(row: any): PunchSessionResult {

@@ -24,7 +24,7 @@ import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
   addSubtask, toggleSubtask, deleteSubtask, addComment, resolveComment,
   toggleWatcher, addDependency, removeDependency, rateTask,
-  listTaskAttachments, insertTaskAttachment, deleteTaskAttachment,
+  listTaskAttachments, insertTaskAttachment, deleteTaskAttachment, updateTaskAssetLinks,
 } from "@/lib/tasks-workflow.functions";
 import { logTaskTime } from "@/lib/workflows.functions";
 

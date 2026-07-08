@@ -17,6 +17,7 @@ import { Plus, Workflow, LayoutGrid, List as ListIcon, Layers, ListChecks } from
 import { toast } from "sonner";
 import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board/board-kanban";
 import { createTaskFull } from "@/lib/tasks-plus.functions";
+import { updateTaskFields } from "@/lib/tasks-workflow.functions";
 import { startWorkflow, listWorkflowTemplates } from "@/lib/workflows.functions";
 import { TaxonomyPage } from "./admin.taxonomy";
 
@@ -211,12 +212,16 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   onCreated?: () => void;
 }) {
   const createFn = useServerFn(createTaskFull);
+  const updateFn = useServerFn(updateTaskFields);
   const startWfFn = useServerFn(startWorkflow);
   const listWf = useServerFn(listWorkflowTemplates);
 
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [due, setDue] = useState("");
+  const [postDate, setPostDate] = useState("");
+  const [estimate, setEstimate] = useState("");
+  const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [pri, setPri] = useState<"low" | "medium" | "high">("medium");
   const [projectId, setProjectId] = useState("");
   const [assignee, setAssignee] = useState<string>(defaultAssigneeId ?? "");
@@ -269,6 +274,11 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     if (!title.trim()) return toast.error("Title required");
     if (!projectId) return toast.error("Project required");
     if (repeat === "weekly" && repeatDays.size === 0) return toast.error("Pick at least one weekday");
+    const estNum = estimate.trim() === "" ? null : Number(estimate);
+    if (estNum !== null && (!Number.isFinite(estNum) || estNum < 0)) {
+      return toast.error("Estimated hours must be a positive number.");
+    }
+    const cleanLinks = links.filter((l) => l.url.trim());
     setBusy(true);
     try {
       if (wfMode && wfTemplateId) {
@@ -278,18 +288,24 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           assigneeId: assignee || null, priority: pri,
         }});
       } else {
-        await createFn({ data: {
+        const created = await createFn({ data: {
           projectId, title: title.trim(), description: desc.trim(),
           dueDate: due || null, priority: pri,
-          assigneeId: assignee || defaultAssigneeId!, assetLinks: [],
+          assigneeId: assignee || defaultAssigneeId!, assetLinks: cleanLinks,
           domainId: null, departmentId: null, taskTypeIds: [],
+          estimatedHours: estNum,
           recurrence: repeat === "none"
             ? null
             : { freq: repeat, days: repeat === "weekly" ? Array.from(repeatDays).sort() : [] },
         }});
+        const newId = (created as unknown as { id?: string } | null)?.id;
+        if (newId && repeat === "none" && postDate) {
+          await updateFn({ data: { taskId: newId, patch: { scheduled_post_date: postDate } } });
+        }
       }
       toast.success(repeat === "none" ? "Task created" : "Recurring task saved");
-      setTitle(""); setDesc(""); setDue(""); setProjectId(""); setWfTemplateId(""); setWfMode(false);
+      setTitle(""); setDesc(""); setDue(""); setPostDate(""); setEstimate(""); setLinks([]);
+      setProjectId(""); setWfTemplateId(""); setWfMode(false);
       setRepeat("none"); setRepeatDays(new Set());
       onCreated?.();
       onClose();
@@ -363,6 +379,12 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
               <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
             </div>
             <div className="space-y-1">
+              <Label className="text-xs">Scheduled post date</Label>
+              <Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
               <Label className="text-xs">Assignee</Label>
               <Select value={assignee} onValueChange={setAssignee}>
                 <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
@@ -386,6 +408,27 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Estimated hours</Label>
+              <Input
+                type="number" min={0} step={0.25} value={estimate}
+                onChange={(e) => setEstimate(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Asset links</Label>
+            {links.map((l, i) => (
+              <div key={i} className="flex gap-1">
+                <Input placeholder="Label" value={l.label}
+                  onChange={(e) => setLinks((arr) => arr.map((x, ix) => ix === i ? { ...x, label: e.target.value } : x))} />
+                <Input placeholder="https://…" value={l.url}
+                  onChange={(e) => setLinks((arr) => arr.map((x, ix) => ix === i ? { ...x, url: e.target.value } : x))} />
+                <Button variant="ghost" size="sm" onClick={() => setLinks((arr) => arr.filter((_, ix) => ix !== i))}>×</Button>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" onClick={() => setLinks((arr) => [...arr, { label: "", url: "" }])}>+ Add link</Button>
           </div>
           <div className="space-y-1 rounded-md border border-dashed p-2">
             <Label className="text-xs">Repeat</Label>

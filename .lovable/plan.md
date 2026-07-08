@@ -1,24 +1,12 @@
-## Fix: Duplicate task must carry all fields (workflow, post date, asset links, etc.)
+## Add build version label above profile in the sidebar
 
-**Problem:** `duplicateTask` in `src/lib/tasks-plus.functions.ts` calls the `create_task_full` RPC, which only accepts a subset of columns. Workflow linkage, scheduled post date, asset links, and several other fields are dropped, so duplicating a workflow task creates a plain task that's disconnected from the workflow.
+**Where:** `SidebarFooter` in `src/routes/_authenticated/route.tsx`. Insert a small muted "v1.0.0" line directly above the profile/sign-out row. Hidden when the sidebar is collapsed to icon mode (same pattern as the profile name).
 
-**Change (single file: `src/lib/tasks-plus.functions.ts`, `duplicateTask` handler):**
+**How the version lives in code:**
+- New file `src/lib/version.ts` exporting `export const APP_VERSION = "1.0.0";`
+- Sidebar imports it and renders `v{APP_VERSION}`.
 
-1. Expand the source `select` to also read: `client_brand, scheduled_post_date, workflow_instance_id, workflow_template_id, stage_index, stage_snapshot, required_fields_values, review_state, reviewer_id, requester_id, origin_department, is_recurring_template, recurrence_freq, recurrence_days, recurrence_parent_id`.
-2. Pass the source's `asset_links` (not `[]`) into `create_task_full` so links are preserved.
-3. After the RPC returns the new task id, run a single `supabase.from("tasks").update({...}).eq("id", newId)` that copies over the fields `create_task_full` does not accept:
-   - `client_brand`
-   - `scheduled_post_date`
-   - `workflow_instance_id`
-   - `workflow_template_id`
-   - `stage_index`
-   - `stage_snapshot`
-   - `required_fields_values`
-   - `review_state` (only if source has a non-default value)
-   - `origin_department`
-   - `requester_id` (keep original requester)
-   - Recurrence fields (`is_recurring_template`, `recurrence_freq`, `recurrence_days`) so duplicating a recurring template creates another template rather than a plain one. Do **not** copy `recurrence_parent_id` — the copy is a new template/task, not another occurrence.
-4. Preserve the existing behavior that sets `reviewer_id` to the acting user when assignee differs; only apply that fallback when the source has no `reviewer_id`. If the source already has a `reviewer_id`, copy it as-is.
-5. Preserve the existing impersonation `created_by` override.
+**Auto-increment on publish:**
+There's no build-time hook that runs on publish, so the bump happens in this workflow: every time you tell me to publish (or ship/deploy/go live), I will patch `APP_VERSION` — patch segment by default (1.0.0 → 1.0.1 → 1.0.2 …) — right before calling the publish tool. Say "bump minor" or "bump major" when you want 1.1.0 or 2.0.0 instead. Starting value is `1.0.0` as requested.
 
-No schema changes, no UI changes, no changes to other server functions. RLS unaffected — the update runs as the acting user on a row they just created.
+No backend or schema changes.

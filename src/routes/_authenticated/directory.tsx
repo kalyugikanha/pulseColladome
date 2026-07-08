@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Pencil, Users, Search, UserX, UserCheck, Trash2 } from "lucide-react";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
@@ -32,6 +33,7 @@ type Profile = {
   phone: string | null;
   joined_on: string | null;
   is_active: boolean | null;
+  onboarding_required: boolean | null;
 };
 
 const EMPLOYMENT_TYPES = ["full_time", "intern", "contract", "consultant"] as const;
@@ -66,7 +68,7 @@ export function DirectoryPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let q = (supabase as any)
         .from("profiles")
-        .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on, is_active")
+        .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on, is_active, onboarding_required")
         .order("full_name");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
       if (userScope && userScope.length) q = q.in("id", userScope);
@@ -202,6 +204,17 @@ export function DirectoryPage() {
     }
   }
 
+
+  async function setOnboardingRequired(p: Profile, required: boolean) {
+    if (!canEdit) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("profiles").update({ onboarding_required: required }).eq("id", p.id);
+    if (error) return toast.error(error.message);
+    toast.success(required ? "Onboarding required" : "Onboarding skipped for this user");
+    qc.invalidateQueries({ queryKey: ["directory-profiles"] });
+    qc.invalidateQueries({ queryKey: ["current-user"] });
+  }
+
   async function hardDelete() {
     if (!confirmDelete || !canHardDelete) return;
     if (deleteConfirmText.trim().toLowerCase() !== (confirmDelete.email ?? "").toLowerCase()) {
@@ -282,6 +295,7 @@ export function DirectoryPage() {
                 <TableHead>Reporting manager</TableHead>
                 <TableHead>Employment</TableHead>
                 <TableHead>Joined</TableHead>
+                {canEdit && <TableHead className="text-center">Onboarding required</TableHead>}
                 {canEdit && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
@@ -337,6 +351,15 @@ export function DirectoryPage() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">{p.joined_on ?? "—"}</TableCell>
                   {canEdit && (
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={p.onboarding_required !== false}
+                        onCheckedChange={(v) => setOnboardingRequired(p, v === true)}
+                        aria-label="Onboarding required"
+                      />
+                    </TableCell>
+                  )}
+                  {canEdit && (
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
@@ -359,7 +382,7 @@ export function DirectoryPage() {
               ))}
               {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={canEdit ? 6 : 5} className="text-center text-sm text-muted-foreground py-8">
+                  <TableCell colSpan={canEdit ? 7 : 5} className="text-center text-sm text-muted-foreground py-8">
                     No teammates match.
                   </TableCell>
                 </TableRow>

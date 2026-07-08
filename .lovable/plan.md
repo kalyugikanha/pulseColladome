@@ -1,20 +1,28 @@
-## Show welcome overlay on every sign-in
+## Changes
 
-Switch from "once per user forever" to "once per sign-in event" on the live URL.
+### 1. Allow 0 hours when marking a task done
+`src/components/tasks/mark-done-dialog.tsx` — change validation from `hoursNum > 0` to `hoursNum >= 0` so recurring tasks with no time spent that day can still be submitted for approval. Placeholder/help text stays the same.
 
-### Change
-- Drop the `profiles.welcomed_at` gate. Instead, trigger the overlay from Supabase's `onAuthStateChange` `SIGNED_IN` event.
-- `src/hooks/useFirstLoginWelcome.ts` → rename intent to `useWelcomeOnSignIn(userId)`:
-  - Subscribe to `supabase.auth.onAuthStateChange`.
-  - When event === `"SIGNED_IN"` AND hostname === `colladome-pulse.lovable.app`, set `show = true`.
-  - `dismiss()` just sets `show = false` (no DB write).
-- Keep the live-URL gate so preview/localhost stay quiet.
-- Leave the `welcomed_at` column in place (harmless, no code path reads it anymore).
+### 2. "Onboarding not required" toggle in HR Admin → Directory
+Add an admin-controlled per-user flag that lets the app skip the "complete onboarding first" gate for that user.
 
-### Why `SIGNED_IN` and not mount
-`SIGNED_IN` fires only on an actual auth transition (fresh login, OAuth return). Page reloads and tab switches fire `TOKEN_REFRESHED` / `INITIAL_SESSION`, which we ignore — so the overlay shows on real sign-ins, not on every reload.
+**Database (migration)**
+- Add `profiles.onboarding_required boolean not null default true`.
+- No RLS change needed (profiles already has HR/super-admin update policies); toggle is written via a `createServerFn` that verifies caller is super-admin or HR admin.
 
-### Verify on live URL
-- Sign out → sign in → overlay + confetti appears.
-- Reload the page while signed in → no overlay.
-- Sign out → sign in again → overlay appears again.
+**Server**
+- New `src/lib/hr-directory.functions.ts` exporting `setOnboardingRequired({ user_id, required })` — `requireSupabaseAuth` + role check (`is_super_admin` / `has_role('hr_admin')`), updates `profiles.onboarding_required`.
+
+**Onboarding gate**
+- Wherever the app currently redirects unfinished users to `/complete-onboarding` / `/onboarding-pending` (checked in `src/routes/_authenticated/route.tsx` and/or `use-current-user`), treat `onboarding_required === false` as "gate passes" so the user can navigate freely.
+- `useCurrentUser` returns the new field so UI can read it.
+
+**UI**
+- `src/routes/_authenticated/directory.tsx` (Team Directory, visible under HR Admin tab set and to super admin): add a compact "Onboarding required" checkbox column/toggle on each row, only rendered when `me.isSuperAdmin || me.isHrAdmin`. Toggling calls the server fn and invalidates the directory query. Non-admins don't see the control.
+
+### Verification
+- Mark-done dialog: entering `0` enables the submit button.
+- As super admin, uncheck "Onboarding required" for a pending user → that user can load `/dashboard` and other routes without being bounced to the onboarding flow. Re-check restores the gate.
+
+### Out of scope
+No change to the onboarding form itself, approvals flow, or the welcome overlay.

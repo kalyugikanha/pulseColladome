@@ -138,6 +138,16 @@ export function BoardKanban({
 
   return (
     <>
+      <div className="flex items-center justify-end gap-2 mb-2">
+        <label className="text-xs text-muted-foreground">Sort</label>
+        <select
+          value={sortKey}
+          onChange={(e) => updateSort(e.target.value as SortKey)}
+          className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+        >
+          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+      </div>
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(240px, 1fr))` }}>
           {COLUMNS.map((c) => (

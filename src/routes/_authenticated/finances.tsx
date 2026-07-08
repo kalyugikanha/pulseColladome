@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Wallet, IndianRupee, Users, UserPlus, Loader2, Flame } from "lucide-react";
 import { provisionPendingUsers } from "@/lib/admin-users.functions";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
+import { SalaryBankExport } from "@/components/finances/salary-bank-export";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
@@ -459,6 +460,10 @@ function FinancesPage() {
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Actual salary pool" value={inr(totalConfiguredPool)} sub="pro-rated + unpaid leave" />
         <StatCard icon={<Users className="h-4 w-4" />} label="Employees with salary" value={String(usersWithSalary)} sub={`${visibleProfiles.length + visiblePendingGrants.length} on roster`} />
       </div>
+
+      {me?.realIsSuperAdmin && <SalaryBankExport />}
+
+
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

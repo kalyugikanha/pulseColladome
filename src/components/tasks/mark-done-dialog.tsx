@@ -39,20 +39,20 @@ export function MarkDoneDialog({
   }, [task, defaultHandoffId]);
 
   const hoursNum = Number(hours);
-  const valid = hours !== "" && !Number.isNaN(hoursNum) && hoursNum >= 0;
+  const hoursValid = hours === "" || (!Number.isNaN(hoursNum) && hoursNum >= 0);
 
   return (
     <Dialog open={!!task} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle className="font-display">Mark done — log actual hours</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="font-display">Mark done</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="text-xs text-muted-foreground">{task?.title}</div>
           <div className="space-y-1">
-            <Label>Actual hours spent on this task</Label>
+            <Label>Actual hours spent (optional)</Label>
             <Input
               type="number" min={0} step={0.25} value={hours}
               onChange={(e) => setHours(e.target.value)}
-              placeholder="e.g. 3.5" autoFocus
+              placeholder="Leave blank to skip — you can log time at punch-out" autoFocus
             />
           </div>
           {roster && roster.length > 0 && (
@@ -76,18 +76,19 @@ export function MarkDoneDialog({
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            The task creator reviews these hours. They only land in your timesheet once approved.
+            Hours are optional here — they're captured in the punch-out dialog. When you do log them,
+            the task creator reviews before they land in your timesheet.
           </p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" disabled={!valid}
+          <Button className="gradient-primary" disabled={!hoursValid}
             onClick={() => onConfirm({
-              hours: hoursNum,
+              hours: hours === "" ? 0 : hoursNum,
               note: note || undefined,
               handoffId: handoff || null,
             })}>
-            Send for approval
+            {hours === "" ? "Mark done" : "Send for approval"}
           </Button>
         </DialogFooter>
       </DialogContent>

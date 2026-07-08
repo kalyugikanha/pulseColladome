@@ -6,10 +6,19 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+// Stamp every build with a fresh identifier so each publish is visibly new
+// even without a manual semver bump. YYYYMMDDHHMM in UTC.
+const BUILD_ID = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
+
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  vite: {
+    define: {
+      __BUILD_ID__: JSON.stringify(BUILD_ID),
+    },
   },
 });

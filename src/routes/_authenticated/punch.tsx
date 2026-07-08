@@ -506,7 +506,7 @@ export function PunchPage() {
   );
 }
 
-type TaskComboTask = { id: string; title: string; project_id: string | null; project: { code: string; name: string } | null };
+type TaskComboTask = { id: string; title: string; status?: string; project_id: string | null; project: { code: string; name: string } | null };
 
 function TaskCombobox({ tasks, value, onChange, allowNone }: {
   tasks: TaskComboTask[];

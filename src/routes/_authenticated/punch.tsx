@@ -56,6 +56,7 @@ export function PunchPage() {
   const qc = useQueryClient();
   const punchInServer = useServerFn(punchInServerFn);
   const punchOutServer = useServerFn(punchOutServerFn);
+  const clearUnloggedServer = useServerFn(clearUnloggedHoursServerFn);
   const requestTaskServer = useServerFn(requestTaskFromManager);
   const today = format(new Date(), "yyyy-MM-dd");
   const punchUserId = me?.realId ?? me?.id;
@@ -70,6 +71,8 @@ export function PunchPage() {
   const [punchingIn, setPunchingIn] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [punchOutAt, setPunchOutAt] = useState<string>("");
+  const [unlogged, setUnlogged] = useState<{ balance: number; since: string | null }>({ balance: 0, since: null });
+  const [unloggedDismissed, setUnloggedDismissed] = useState(false);
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["punch-sessions-today", punchUserId],

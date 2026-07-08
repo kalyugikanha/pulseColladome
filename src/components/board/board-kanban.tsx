@@ -242,7 +242,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
   // Materialize today's recurring occurrences (idempotent, safe to call every load).
   try { await supabase.rpc("generate_recurring_task_occurrences" as never); } catch { /* noop */ }
   let q = supabase.from("tasks").select(`
-    id, title, status, priority, due_date, assignee_id, reviewer_id, project_id, created_by,
+    id, title, status, priority, due_date, created_at, assignee_id, reviewer_id, project_id, created_by,
     workflow_instance_id, stage_index, stage_snapshot,
     assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
     project:projects(id, name)

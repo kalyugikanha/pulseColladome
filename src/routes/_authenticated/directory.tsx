@@ -409,6 +409,11 @@ export function DirectoryPage() {
                   {canEdit && (
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {me?.isSuperAdmin && (
+                          <Button variant="ghost" size="sm" onClick={() => setProfileSheetId(p.id)}>
+                            <IdCard className="h-3.5 w-3.5 mr-1" /> Profile
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
                           <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                         </Button>

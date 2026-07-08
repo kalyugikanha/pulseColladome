@@ -1,6 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { OnboardingSection, OnboardingSectionStatus, SectionRow } from "@/lib/onboarding-sections";
+import { SECTION_LABELS, type OnboardingSection, type OnboardingSectionStatus, type SectionRow } from "@/lib/onboarding-sections";
+
+type NotifKind = "onboarding_approved" | "onboarding_rejected" | "onboarding_required";
+async function notifyEmployee(
+  supabase: SupabaseLoose,
+  user_id: string,
+  kind: NotifKind,
+  body: string,
+): Promise<void> {
+  try {
+    await supabase.from("notifications").insert({ user_id, kind, body });
+  } catch {
+    // Notifications are best-effort; never block the primary action.
+  }
+}
 
 const WELCOME_TASK_ASSIGNEE_EMAIL = "kanishka@colladome.in";
 const WELCOME_TASK_PROJECT_ID = "0995c181-bda4-4cf3-b1c5-73b1a1834d24";

@@ -1628,6 +1628,7 @@ export type Database = {
           domain_id: string | null
           due_date: string | null
           estimated_hours: number | null
+          hours_worked: number | null
           id: string
           is_recurring_template: boolean
           manual_rank: number | null
@@ -1662,6 +1663,7 @@ export type Database = {
           domain_id?: string | null
           due_date?: string | null
           estimated_hours?: number | null
+          hours_worked?: number | null
           id?: string
           is_recurring_template?: boolean
           manual_rank?: number | null
@@ -1696,6 +1698,7 @@ export type Database = {
           domain_id?: string | null
           due_date?: string | null
           estimated_hours?: number | null
+          hours_worked?: number | null
           id?: string
           is_recurring_template?: boolean
           manual_rank?: number | null
@@ -2353,6 +2356,7 @@ export type Database = {
           domain_id: string | null
           due_date: string | null
           estimated_hours: number | null
+          hours_worked: number | null
           id: string
           is_recurring_template: boolean
           manual_rank: number | null

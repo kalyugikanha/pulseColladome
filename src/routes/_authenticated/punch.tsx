@@ -585,7 +585,7 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
                 {selected.title}
               </>
             ) : (
-              <span className="text-muted-foreground">Pick one of your open tasks</span>
+              <span className="text-muted-foreground">Pick one of your tasks</span>
             )}
           </span>
           <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />

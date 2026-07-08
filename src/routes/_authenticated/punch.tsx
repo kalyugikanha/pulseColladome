@@ -48,7 +48,7 @@ type Session = {
   allocations: Allocation[] | null;
 };
 
-type Row = { projectId: string; taskId: string; hours: string; comments: string };
+type Row = { projectId: string; taskId: string; hours: string; comments: string; atRisk: boolean };
 
 export function PunchPage() {
   const { data: me } = useCurrentUser();

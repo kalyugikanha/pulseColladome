@@ -124,8 +124,41 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
   async function refresh() {
     await qc.invalidateQueries({ queryKey: ["task-detail", taskId] });
+    await qc.invalidateQueries({ queryKey: ["task-attachments", taskId] });
     await qc.invalidateQueries({ queryKey: ["my-tasks"] });
     await qc.invalidateQueries({ queryKey: ["awaiting-my-review"] });
+  }
+
+  async function handleUploadFiles(files: FileList | null) {
+    if (!files || !files.length || !taskId) return;
+    setUploadBusy(true);
+    try {
+      for (const file of Array.from(files)) {
+        const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+        const path = `tasks/${taskId}/${crypto.randomUUID()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("task-attachments")
+          .upload(path, file, { contentType: file.type || undefined, upsert: false });
+        if (upErr) throw new Error(upErr.message);
+        await insertAttachmentFn({ data: {
+          taskId, filePath: path, fileName: file.name,
+          contentType: file.type || null, sizeBytes: file.size,
+        }});
+      }
+      toast.success("Attachment uploaded");
+      await refresh();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
+  async function handleDeleteAttachment(id: string) {
+    try {
+      await deleteAttachmentFn({ data: { id } });
+      await refresh();
+    } catch (e) { toast.error((e as Error).message); }
   }
 
   const assetLinks = ((task as { asset_links?: { label: string; url: string }[] | null } | undefined)?.asset_links) ?? [];

@@ -199,6 +199,12 @@ export const rejectOnboardingSection = createServerFn({ method: "POST" })
       .eq("user_id", data.user_id)
       .eq("section", data.section);
     if (error) throw new Error(error.message);
+    await notifyEmployee(
+      supabase,
+      data.user_id,
+      "onboarding_rejected",
+      `${SECTION_LABELS[data.section]} was sent back by HR.\nReason: ${reason}`,
+    );
     return { ok: true as const };
   });
 
@@ -208,18 +214,18 @@ export const setOnboardingSectionRequired = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertHrOrSuper(context as unknown as { supabase: unknown; userId: string });
     const supabase = context.supabase as unknown as SupabaseLoose;
+    const { data: rowBefore } = await supabase.from("onboarding_section_state")
+      .select("status, required").eq("user_id", data.user_id).eq("section", data.section).maybeSingle();
+    const before = rowBefore as { status?: string; required?: boolean } | null;
     // If turning ON and section is currently approved, reset to draft so the user re-submits.
     const patch: Record<string, unknown> = { required: data.required };
-    if (data.required) {
-      // Only reset when currently approved
-      const { data: row } = await supabase.from("onboarding_section_state")
-        .select("status").eq("user_id", data.user_id).eq("section", data.section).maybeSingle();
-      if ((row as { status?: string } | null)?.status === "approved") {
-        patch.status = "draft";
-        patch.approved_at = null;
-        patch.approved_by = null;
-        patch.submitted_at = null;
-      }
+    let didReset = false;
+    if (data.required && before?.status === "approved") {
+      patch.status = "draft";
+      patch.approved_at = null;
+      patch.approved_by = null;
+      patch.submitted_at = null;
+      didReset = true;
     }
     const { error } = await supabase.from("onboarding_section_state")
       .update(patch)

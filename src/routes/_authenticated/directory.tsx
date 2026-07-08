@@ -18,6 +18,10 @@ import { toast } from "sonner";
 import { Pencil, Users, Search, UserX, UserCheck, Trash2, IdCard } from "lucide-react";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 import { EmployeeProfileSheet } from "@/components/directory/employee-profile-sheet";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { setOnboardingSectionRequired } from "@/lib/onboarding-approvals.functions";
+import { ONBOARDING_SECTIONS, SECTION_LABELS, type OnboardingSection } from "@/lib/onboarding-sections";
+
 
 
 export const Route = createFileRoute("/_authenticated/directory")({

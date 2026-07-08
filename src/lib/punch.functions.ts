@@ -80,7 +80,15 @@ function normalizePunchOutInput(input: PunchOutInput) {
     return { projectId, taskId, hours: Number(hours.toFixed(2)), comments };
   });
 
-  return { sessionId: input.sessionId.trim(), allocations };
+  let punchOutTime: string | null = null;
+  if (input.punchOutTime != null && input.punchOutTime !== "") {
+    const d = new Date(input.punchOutTime);
+    if (Number.isNaN(d.getTime())) throw new Error("Invalid punch-out time.");
+    if (d.getTime() > Date.now() + 60_000) throw new Error("Punch-out time can't be in the future.");
+    punchOutTime = d.toISOString();
+  }
+
+  return { sessionId: input.sessionId.trim(), allocations, punchOutTime };
 }
 
 function toPunchSession(row: any): PunchSessionResult {

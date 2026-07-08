@@ -389,6 +389,15 @@ function CompleteOnboardingPage() {
         </p>
       </header>
 
+      {banner && (
+        <div className={`rounded-lg border p-3 ${bannerClass[banner.tone]}`}>
+          <div className="text-sm font-medium">{banner.title}</div>
+          {banner.body}
+        </div>
+      )}
+
+
+
       <Card>
         <CardContent className="p-4 flex items-center gap-4">
           <div

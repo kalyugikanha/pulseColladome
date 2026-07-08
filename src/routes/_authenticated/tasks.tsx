@@ -505,3 +505,50 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     </Dialog>
   );
 }
+
+type ProjectLite = { id: string; code: string | null; name: string | null };
+
+function ProjectCombobox({ projects, value, onChange }: { projects: ProjectLite[]; value: string; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = projects.find((p) => p.id === value) ?? null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+          <span className="truncate text-left">
+            {selected ? (
+              <>
+                {selected.code && <span className="font-mono text-xs mr-2">{selected.code}</span>}
+                {selected.name ?? "Untitled project"}
+              </>
+            ) : (
+              <span className="text-muted-foreground">Pick project</span>
+            )}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search by project code or name…" />
+          <CommandList>
+            <CommandEmpty>No projects found.</CommandEmpty>
+            <CommandGroup>
+              {projects.map((p) => (
+                <CommandItem
+                  key={p.id}
+                  value={`${p.code ?? ""} ${p.name ?? ""}`}
+                  onSelect={() => { onChange(p.id); setOpen(false); }}
+                >
+                  <Check className={`h-4 w-4 mr-2 ${value === p.id ? "opacity-100" : "opacity-0"}`} />
+                  {p.code && <span className="font-mono text-xs mr-2">{p.code}</span>}
+                  <span className="truncate">{p.name ?? "Untitled project"}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}

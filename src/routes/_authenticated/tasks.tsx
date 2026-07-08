@@ -13,7 +13,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Workflow, LayoutGrid, List as ListIcon, Layers, ListChecks } from "lucide-react";
+import { Plus, Workflow, LayoutGrid, List as ListIcon, Layers, ListChecks, ChevronsUpDown, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "sonner";
 import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board/board-kanban";
 import { createTaskFull } from "@/lib/tasks-plus.functions";
@@ -389,12 +391,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Project</Label>
-              <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger><SelectValue placeholder="Pick project" /></SelectTrigger>
-                <SelectContent>
-                  {(projects ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.code ? `${p.code} · ` : ""}{p.name ?? "Untitled project"}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <ProjectCombobox projects={projects ?? []} value={projectId} onChange={setProjectId} />
               {projectId && (() => {
                 const p = (projects ?? []).find((project) => project.id === projectId);
                 return p ? <div className="text-[10px] text-muted-foreground font-mono">Project ID: {p.code ?? p.id}</div> : null;
@@ -506,5 +503,52 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type ProjectLite = { id: string; code: string | null; name: string | null };
+
+function ProjectCombobox({ projects, value, onChange }: { projects: ProjectLite[]; value: string; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = projects.find((p) => p.id === value) ?? null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+          <span className="truncate text-left">
+            {selected ? (
+              <>
+                {selected.code && <span className="font-mono text-xs mr-2">{selected.code}</span>}
+                {selected.name ?? "Untitled project"}
+              </>
+            ) : (
+              <span className="text-muted-foreground">Pick project</span>
+            )}
+          </span>
+          <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search by project code or name…" />
+          <CommandList>
+            <CommandEmpty>No projects found.</CommandEmpty>
+            <CommandGroup>
+              {projects.map((p) => (
+                <CommandItem
+                  key={p.id}
+                  value={`${p.code ?? ""} ${p.name ?? ""}`}
+                  onSelect={() => { onChange(p.id); setOpen(false); }}
+                >
+                  <Check className={`h-4 w-4 mr-2 ${value === p.id ? "opacity-100" : "opacity-0"}`} />
+                  {p.code && <span className="font-mono text-xs mr-2">{p.code}</span>}
+                  <span className="truncate">{p.name ?? "Untitled project"}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

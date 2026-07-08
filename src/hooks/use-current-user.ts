@@ -58,7 +58,10 @@ export function useCurrentUser() {
       const realHeadOf = (headRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
       const realReportIds = ((reportRows ?? []) as Array<{ id: string }>).map((r) => r.id);
       const sections = ((sectionRows ?? []) as Array<{ required: boolean; status: string }>);
-      const onboardingGateBlocked = sections.some((r) => r.required && r.status !== "approved");
+      // Onboarding gate relaxed: HR now reviews sections at their own pace.
+      // Portal access is no longer blocked by unapproved sections. Data,
+      // uploaded proof, and section history remain intact for HR review.
+      const onboardingGateBlocked = false;
       const onboardingAnyRejected = sections.some((r) => r.status === "rejected");
       const onboardingAnySubmitted = sections.some((r) => r.status === "submitted");
       const onboardingAnyDraft = sections.some((r) => r.required && r.status === "draft");

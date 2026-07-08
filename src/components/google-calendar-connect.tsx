@@ -392,8 +392,6 @@ export function GoogleCalendarConnectCard() {
               Disconnect
             </Button>
           </div>
-          {setupCheck}
-          {panel}
         </CardContent>
       </Card>
     );

@@ -56,6 +56,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const duplicateFn = useServerFn(duplicateTask);
   const rateFn = useServerFn(rateTask);
   const logTimeFn = useServerFn(logTaskTime);
+  const listAttachmentsFn = useServerFn(listTaskAttachments);
+  const insertAttachmentFn = useServerFn(insertTaskAttachment);
+  const deleteAttachmentFn = useServerFn(deleteTaskAttachment);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["task-detail", taskId ?? null], enabled: !!taskId,

@@ -52,6 +52,13 @@ function TasksPage() {
   const [open, setOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [personFilter, setPersonFilter] = useState<string>("");
+  const [personSearch, setPersonSearch] = useState("");
+
+  const { data: allPeople } = useQuery({
+    queryKey: ["people-lite-all-tasks"],
+    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department").order("full_name")).data ?? [],
+  });
 
   if (!me) return <div className="text-muted-foreground">Loading…</div>;
 

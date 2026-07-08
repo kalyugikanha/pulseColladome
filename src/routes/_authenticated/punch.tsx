@@ -68,6 +68,7 @@ export function PunchPage() {
   const [reqSubmitting, setReqSubmitting] = useState(false);
   const [punchingIn, setPunchingIn] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [punchOutAt, setPunchOutAt] = useState<string>("");
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["punch-sessions-today", punchUserId],
@@ -171,10 +172,17 @@ export function PunchPage() {
     }
   }
 
+  function toLocalDatetimeInput(d: Date) {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   function openPunchOut() {
     if (!openSession) return;
-    const suggested = Number((differenceInMinutes(new Date(), new Date(openSession.punch_in_time)) / 60).toFixed(2));
+    const now = new Date();
+    const suggested = Number((differenceInMinutes(now, new Date(openSession.punch_in_time)) / 60).toFixed(2));
     setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "" }]);
+    setPunchOutAt(toLocalDatetimeInput(now));
     setDialogOpen(true);
   }
 
@@ -207,9 +215,18 @@ export function PunchPage() {
     }));
     const totalHours = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
 
+    let punchOutIso: string | null = null;
+    if (punchOutAt) {
+      const d = new Date(punchOutAt);
+      if (Number.isNaN(d.getTime())) { toast.error("Invalid punch-out time."); return; }
+      if (d.getTime() <= new Date(openSession.punch_in_time).getTime()) { toast.error("Punch-out must be after punch-in."); return; }
+      if (d.getTime() > Date.now() + 60_000) { toast.error("Punch-out can't be in the future."); return; }
+      punchOutIso = d.toISOString();
+    }
+
     setSubmitting(true);
     try {
-      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations } }) as PunchOutResult;
+      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations, punchOutTime: punchOutIso } }) as PunchOutResult;
       qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => old.map((row) => row.id === result.session.id ? result.session as Session : row));
       await refetchSessions();
       toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);
@@ -346,7 +363,22 @@ export function PunchPage() {
             </DialogDescription>
           </DialogHeader>
 
+          {openSession && (
+            <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-1.5">
+              <Label className="text-xs">Punch-out date & time</Label>
+              <Input
+                type="datetime-local"
+                value={punchOutAt}
+                min={toLocalDatetimeInput(new Date(openSession.punch_in_time))}
+                max={toLocalDatetimeInput(new Date())}
+                onChange={(e) => setPunchOutAt(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">Default is now. Change it if you're logging a session from a previous day or an earlier time.</p>
+            </div>
+          )}
+
           <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+
             {rows.map((r, idx) => {
               const pickedTask = r.taskId ? (myTasks ?? []).find((t) => t.id === r.taskId) : null;
               return (
@@ -412,7 +444,12 @@ export function PunchPage() {
           </div>
 
           <div className="flex items-center justify-between text-sm px-1">
-            <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{sessionDurationHours.toFixed(2)}h</span></span>
+            <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{(() => {
+              if (!openSession) return sessionDurationHours.toFixed(2);
+              const end = punchOutAt ? new Date(punchOutAt) : new Date(nowTick);
+              if (Number.isNaN(end.getTime())) return sessionDurationHours.toFixed(2);
+              return Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2))).toFixed(2);
+            })()}h</span></span>
             <span className={`font-semibold ${Math.abs(allocatedTotal - sessionDurationHours) > 0.25 ? "text-amber-600" : "text-foreground"}`}>
               Allocated: {allocatedTotal.toFixed(2)}h
             </span>

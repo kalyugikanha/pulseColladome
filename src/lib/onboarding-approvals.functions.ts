@@ -165,6 +165,13 @@ export const approveOnboardingSection = createServerFn({ method: "POST" })
       .eq("section", data.section);
     if (error) throw new Error(error.message);
 
+    await notifyEmployee(
+      supabase,
+      data.user_id,
+      "onboarding_approved",
+      `${SECTION_LABELS[data.section]} was approved by HR. ✓`,
+    );
+
     // Side effect: on "follow" approval, create the welcome-post task (once).
     let welcome_task_created = false;
     if (data.section === "follow") {

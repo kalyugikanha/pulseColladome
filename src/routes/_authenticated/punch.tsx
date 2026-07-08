@@ -409,7 +409,7 @@ export function PunchPage() {
                       <Send className="h-3 w-3" /> Can't find your task? Request one from your manager
                     </button>
                     {requireTask && !myTasks?.length && (
-                      <p className="text-[11px] text-warning">No open tasks assigned to you yet — request one above and your manager will get it in their notifications.</p>
+                      <p className="text-[11px] text-warning">No active or recently completed tasks — request one above or pick a project below.</p>
                     )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-[1fr_120px]">

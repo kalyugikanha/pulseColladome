@@ -166,8 +166,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
   async function saveAssetLinks(next: { label: string; url: string }[]) {
     if (!task) return;
-    const { error } = await supabase.from("tasks").update({ asset_links: next as never } as never).eq("id", task.id);
-    if (error) throw new Error(error.message);
+    await saveAssetLinksFn({ data: { taskId: task.id, links: next } });
     await refresh();
   }
   async function addReference() {

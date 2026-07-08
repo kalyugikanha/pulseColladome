@@ -297,6 +297,48 @@ export const clearManualRank = createServerFn({ method: "POST" })
     return { ok: true, cleared: rows?.length ?? 0 };
   });
 
+/** Sort a column's tasks by due date (asc, nulls last, priority tiebreaker) and
+ *  write evenly-spaced manual_rank values so drag reorder still has room to insert
+ *  between neighbors. RLS silently skips tasks the caller can't update. */
+export const sortColumnByDueDate = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskIds: string[] }) => d)
+  .handler(async ({ data, context }) => {
+    if (!data.taskIds.length) return { ok: true, updated: 0, skipped: 0 };
+    const { data: rows, error: readErr } = await context.supabase
+      .from("tasks")
+      .select("id, due_date, priority, created_at")
+      .in("id", data.taskIds);
+    if (readErr) throw readErr;
+    const priRank: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    const sorted = ((rows ?? []) as Array<{ id: string; due_date: string | null; priority: string; created_at: string | null }>)
+      .slice()
+      .sort((a, b) => {
+        const da = a.due_date ? new Date(a.due_date).getTime() : null;
+        const db = b.due_date ? new Date(b.due_date).getTime() : null;
+        if (da === null && db === null) {
+          const pa = priRank[a.priority] ?? 99, pb = priRank[b.priority] ?? 99;
+          if (pa !== pb) return pa - pb;
+          return (b.created_at ? new Date(b.created_at).getTime() : 0) - (a.created_at ? new Date(a.created_at).getTime() : 0);
+        }
+        if (da === null) return 1;
+        if (db === null) return -1;
+        if (da !== db) return da - db;
+        const pa = priRank[a.priority] ?? 99, pb = priRank[b.priority] ?? 99;
+        return pa - pb;
+      });
+
+    let updated = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      const rank = 1024 * (i + 1);
+      const { data: upd, error } = await context.supabase
+        .from("tasks").update({ manual_rank: rank } as never).eq("id", sorted[i].id).select("id");
+      if (error) throw error;
+      if (upd && upd.length) updated += 1;
+    }
+    return { ok: true, updated, skipped: sorted.length - updated };
+  });
+
 /* ============ Completion percent ============ */
 export const setCompletionPercent = createServerFn({ method: "POST" })
   .middleware([impersonationMiddleware])

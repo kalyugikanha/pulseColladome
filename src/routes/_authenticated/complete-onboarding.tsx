@@ -256,6 +256,7 @@ function CompleteOnboardingPage() {
 
 
   async function handleSubmitSection(section: OnboardingSection) {
+    if (readOnly) return;
     setSubmitting(true);
     try {
       await saveDraft(true);
@@ -278,6 +279,7 @@ function CompleteOnboardingPage() {
       setSubmitting(false);
     }
   }
+
 
 
   // ---- Profile completion % ----

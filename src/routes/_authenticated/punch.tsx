@@ -294,6 +294,19 @@ export function PunchPage() {
         <p className="text-muted-foreground text-sm mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")} — you can punch in and out as many times as you like.</p>
       </header>
 
+      {unlogged.balance > 0 && !unloggedDismissed && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <div className="font-medium text-foreground">You have {unlogged.balance.toFixed(1)}h unlogged{unlogged.since ? ` from ${format(new Date(unlogged.since), "MMM d")}` : ""}.</div>
+            <div className="text-muted-foreground text-xs mt-0.5">Add them at your next punch-out — this reminder is only visible to you.</div>
+          </div>
+          <Button type="button" variant="ghost" size="sm" onClick={dismissUnlogged} className="h-7 px-2 text-xs">
+            <X className="h-3.5 w-3.5 mr-1" /> Dismiss
+          </Button>
+        </div>
+      )}
+
       <Card className="shadow-elevated overflow-hidden">
         <div className="gradient-surface p-8 md:p-12 relative">
           <div aria-hidden className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary/20 blur-3xl" />

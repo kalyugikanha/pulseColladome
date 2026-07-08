@@ -204,24 +204,8 @@ export function PunchPage() {
     setRows((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
   }
 
-  async function submitPunchOut() {
+  async function performPunchOut(opts: { skip: boolean }) {
     if (!openSession) return;
-    if (rows.length === 0) { toast.error("Add at least one entry."); return; }
-    for (const [i, r] of rows.entries()) {
-      if (requireTask && !r.taskId) { toast.error(`Row ${i + 1}: pick a task (required for your team).`); return; }
-      if (!r.taskId && !r.projectId) { toast.error(`Row ${i + 1}: pick a task or project.`); return; }
-      const h = Number(r.hours);
-      if (!Number.isFinite(h) || h <= 0) { toast.error(`Row ${i + 1}: enter hours (>0).`); return; }
-      if (!r.comments.trim()) { toast.error(`Row ${i + 1}: add a comment.`); return; }
-    }
-
-    const allocations = rows.map((r) => ({
-      projectId: r.projectId,
-      taskId: r.taskId || null,
-      hours: Number(Number(r.hours).toFixed(2)),
-      comments: r.comments.trim(),
-    }));
-    const totalHours = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
 
     let punchOutIso: string | null = null;
     if (punchOutAt) {
@@ -232,12 +216,39 @@ export function PunchPage() {
       punchOutIso = d.toISOString();
     }
 
+    // Skip → send zero allocations. Otherwise, only include rows the user filled in.
+    const usableRows = opts.skip
+      ? []
+      : rows.filter((r) => (r.taskId || r.projectId) && Number(r.hours) > 0);
+
+    if (!opts.skip) {
+      for (const [i, r] of usableRows.entries()) {
+        if (requireTask && !r.taskId) { toast.error(`Row ${i + 1}: pick a task (required for your team).`); return; }
+        if (!r.taskId && !r.projectId) { toast.error(`Row ${i + 1}: pick a task or project.`); return; }
+      }
+    }
+
+    const allocations = usableRows.map((r) => ({
+      projectId: r.projectId,
+      taskId: r.taskId || null,
+      hours: Number(Number(r.hours).toFixed(2)),
+      comments: r.comments.trim(),
+      atRisk: !!r.atRisk,
+    }));
+    const totalLogged = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
+
     setSubmitting(true);
     try {
-      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations, punchOutTime: punchOutIso } }) as PunchOutResult;
+      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations, punchOutTime: punchOutIso, skip: opts.skip } }) as PunchOutResult;
       qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => old.map((row) => row.id === result.session.id ? result.session as Session : row));
+      setUnlogged({ balance: Number(result.unloggedBalance ?? 0), since: result.unloggedSince ?? null });
+      setUnloggedDismissed(false);
       await refetchSessions();
-      toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);
+      if (opts.skip) {
+        toast.success("Punched out — you can log hours later.");
+      } else {
+        toast.success(`Punched out — ${totalLogged.toFixed(2)}h logged across ${allocations.length} entr${allocations.length === 1 ? "y" : "ies"}.`);
+      }
       setDialogOpen(false);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
@@ -251,6 +262,15 @@ export function PunchPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  const submitPunchOut = () => performPunchOut({ skip: false });
+  const skipPunchOut = () => performPunchOut({ skip: true });
+
+  async function dismissUnlogged() {
+    setUnloggedDismissed(true);
+    try { await clearUnloggedServer({}); setUnlogged({ balance: 0, since: null }); }
+    catch { /* non-fatal */ }
   }
 
   async function submitTaskRequest() {

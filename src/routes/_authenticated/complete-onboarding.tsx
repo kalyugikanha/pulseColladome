@@ -330,31 +330,10 @@ function CompleteOnboardingPage() {
     }
   }
 
-  async function submit() {
-    if (isApproved) {
-      await saveDraft(true);
-      qc.invalidateQueries({ queryKey: ["current-user"] });
-      qc.invalidateQueries({ queryKey: ["my-onboarding"] });
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await saveDraft(true);
-      const res = await finalize();
-      if (!res.ok) {
-        toast.error(`Please complete: ${res.missing.slice(0, 3).join(", ")}${res.missing.length > 3 ? "…" : ""}`);
-        return;
-      }
-      toast.success("Submitted — waiting for HR approval");
-      qc.invalidateQueries({ queryKey: ["current-user"] });
-      qc.invalidateQueries({ queryKey: ["my-onboarding"] });
-      router.navigate({ to: "/onboarding-pending", replace: true });
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Submission failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const approvedCount = sections.filter((s) => s.required && s.status === "approved").length;
+  const requiredCount = sections.filter((s) => s.required).length;
+  const allApproved = requiredCount > 0 && approvedCount === requiredCount;
+
 
   if (isLoading) {
     return <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading…</div>;

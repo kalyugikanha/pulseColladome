@@ -7,6 +7,8 @@ import {
   listOnboardingSectionSubmissions,
   approveOnboardingSection,
   rejectOnboardingSection,
+  setOnboardingSectionRequired,
+  resetOnboardingSection,
   type EmployeeOnboardingSummary,
 } from "@/lib/onboarding-approvals.functions";
 import {
@@ -24,12 +26,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ClipboardCheck, ExternalLink, Loader2, Check, X } from "lucide-react";
+import { ClipboardCheck, ExternalLink, Loader2, Check, X, CheckCircle2, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/hr/onboarding")({
   beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "approvals" } }); },

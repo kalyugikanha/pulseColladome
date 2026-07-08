@@ -77,15 +77,21 @@ const LINKEDIN_EMPLOYMENT: DocSpec = {
 function CompleteOnboardingPage() {
   const router = useRouter();
   const qc = useQueryClient();
-  const getOnboarding = useServerFn(getMyOnboarding);
+  const { data: me } = useCurrentUser();
+  const viewingAs = !!me?.viewingAs;
+  const targetUserId = me?.id ?? null;
+  const readOnly = viewingAs;
+  const getOnboarding = useServerFn(getOnboardingForUser);
   const saveOnboarding = useServerFn(saveMyOnboarding);
   const recordDoc = useServerFn(recordMyDocument);
   const submitSection = useServerFn(submitOnboardingSection);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["my-onboarding"],
-    queryFn: () => getOnboarding(),
+    queryKey: ["my-onboarding", targetUserId],
+    enabled: !!targetUserId,
+    queryFn: () => getOnboarding({ data: { user_id: targetUserId! } }),
   });
+
 
   const [fullName, setFullName] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");

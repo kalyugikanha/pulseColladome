@@ -71,6 +71,14 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
   });
 
+  type Attachment = { id: string; task_id: string; uploader_id: string; file_path: string; file_name: string; content_type: string | null; size_bytes: number | null; created_at: string; url: string | null; uploader: { id: string; full_name: string | null; email: string | null } | null };
+  const { data: attachmentsList } = useQuery({
+    queryKey: ["task-attachments", taskId ?? null],
+    enabled: !!taskId,
+    queryFn: () => listAttachmentsFn({ data: { taskId: taskId! } }) as Promise<Attachment[]>,
+  });
+  const [uploadBusy, setUploadBusy] = useState(false);
+
   const [newSub, setNewSub] = useState("");
   const [commentBody, setCommentBody] = useState("");
   const [reviewNote, setReviewNote] = useState("");

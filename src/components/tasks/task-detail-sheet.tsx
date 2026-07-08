@@ -188,10 +188,13 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
 
   async function doStatus(s: "todo" | "in_progress" | "review" | "done") {
-    // When the assignee marks a task done, prompt for actual hours first.
-    // Applies to both plain and workflow tasks; workflow tasks whose "close stage"
-    // dialog is used instead never come through this code path.
-    if (s === "done" && isAssignee && task?.status !== "done" && !task?.workflow_instance_id) {
+    // When the assignee sends a task into review or marks it done, prompt for
+    // actual hours first. Applies to both plain and workflow tasks; workflow
+    // tasks whose "close stage" dialog is used instead never come through here.
+    const sendingForReview = (s === "done" || s === "review")
+      && isAssignee && task?.status !== "done" && task?.status !== "review"
+      && !task?.workflow_instance_id;
+    if (sendingForReview) {
       setMarkDoneOpen(true);
       return;
     }

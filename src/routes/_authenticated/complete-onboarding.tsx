@@ -395,6 +395,10 @@ function CompleteOnboardingPage() {
     return <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading…</div>;
   }
 
+  const isReq = (s: OnboardingSection) => sectionOf(s)?.required !== false;
+  // Required-first ordering via CSS order (required=0, optional=1).
+  const orderOf = (s: OnboardingSection) => (isReq(s) ? 0 : 1);
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <header>
@@ -407,6 +411,18 @@ function CompleteOnboardingPage() {
             : "Fill each section, then submit it for HR approval. Portal access unlocks once every required section is approved."}
         </p>
       </header>
+
+      {readOnly && (
+        <div className="rounded-lg border border-primary/40 bg-primary/10 text-primary p-3 flex items-start gap-2">
+          <Eye className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <div className="font-medium">Viewing as {me?.fullName ?? me?.email ?? "employee"} — read-only</div>
+            <div className="text-xs mt-0.5 opacity-90">
+              You're impersonating this employee. To approve, send back, or toggle required, use HR › Onboarding Approvals.
+            </div>
+          </div>
+        </div>
+      )}
 
       {banner && (
         <div className={`rounded-lg border p-3 ${bannerClass[banner.tone]}`}>
@@ -441,7 +457,9 @@ function CompleteOnboardingPage() {
         </CardContent>
       </Card>
 
-      <SectionCard row={sectionOf("personal")} title="Personal details" submitting={submitting} onSubmit={() => handleSubmitSection("personal")}>
+      <fieldset disabled={readOnly} className={`flex flex-col gap-6 ${readOnly ? "opacity-95" : ""}`}>
+      <div style={{ order: orderOf("personal") }}>
+      <SectionCard row={sectionOf("personal")} title="Personal details" submitting={submitting} readOnly={readOnly} onSubmit={() => handleSubmitSection("personal")}>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Full name *"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field>
           <Field label="Official email"><Input value={data?.profile?.email ?? ""} readOnly disabled /></Field>
@@ -462,8 +480,10 @@ function CompleteOnboardingPage() {
           </Field>
         </div>
       </SectionCard>
+      </div>
 
-      <SectionCard row={sectionOf("work")} title="Work preferences" submitting={submitting} onSubmit={() => handleSubmitSection("work")}>
+      <div style={{ order: orderOf("work") }}>
+      <SectionCard row={sectionOf("work")} title="Work preferences" submitting={submitting} readOnly={readOnly} onSubmit={() => handleSubmitSection("work")}>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Job department *"><DepartmentSelect value={department} onChange={setDepartment} allowClear={false} /></Field>
           <Field label="Joining date"><Input type="date" value={data?.profile?.joined_on ?? ""} readOnly disabled /></Field>
@@ -471,8 +491,10 @@ function CompleteOnboardingPage() {
           <Field label="Preferred standup time *"><Input type="time" value={standup} onChange={(e) => setStandup(e.target.value)} /></Field>
         </div>
       </SectionCard>
+      </div>
 
-      <SectionCard row={sectionOf("bank")} title="Bank details" submitting={submitting} onSubmit={() => handleSubmitSection("bank")}>
+      <div style={{ order: orderOf("bank") }}>
+      <SectionCard row={sectionOf("bank")} title="Bank details" submitting={submitting} readOnly={readOnly} onSubmit={() => handleSubmitSection("bank")}>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="Account holder name *" className="md:col-span-2"><Input value={holder} onChange={(e) => setHolder(e.target.value)} /></Field>
           <Field label="Account number *"><Input value={account} onChange={(e) => setAccount(e.target.value)} /></Field>
@@ -481,68 +503,83 @@ function CompleteOnboardingPage() {
           <Field label="PAN card number *"><Input value={pan} onChange={(e) => setPan(e.target.value.toUpperCase())} placeholder="ABCDE1234F" maxLength={10} /></Field>
         </div>
       </SectionCard>
+      </div>
 
+      <div style={{ order: orderOf("documents") }}>
       <SectionCard
         row={sectionOf("documents")}
         title="Documents"
         description="Upload each file (PDF or image, max 10 MB). You can replace a file by re-uploading it."
         submitting={submitting}
+        readOnly={readOnly}
         onSubmit={() => handleSubmitSection("documents")}
       >
         <div className="space-y-2">
           {DOCS.map((doc) => (
-            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} readOnly={readOnly} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
         </div>
       </SectionCard>
+      </div>
 
+      <div style={{ order: orderOf("follow") }}>
       <SectionCard
         row={sectionOf("follow")}
         title="Follow Colladome — upload screenshot proof"
         icon={<Heart className="h-5 w-5 text-primary" />}
         description="Open each link, follow / subscribe / join, then upload a screenshot showing you're following. All items are required."
         submitting={submitting}
+        readOnly={readOnly}
         onSubmit={() => handleSubmitSection("follow")}
       >
         <div className="space-y-2">
           {FOLLOW_PROOFS.map((doc) => (
-            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} readOnly={readOnly} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
         </div>
       </SectionCard>
+      </div>
 
+      <div style={{ order: orderOf("reviews") }}>
       <SectionCard
         row={sectionOf("reviews")}
         title="Leave a review — upload screenshot proof"
         icon={<Star className="h-5 w-5 text-primary" />}
         description="Open each platform, leave an honest review, then upload a screenshot of your published review. All items are required."
         submitting={submitting}
+        readOnly={readOnly}
         onSubmit={() => handleSubmitSection("reviews")}
       >
         <div className="space-y-2">
           {REVIEW_PROOFS.map((doc) => (
-            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} onUpload={(f) => uploadDoc(doc, f)} />
+            <UploadRow key={doc.key} spec={doc} uploaded={uploaded.has(doc.key)} busy={uploading === doc.key} readOnly={readOnly} onUpload={(f) => uploadDoc(doc, f)} />
           ))}
         </div>
       </SectionCard>
+      </div>
 
+      <div style={{ order: orderOf("linkedin_employment") }}>
       <SectionCard
         row={sectionOf("linkedin_employment")}
         title="Update your LinkedIn employment"
         icon={<Linkedin className="h-5 w-5 text-primary" />}
         description={`Add Colladome as your current employer on LinkedIn, then upload a screenshot of your LinkedIn profile showing "Works at Colladome".`}
         submitting={submitting}
+        readOnly={readOnly}
         onSubmit={() => handleSubmitSection("linkedin_employment")}
       >
         <div className="space-y-2">
-          <UploadRow spec={LINKEDIN_EMPLOYMENT} uploaded={uploaded.has(LINKEDIN_EMPLOYMENT.key)} busy={uploading === LINKEDIN_EMPLOYMENT.key} onUpload={(f) => uploadDoc(LINKEDIN_EMPLOYMENT, f)} />
+          <UploadRow spec={LINKEDIN_EMPLOYMENT} uploaded={uploaded.has(LINKEDIN_EMPLOYMENT.key)} busy={uploading === LINKEDIN_EMPLOYMENT.key} readOnly={readOnly} onUpload={(f) => uploadDoc(LINKEDIN_EMPLOYMENT, f)} />
         </div>
       </SectionCard>
+      </div>
+      </fieldset>
 
       <div className="flex items-center justify-end gap-2 pb-8">
         <AutoSaveStatusPill status={autoStatus} lastSavedAt={lastSavedAt} />
-        <Button variant="outline" onClick={() => saveDraft()} disabled={saving || submitting}>
+        <Button variant="outline" onClick={() => saveDraft()} disabled={readOnly || saving || submitting}>
           {saving ? "Saving…" : "Save progress"}
+
         </Button>
       </div>
 

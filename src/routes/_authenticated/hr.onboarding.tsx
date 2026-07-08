@@ -326,23 +326,30 @@ function ReviewSheet({ summary, onClose, onChanged }: {
 
         {summary && (
           <>
-            <div className={`mt-4 flex items-center gap-3 rounded-lg border p-3 ${fullyApproved ? "border-green-600/40 bg-green-500/10" : "border-border/60 bg-muted/30"}`}>
-              {fullyApproved ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-              ) : (
-                <ClipboardCheck className="h-5 w-5 text-muted-foreground shrink-0" />
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium">
-                  {approvedRequired} of {totalRequired} required sections approved
+            {(() => {
+              const denom = totalRequired > 0 ? totalRequired : liveRows.length;
+              const pct = denom > 0 ? Math.round((approvedRequired / denom) * 100) : 100;
+              return (
+                <div className={`mt-4 rounded-lg border p-3 ${fullyApproved ? "border-green-600/40 bg-green-500/10" : "border-border/60 bg-muted/30"}`}>
+                  <div className="flex items-center gap-3">
+                    {fullyApproved ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                    ) : (
+                      <ClipboardCheck className="h-5 w-5 text-muted-foreground shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">Profile completion: {pct}%</div>
+                      <div className="text-xs text-muted-foreground">
+                        {approvedRequired} of {denom} sections confirmed. Portal access is not gated — confirm the rest whenever you're ready.
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {fullyApproved
-                    ? "Portal access is unlocked for this employee."
-                    : "Employee is blocked from the portal until every required section is approved."}
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <div className="mt-3 space-y-3">
             {ONBOARDING_SECTIONS.map((section) => {

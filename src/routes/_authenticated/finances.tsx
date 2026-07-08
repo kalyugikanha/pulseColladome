@@ -525,7 +525,11 @@ function FinancesPage() {
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.email}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/40">Active</Badge></TableCell>
+                    <TableCell>
+                      {!s && !(grant && (grant.comp_type === "hourly" ? grant.default_hourly_rate != null : grant.default_monthly_salary != null))
+                        ? <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/40">Missing salary</Badge>
+                        : <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/40">Active</Badge>}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] capitalize">{effType}</Badge>
                     </TableCell>

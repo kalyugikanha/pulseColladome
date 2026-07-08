@@ -1,0 +1,2 @@
+CREATE POLICY "tasks: creator delete" ON public.tasks FOR DELETE USING (created_by = auth.uid());
+CREATE POLICY "tasks: assignee delete" ON public.tasks FOR DELETE USING (assignee_id IS NOT NULL AND assignee_id = auth.uid());

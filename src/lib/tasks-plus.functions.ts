@@ -214,8 +214,12 @@ export const deleteTask = createServerFn({ method: "POST" })
   .middleware([impersonationMiddleware])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("tasks").delete().eq("id", data.id);
+    const { data: rows, error } = await context.supabase
+      .from("tasks").delete().eq("id", data.id).select("id");
     if (error) throw error;
+    if (!rows || rows.length === 0) {
+      throw new Error("You don't have permission to delete this task.");
+    }
     return { ok: true };
   });
 

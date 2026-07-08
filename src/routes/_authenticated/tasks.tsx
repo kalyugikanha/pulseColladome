@@ -379,6 +379,12 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
               <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
             </div>
             <div className="space-y-1">
+              <Label className="text-xs">Scheduled post date</Label>
+              <Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
               <Label className="text-xs">Assignee</Label>
               <Select value={assignee} onValueChange={setAssignee}>
                 <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
@@ -402,6 +408,27 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Estimated hours</Label>
+              <Input
+                type="number" min={0} step={0.25} value={estimate}
+                onChange={(e) => setEstimate(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Asset links</Label>
+            {links.map((l, i) => (
+              <div key={i} className="flex gap-1">
+                <Input placeholder="Label" value={l.label}
+                  onChange={(e) => setLinks((arr) => arr.map((x, ix) => ix === i ? { ...x, label: e.target.value } : x))} />
+                <Input placeholder="https://…" value={l.url}
+                  onChange={(e) => setLinks((arr) => arr.map((x, ix) => ix === i ? { ...x, url: e.target.value } : x))} />
+                <Button variant="ghost" size="sm" onClick={() => setLinks((arr) => arr.filter((_, ix) => ix !== i))}>×</Button>
+              </div>
+            ))}
+            <Button variant="outline" size="sm" onClick={() => setLinks((arr) => [...arr, { label: "", url: "" }])}>+ Add link</Button>
           </div>
           <div className="space-y-1 rounded-md border border-dashed p-2">
             <Label className="text-xs">Repeat</Label>

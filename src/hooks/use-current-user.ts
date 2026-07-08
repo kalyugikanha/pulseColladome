@@ -133,6 +133,8 @@ export function useCurrentUser() {
         onboardingGateBlocked,
         onboardingAnyRejected,
         onboardingAnySubmitted,
+        onboardingAnyDraft,
+
         viewingAs,
         realIsSuperAdmin: isSuperAdmin,
         realIsHrAdmin,

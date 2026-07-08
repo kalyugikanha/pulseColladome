@@ -233,6 +233,36 @@ export const updateTaskFields = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Save task reference links (asset_links) for any user who can view the task.
+ *  Uses admin client to bypass tasks-table UPDATE RLS after an explicit
+ *  can_view_task() authorization check, so creators/watchers/etc. can add
+ *  references without needing write access to the whole row. */
+export const updateTaskAssetLinks = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string; links: { label: string; url: string }[] }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const actingUserId = context.actingUserId;
+    const clean = (data.links ?? [])
+      .map((l) => ({ label: String(l.label ?? "").trim(), url: String(l.url ?? "").trim() }))
+      .filter((l) => l.url.length > 0);
+
+    const { data: canView, error: canErr } = await supabase.rpc("can_view_task", { _task_id: data.taskId });
+    if (canErr) throw canErr;
+    if (!canView) throw new Error("You can't edit this task.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("tasks")
+      .update({ asset_links: clean as never } as never)
+      .eq("id", data.taskId);
+    if (error) throw error;
+
+    await logActivity(supabaseAdmin, data.taskId, actingUserId, "references_updated", null, null,
+      `${clean.length} reference${clean.length === 1 ? "" : "s"}`);
+    return { ok: true, links: clean };
+  });
+
 /* ============ Completion percent ============ */
 export const setCompletionPercent = createServerFn({ method: "POST" })
   .middleware([impersonationMiddleware])

@@ -473,9 +473,21 @@ export function PunchPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">What did you work on?</Label>
+                    <Label className="text-xs">What did you work on? <span className="text-muted-foreground">(optional)</span></Label>
                     <Textarea rows={2} placeholder="Short comment on this entry" value={r.comments} onChange={(e) => updateRow(idx, { comments: e.target.value })} />
                   </div>
+                  {r.taskId && (
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                      <Checkbox
+                        checked={r.atRisk}
+                        onCheckedChange={(v) => updateRow(idx, { atRisk: v === true })}
+                      />
+                      <span className="inline-flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                        Flag this task as <span className="font-medium text-foreground">at risk</span> — visible to your reporting manager.
+                      </span>
+                    </label>
+                  )}
                 </div>
               );
             })}
@@ -491,16 +503,21 @@ export function PunchPage() {
               if (Number.isNaN(end.getTime())) return sessionDurationHours.toFixed(2);
               return Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2))).toFixed(2);
             })()}h</span></span>
-            <span className={`font-semibold ${Math.abs(allocatedTotal - sessionDurationHours) > 0.25 ? "text-amber-600" : "text-foreground"}`}>
-              Allocated: {allocatedTotal.toFixed(2)}h
+            <span className="font-semibold text-foreground">
+              Logging: {allocatedTotal.toFixed(2)}h <span className="text-muted-foreground font-normal">(doesn't have to match)</span>
             </span>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>
-            <Button onClick={submitPunchOut} disabled={submitting} className="gradient-primary">
-              {submitting ? "Saving…" : "Punch out"}
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button variant="ghost" onClick={skipPunchOut} disabled={submitting} className="text-muted-foreground">
+              Skip for now
             </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>
+              <Button onClick={submitPunchOut} disabled={submitting} className="gradient-primary">
+                {submitting ? "Saving…" : "Punch out & log hours"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

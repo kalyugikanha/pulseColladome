@@ -263,6 +263,40 @@ export const updateTaskAssetLinks = createServerFn({ method: "POST" })
     return { ok: true, links: clean };
   });
 
+/** Reprioritize a card on the Kanban board. Optionally moves it to a new column.
+ *  Auth: relies on tasks-table UPDATE RLS (assignee, reviewer, project manager,
+ *  dept head, reporting manager). 0 rows updated → clear "no permission" error. */
+export const reorderKanbanCard = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: {
+    taskId: string;
+    manualRank: number | null;
+    status?: "todo" | "in_progress" | "review" | "done";
+  }) => d)
+  .handler(async ({ data, context }) => {
+    const patch: Record<string, unknown> = { manual_rank: data.manualRank };
+    if (data.status) patch.status = data.status;
+    const { data: rows, error } = await context.supabase
+      .from("tasks").update(patch as never).eq("id", data.taskId).select("id");
+    if (error) throw error;
+    if (!rows || rows.length === 0) {
+      throw new Error("You don't have permission to reorder this task.");
+    }
+    return { ok: true };
+  });
+
+/** Clear manual_rank for a list of tasks (best-effort — only rows the caller can update change). */
+export const clearManualRank = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskIds: string[] }) => d)
+  .handler(async ({ data, context }) => {
+    if (!data.taskIds.length) return { ok: true, cleared: 0 };
+    const { data: rows, error } = await context.supabase
+      .from("tasks").update({ manual_rank: null } as never).in("id", data.taskIds).select("id");
+    if (error) throw error;
+    return { ok: true, cleared: rows?.length ?? 0 };
+  });
+
 /* ============ Completion percent ============ */
 export const setCompletionPercent = createServerFn({ method: "POST" })
   .middleware([impersonationMiddleware])

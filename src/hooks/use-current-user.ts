@@ -61,6 +61,8 @@ export function useCurrentUser() {
       const onboardingGateBlocked = sections.some((r) => r.required && r.status !== "approved");
       const onboardingAnyRejected = sections.some((r) => r.status === "rejected");
       const onboardingAnySubmitted = sections.some((r) => r.status === "submitted");
+      const onboardingAnyDraft = sections.some((r) => r.required && r.status === "draft");
+
 
 
       const isSuperAdmin = !!sa;

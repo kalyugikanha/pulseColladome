@@ -18,6 +18,10 @@ import { toast } from "sonner";
 import { Pencil, Users, Search, UserX, UserCheck, Trash2, IdCard } from "lucide-react";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 import { EmployeeProfileSheet } from "@/components/directory/employee-profile-sheet";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { setOnboardingSectionRequired } from "@/lib/onboarding-approvals.functions";
+import { ONBOARDING_SECTIONS, SECTION_LABELS, type OnboardingSection } from "@/lib/onboarding-sections";
+
 
 
 export const Route = createFileRoute("/_authenticated/directory")({
@@ -342,9 +346,10 @@ export function DirectoryPage() {
                 <TableHead>Reporting manager</TableHead>
                 <TableHead>Employment</TableHead>
                 <TableHead>Joined</TableHead>
-                {canEdit && <TableHead className="text-center">Onboarding required</TableHead>}
+                {canEdit && <TableHead className="text-center">Onboarding sections required</TableHead>}
                 {canEdit && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
+
             </TableHeader>
             <TableBody>
               {rows.map((p) => (
@@ -399,13 +404,10 @@ export function DirectoryPage() {
                   <TableCell className="text-xs text-muted-foreground">{p.joined_on ?? "—"}</TableCell>
                   {canEdit && (
                     <TableCell className="text-center">
-                      <Checkbox
-                        checked={p.onboarding_required !== false}
-                        onCheckedChange={(v) => setOnboardingRequired(p, v === true)}
-                        aria-label="Onboarding required"
-                      />
+                      <SectionRequiredPopover userId={p.id} />
                     </TableCell>
                   )}
+
                   {canEdit && (
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -610,3 +612,75 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
+
+function SectionRequiredPopover({ userId }: { userId: string }) {
+  const qc = useQueryClient();
+  const setReqFn = useServerFn(setOnboardingSectionRequired);
+  const [busy, setBusy] = useState<OnboardingSection | null>(null);
+
+  const { data: rows } = useQuery({
+    queryKey: ["onboarding-sections-for", userId],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("onboarding_section_state")
+        .select("section, required, status")
+        .eq("user_id", userId);
+      return (data ?? []) as Array<{ section: OnboardingSection; required: boolean; status: string }>;
+    },
+  });
+
+  const bySection = new Map((rows ?? []).map((r) => [r.section, r]));
+  const requiredCount = (rows ?? []).filter((r) => r.required).length;
+  const approvedCount = (rows ?? []).filter((r) => r.required && r.status === "approved").length;
+
+  async function toggle(section: OnboardingSection, required: boolean) {
+    setBusy(section);
+    try {
+      await setReqFn({ data: { user_id: userId, section, required } });
+      qc.invalidateQueries({ queryKey: ["onboarding-sections-for", userId] });
+      qc.invalidateQueries({ queryKey: ["current-user"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="h-7 text-xs">
+          {requiredCount}/7 required · {approvedCount} approved
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Required onboarding sections</div>
+        <div className="space-y-1.5">
+          {ONBOARDING_SECTIONS.map((s) => {
+            const row = bySection.get(s);
+            const req = row?.required !== false;
+            const status = row?.status ?? "draft";
+            return (
+              <label key={s} className="flex items-center justify-between gap-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={req}
+                    disabled={busy === s}
+                    onCheckedChange={(v) => toggle(s, v === true)}
+                  />
+                  <span>{SECTION_LABELS[s]}</span>
+                </div>
+                <Badge variant="outline" className="text-[10px] capitalize">{status}</Badge>
+              </label>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-3">
+          Turning a section back on for an already-approved user resets it to draft — they'll re-submit and you'll re-approve.
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+

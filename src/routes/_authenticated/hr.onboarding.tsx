@@ -4,15 +4,23 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import {
-  listOnboardingSubmissions,
-  approveOnboarding,
-  rejectOnboarding,
+  listOnboardingSectionSubmissions,
+  approveOnboardingSection,
+  rejectOnboardingSection,
+  type EmployeeOnboardingSummary,
 } from "@/lib/onboarding-approvals.functions";
 import {
   getEmployeeOnboarding,
   getEmployeeDocumentUrl,
   type OnboardingDocType,
 } from "@/lib/onboarding.functions";
+import {
+  ONBOARDING_SECTIONS,
+  SECTION_LABELS,
+  SECTION_SHORT,
+  type OnboardingSection,
+  type SectionRow,
+} from "@/lib/onboarding-sections";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,20 +34,6 @@ import { ClipboardCheck, ExternalLink, Loader2, Check, X } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/hr/onboarding")({
   beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "approvals" } }); },
 });
-
-type SubmissionRow = {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  department: string | null;
-  joined_on: string | null;
-  onboarding_submitted_at: string | null;
-  onboarding_approved_at: string | null;
-  onboarding_rejected_at: string | null;
-  onboarding_rejection_reason: string | null;
-  hobbies: string | null;
-  linkedin_url: string | null;
-};
 
 const DOC_LABELS: Record<OnboardingDocType, string> = {
   offer_letter: "Signed offer letter",
@@ -66,25 +60,35 @@ const DOC_LABELS: Record<OnboardingDocType, string> = {
   linkedin_employment: "LinkedIn 'Works at Colladome' proof",
 };
 
+const DOCS_BY_SECTION: Record<OnboardingSection, OnboardingDocType[]> = {
+  personal: [],
+  work: [],
+  bank: [],
+  documents: ["profile_picture","offer_letter","aadhar","pan","cancelled_cheque","marksheet_10","marksheet_12","graduation","masters","resume"],
+  follow: ["follow_facebook","follow_instagram","follow_twitter","follow_linkedin","follow_youtube","follow_pinterest","follow_whatsapp"],
+  reviews: ["review_google_jaipur","review_google_hyderabad","review_glassdoor","review_ambitionbox"],
+  linkedin_employment: ["linkedin_employment"],
+};
+
+type FilterKey = "any_pending" | "any_rejected" | "all_approved" | "all";
+
 export function HrOnboardingPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
-  const listFn = useServerFn(listOnboardingSubmissions);
-  const approveFn = useServerFn(approveOnboarding);
-  const rejectFn = useServerFn(rejectOnboarding);
+  const listFn = useServerFn(listOnboardingSectionSubmissions);
 
   if (me && !me.isSuperAdmin && !me.isHrAdmin) throw redirect({ to: "/dashboard" });
 
-  const [tab, setTab] = useState<"pending" | "approved" | "rejected">("pending");
+  const [filter, setFilter] = useState<FilterKey>("any_pending");
   const [openId, setOpenId] = useState<string | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["onboarding-submissions", tab],
-    queryFn: () => listFn({ data: { status: tab } }) as Promise<SubmissionRow[]>,
+    queryKey: ["onboarding-section-submissions", filter],
+    queryFn: () => listFn({ data: { filter } }) as Promise<EmployeeOnboardingSummary[]>,
     enabled: !!me,
   });
 
-  const openRow = rows.find((r) => r.id === openId) ?? null;
+  const openRow = rows.find((r) => r.user_id === openId) ?? null;
 
   return (
     <div className="space-y-6">
@@ -92,22 +96,26 @@ export function HrOnboardingPage() {
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
           <ClipboardCheck className="h-6 w-6 text-primary" /> Onboarding approvals
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">Review new-hire submissions, verify screenshots, and approve to unlock portal access.</p>
+        <p className="text-muted-foreground text-sm mt-1">Review each section on its own. Approve one at a time — portal access unlocks only when every required section is approved.</p>
       </header>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+      <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterKey)}>
         <TabsList>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="rejected">Sent back</TabsTrigger>
+          <TabsTrigger value="any_pending">Awaiting review</TabsTrigger>
+          <TabsTrigger value="any_rejected">Sent back</TabsTrigger>
+          <TabsTrigger value="all_approved">Fully approved</TabsTrigger>
+          <TabsTrigger value="all">All employees</TabsTrigger>
         </TabsList>
-        <TabsContent value={tab} className="mt-4">
+        <TabsContent value={filter} className="mt-4">
           <Card>
             <CardHeader>
               <CardTitle className="font-display text-lg">
-                {tab === "pending" ? "Awaiting review" : tab === "approved" ? "Approved" : "Sent back for edits"}
+                {filter === "any_pending" ? "Sections awaiting review"
+                  : filter === "any_rejected" ? "Sections sent back"
+                  : filter === "all_approved" ? "Fully approved employees"
+                  : "All employees"}
               </CardTitle>
-              <CardDescription>{rows.length} member{rows.length === 1 ? "" : "s"}</CardDescription>
+              <CardDescription>{rows.length} employee{rows.length === 1 ? "" : "s"}</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -119,26 +127,38 @@ export function HrOnboardingPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
                       <tr>
-                        <th className="text-left px-3 py-2">Name</th>
-                        <th className="text-left px-3 py-2">Email</th>
+                        <th className="text-left px-3 py-2">Employee</th>
                         <th className="text-left px-3 py-2">Department</th>
-                        <th className="text-left px-3 py-2">{tab === "approved" ? "Approved" : tab === "rejected" ? "Sent back" : "Submitted"}</th>
+                        <th className="text-left px-3 py-2">Sections</th>
+                        <th className="text-left px-3 py-2">Progress</th>
                         <th className="text-right px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((r) => {
-                        const ts = tab === "approved" ? r.onboarding_approved_at : tab === "rejected" ? r.onboarding_rejected_at : r.onboarding_submitted_at;
-                        return (
-                          <tr key={r.id} className="border-t border-border/40 hover:bg-muted/30 cursor-pointer" onClick={() => setOpenId(r.id)}>
-                            <td className="px-3 py-2 font-medium">{r.full_name ?? "—"}</td>
-                            <td className="px-3 py-2 text-muted-foreground">{r.email ?? "—"}</td>
-                            <td className="px-3 py-2">{r.department ? <Badge variant="outline">{r.department}</Badge> : <span className="text-muted-foreground">—</span>}</td>
-                            <td className="px-3 py-2">{ts ? format(new Date(ts), "d MMM yyyy, HH:mm") : "—"}</td>
-                            <td className="px-3 py-2 text-right"><Button size="sm" variant="ghost">Review</Button></td>
-                          </tr>
-                        );
-                      })}
+                      {rows.map((r) => (
+                        <tr key={r.user_id} className="border-t border-border/40 hover:bg-muted/30 cursor-pointer" onClick={() => setOpenId(r.user_id)}>
+                          <td className="px-3 py-2">
+                            <div className="font-medium">{r.full_name ?? "—"}</div>
+                            <div className="text-xs text-muted-foreground">{r.email ?? "—"}</div>
+                          </td>
+                          <td className="px-3 py-2">{r.department ? <Badge variant="outline">{r.department}</Badge> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-1">
+                              {r.sections.map((s) => (
+                                <SectionPill key={s.section} label={SECTION_SHORT[s.section]} row={s} />
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <span className={r.fully_approved ? "text-green-600" : "text-muted-foreground"}>
+                              {r.approved_count}/{r.required_count} approved
+                            </span>
+                            {r.pending_count > 0 && <span className="ml-2 text-amber-600">· {r.pending_count} pending</span>}
+                            {r.rejected_count > 0 && <span className="ml-2 text-destructive">· {r.rejected_count} sent back</span>}
+                          </td>
+                          <td className="px-3 py-2 text-right"><Button size="sm" variant="ghost">Review</Button></td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -149,125 +169,152 @@ export function HrOnboardingPage() {
       </Tabs>
 
       <ReviewSheet
-        row={openRow}
+        summary={openRow}
         onClose={() => setOpenId(null)}
-        onApprove={async (id) => {
-          try {
-            const res = await approveFn({ data: { user_id: id } });
-            toast.success(res.welcome_task_created ? "Approved — welcome-post task sent to Kanishka" : "Approved");
-            setOpenId(null);
-            qc.invalidateQueries({ queryKey: ["onboarding-submissions"] });
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Approval failed");
-          }
-        }}
-        onReject={async (id, reason) => {
-          try {
-            await rejectFn({ data: { user_id: id, reason } });
-            toast.success("Sent back to the employee");
-            setOpenId(null);
-            qc.invalidateQueries({ queryKey: ["onboarding-submissions"] });
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : "Failed");
-          }
+        onChanged={() => {
+          qc.invalidateQueries({ queryKey: ["onboarding-section-submissions"] });
         }}
       />
     </div>
   );
 }
 
-function ReviewSheet({ row, onClose, onApprove, onReject }: {
-  row: SubmissionRow | null;
+function SectionPill({ label, row }: { label: string; row: SectionRow }) {
+  if (!row.required) return <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/30 px-1.5 py-0.5 text-[10px] text-muted-foreground">{label}·off</span>;
+  const map: Record<string, string> = {
+    approved: "text-green-600 border-green-600/40 bg-green-500/10",
+    submitted: "text-amber-600 border-amber-500/40 bg-amber-500/10",
+    rejected: "text-destructive border-destructive/40 bg-destructive/10",
+    draft: "text-muted-foreground border-border/60 bg-muted/40",
+  };
+  return <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] ${map[row.status]}`}>{label}</span>;
+}
+
+function ReviewSheet({ summary, onClose, onChanged }: {
+  summary: EmployeeOnboardingSummary | null;
   onClose: () => void;
-  onApprove: (id: string) => void | Promise<void>;
-  onReject: (id: string, reason: string) => void | Promise<void>;
+  onChanged: () => void;
 }) {
   const getDetails = useServerFn(getEmployeeOnboarding);
   const getUrl = useServerFn(getEmployeeDocumentUrl);
-  const [rejectMode, setRejectMode] = useState(false);
+  const approveFn = useServerFn(approveOnboardingSection);
+  const rejectFn = useServerFn(rejectOnboardingSection);
+  const [rejectingSection, setRejectingSection] = useState<OnboardingSection | null>(null);
   const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<OnboardingSection | null>(null);
 
-  const { data: details } = useQuery({
-    queryKey: ["hr-onboarding-details", row?.id],
-    enabled: !!row?.id,
-    queryFn: () => getDetails({ data: { user_id: row!.id } }),
+  const { data: details, refetch } = useQuery({
+    queryKey: ["hr-onboarding-details", summary?.user_id],
+    enabled: !!summary?.user_id,
+    queryFn: () => getDetails({ data: { user_id: summary!.user_id } }),
   });
 
   const uploaded = useMemo(() => new Set((details?.documents ?? []).map((d) => d.doc_type)), [details]);
+  const sectionMap = useMemo(() => {
+    const m = new Map<OnboardingSection, SectionRow>();
+    (details?.sections ?? []).forEach((s) => m.set(s.section, s));
+    (summary?.sections ?? []).forEach((s) => { if (!m.has(s.section)) m.set(s.section, s); });
+    return m;
+  }, [details, summary]);
+
+  async function approve(section: OnboardingSection) {
+    if (!summary) return;
+    setBusy(section);
+    try {
+      const res = await approveFn({ data: { user_id: summary.user_id, section } });
+      toast.success(res.welcome_task_created ? "Approved — welcome-post task sent to Kanishka" : "Section approved");
+      onChanged();
+      refetch();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Approval failed"); }
+    finally { setBusy(null); }
+  }
+
+  async function reject(section: OnboardingSection) {
+    if (!summary || !reason.trim()) return;
+    setBusy(section);
+    try {
+      await rejectFn({ data: { user_id: summary.user_id, section, reason } });
+      toast.success("Section sent back");
+      setRejectingSection(null);
+      setReason("");
+      onChanged();
+      refetch();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    finally { setBusy(null); }
+  }
 
   return (
-    <Sheet open={!!row} onOpenChange={(o) => { if (!o) { onClose(); setRejectMode(false); setReason(""); } }}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+    <Sheet open={!!summary} onOpenChange={(o) => { if (!o) { onClose(); setRejectingSection(null); setReason(""); } }}>
+      <SheetContent className="w-full sm:max-w-3xl overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="font-display">{row?.full_name ?? "—"}</SheetTitle>
-          <SheetDescription>{row?.email} · {row?.department ?? "—"}</SheetDescription>
+          <SheetTitle className="font-display">{summary?.full_name ?? "—"}</SheetTitle>
+          <SheetDescription>{summary?.email} · {summary?.department ?? "—"}</SheetDescription>
         </SheetHeader>
 
-        {row && (
-          <div className="mt-4 space-y-6">
-            <Section title="Personal">
-              <KV k="Personal email" v={(details?.profile as { personal_email?: string | null } | null)?.personal_email} />
-              <KV k="Phone" v={(details?.profile as { phone?: string | null } | null)?.phone} />
-              <KV k="Date of birth" v={(details?.profile as { date_of_birth?: string | null } | null)?.date_of_birth} />
-              <KV k="Address" v={(details?.profile as { permanent_address?: string | null } | null)?.permanent_address} />
-              <KV k="LinkedIn" v={row.linkedin_url} link />
-              <KV k="Hobbies / about" v={row.hobbies} />
-            </Section>
-
-            <Section title="Work">
-              <KV k="Department" v={row.department} />
-              <KV k="Joined on" v={row.joined_on} />
-              <KV k="Day start" v={(details?.profile as { day_start_time?: string | null } | null)?.day_start_time} />
-              <KV k="Standup" v={(details?.profile as { standup_time?: string | null } | null)?.standup_time} />
-            </Section>
-
-            <Section title="Bank">
-              <KV k="Account holder" v={(details?.bank as { account_holder_name?: string | null } | null)?.account_holder_name} />
-              <KV k="Account number" v={(details?.bank as { account_number?: string | null } | null)?.account_number} />
-              <KV k="IFSC" v={(details?.bank as { ifsc_code?: string | null } | null)?.ifsc_code} />
-              <KV k="PAN" v={(details?.bank as { pan_number?: string | null } | null)?.pan_number} />
-              <KV k="Branch" v={(details?.bank as { bank_branch?: string | null } | null)?.bank_branch} />
-            </Section>
-
-            <Section title="Uploaded documents & proofs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {(Object.keys(DOC_LABELS) as OnboardingDocType[]).map((k) => (
-                  <DocLinkRow key={k} label={DOC_LABELS[k]} present={uploaded.has(k)} onOpen={async () => {
-                    try {
-                      const r = await getUrl({ data: { user_id: row.id, doc_type: k } });
-                      window.open(r.url, "_blank", "noopener");
-                    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to open"); }
-                  }} />
-                ))}
-              </div>
-            </Section>
-
-            {!row.onboarding_approved_at && (
-              <div className="border-t border-border pt-4 space-y-3">
-                {rejectMode ? (
-                  <>
-                    <div className="space-y-1">
-                      <label className="text-xs uppercase tracking-wider text-muted-foreground">Reason to send back</label>
-                      <Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What needs to be fixed?" />
+        {summary && (
+          <div className="mt-4 space-y-3">
+            {ONBOARDING_SECTIONS.map((section) => {
+              const row = sectionMap.get(section);
+              const required = row?.required !== false;
+              const status = row?.status ?? "draft";
+              const rejecting = rejectingSection === section;
+              const statusMap: Record<string, { label: string; className: string }> = {
+                approved: { label: "Approved", className: "text-green-600 border-green-600/40 bg-green-500/10" },
+                submitted: { label: "Awaiting review", className: "text-amber-600 border-amber-500/40 bg-amber-500/10" },
+                rejected: { label: "Sent back", className: "text-destructive border-destructive/40 bg-destructive/10" },
+                draft: { label: "Not submitted", className: "text-muted-foreground border-border/60 bg-muted/40" },
+              };
+              const s = statusMap[status];
+              return (
+                <Card key={section}>
+                  <CardHeader className="pb-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <CardTitle className="text-base font-display">{SECTION_LABELS[section]}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        {!required && <Badge variant="outline" className="text-[10px]">Not required</Badge>}
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${s.className}`}>{s.label}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" onClick={() => { setRejectMode(false); setReason(""); }} disabled={busy}>Cancel</Button>
-                      <Button variant="destructive" onClick={async () => { setBusy(true); await onReject(row.id, reason); setBusy(false); }} disabled={busy || !reason.trim()}>
-                        <X className="h-4 w-4 mr-1" /> Send back
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" onClick={() => setRejectMode(true)}>Send back with reason</Button>
-                    <Button className="gradient-primary" onClick={async () => { setBusy(true); await onApprove(row.id); setBusy(false); }} disabled={busy}>
-                      <Check className="h-4 w-4 mr-1" /> Approve & create welcome post task
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
+                    {row?.submitted_at && <div className="text-[11px] text-muted-foreground">Submitted {format(new Date(row.submitted_at), "d MMM yyyy, HH:mm")}</div>}
+                    {row?.approved_at && <div className="text-[11px] text-muted-foreground">Approved {format(new Date(row.approved_at), "d MMM yyyy, HH:mm")}</div>}
+                    {row?.rejected_at && row.rejection_reason && (
+                      <div className="mt-1 text-xs text-destructive whitespace-pre-wrap">Reason: {row.rejection_reason}</div>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <SectionBody section={section} details={details} uploaded={uploaded} onOpen={async (k) => {
+                      try {
+                        const r = await getUrl({ data: { user_id: summary.user_id, doc_type: k } });
+                        window.open(r.url, "_blank", "noopener");
+                      } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to open"); }
+                    }} />
+
+                    {required && (status === "submitted" || status === "approved" || status === "rejected") && (
+                      <div className="border-t border-border pt-3">
+                        {rejecting ? (
+                          <div className="space-y-2">
+                            <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What needs to be fixed?" />
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => { setRejectingSection(null); setReason(""); }} disabled={busy === section}>Cancel</Button>
+                              <Button variant="destructive" size="sm" onClick={() => reject(section)} disabled={busy === section || !reason.trim()}>
+                                <X className="h-3.5 w-3.5 mr-1" /> Send back
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => { setRejectingSection(section); setReason(""); }}>Send back with reason</Button>
+                            <Button size="sm" className="gradient-primary" onClick={() => approve(section)} disabled={busy === section || status === "approved"}>
+                              <Check className="h-3.5 w-3.5 mr-1" /> {status === "approved" ? "Approved" : "Approve"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </SheetContent>
@@ -275,12 +322,57 @@ function ReviewSheet({ row, onClose, onApprove, onReject }: {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+type DetailsShape = {
+  profile: Record<string, unknown> | null;
+  bank: Record<string, unknown> | null;
+} | undefined | null;
+
+function SectionBody({ section, details, uploaded, onOpen }: {
+  section: OnboardingSection;
+  details: DetailsShape;
+  uploaded: Set<OnboardingDocType>;
+  onOpen: (k: OnboardingDocType) => void;
+}) {
+  const p = (details?.profile ?? {}) as Record<string, string | null | undefined>;
+  const b = (details?.bank ?? {}) as Record<string, string | null | undefined>;
+  if (section === "personal") return (
+    <div className="grid gap-1">
+      <KV k="Personal email" v={p.personal_email} />
+      <KV k="Phone" v={p.phone} />
+      <KV k="Date of birth" v={p.date_of_birth} />
+      <KV k="Address" v={p.permanent_address} />
+      <KV k="LinkedIn" v={p.linkedin_url} link />
+      <KV k="GitHub" v={p.github_url} link />
+      <KV k="Facebook" v={p.facebook_url} link />
+      <KV k="Instagram" v={p.instagram_url} link />
+      <KV k="X (Twitter)" v={p.twitter_url} link />
+      <KV k="Hobbies / about" v={p.hobbies} />
+    </div>
+  );
+  if (section === "work") return (
+    <div className="grid gap-1">
+      <KV k="Department" v={p.department} />
+      <KV k="Joined on" v={p.joined_on} />
+      <KV k="Day start" v={p.day_start_time} />
+      <KV k="Standup" v={p.standup_time} />
+    </div>
+  );
+  if (section === "bank") return (
+    <div className="grid gap-1">
+      <KV k="Account holder" v={b.account_holder_name} />
+      <KV k="Account number" v={b.account_number} />
+      <KV k="IFSC" v={b.ifsc_code} />
+      <KV k="PAN" v={b.pan_number} />
+      <KV k="Branch" v={b.bank_branch} />
+    </div>
+  );
+  const docs = DOCS_BY_SECTION[section];
   return (
-    <section className="space-y-2">
-      <h3 className="text-xs uppercase tracking-wider text-muted-foreground">{title}</h3>
-      <div className="grid gap-1 text-sm">{children}</div>
-    </section>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {docs.map((k) => (
+        <DocLinkRow key={k} label={DOC_LABELS[k]} present={uploaded.has(k)} onOpen={() => onOpen(k)} />
+      ))}
+    </div>
   );
 }
 
@@ -299,7 +391,9 @@ function DocLinkRow({ label, present, onOpen }: { label: string; present: boolea
   return (
     <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1.5 text-sm">
       <div className="truncate">
-        {label} {present ? <Badge variant="outline" className="ml-1 text-[10px] text-green-600 border-green-600/40">Uploaded</Badge> : <Badge variant="outline" className="ml-1 text-[10px] text-muted-foreground">Missing</Badge>}
+        {label} {present
+          ? <Badge variant="outline" className="ml-1 text-[10px] text-green-600 border-green-600/40">Uploaded</Badge>
+          : <Badge variant="outline" className="ml-1 text-[10px] text-muted-foreground">Missing</Badge>}
       </div>
       {present && (
         <Button size="sm" variant="ghost" onClick={onOpen}>

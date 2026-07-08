@@ -703,6 +703,45 @@ export type Database = {
           },
         ]
       }
+      onboarding_section_state: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          rejected_at: string | null
+          rejection_reason: string | null
+          required: boolean
+          section: Database["public"]["Enums"]["onboarding_section"]
+          status: Database["public"]["Enums"]["onboarding_section_status"]
+          submitted_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          required?: boolean
+          section: Database["public"]["Enums"]["onboarding_section"]
+          status?: Database["public"]["Enums"]["onboarding_section_status"]
+          submitted_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          required?: boolean
+          section?: Database["public"]["Enums"]["onboarding_section"]
+          status?: Database["public"]["Enums"]["onboarding_section_status"]
+          submitted_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payroll_settings: {
         Row: {
           debit_account_number: string
@@ -2387,6 +2426,7 @@ export type Database = {
         Args: { _session_date: string; _user_id: string }
         Returns: undefined
       }
+      user_onboarding_gate: { Args: { _uid: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "employee" | "project_manager" | "hr_admin"
@@ -2417,6 +2457,15 @@ export type Database = {
         | "linkedin_employment"
       leave_status: "pending" | "approved" | "rejected"
       leave_type: "casual" | "sick" | "earned" | "unpaid"
+      onboarding_section:
+        | "personal"
+        | "work"
+        | "bank"
+        | "documents"
+        | "follow"
+        | "reviews"
+        | "linkedin_employment"
+      onboarding_section_status: "draft" | "submitted" | "approved" | "rejected"
       project_status: "active" | "on_hold" | "completed"
       task_priority: "low" | "medium" | "high"
       task_recurrence: "none" | "weekly" | "monthly"
@@ -2577,6 +2626,16 @@ export const Constants = {
       ],
       leave_status: ["pending", "approved", "rejected"],
       leave_type: ["casual", "sick", "earned", "unpaid"],
+      onboarding_section: [
+        "personal",
+        "work",
+        "bank",
+        "documents",
+        "follow",
+        "reviews",
+        "linkedin_employment",
+      ],
+      onboarding_section_status: ["draft", "submitted", "approved", "rejected"],
       project_status: ["active", "on_hold", "completed"],
       task_priority: ["low", "medium", "high"],
       task_recurrence: ["none", "weekly", "monthly"],

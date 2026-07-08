@@ -274,6 +274,11 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     if (!title.trim()) return toast.error("Title required");
     if (!projectId) return toast.error("Project required");
     if (repeat === "weekly" && repeatDays.size === 0) return toast.error("Pick at least one weekday");
+    const estNum = estimate.trim() === "" ? null : Number(estimate);
+    if (estNum !== null && (!Number.isFinite(estNum) || estNum < 0)) {
+      return toast.error("Estimated hours must be a positive number.");
+    }
+    const cleanLinks = links.filter((l) => l.url.trim());
     setBusy(true);
     try {
       if (wfMode && wfTemplateId) {
@@ -283,18 +288,24 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           assigneeId: assignee || null, priority: pri,
         }});
       } else {
-        await createFn({ data: {
+        const created = await createFn({ data: {
           projectId, title: title.trim(), description: desc.trim(),
           dueDate: due || null, priority: pri,
-          assigneeId: assignee || defaultAssigneeId!, assetLinks: [],
+          assigneeId: assignee || defaultAssigneeId!, assetLinks: cleanLinks,
           domainId: null, departmentId: null, taskTypeIds: [],
+          estimatedHours: estNum,
           recurrence: repeat === "none"
             ? null
             : { freq: repeat, days: repeat === "weekly" ? Array.from(repeatDays).sort() : [] },
         }});
+        const newId = (created as unknown as { id?: string } | null)?.id;
+        if (newId && repeat === "none" && postDate) {
+          await updateFn({ data: { taskId: newId, patch: { scheduled_post_date: postDate } } });
+        }
       }
       toast.success(repeat === "none" ? "Task created" : "Recurring task saved");
-      setTitle(""); setDesc(""); setDue(""); setProjectId(""); setWfTemplateId(""); setWfMode(false);
+      setTitle(""); setDesc(""); setDue(""); setPostDate(""); setEstimate(""); setLinks([]);
+      setProjectId(""); setWfTemplateId(""); setWfMode(false);
       setRepeat("none"); setRepeatDays(new Set());
       onCreated?.();
       onClose();

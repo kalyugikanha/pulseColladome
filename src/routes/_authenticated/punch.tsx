@@ -59,7 +59,7 @@ export function PunchPage() {
   const today = format(new Date(), "yyyy-MM-dd");
   const punchUserId = me?.realId ?? me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "" }]);
+  const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
   const [submitting, setSubmitting] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [reqTitle, setReqTitle] = useState("");
@@ -192,7 +192,7 @@ export function PunchPage() {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
   function addRow() {
-    setRows((prev) => [...prev, { projectId: "", taskId: "", hours: "", comments: "" }]);
+    setRows((prev) => [...prev, { projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
   }
   function removeRow(idx: number) {
     setRows((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));

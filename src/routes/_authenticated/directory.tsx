@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Pencil, Users, Search, UserX, UserCheck, Trash2 } from "lucide-react";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
@@ -32,6 +33,7 @@ type Profile = {
   phone: string | null;
   joined_on: string | null;
   is_active: boolean | null;
+  onboarding_required: boolean | null;
 };
 
 const EMPLOYMENT_TYPES = ["full_time", "intern", "contract", "consultant"] as const;
@@ -66,7 +68,7 @@ export function DirectoryPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let q = (supabase as any)
         .from("profiles")
-        .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on, is_active")
+        .select("id, full_name, email, department, reporting_manager_id, employment_type, phone, joined_on, is_active, onboarding_required")
         .order("full_name");
       if (deptScope && deptScope.length) q = q.in("department", deptScope);
       if (userScope && userScope.length) q = q.in("id", userScope);

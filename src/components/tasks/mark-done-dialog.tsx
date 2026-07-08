@@ -39,7 +39,7 @@ export function MarkDoneDialog({
   }, [task, defaultHandoffId]);
 
   const hoursNum = Number(hours);
-  const valid = hours !== "" && !Number.isNaN(hoursNum) && hoursNum > 0;
+  const valid = hours !== "" && !Number.isNaN(hoursNum) && hoursNum >= 0;
 
   return (
     <Dialog open={!!task} onOpenChange={(o) => !o && onClose()}>

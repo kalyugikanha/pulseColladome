@@ -53,6 +53,7 @@ export function DirectoryPage() {
   const [busy, setBusy] = useState(false);
   const [bankAcct, setBankAcct] = useState("");
   const [bankIfsc, setBankIfsc] = useState("");
+  const [profileSheetId, setProfileSheetId] = useState<string | null>(null);
 
   const setActiveFn = useServerFn(setUserActive);
   const deleteFn = useServerFn(deleteUserPermanently);

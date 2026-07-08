@@ -248,10 +248,12 @@ function CompleteOnboardingPage() {
 
 
 
-  const uploaded = new Set((data?.documents ?? []).map((d) => d.doc_type));
+  type DocRow = { doc_type: OnboardingDocType; storage_path?: string; uploaded_at: string };
+  const uploaded = new Set(((data?.documents ?? []) as DocRow[]).map((d) => d.doc_type));
   const sections = (data?.sections ?? []) as SectionRow[];
   const sectionMap = new Map(sections.map((s) => [s.section, s]));
   const sectionOf = (s: OnboardingSection) => sectionMap.get(s);
+
 
   async function handleSubmitSection(section: OnboardingSection) {
     setSubmitting(true);

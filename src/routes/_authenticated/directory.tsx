@@ -15,8 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Pencil, Users, Search, UserX, UserCheck, Trash2 } from "lucide-react";
+import { Pencil, Users, Search, UserX, UserCheck, Trash2, IdCard } from "lucide-react";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
+import { EmployeeProfileSheet } from "@/components/directory/employee-profile-sheet";
 
 
 export const Route = createFileRoute("/_authenticated/directory")({

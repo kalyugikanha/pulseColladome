@@ -334,6 +334,43 @@ function CompleteOnboardingPage() {
   const requiredCount = sections.filter((s) => s.required).length;
   const allApproved = requiredCount > 0 && approvedCount === requiredCount;
 
+  // Banner state (state-derived, no read/unread tracking)
+  const rejectedSections = sections.filter((s) => s.required && s.status === "rejected");
+  const submittedSections = sections.filter((s) => s.required && s.status === "submitted");
+  const recentlyApproved = sections.filter((s) => {
+    if (s.status !== "approved" || !s.approved_at) return false;
+    return Date.now() - new Date(s.approved_at).getTime() < 7 * 24 * 60 * 60 * 1000;
+  });
+  const newlyRequired = sections.filter((s) => s.required && s.status === "draft");
+  const banner: { tone: "destructive" | "amber" | "green" | "blue"; title: string; body: React.ReactNode } | null =
+    rejectedSections.length > 0
+      ? {
+          tone: "destructive",
+          title: `HR sent back ${rejectedSections.length} section${rejectedSections.length === 1 ? "" : "s"}`,
+          body: (
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {rejectedSections.map((s) => (
+                <li key={s.section}><span className="font-medium">{SECTION_LABELS[s.section]}:</span> {s.rejection_reason ?? "Please review and re-submit."}</li>
+              ))}
+            </ul>
+          ),
+        }
+      : submittedSections.length > 0
+        ? { tone: "amber", title: `Waiting on HR review for ${submittedSections.length} section${submittedSections.length === 1 ? "" : "s"}`, body: <div className="text-xs mt-0.5">{submittedSections.map((s) => SECTION_LABELS[s.section]).join(" · ")}</div> }
+        : recentlyApproved.length > 0 && !allApproved
+          ? { tone: "green", title: `${recentlyApproved.length} section${recentlyApproved.length === 1 ? "" : "s"} approved by HR`, body: <div className="text-xs mt-0.5">{recentlyApproved.map((s) => SECTION_LABELS[s.section]).join(" · ")}</div> }
+          : allApproved
+            ? { tone: "green", title: "All required sections approved", body: <div className="text-xs mt-0.5">Portal access is unlocked. You can still update your details anytime.</div> }
+            : newlyRequired.length > 0
+              ? { tone: "blue", title: "Please complete these sections", body: <div className="text-xs mt-0.5">{newlyRequired.map((s) => SECTION_LABELS[s.section]).join(" · ")}</div> }
+              : null;
+  const bannerClass: Record<string, string> = {
+    destructive: "border-destructive/40 bg-destructive/10 text-destructive",
+    amber: "border-amber-500/40 bg-amber-500/10 text-amber-700",
+    green: "border-green-600/40 bg-green-500/10 text-green-700",
+    blue: "border-primary/40 bg-primary/10 text-primary",
+  };
+
 
   if (isLoading) {
     return <div className="flex min-h-[50vh] items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading…</div>;
@@ -351,6 +388,15 @@ function CompleteOnboardingPage() {
             : "Fill each section, then submit it for HR approval. Portal access unlocks once every required section is approved."}
         </p>
       </header>
+
+      {banner && (
+        <div className={`rounded-lg border p-3 ${bannerClass[banner.tone]}`}>
+          <div className="text-sm font-medium">{banner.title}</div>
+          {banner.body}
+        </div>
+      )}
+
+
 
       <Card>
         <CardContent className="p-4 flex items-center gap-4">

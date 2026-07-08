@@ -431,8 +431,8 @@ function ReviewSheet({ summary, onClose, onChanged }: {
                               size="sm"
                               className="gradient-primary"
                               onClick={() => approve(section)}
-                              disabled={busy === section || status === "draft"}
-                              title={status === "draft" ? "Employee has not submitted this section yet." : undefined}
+                              disabled={busy === section}
+                              title={status === "draft" ? "Employee has not submitted yet — approve manually if you have already confirmed offline." : undefined}
                             >
                               <Check className="h-3.5 w-3.5 mr-1" /> Approve
                             </Button>

@@ -5,15 +5,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Workflow } from "lucide-react";
+import { Workflow, ArrowDownAZ } from "lucide-react";
 import { format } from "date-fns";
 import {
-  DndContext, PointerSensor, useSensor, useSensors, useDroppable, useDraggable,
-  DragOverlay, type DragEndEvent, type DragStartEvent,
+  DndContext, PointerSensor, useSensor, useSensors, useDroppable,
+  DragOverlay, closestCorners,
+  type DragEndEvent, type DragStartEvent, type DragOverEvent,
 } from "@dnd-kit/core";
+import {
+  SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { toast } from "sonner";
-import { reorderKanbanCard, clearManualRank } from "@/lib/tasks-workflow.functions";
+import { reorderKanbanCard, clearManualRank, sortColumnByDueDate } from "@/lib/tasks-workflow.functions";
 
 type Status = "todo" | "in_progress" | "review" | "done";
 const COLUMNS: { key: Status; label: string }[] = [
@@ -80,8 +85,6 @@ function secondaryCompare(a: BoardCard, b: BoardCard, key: SortKey): number {
 }
 
 function compareCards(a: BoardCard, b: BoardCard, key: SortKey): number {
-  // Manual rank is always primary — a card someone dragged to the top stays on top
-  // regardless of the sort mode; unranked cards fall back to the chosen sort.
   const rA = a.manual_rank;
   const rB = b.manual_rank;
   if (rA != null && rB != null) return rA - rB;
@@ -116,83 +119,144 @@ export function BoardKanban({
 
   const reorderFn = useServerFn(reorderKanbanCard);
   const clearRankFn = useServerFn(clearManualRank);
+  const sortColFn = useServerFn(sortColumnByDueDate);
 
-  const byCol = useMemo(() => {
+  // Local override that mirrors columns while dragging, so cards animate live
+  // between columns and drops always resolve to a well-defined position.
+  const [overrides, setOverrides] = useState<Partial<Record<Status, string[]>> | null>(null);
+
+  const baseByCol = useMemo(() => {
     const map: Record<Status, BoardCard[]> = { todo: [], in_progress: [], review: [], done: [] };
     for (const t of tasks ?? []) map[t.status].push(t);
     for (const k of Object.keys(map) as Status[]) map[k].sort((a, b) => compareCards(a, b, sortKey));
     return map;
   }, [tasks, sortKey]);
 
+  const cardMap = useMemo(() => {
+    const m = new Map<string, BoardCard>();
+    for (const t of tasks ?? []) m.set(t.id, t);
+    return m;
+  }, [tasks]);
+
+  // Effective per-column ordering: overrides take precedence during drag.
+  const byCol = useMemo(() => {
+    const out: Record<Status, BoardCard[]> = { todo: [], in_progress: [], review: [], done: [] };
+    for (const k of Object.keys(baseByCol) as Status[]) {
+      const ids = overrides?.[k];
+      if (ids) {
+        out[k] = ids.map((id) => cardMap.get(id)).filter(Boolean) as BoardCard[];
+      } else {
+        out[k] = baseByCol[k];
+      }
+    }
+    return out;
+  }, [baseByCol, overrides, cardMap]);
+
   const activeCard = useMemo(
-    () => (activeId ? (tasks ?? []).find((t) => t.id === activeId) ?? null : null),
-    [activeId, tasks],
+    () => (activeId ? cardMap.get(activeId) ?? null : null),
+    [activeId, cardMap],
   );
+
+  function findColOfId(id: string): Status | null {
+    if ((["todo", "in_progress", "review", "done"] as Status[]).includes(id as Status)) return id as Status;
+    for (const k of Object.keys(byCol) as Status[]) {
+      if (byCol[k].some((c) => c.id === id)) return k;
+    }
+    return null;
+  }
 
   function onDragStart(e: DragStartEvent) {
     setActiveId(String(e.active.id));
+    // Snapshot current display order into overrides so we can freely mutate.
+    setOverrides({
+      todo: baseByCol.todo.map((c) => c.id),
+      in_progress: baseByCol.in_progress.map((c) => c.id),
+      review: baseByCol.review.map((c) => c.id),
+      done: baseByCol.done.map((c) => c.id),
+    });
   }
 
-  /** Compute a manual_rank that positions the card between its new neighbors.
-   *  `overList` is the destination column's cards in current display order,
-   *  excluding the dragged card. `insertBeforeIdx` is where to insert (0..len). */
-  function computeNewRank(overList: BoardCard[], insertBeforeIdx: number): number {
-    const before = insertBeforeIdx > 0 ? overList[insertBeforeIdx - 1] : null;
-    const after = insertBeforeIdx < overList.length ? overList[insertBeforeIdx] : null;
-    const beforeRank = before?.manual_rank;
-    const afterRank = after?.manual_rank;
-    if (beforeRank == null && afterRank == null) return 0;
-    if (beforeRank == null && afterRank != null) return afterRank - RANK_STEP;
-    if (afterRank == null && beforeRank != null) return beforeRank + RANK_STEP;
-    return ((beforeRank as number) + (afterRank as number)) / 2;
+  function onDragOver(e: DragOverEvent) {
+    const activeIdStr = String(e.active.id);
+    const overId = e.over ? String(e.over.id) : null;
+    if (!overId) return;
+    setOverrides((prev) => {
+      if (!prev) return prev;
+      const from = (Object.keys(prev) as Status[]).find((k) => prev[k]?.includes(activeIdStr));
+      if (!from) return prev;
+      const to = (["todo", "in_progress", "review", "done"] as Status[]).includes(overId as Status)
+        ? (overId as Status)
+        : (Object.keys(prev) as Status[]).find((k) => prev[k]?.includes(overId)) ?? from;
+      const next = { ...prev, [from]: [...(prev[from] ?? [])], [to]: [...(prev[to] ?? [])] };
+      const fromArr = next[from]!;
+      const toArr = next[to]!;
+      const fromIdx = fromArr.indexOf(activeIdStr);
+      if (fromIdx < 0) return prev;
+      if (from === to) {
+        const overIdx = toArr.indexOf(overId);
+        if (overIdx < 0 || overIdx === fromIdx) return prev;
+        next[to] = arrayMove(toArr, fromIdx, overIdx);
+        return next;
+      }
+      fromArr.splice(fromIdx, 1);
+      const overIdx = toArr.indexOf(overId);
+      const insertAt = overIdx < 0 ? toArr.length : overIdx;
+      toArr.splice(insertAt, 0, activeIdStr);
+      return next;
+    });
+  }
+
+  function computeNewRank(list: BoardCard[], idx: number): number {
+    const before = idx > 0 ? list[idx - 1] : null;
+    const after = idx < list.length - 1 ? list[idx + 1] : null;
+    const b = before?.manual_rank;
+    const a = after?.manual_rank;
+    if (b == null && a == null) return RANK_STEP;
+    if (b == null && a != null) return a - RANK_STEP;
+    if (a == null && b != null) return b + RANK_STEP;
+    return ((b as number) + (a as number)) / 2;
   }
 
   async function onDragEnd(e: DragEndEvent) {
+    const activeIdStr = String(e.active.id);
+    const currentOverrides = overrides;
     setActiveId(null);
-    const overId = e.over?.id ? String(e.over.id) : null;
-    if (!overId) return;
-    const card = (tasks ?? []).find((t) => t.id === e.active.id);
+    setOverrides(null);
+    if (!currentOverrides) return;
+    const card = cardMap.get(activeIdStr);
     if (!card) return;
     if (!canMoveTask(card)) return toast.error("You can't move this card.");
 
-    // Parse the drop target: "col:<status>" (append) or "slot:<status>:<idx>" (insert before idx).
-    let destStatus: Status;
-    let insertIdx: number | null = null;
-    if (overId.startsWith("slot:")) {
-      const [, s, i] = overId.split(":");
-      destStatus = s as Status;
-      insertIdx = Number(i);
-    } else if (overId.startsWith("col:")) {
-      destStatus = overId.slice(4) as Status;
-    } else {
-      return;
-    }
-
+    const destStatus = (Object.keys(currentOverrides) as Status[]).find((k) =>
+      currentOverrides[k]?.includes(activeIdStr),
+    );
+    if (!destStatus) return;
+    const destIds = currentOverrides[destStatus]!;
+    const idx = destIds.indexOf(activeIdStr);
     const statusChanged = card.status !== destStatus;
 
-    // Workflow status transitions still route through the detail sheet.
     if (statusChanged && (destStatus === "review" || destStatus === "done") && card.workflow_instance_id) {
       setOpenAction(null);
       setOpenTaskId(card.id);
       toast.info("Close this stage from the task detail panel.");
+      qc.invalidateQueries({ queryKey });
       return;
     }
     if (statusChanged && destStatus === "done" && card.assignee_id === currentUserId) {
       setOpenAction("mark-done");
       setOpenTaskId(card.id);
+      qc.invalidateQueries({ queryKey });
       return;
     }
 
-    // Compute the new manual_rank for the drop position within the destination column.
-    const destList = byCol[destStatus].filter((c) => c.id !== card.id);
-    const targetIdx = insertIdx == null ? destList.length : Math.max(0, Math.min(destList.length, insertIdx));
-    const newRank = computeNewRank(destList, targetIdx);
+    // Build the destination list (in current on-screen order) to compute rank.
+    const destList = destIds.map((id) => cardMap.get(id)).filter(Boolean) as BoardCard[];
+    const newRank = computeNewRank(destList, idx);
 
-    // Optimistic update.
     qc.setQueryData<BoardCard[] | undefined>(queryKey, (prev) =>
       prev?.map((t) => t.id === card.id
         ? { ...t, manual_rank: newRank, status: statusChanged ? destStatus : t.status }
-        : t)
+        : t),
     );
 
     try {
@@ -219,6 +283,22 @@ export function BoardKanban({
     }
   }
 
+  async function handleSortColumn(status: Status) {
+    const ids = baseByCol[status].map((c) => c.id);
+    if (!ids.length) return;
+    try {
+      const res = await sortColFn({ data: { taskIds: ids } }) as { updated: number; skipped: number };
+      if (res.skipped > 0) {
+        toast.success(`Sorted ${res.updated}. Skipped ${res.skipped} (no permission).`);
+      } else {
+        toast.success(`Sorted ${res.updated} task${res.updated === 1 ? "" : "s"} by due date.`);
+      }
+      qc.invalidateQueries({ queryKey });
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
   return (
     <>
       <div className="flex items-center justify-end gap-2 mb-2">
@@ -234,10 +314,23 @@ export function BoardKanban({
           {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
       </div>
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragEnd={onDragEnd}
+        onDragCancel={() => { setActiveId(null); setOverrides(null); }}
+      >
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${COLUMNS.length}, minmax(240px, 1fr))` }}>
           {COLUMNS.map((c) => (
-            <Column key={c.key} col={c} cards={byCol[c.key]} onOpen={(id) => setOpenTaskId(id)} currentUserId={currentUserId} activeId={activeId} />
+            <Column
+              key={c.key}
+              col={c}
+              cards={byCol[c.key]}
+              onOpen={(id) => setOpenTaskId(id)}
+              onSortColumn={() => handleSortColumn(c.key)}
+            />
           ))}
         </div>
         <DragOverlay dropAnimation={null}>
@@ -253,48 +346,52 @@ export function BoardKanban({
   );
 }
 
-function Column({ col, cards, onOpen, currentUserId, activeId }: {
+function Column({ col, cards, onOpen, onSortColumn }: {
   col: { key: Status; label: string };
   cards: BoardCard[];
   onOpen: (id: string) => void;
-  currentUserId: string;
-  activeId: string | null;
+  onSortColumn: () => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `col:${col.key}` });
+  const { setNodeRef, isOver } = useDroppable({ id: col.key });
+  const ids = useMemo(() => cards.map((c) => c.id), [cards]);
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-lg border-2 p-2 space-y-1 min-h-[400px] transition-colors ${
+      className={`rounded-lg border-2 p-2 min-h-[400px] transition-colors ${
         isOver
           ? "border-primary bg-primary/10 ring-2 ring-primary/30"
           : "border-border/60 bg-muted/20"
       }`}
     >
-      <div className="flex items-center justify-between px-1 pb-1">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{col.label}</span>
-        <span className="text-xs text-muted-foreground">{cards.length}</span>
-      </div>
-      {cards.map((c, i) => (
-        <div key={c.id} className="space-y-1">
-          <DropSlot id={`slot:${col.key}:${i}`} active={!!activeId && activeId !== c.id} />
-          <CardItem card={c} onOpen={onOpen} currentUserId={currentUserId} />
+      <div className="flex items-center justify-between px-1 pb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{col.label}</span>
+          <span className="text-xs text-muted-foreground">{cards.length}</span>
         </div>
-      ))}
-      <DropSlot id={`slot:${col.key}:${cards.length}`} active={!!activeId} trailing />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[10px] gap-1"
+          onClick={onSortColumn}
+          title="Sort this column by due date"
+        >
+          <ArrowDownAZ className="h-3 w-3" />
+          Sort by due
+        </Button>
+      </div>
+      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        <div className="space-y-2">
+          {cards.map((c) => (
+            <SortableCardItem key={c.id} card={c} onOpen={onOpen} />
+          ))}
+          {cards.length === 0 && (
+            <div className="text-[11px] text-muted-foreground/60 italic px-1 py-4 text-center">
+              Drop here
+            </div>
+          )}
+        </div>
+      </SortableContext>
     </div>
-  );
-}
-
-function DropSlot({ id, active, trailing = false }: { id: string; active: boolean; trailing?: boolean }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  if (!active) return null;
-  return (
-    <div
-      ref={setNodeRef}
-      className={`transition-all rounded-md ${
-        isOver ? "h-8 bg-primary/20 border-2 border-dashed border-primary/60" : trailing ? "h-4" : "h-2"
-      }`}
-    />
   );
 }
 
@@ -326,17 +423,21 @@ function CardBody({ card }: { card: BoardCard }) {
   );
 }
 
-function CardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => void; currentUserId: string }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id });
+function SortableCardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
   return (
-    <Card
-      ref={setNodeRef}
-      {...attributes} {...listeners}
-      onDoubleClick={() => onOpen(card.id)}
-      className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-30 border-dashed" : ""}`}
-    >
-      <CardBody card={card} />
-    </Card>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <Card
+        onDoubleClick={() => onOpen(card.id)}
+        className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-30 border-dashed" : ""}`}
+      >
+        <CardBody card={card} />
+      </Card>
+    </div>
   );
 }
 

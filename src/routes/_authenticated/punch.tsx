@@ -183,7 +183,7 @@ export function PunchPage() {
     if (!openSession) return;
     const now = new Date();
     const suggested = Number((differenceInMinutes(now, new Date(openSession.punch_in_time)) / 60).toFixed(2));
-    setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "" }]);
+    setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "", atRisk: false }]);
     setPunchOutAt(toLocalDatetimeInput(now));
     setDialogOpen(true);
   }

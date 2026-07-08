@@ -81,13 +81,23 @@ export function BoardKanban({
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openAction, setOpenAction] = useState<"mark-done" | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>(() => {
+    if (typeof window === "undefined") return "due_asc";
+    const stored = window.localStorage.getItem(SORT_STORAGE_KEY) as SortKey | null;
+    return stored && SORT_OPTIONS.some((o) => o.key === stored) ? stored : "due_asc";
+  });
+  function updateSort(next: SortKey) {
+    setSortKey(next);
+    try { window.localStorage.setItem(SORT_STORAGE_KEY, next); } catch { /* noop */ }
+  }
   const { data: tasks } = useQuery({ queryKey, queryFn: fetcher });
 
   const byCol = useMemo(() => {
     const map: Record<Status, BoardCard[]> = { todo: [], in_progress: [], review: [], done: [] };
     for (const t of tasks ?? []) map[t.status].push(t);
+    for (const k of Object.keys(map) as Status[]) map[k].sort((a, b) => compareCards(a, b, sortKey));
     return map;
-  }, [tasks]);
+  }, [tasks, sortKey]);
 
   const activeCard = useMemo(
     () => (activeId ? (tasks ?? []).find((t) => t.id === activeId) ?? null : null),

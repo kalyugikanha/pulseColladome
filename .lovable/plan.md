@@ -1,41 +1,39 @@
-## Kanban: drag-to-reorder within a column (assignee + managers)
+## Kanban: per-column sort button + smoother reordering
 
-Add manual prioritization on top of the existing sort dropdown. Default view still auto-sorts by soonest due date; when someone drags a card within a column, that manual order takes over.
+Two problems to fix:
+1. Reorder is clumsy — thin drop slots between cards, cards jump around, hard to hit the target.
+2. No quick way to reset one column to due-date order without wiping the whole board's manual ranks.
 
-### 1. Schema
-Add one nullable column `manual_rank double precision` on `public.tasks`.
-- `NULL` → card sorted by the current sort mode (existing behavior).
-- Non-null → card is manually ranked; lower value = higher on the board.
+### 1. Per-column "Sort by due date" button
+Add a small button in each column header (next to the count) that, on click:
+- Reassigns `manual_rank` on every card in THAT column (that the user can update) so they end up in ascending due-date order (nulls last, priority tiebreaker).
+- Uses evenly spaced ranks (e.g. `1024, 2048, 3072, ...`) so subsequent drags still have room to insert between neighbors.
+- Calls a new server fn `sortColumnByDueDate({ status, taskIds })` that runs a single `upsert`/batched update — RLS silently skips cards the user can't update, and we report "Sorted N cards" (skipped M) via toast.
+- After that, the user can still drag any card to override — same behavior as today, just starting from a clean due-date order in that one column.
 
-New index: `create index tasks_status_manual_rank_idx on public.tasks(status, manual_rank);`
+The existing global "Clear manual order" button and the global sort dropdown stay as they are.
 
-No new RLS. Assignee/reviewer/manager/dept-head/reporting-manager/project-manager already have UPDATE on `tasks`, which is exactly the set of people we want to let reorder — the assignee themselves and their managers. Non-managers cannot reorder someone else's task; that's the correct behavior.
+### 2. Smoother drag-and-drop
+Replace the current thin drop-slots-between-cards model with a **whole-card hover target** using `@dnd-kit/sortable` (already a transitive dep of `@dnd-kit/core`; add explicitly if missing).
 
-### 2. Sort mode
-Add a new option **"Manual (drag to reorder)"** to the existing sort dropdown, and make it the default (persist in `localStorage`; existing users keep whatever they had). In every mode:
-- Sort primary: `manual_rank` ascending, `NULL`s go to the end.
-- Sort secondary: whatever the current sort key is (due date / priority / recently created).
-- So even in "Due date" mode, a card someone dragged to the top stays on top; the rest sort by date underneath.
+Concretely:
+- Wrap each column's card list in `SortableContext` with `verticalListSortingStrategy`.
+- Each card becomes a `useSortable` item — the whole card is the drop target, cards animate out of the way as you hover, no more tiny 8px slots to aim at.
+- Column itself stays a `useDroppable` for empty-column drops and cross-column moves.
+- `onDragOver` handles cross-column preview (card visually moves into the new column before drop); `onDragEnd` commits: computes fractional midpoint rank based on final neighbors and calls existing `reorderKanbanCard`.
+- Keep the existing `DragOverlay` for the "floating card" visual — it's fine.
+- Keep existing gating (`canMoveTask`), workflow-transition detour to `TaskDetailSheet`, and optimistic cache update.
 
-If the user prefers pure sort (no manual override), a small "Clear manual order" button in the header wipes `manual_rank` for all their visible cards in this board (only cards they can UPDATE).
+Net effect: dragging feels like Trello/Linear — cards shuffle live, drop anywhere on a card to place there, no more hunting for a 4-8px gap.
 
-### 3. Drag behavior
-- Existing cross-column DnD stays. Add within-column drop targets (drop between cards).
-- On drop: compute new rank as midpoint between the ranks of the cards above and below the drop position (standard fractional-index approach). If dropped at the top, `above.rank - 1`; at the bottom, `below.rank + 1`. Guarantees O(1) writes without renumbering.
-- If the dragged card doesn't have UPDATE permission, disable drag and show tooltip.
-- Optimistic update via existing React Query cache; call a new server fn `reorderKanbanCard({ taskId, newRank })` that updates `manual_rank` (and `status` if the column changed — merge with existing cross-column move).
-
-### 4. Files
-- Migration: add `manual_rank` column + index on `public.tasks`.
-- `src/lib/tasks-workflow.functions.ts`: add `reorderKanbanCard` server fn (auth via existing RLS — errors clearly if 0 rows updated, same pattern we just applied).
+### 3. Files
+- `src/lib/tasks-workflow.functions.ts`: add `sortColumnByDueDate` server fn. Input: `{ status, taskIds }`. Server fetches those tasks' `due_date` + `priority`, sorts them, then issues a batched `upsert` on `id` setting `manual_rank = 1024 * (index+1)`. Uses `requireSupabaseAuth` — RLS handles permission, returns `{ updated, skipped }`.
 - `src/components/board/board-kanban.tsx`:
-  - Extend `BoardCard` type with `manual_rank: number | null`.
-  - Add `manual_rank` to the SELECT projection (fetcher).
-  - Add "Manual" to `SortKey`, make it default.
-  - Update `compareCards` so `manual_rank` (asc, nulls last) is always primary.
-  - Add within-column droppable slots and `onDragEnd` handling that computes fractional rank and calls the new server fn.
-  - Reuse existing `canMoveTask` for drag gating.
-- No changes to workflow logic.
+  - Add `sortColumnByDueDate` button in `Column` header (icon + tooltip: "Sort this column by due date").
+  - Replace `DropSlot` between-cards model with `SortableContext` + `useSortable` per card.
+  - Update `onDragOver`/`onDragEnd` to use the sortable item indexes for rank computation.
+  - Remove `DropSlot` component.
+- No schema changes. No RLS changes.
 
 ### Assumption
-Manual order is **shared** across viewers (stored on the task), not per-viewer. So if a manager drags a card up for their report, the report sees the same order in their own Kanban — matching how "priority" already behaves. Tell me if you'd rather have per-user order (that would need a separate table and different plan).
+Sorting a column stores explicit `manual_rank` values (doesn't just set them to `NULL`), so the order sticks even if the global sort dropdown is on "Manual" — and stays overridable by drag. Tell me if you'd rather have it just clear `manual_rank` for that column (which only works cleanly when the global sort is on "Due date").

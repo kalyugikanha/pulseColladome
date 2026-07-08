@@ -194,9 +194,10 @@ function CompleteOnboardingPage() {
     },
   }), [fullName, personalEmail, phone, address, dob, anniversary, linkedin, github, facebook, instagram, twitter, youtube, pinterest, department, dayStart, standup, hobbies, holder, account, branch, ifsc, pan]);
 
-  // Debounced auto-save on any field change
+  // Debounced auto-save on any field change (disabled in read-only impersonation view)
   useEffect(() => {
     if (!hydratedRef.current) return;
+    if (readOnly) return;
     setAutoStatus((prev) => (prev === "saving" ? prev : "unsaved"));
     const t = setTimeout(async () => {
       if (inFlightRef.current) { pendingRef.current = true; return; }
@@ -225,7 +226,8 @@ function CompleteOnboardingPage() {
       await runSave();
     }, 800);
     return () => clearTimeout(t);
-  }, [autoSavePayload, saveOnboarding]);
+  }, [autoSavePayload, saveOnboarding, readOnly]);
+
 
   // Best-effort flush on tab close / hide
   useEffect(() => {

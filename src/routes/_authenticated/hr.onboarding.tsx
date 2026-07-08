@@ -99,7 +99,7 @@ export function HrOnboardingPage() {
         <h1 className="font-display text-3xl font-bold flex items-center gap-2">
           <ClipboardCheck className="h-6 w-6 text-primary" /> Onboarding approvals
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">Review each section on its own. Approve one at a time — portal access unlocks only when every required section is approved.</p>
+        <p className="text-muted-foreground text-sm mt-1">See what's still pending per employee and section. Portal access is no longer gated — confirm each section at your own pace, with or without proof.</p>
       </header>
 
       <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterKey)}>

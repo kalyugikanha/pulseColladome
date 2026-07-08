@@ -188,16 +188,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
 
   async function doStatus(s: "todo" | "in_progress" | "review" | "done") {
-    // When the assignee sends a task into review or marks it done, prompt for
-    // actual hours first. Applies to both plain and workflow tasks; workflow
-    // tasks whose "close stage" dialog is used instead never come through here.
-    const sendingForReview = (s === "done" || s === "review")
-      && isAssignee && task?.status !== "done" && task?.status !== "review"
-      && !task?.workflow_instance_id;
-    if (sendingForReview) {
-      setMarkDoneOpen(true);
-      return;
-    }
+    // Status transitions are free — no hours gate. Hours are captured in the
+    // punch-out dialog. Review → Done still requires the reviewer's approval
+    // (enforced server-side by setTaskStatus when a distinct reviewer is set).
     try {
       await setStatusFn({ data: { taskId: taskId!, status: s } });
       toast.success("Status updated");
@@ -207,10 +200,12 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
   async function confirmMarkDone(v: { hours: number; note?: string }) {
     try {
-      await logTimeFn({ data: { taskId: taskId!, hours: v.hours, note: v.note ?? null } });
+      if (v.hours && v.hours > 0) {
+        await logTimeFn({ data: { taskId: taskId!, hours: v.hours, note: v.note ?? null } });
+      }
       await setStatusFn({ data: { taskId: taskId!, status: "done" } });
       setMarkDoneOpen(false);
-      toast.success("Marked done — hours sent for approval");
+      toast.success(v.hours > 0 ? "Marked done — hours sent for approval" : "Marked done");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
   }

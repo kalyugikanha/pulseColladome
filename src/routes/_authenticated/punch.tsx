@@ -109,7 +109,7 @@ export function PunchPage() {
         .from("tasks")
         .select("id, title, status, project_id, project:projects(id, code, name)")
         .eq("assignee_id", punchUserId!)
-        .neq("status", "done")
+        
         .not("project_id", "is", null)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -554,6 +554,7 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
                   <Check className={`h-4 w-4 mr-2 ${value === t.id ? "opacity-100" : "opacity-0"}`} />
                   {t.project?.code && <span className="font-mono text-xs mr-2">{t.project.code}</span>}
                   <span className="truncate">{t.title}</span>
+                  {t.status === "done" && <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">Done</span>}
                 </CommandItem>
               ))}
             </CommandGroup>

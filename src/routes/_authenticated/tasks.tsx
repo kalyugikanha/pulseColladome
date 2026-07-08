@@ -52,6 +52,13 @@ function TasksPage() {
   const [open, setOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [personFilter, setPersonFilter] = useState<string>("");
+  const [personSearch, setPersonSearch] = useState("");
+
+  const { data: allPeople } = useQuery({
+    queryKey: ["people-lite-all-tasks"],
+    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department").order("full_name")).data ?? [],
+  });
 
   if (!me) return <div className="text-muted-foreground">Loading…</div>;
 
@@ -72,10 +79,11 @@ function TasksPage() {
   const fetcherArgs = useMemo(() => {
     if (effectiveScope === "mine") return { assigneeId: me.id };
     if (effectiveScope === "dept") return { department: dept };
+    if (effectiveScope === "all" && personFilter) return { assigneeId: personFilter };
     return {};
-  }, [effectiveScope, me.id, dept]);
+  }, [effectiveScope, me.id, dept, personFilter]);
 
-  const queryKey = ["tasks-unified", effectiveScope, dept, me.id];
+  const queryKey = ["tasks-unified", effectiveScope, dept, me.id, personFilter];
 
   return (
     <div className="space-y-4">
@@ -101,6 +109,37 @@ function TasksPage() {
               <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {DEPTS.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          {effectiveScope === "all" && (
+            <Select value={personFilter || "__all__"} onValueChange={(v) => setPersonFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="h-9 w-56"><SelectValue placeholder="All people" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <div className="p-1 sticky top-0 bg-popover z-10">
+                  <Input
+                    placeholder="Search name, email, department…"
+                    value={personSearch}
+                    onChange={(e) => setPersonSearch(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <SelectItem value="__all__">All people</SelectItem>
+                {(allPeople ?? [])
+                  .filter((p) => {
+                    if (!personSearch.trim()) return true;
+                    const q = personSearch.toLowerCase();
+                    return (
+                      (p.full_name ?? "").toLowerCase().includes(q) ||
+                      (p.email ?? "").toLowerCase().includes(q) ||
+                      (p.department ?? "").toLowerCase().includes(q)
+                    );
+                  })
+                  .map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {(p.full_name ?? p.email)}{p.department ? ` · ${p.department}` : ""}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           )}

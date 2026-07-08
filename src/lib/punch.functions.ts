@@ -15,6 +15,7 @@ type PunchInInput = {
 type PunchOutInput = {
   sessionId: string;
   allocations: PunchAllocationInput[];
+  punchOutTime?: string | null;
 };
 
 export type PunchAllocation = {

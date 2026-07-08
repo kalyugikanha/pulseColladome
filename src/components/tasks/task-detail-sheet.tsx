@@ -24,7 +24,7 @@ import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
   addSubtask, toggleSubtask, deleteSubtask, addComment, resolveComment,
   toggleWatcher, addDependency, removeDependency, rateTask,
-  listTaskAttachments, insertTaskAttachment, deleteTaskAttachment,
+  listTaskAttachments, insertTaskAttachment, deleteTaskAttachment, updateTaskAssetLinks,
 } from "@/lib/tasks-workflow.functions";
 import { logTaskTime } from "@/lib/workflows.functions";
 
@@ -59,6 +59,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const listAttachmentsFn = useServerFn(listTaskAttachments);
   const insertAttachmentFn = useServerFn(insertTaskAttachment);
   const deleteAttachmentFn = useServerFn(deleteTaskAttachment);
+  const saveAssetLinksFn = useServerFn(updateTaskAssetLinks);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["task-detail", taskId ?? null], enabled: !!taskId,
@@ -165,8 +166,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
   async function saveAssetLinks(next: { label: string; url: string }[]) {
     if (!task) return;
-    const { error } = await supabase.from("tasks").update({ asset_links: next as never } as never).eq("id", task.id);
-    if (error) throw new Error(error.message);
+    await saveAssetLinksFn({ data: { taskId: task.id, links: next } });
     await refresh();
   }
   async function addReference() {

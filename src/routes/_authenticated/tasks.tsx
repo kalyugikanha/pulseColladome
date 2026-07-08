@@ -212,12 +212,16 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   onCreated?: () => void;
 }) {
   const createFn = useServerFn(createTaskFull);
+  const updateFn = useServerFn(updateTaskFields);
   const startWfFn = useServerFn(startWorkflow);
   const listWf = useServerFn(listWorkflowTemplates);
 
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [due, setDue] = useState("");
+  const [postDate, setPostDate] = useState("");
+  const [estimate, setEstimate] = useState("");
+  const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [pri, setPri] = useState<"low" | "medium" | "high">("medium");
   const [projectId, setProjectId] = useState("");
   const [assignee, setAssignee] = useState<string>(defaultAssigneeId ?? "");

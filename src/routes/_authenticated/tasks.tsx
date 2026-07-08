@@ -17,6 +17,7 @@ import { Plus, Workflow, LayoutGrid, List as ListIcon, Layers, ListChecks } from
 import { toast } from "sonner";
 import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board/board-kanban";
 import { createTaskFull } from "@/lib/tasks-plus.functions";
+import { updateTaskFields } from "@/lib/tasks-workflow.functions";
 import { startWorkflow, listWorkflowTemplates } from "@/lib/workflows.functions";
 import { TaxonomyPage } from "./admin.taxonomy";
 

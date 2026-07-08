@@ -31,7 +31,7 @@ function WorkflowsAdmin() {
   const { data: templates } = useQuery({ queryKey: ["workflow-templates"], queryFn: () => list() });
   const [editing, setEditing] = useState<null | { id?: string; name: string; description: string; department: string; is_active: boolean; stages: WorkflowStageInput[] }>(null);
 
-  if (!me?.isAdmin && !me?.isSuperAdmin) return <div className="p-8 text-muted-foreground">Admins only.</div>;
+  if (!me?.isAdmin && !me?.isSuperAdmin && !me?.isReportingManager) return <div className="p-8 text-muted-foreground">Access restricted.</div>;
 
   async function refresh() { await qc.invalidateQueries({ queryKey: ["workflow-templates"] }); }
 

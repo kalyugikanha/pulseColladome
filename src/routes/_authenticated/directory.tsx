@@ -404,13 +404,10 @@ export function DirectoryPage() {
                   <TableCell className="text-xs text-muted-foreground">{p.joined_on ?? "—"}</TableCell>
                   {canEdit && (
                     <TableCell className="text-center">
-                      <Checkbox
-                        checked={p.onboarding_required !== false}
-                        onCheckedChange={(v) => setOnboardingRequired(p, v === true)}
-                        aria-label="Onboarding required"
-                      />
+                      <SectionRequiredPopover userId={p.id} />
                     </TableCell>
                   )}
+
                   {canEdit && (
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">

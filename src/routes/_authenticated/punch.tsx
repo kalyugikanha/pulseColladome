@@ -444,7 +444,12 @@ export function PunchPage() {
           </div>
 
           <div className="flex items-center justify-between text-sm px-1">
-            <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{sessionDurationHours.toFixed(2)}h</span></span>
+            <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{(() => {
+              if (!openSession) return sessionDurationHours.toFixed(2);
+              const end = punchOutAt ? new Date(punchOutAt) : new Date(nowTick);
+              if (Number.isNaN(end.getTime())) return sessionDurationHours.toFixed(2);
+              return Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2))).toFixed(2);
+            })()}h</span></span>
             <span className={`font-semibold ${Math.abs(allocatedTotal - sessionDurationHours) > 0.25 ? "text-amber-600" : "text-foreground"}`}>
               Allocated: {allocatedTotal.toFixed(2)}h
             </span>

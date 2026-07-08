@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getMyOnboarding,
+  getOnboardingForUser,
   saveMyOnboarding,
   recordMyDocument,
   submitOnboardingSection,
@@ -24,12 +24,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star, Linkedin, Send } from "lucide-react";
+import { CheckCircle2, Upload, Loader2, ClipboardCheck, ExternalLink, Heart, Star, Linkedin, Send, Eye } from "lucide-react";
 import { DepartmentSelect } from "@/components/department-select";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/complete-onboarding")({
   component: CompleteOnboardingPage,
 });
+
 
 
 type DocSpec = { key: OnboardingDocType; label: string; required: boolean; accept: string; link?: string };

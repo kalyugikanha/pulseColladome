@@ -104,7 +104,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {(isAdmin || isSuperAdmin) && (
+                {(isAdmin || isSuperAdmin || isReportingManager) && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/workflows")}>
                       <Link to="/workflows"><Workflow /><span>Workflows</span></Link>

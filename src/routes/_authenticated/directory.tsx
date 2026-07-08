@@ -346,9 +346,10 @@ export function DirectoryPage() {
                 <TableHead>Reporting manager</TableHead>
                 <TableHead>Employment</TableHead>
                 <TableHead>Joined</TableHead>
-                {canEdit && <TableHead className="text-center">Onboarding required</TableHead>}
+                {canEdit && <TableHead className="text-center">Onboarding sections required</TableHead>}
                 {canEdit && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
+
             </TableHeader>
             <TableBody>
               {rows.map((p) => (

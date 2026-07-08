@@ -805,6 +805,8 @@ export type Database = {
           social_follows_confirmed_at: string | null
           standup_time: string | null
           twitter_url: string | null
+          unlogged_hours_balance: number
+          unlogged_hours_since: string | null
           updated_at: string
           welcomed_at: string | null
           youtube_url: string | null
@@ -850,6 +852,8 @@ export type Database = {
           social_follows_confirmed_at?: string | null
           standup_time?: string | null
           twitter_url?: string | null
+          unlogged_hours_balance?: number
+          unlogged_hours_since?: string | null
           updated_at?: string
           welcomed_at?: string | null
           youtube_url?: string | null
@@ -895,6 +899,8 @@ export type Database = {
           social_follows_confirmed_at?: string | null
           standup_time?: string | null
           twitter_url?: string | null
+          unlogged_hours_balance?: number
+          unlogged_hours_since?: string | null
           updated_at?: string
           welcomed_at?: string | null
           youtube_url?: string | null
@@ -1619,6 +1625,7 @@ export type Database = {
         Row: {
           asset_links: Json
           assignee_id: string | null
+          at_risk: boolean
           client_brand: string | null
           completion_percent: number
           created_at: string
@@ -1654,6 +1661,7 @@ export type Database = {
         Insert: {
           asset_links?: Json
           assignee_id?: string | null
+          at_risk?: boolean
           client_brand?: string | null
           completion_percent?: number
           created_at?: string
@@ -1689,6 +1697,7 @@ export type Database = {
         Update: {
           asset_links?: Json
           assignee_id?: string | null
+          at_risk?: boolean
           client_brand?: string | null
           completion_percent?: number
           created_at?: string
@@ -2347,6 +2356,7 @@ export type Database = {
         Returns: {
           asset_links: Json
           assignee_id: string | null
+          at_risk: boolean
           client_brand: string | null
           completion_percent: number
           created_at: string

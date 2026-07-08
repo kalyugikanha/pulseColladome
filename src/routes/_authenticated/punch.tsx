@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { punchIn as punchInServerFn, punchOut as punchOutServerFn, type PunchInResult, type PunchOutResult } from "@/lib/punch.functions";
+import { punchIn as punchInServerFn, punchOut as punchOutServerFn, clearUnloggedHours as clearUnloggedHoursServerFn, type PunchInResult, type PunchOutResult } from "@/lib/punch.functions";
 import { requestTaskFromManager } from "@/lib/tasks-plus.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Plus, Trash2, Check, ChevronsUpDown, Send } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Clock, Plus, Trash2, Check, ChevronsUpDown, Send, AlertTriangle, X } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
 
@@ -48,18 +49,19 @@ type Session = {
   allocations: Allocation[] | null;
 };
 
-type Row = { projectId: string; taskId: string; hours: string; comments: string };
+type Row = { projectId: string; taskId: string; hours: string; comments: string; atRisk: boolean };
 
 export function PunchPage() {
   const { data: me } = useCurrentUser();
   const qc = useQueryClient();
   const punchInServer = useServerFn(punchInServerFn);
   const punchOutServer = useServerFn(punchOutServerFn);
+  const clearUnloggedServer = useServerFn(clearUnloggedHoursServerFn);
   const requestTaskServer = useServerFn(requestTaskFromManager);
   const today = format(new Date(), "yyyy-MM-dd");
   const punchUserId = me?.realId ?? me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "" }]);
+  const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
   const [submitting, setSubmitting] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [reqTitle, setReqTitle] = useState("");
@@ -69,6 +71,8 @@ export function PunchPage() {
   const [punchingIn, setPunchingIn] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [punchOutAt, setPunchOutAt] = useState<string>("");
+  const [unlogged, setUnlogged] = useState<{ balance: number; since: string | null }>({ balance: 0, since: null });
+  const [unloggedDismissed, setUnloggedDismissed] = useState(false);
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["punch-sessions-today", punchUserId],
@@ -150,6 +154,8 @@ export function PunchPage() {
     setPunchingIn(true);
     try {
       const result = await punchInServer({ data: { sessionDate: today } }) as PunchInResult;
+      setUnlogged({ balance: Number(result.unloggedBalance ?? 0), since: result.unloggedSince ?? null });
+      setUnloggedDismissed(false);
       if (result.session.session_date === today) {
         qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => {
           const next = old.some((row) => row.id === result.session.id)
@@ -183,7 +189,7 @@ export function PunchPage() {
     if (!openSession) return;
     const now = new Date();
     const suggested = Number((differenceInMinutes(now, new Date(openSession.punch_in_time)) / 60).toFixed(2));
-    setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "" }]);
+    setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "", atRisk: false }]);
     setPunchOutAt(toLocalDatetimeInput(now));
     setDialogOpen(true);
   }
@@ -192,30 +198,14 @@ export function PunchPage() {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
   function addRow() {
-    setRows((prev) => [...prev, { projectId: "", taskId: "", hours: "", comments: "" }]);
+    setRows((prev) => [...prev, { projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
   }
   function removeRow(idx: number) {
     setRows((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
   }
 
-  async function submitPunchOut() {
+  async function performPunchOut(opts: { skip: boolean }) {
     if (!openSession) return;
-    if (rows.length === 0) { toast.error("Add at least one entry."); return; }
-    for (const [i, r] of rows.entries()) {
-      if (requireTask && !r.taskId) { toast.error(`Row ${i + 1}: pick a task (required for your team).`); return; }
-      if (!r.taskId && !r.projectId) { toast.error(`Row ${i + 1}: pick a task or project.`); return; }
-      const h = Number(r.hours);
-      if (!Number.isFinite(h) || h <= 0) { toast.error(`Row ${i + 1}: enter hours (>0).`); return; }
-      if (!r.comments.trim()) { toast.error(`Row ${i + 1}: add a comment.`); return; }
-    }
-
-    const allocations = rows.map((r) => ({
-      projectId: r.projectId,
-      taskId: r.taskId || null,
-      hours: Number(Number(r.hours).toFixed(2)),
-      comments: r.comments.trim(),
-    }));
-    const totalHours = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
 
     let punchOutIso: string | null = null;
     if (punchOutAt) {
@@ -226,12 +216,39 @@ export function PunchPage() {
       punchOutIso = d.toISOString();
     }
 
+    // Skip → send zero allocations. Otherwise, only include rows the user filled in.
+    const usableRows = opts.skip
+      ? []
+      : rows.filter((r) => (r.taskId || r.projectId) && Number(r.hours) > 0);
+
+    if (!opts.skip) {
+      for (const [i, r] of usableRows.entries()) {
+        if (requireTask && !r.taskId) { toast.error(`Row ${i + 1}: pick a task (required for your team).`); return; }
+        if (!r.taskId && !r.projectId) { toast.error(`Row ${i + 1}: pick a task or project.`); return; }
+      }
+    }
+
+    const allocations = usableRows.map((r) => ({
+      projectId: r.projectId,
+      taskId: r.taskId || null,
+      hours: Number(Number(r.hours).toFixed(2)),
+      comments: r.comments.trim(),
+      atRisk: !!r.atRisk,
+    }));
+    const totalLogged = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
+
     setSubmitting(true);
     try {
-      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations, punchOutTime: punchOutIso } }) as PunchOutResult;
+      const result = await punchOutServer({ data: { sessionId: openSession.id, allocations, punchOutTime: punchOutIso, skip: opts.skip } }) as PunchOutResult;
       qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => old.map((row) => row.id === result.session.id ? result.session as Session : row));
+      setUnlogged({ balance: Number(result.unloggedBalance ?? 0), since: result.unloggedSince ?? null });
+      setUnloggedDismissed(false);
       await refetchSessions();
-      toast.success(`Session logged — ${totalHours.toFixed(2)}h across ${allocations.length} project${allocations.length === 1 ? "" : "s"}`);
+      if (opts.skip) {
+        toast.success("Punched out — you can log hours later.");
+      } else {
+        toast.success(`Punched out — ${totalLogged.toFixed(2)}h logged across ${allocations.length} entr${allocations.length === 1 ? "y" : "ies"}.`);
+      }
       setDialogOpen(false);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
@@ -245,6 +262,15 @@ export function PunchPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  const submitPunchOut = () => performPunchOut({ skip: false });
+  const skipPunchOut = () => performPunchOut({ skip: true });
+
+  async function dismissUnlogged() {
+    setUnloggedDismissed(true);
+    try { await clearUnloggedServer({}); setUnlogged({ balance: 0, since: null }); }
+    catch { /* non-fatal */ }
   }
 
   async function submitTaskRequest() {
@@ -267,6 +293,19 @@ export function PunchPage() {
         <h1 className="font-display text-3xl font-bold">Attendance</h1>
         <p className="text-muted-foreground text-sm mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")} — you can punch in and out as many times as you like.</p>
       </header>
+
+      {unlogged.balance > 0 && !unloggedDismissed && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <div className="font-medium text-foreground">You have {unlogged.balance.toFixed(1)}h unlogged{unlogged.since ? ` from ${format(new Date(unlogged.since), "MMM d")}` : ""}.</div>
+            <div className="text-muted-foreground text-xs mt-0.5">Add them at your next punch-out — this reminder is only visible to you.</div>
+          </div>
+          <Button type="button" variant="ghost" size="sm" onClick={dismissUnlogged} className="h-7 px-2 text-xs">
+            <X className="h-3.5 w-3.5 mr-1" /> Dismiss
+          </Button>
+        </div>
+      )}
 
       <Card className="shadow-elevated overflow-hidden">
         <div className="gradient-surface p-8 md:p-12 relative">
@@ -434,9 +473,21 @@ export function PunchPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">What did you work on?</Label>
+                    <Label className="text-xs">What did you work on? <span className="text-muted-foreground">(optional)</span></Label>
                     <Textarea rows={2} placeholder="Short comment on this entry" value={r.comments} onChange={(e) => updateRow(idx, { comments: e.target.value })} />
                   </div>
+                  {r.taskId && (
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                      <Checkbox
+                        checked={r.atRisk}
+                        onCheckedChange={(v) => updateRow(idx, { atRisk: v === true })}
+                      />
+                      <span className="inline-flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                        Flag this task as <span className="font-medium text-foreground">at risk</span> — visible to your reporting manager.
+                      </span>
+                    </label>
+                  )}
                 </div>
               );
             })}
@@ -452,16 +503,21 @@ export function PunchPage() {
               if (Number.isNaN(end.getTime())) return sessionDurationHours.toFixed(2);
               return Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2))).toFixed(2);
             })()}h</span></span>
-            <span className={`font-semibold ${Math.abs(allocatedTotal - sessionDurationHours) > 0.25 ? "text-amber-600" : "text-foreground"}`}>
-              Allocated: {allocatedTotal.toFixed(2)}h
+            <span className="font-semibold text-foreground">
+              Logging: {allocatedTotal.toFixed(2)}h <span className="text-muted-foreground font-normal">(doesn't have to match)</span>
             </span>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>
-            <Button onClick={submitPunchOut} disabled={submitting} className="gradient-primary">
-              {submitting ? "Saving…" : "Punch out"}
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button variant="ghost" onClick={skipPunchOut} disabled={submitting} className="text-muted-foreground">
+              Skip for now
             </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>
+              <Button onClick={submitPunchOut} disabled={submitting} className="gradient-primary">
+                {submitting ? "Saving…" : "Punch out & log hours"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

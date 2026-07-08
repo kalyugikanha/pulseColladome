@@ -202,9 +202,12 @@ function ReviewSheet({ summary, onClose, onChanged }: {
   const getUrl = useServerFn(getEmployeeDocumentUrl);
   const approveFn = useServerFn(approveOnboardingSection);
   const rejectFn = useServerFn(rejectOnboardingSection);
+  const setRequiredFn = useServerFn(setOnboardingSectionRequired);
+  const resetFn = useServerFn(resetOnboardingSection);
   const [rejectingSection, setRejectingSection] = useState<OnboardingSection | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState<OnboardingSection | null>(null);
+  const [justActed, setJustActed] = useState<{ section: OnboardingSection; msg: string } | null>(null);
 
   const { data: details, refetch } = useQuery({
     queryKey: ["hr-onboarding-details", summary?.user_id],
@@ -220,12 +223,18 @@ function ReviewSheet({ summary, onClose, onChanged }: {
     return m;
   }, [details, summary]);
 
+  function flash(section: OnboardingSection, msg: string) {
+    setJustActed({ section, msg });
+    setTimeout(() => setJustActed((cur) => (cur?.section === section ? null : cur)), 3000);
+  }
+
   async function approve(section: OnboardingSection) {
     if (!summary) return;
     setBusy(section);
     try {
       const res = await approveFn({ data: { user_id: summary.user_id, section } });
       toast.success(res.welcome_task_created ? "Approved — welcome-post task sent to Kanishka" : "Section approved");
+      flash(section, "Approved. Employee has been notified.");
       onChanged();
       refetch();
     } catch (e) { toast.error(e instanceof Error ? e.message : "Approval failed"); }
@@ -238,6 +247,7 @@ function ReviewSheet({ summary, onClose, onChanged }: {
     try {
       await rejectFn({ data: { user_id: summary.user_id, section, reason } });
       toast.success("Section sent back");
+      flash(section, "Sent back. Employee has been notified.");
       setRejectingSection(null);
       setReason("");
       onChanged();
@@ -245,6 +255,45 @@ function ReviewSheet({ summary, onClose, onChanged }: {
     } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
     finally { setBusy(null); }
   }
+
+  async function toggleRequired(section: OnboardingSection, required: boolean) {
+    if (!summary) return;
+    setBusy(section);
+    try {
+      const res = await setRequiredFn({ data: { user_id: summary.user_id, section, required } });
+      const msg = !required
+        ? "Marked as not required."
+        : res.didReset
+          ? "Now required — reset to draft for re-submission."
+          : "Marked as required. Employee has been notified.";
+      toast.success(msg);
+      flash(section, msg);
+      onChanged();
+      refetch();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    finally { setBusy(null); }
+  }
+
+  async function resetToDraft(section: OnboardingSection) {
+    if (!summary) return;
+    if (!confirm(`Reset "${SECTION_LABELS[section]}" to draft? The employee will be asked to re-submit.`)) return;
+    setBusy(section);
+    try {
+      await resetFn({ data: { user_id: summary.user_id, section } });
+      toast.success("Section reopened for re-submission");
+      flash(section, "Reopened. Employee has been notified.");
+      onChanged();
+      refetch();
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    finally { setBusy(null); }
+  }
+
+  // Live totals from sectionMap (more up-to-date than the list-summary)
+  const liveRows = ONBOARDING_SECTIONS.map((sec) => sectionMap.get(sec)).filter((r): r is SectionRow => !!r);
+  const requiredRows = liveRows.filter((r) => r.required);
+  const approvedRequired = requiredRows.filter((r) => r.status === "approved").length;
+  const totalRequired = requiredRows.length;
+  const fullyApproved = totalRequired > 0 && approvedRequired === totalRequired;
 
   return (
     <Sheet open={!!summary} onOpenChange={(o) => { if (!o) { onClose(); setRejectingSection(null); setReason(""); } }}>
@@ -255,7 +304,26 @@ function ReviewSheet({ summary, onClose, onChanged }: {
         </SheetHeader>
 
         {summary && (
-          <div className="mt-4 space-y-3">
+          <>
+            <div className={`mt-4 flex items-center gap-3 rounded-lg border p-3 ${fullyApproved ? "border-green-600/40 bg-green-500/10" : "border-border/60 bg-muted/30"}`}>
+              {fullyApproved ? (
+                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+              ) : (
+                <ClipboardCheck className="h-5 w-5 text-muted-foreground shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">
+                  {approvedRequired} of {totalRequired} required sections approved
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {fullyApproved
+                    ? "Portal access is unlocked for this employee."
+                    : "Employee is blocked from the portal until every required section is approved."}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-3">
             {ONBOARDING_SECTIONS.map((section) => {
               const row = sectionMap.get(section);
               const required = row?.required !== false;
@@ -268,20 +336,33 @@ function ReviewSheet({ summary, onClose, onChanged }: {
                 draft: { label: "Not submitted", className: "text-muted-foreground border-border/60 bg-muted/40" },
               };
               const s = statusMap[status];
+              const flashMsg = justActed?.section === section ? justActed.msg : null;
               return (
-                <Card key={section}>
+                <Card key={section} className={status === "approved" && required ? "border-green-600/40" : undefined}>
                   <CardHeader className="pb-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <CardTitle className="text-base font-display">{SECTION_LABELS[section]}</CardTitle>
-                      <div className="flex items-center gap-2">
-                        {!required && <Badge variant="outline" className="text-[10px]">Not required</Badge>}
+                      <div className="flex items-center gap-3">
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${s.className}`}>{s.label}</span>
+                        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <span>Required</span>
+                          <Switch
+                            checked={required}
+                            disabled={busy === section}
+                            onCheckedChange={(v) => toggleRequired(section, v)}
+                          />
+                        </label>
                       </div>
                     </div>
                     {row?.submitted_at && <div className="text-[11px] text-muted-foreground">Submitted {format(new Date(row.submitted_at), "d MMM yyyy, HH:mm")}</div>}
-                    {row?.approved_at && <div className="text-[11px] text-muted-foreground">Approved {format(new Date(row.approved_at), "d MMM yyyy, HH:mm")}</div>}
+                    {row?.approved_at && <div className="text-[11px] text-green-600">Approved {format(new Date(row.approved_at), "d MMM yyyy, HH:mm")}</div>}
                     {row?.rejected_at && row.rejection_reason && (
                       <div className="mt-1 text-xs text-destructive whitespace-pre-wrap">Reason: {row.rejection_reason}</div>
+                    )}
+                    {flashMsg && (
+                      <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-green-600/40 bg-green-500/10 px-2 py-0.5 text-[11px] text-green-700">
+                        <CheckCircle2 className="h-3 w-3" /> {flashMsg}
+                      </div>
                     )}
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
@@ -292,9 +373,18 @@ function ReviewSheet({ summary, onClose, onChanged }: {
                       } catch (e) { toast.error(e instanceof Error ? e.message : "Failed to open"); }
                     }} />
 
-                    {required && (status === "submitted" || status === "approved" || status === "rejected") && (
+                    {required && (
                       <div className="border-t border-border pt-3">
-                        {rejecting ? (
+                        {status === "approved" ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="inline-flex items-center gap-1.5 text-sm font-medium text-green-700">
+                              <CheckCircle2 className="h-4 w-4" /> Approved
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => resetToDraft(section)} disabled={busy === section}>
+                              <RotateCcw className="h-3.5 w-3.5 mr-1" /> Reset to draft
+                            </Button>
+                          </div>
+                        ) : rejecting ? (
                           <div className="space-y-2">
                             <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What needs to be fixed?" />
                             <div className="flex justify-end gap-2">
@@ -306,9 +396,17 @@ function ReviewSheet({ summary, onClose, onChanged }: {
                           </div>
                         ) : (
                           <div className="flex items-center justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => { setRejectingSection(section); setReason(""); }}>Send back with reason</Button>
-                            <Button size="sm" className="gradient-primary" onClick={() => approve(section)} disabled={busy === section || status === "approved"}>
-                              <Check className="h-3.5 w-3.5 mr-1" /> {status === "approved" ? "Approved" : "Approve"}
+                            {(status === "submitted" || status === "rejected") && (
+                              <Button variant="outline" size="sm" onClick={() => { setRejectingSection(section); setReason(""); }}>Send back with reason</Button>
+                            )}
+                            <Button
+                              size="sm"
+                              className="gradient-primary"
+                              onClick={() => approve(section)}
+                              disabled={busy === section || status === "draft"}
+                              title={status === "draft" ? "Employee has not submitted this section yet." : undefined}
+                            >
+                              <Check className="h-3.5 w-3.5 mr-1" /> Approve
                             </Button>
                           </div>
                         )}
@@ -318,7 +416,8 @@ function ReviewSheet({ summary, onClose, onChanged }: {
                 </Card>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
       </SheetContent>
     </Sheet>

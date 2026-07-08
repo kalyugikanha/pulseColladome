@@ -28,6 +28,8 @@ export type CurrentUser = {
   onboardingGateBlocked: boolean;
   onboardingAnyRejected: boolean;
   onboardingAnySubmitted: boolean;
+  onboardingAnyDraft: boolean;
+
   viewingAs: boolean;
   realIsSuperAdmin: boolean;
   realIsHrAdmin: boolean;

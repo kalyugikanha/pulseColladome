@@ -68,6 +68,7 @@ export function PunchPage() {
   const [reqSubmitting, setReqSubmitting] = useState(false);
   const [punchingIn, setPunchingIn] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [punchOutAt, setPunchOutAt] = useState<string>("");
 
   const { data: sessions, refetch: refetchSessions } = useQuery({
     queryKey: ["punch-sessions-today", punchUserId],

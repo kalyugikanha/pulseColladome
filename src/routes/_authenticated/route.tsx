@@ -61,7 +61,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
     { title: "Resource Hub", url: "/resources", icon: BookOpen },
   ];
 
-  const showAdminGroup = isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin;
+  const showAdminGroup = isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin || isReportingManager;
   const isActive = (item: NavItem) => {
     if (item.match) return item.match.split("|").some((p) => pathname === p || pathname.startsWith(p + "/"));
     return pathname === item.url || pathname.startsWith(item.url + "/");

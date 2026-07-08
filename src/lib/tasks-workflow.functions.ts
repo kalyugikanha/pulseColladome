@@ -111,7 +111,7 @@ export const setTaskStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const actingUserId = context.actingUserId;
-    const { data: task } = await supabase.from("tasks").select("id, status, reviewer_id, assignee_id, review_state, created_by").eq("id", data.taskId).maybeSingle();
+    const { data: task } = await supabase.from("tasks").select("id, status, reviewer_id, assignee_id, review_state, created_by, workflow_instance_id").eq("id", data.taskId).maybeSingle();
     if (!task) throw new Error("Task not found");
 
     // Dependency gate: cannot leave 'todo' if any dep is not done
@@ -143,6 +143,24 @@ export const setTaskStatus = createServerFn({ method: "POST" })
       reviewState = "pending_review";
     } else if (data.status !== "done") {
       reviewState = "none";
+    }
+
+    // Hours-before-review gate: when the assignee is sending the task into review
+    // (either explicitly picking "In Review" or marking done with a distinct reviewer),
+    // require at least one logged time entry from them on this task.
+    const goingToReview = nextStatus === "review";
+    const isAssignee = task.assignee_id === actingUserId;
+    if (goingToReview && isAssignee && !task.workflow_instance_id) {
+      const { data: logs } = await supabase
+        .from("task_activity")
+        .select("hours")
+        .eq("task_id", data.taskId)
+        .eq("actor_id", actingUserId)
+        .eq("kind", "time_logged");
+      const total = (logs ?? []).reduce((sum: number, r: { hours: number | null }) => sum + (Number(r.hours) || 0), 0);
+      if (total <= 0) {
+        throw new Error("Log the hours you worked on this task before sending it for review.");
+      }
     }
 
     const { error } = await supabase.from("tasks").update({

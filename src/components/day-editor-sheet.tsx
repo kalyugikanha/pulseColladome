@@ -286,8 +286,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                 const apprH = r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
                   ? Number(r.approved_hours) : null;
                 const reduced = apprH != null && apprH < loggedH;
-                const readOnlyTask = canApprove || (!mayEdit) || (!!r.task_id && !legacyTaskMissing && !canEdit);
-                const showTaskAsText = canApprove || (!!r.task_id && !legacyTaskMissing);
+                const readOnlyTask = canApprove || !mayEdit;
+                const showTaskAsText = readOnlyTask;
                 return (
                   <TableRow key={i}>
                     <TableCell>

@@ -436,8 +436,8 @@ export function PunchPage() {
           <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
 
             {rows.map((r, idx) => {
-              const pickedTask = r.taskId ? (myTasks ?? []).find((t) => t.id === r.taskId) : null;
               return (
+
                 <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-3 bg-muted/20">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs uppercase tracking-wider text-muted-foreground">Entry {idx + 1}</span>

@@ -39,14 +39,18 @@ type Task = {
   comments?: string;
   source?: "log" | "activity";
   approval_status?: string;
+  task_id?: string;
+  task_title?: string;
 };
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
+type UserTask = { id: string; title: string | null; project_id: string | null };
 type ActivityRow = {
   id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
   note: string | null; completion_date: string | null; created_at: string; approval_status: string;
   task: { id: string; title: string | null; project: { id: string; code: string | null; name: string | null } | null } | null;
 };
+
 
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

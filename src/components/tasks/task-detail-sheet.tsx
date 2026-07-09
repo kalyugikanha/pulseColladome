@@ -111,6 +111,11 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
   const [markDoneOpen, setMarkDoneOpen] = useState(false);
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [subAddBusy, setSubAddBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [duplicateBusy, setDuplicateBusy] = useState(false);
 
 
   useEffect(() => {

@@ -280,7 +280,8 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email").order("full_name").then(({ data }) => setPeople((data ?? []) as typeof people));
+    // See CloseStageDialog above — RPC bypasses RLS so the roster is complete.
+    supabase.rpc("list_assignable_users").then(({ data }) => setPeople((data ?? []) as typeof people));
   }, []);
 
   const hasBranches = stage.branch_options.length > 0 && action === "approve";

@@ -64,7 +64,7 @@ export function PunchPage() {
   // records the real admin id in on_behalf_of for the audit trail).
   const punchUserId = me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [reqTitle, setReqTitle] = useState("");

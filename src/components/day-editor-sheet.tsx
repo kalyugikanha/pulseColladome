@@ -91,11 +91,18 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
 
   const total = rows.reduce((s, r) => s + (Number(r.hours) || 0), 0);
 
-  function tasksForProject(code: string | undefined): UserTask[] {
-    if (!code) return [];
-    const pid = projectIdByCode.get(code);
-    if (!pid) return [];
-    return (userTasks ?? []).filter((t) => t.project_id === pid);
+  const projectById = useMemo(() => new Map((projects ?? []).map((p) => [p.id, p])), [projects]);
+
+  function pickTask(i: number, taskId: string) {
+    const t = taskById.get(taskId);
+    const proj = t?.project_id ? projectById.get(t.project_id) : undefined;
+    setRows((prev) => prev.map((r, idx) => idx === i ? {
+      ...r,
+      task_id: taskId,
+      task_title: t?.title ?? "",
+      project_code: proj?.code ?? r.project_code ?? "",
+      project_name: proj?.name ?? r.project_name ?? "",
+    } : r));
   }
 
   function updateRow(i: number, patch: Partial<Task>) {

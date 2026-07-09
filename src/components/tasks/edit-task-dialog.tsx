@@ -41,7 +41,7 @@ export function EditTaskDialog({
   const [projectId, setProjectId] = useState<string>("");
   const [deadline, setDeadline] = useState<string>("");
   const [postDate, setPostDate] = useState<string>("");
-  const [client, setClient] = useState<string>("");
+  
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [estimate, setEstimate] = useState<string>("");
   const [saving, setSaving] = useState(false);

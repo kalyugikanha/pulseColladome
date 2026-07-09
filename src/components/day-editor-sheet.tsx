@@ -438,6 +438,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
               })}
             </TableBody>
           </Table>
+          </div>
+
 
           <div className="flex items-center justify-between gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={addRow} disabled={!mayEdit}>

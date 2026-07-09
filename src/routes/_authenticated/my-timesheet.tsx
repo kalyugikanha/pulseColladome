@@ -88,7 +88,7 @@ export function MyTimesheetPage() {
 
 
   // Flatten to (date, project, hours, comments)
-  type Row = { date: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
+  type Row = { date: string; taskTitle?: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const l of logs ?? []) {
@@ -98,9 +98,9 @@ export function MyTimesheetPage() {
         const isApproved = !!l.approved_at;
         const ah = t.approved_hours != null ? Number(t.approved_hours) : null;
         out.push({
-          date: l.date, code, name: t.project_name || code, hours: h,
+          date: l.date, taskTitle: t.task_title, code, name: t.project_name || code, hours: h,
           approvedHours: isApproved ? (ah ?? h) : null,
-          comments: t.comments, approved: isApproved,
+          comments: t.comments, approved: isApproved, taskId: t.task_id,
         });
       }
     }
@@ -114,9 +114,9 @@ export function MyTimesheetPage() {
       const approved = a.approval_status === "approved" || a.approval_status === "auto";
       const appHrs = approved ? Number(a.approved_hours ?? h) : null;
       out.push({
-        date, code, name, hours: h,
+        date, taskTitle: a.task?.title ?? undefined, code, name, hours: h,
         approvedHours: appHrs,
-        comments: a.note ?? a.task?.title ?? undefined,
+        comments: a.note ?? undefined,
         approved,
         pending: !approved,
         taskId: a.task_id,
@@ -125,6 +125,7 @@ export function MyTimesheetPage() {
 
     return out.sort((a, b) => b.date.localeCompare(a.date));
   }, [logs, activityRows]);
+
 
   const distinctProjects = useMemo(() => {
     const map = new Map<string, string>();

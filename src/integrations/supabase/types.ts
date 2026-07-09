@@ -971,6 +971,7 @@ export type Database = {
           created_at: string
           hours: number | null
           id: string
+          on_behalf_of: string | null
           primary_task_id: string | null
           project_code: string | null
           project_id: string | null
@@ -987,6 +988,7 @@ export type Database = {
           created_at?: string
           hours?: number | null
           id?: string
+          on_behalf_of?: string | null
           primary_task_id?: string | null
           project_code?: string | null
           project_id?: string | null
@@ -1003,6 +1005,7 @@ export type Database = {
           created_at?: string
           hours?: number | null
           id?: string
+          on_behalf_of?: string | null
           primary_task_id?: string | null
           project_code?: string | null
           project_id?: string | null
@@ -1014,6 +1017,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "punch_sessions_on_behalf_of_fkey"
+            columns: ["on_behalf_of"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "punch_sessions_primary_task_id_fkey"
             columns: ["primary_task_id"]

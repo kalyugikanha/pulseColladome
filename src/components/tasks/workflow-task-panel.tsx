@@ -101,12 +101,25 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
 
       {siblings.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {siblings.map((s) => (
-            <span key={s.id} className={`inline-flex items-center gap-1 text-xs rounded-full border px-2 py-0.5 ${s.id === task.id ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"}`}>
-              {s.status === "done" ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
-              #{s.stage_index}
-            </span>
-          ))}
+          {siblings.map((s) => {
+            const isCurrent = s.id === task.id;
+            const stageName = (s as unknown as { stage_snapshot?: { name?: string } }).stage_snapshot?.name;
+            const label = `Stage ${s.stage_index}${stageName ? `: ${stageName}` : ""} · ${s.status.replace("_", " ")}`;
+            const cls = `inline-flex items-center gap-1 text-xs rounded-full border px-2 py-0.5 transition-colors ${
+              isCurrent
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border text-muted-foreground hover:border-primary hover:text-foreground cursor-pointer"
+            }`;
+            const icon = s.status === "done" ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />;
+            if (isCurrent || !onOpenTask) {
+              return <span key={s.id} className={cls} title={label}>{icon}#{s.stage_index}</span>;
+            }
+            return (
+              <button key={s.id} type="button" className={cls} title={`Jump to ${label}`} onClick={() => onOpenTask(s.id)}>
+                {icon}#{s.stage_index}
+              </button>
+            );
+          })}
         </div>
       )}
 

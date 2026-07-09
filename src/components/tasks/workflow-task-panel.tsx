@@ -41,7 +41,7 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
   const { data: me } = useCurrentUser();
   const [task, setTask] = useState<TaskInfo | null>(null);
   const [instance, setInstance] = useState<{ id: string; started_by: string; template_id: string; template_name: string; total_stages: number } | null>(null);
-  const [siblings, setSiblings] = useState<Array<{ id: string; title: string; status: string; stage_index: number | null }>>([]);
+  const [siblings, setSiblings] = useState<Array<{ id: string; title: string; status: string; stage_index: number | null; stage_snapshot: { name?: string } | null }>>([]);
   const [closeOpen, setCloseOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState<"approve" | "request_changes" | "comment" | null>(null);
   const [logOpen, setLogOpen] = useState(false);

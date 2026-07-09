@@ -1626,20 +1626,17 @@ export type Database = {
           asset_links: Json
           assignee_id: string | null
           at_risk: boolean
-          client_brand: string | null
           completion_percent: number
           created_at: string
           created_by: string | null
           department_id: string | null
           description: string | null
-          domain_id: string | null
           due_date: string | null
           estimated_hours: number | null
           hours_worked: number | null
           id: string
           is_recurring_template: boolean
           manual_rank: number | null
-          origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
           recurrence_days: number[] | null
@@ -1662,20 +1659,17 @@ export type Database = {
           asset_links?: Json
           assignee_id?: string | null
           at_risk?: boolean
-          client_brand?: string | null
           completion_percent?: number
           created_at?: string
           created_by?: string | null
           department_id?: string | null
           description?: string | null
-          domain_id?: string | null
           due_date?: string | null
           estimated_hours?: number | null
           hours_worked?: number | null
           id?: string
           is_recurring_template?: boolean
           manual_rank?: number | null
-          origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
           recurrence_days?: number[] | null
@@ -1698,20 +1692,17 @@ export type Database = {
           asset_links?: Json
           assignee_id?: string | null
           at_risk?: boolean
-          client_brand?: string | null
           completion_percent?: number
           created_at?: string
           created_by?: string | null
           department_id?: string | null
           description?: string | null
-          domain_id?: string | null
           due_date?: string | null
           estimated_hours?: number | null
           hours_worked?: number | null
           id?: string
           is_recurring_template?: boolean
           manual_rank?: number | null
-          origin_department?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
           recurrence_days?: number[] | null
@@ -1743,13 +1734,6 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "taxonomy_departments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_domain_id_fkey"
-            columns: ["domain_id"]
-            isOneToOne: false
-            referencedRelation: "taxonomy_domains"
             referencedColumns: ["id"]
           },
           {
@@ -2345,7 +2329,6 @@ export type Database = {
           _assignee_id?: string
           _department_id?: string
           _description?: string
-          _domain_id?: string
           _due_date?: string
           _estimated_hours?: number
           _priority?: Database["public"]["Enums"]["task_priority"]
@@ -2357,20 +2340,17 @@ export type Database = {
           asset_links: Json
           assignee_id: string | null
           at_risk: boolean
-          client_brand: string | null
           completion_percent: number
           created_at: string
           created_by: string | null
           department_id: string | null
           description: string | null
-          domain_id: string | null
           due_date: string | null
           estimated_hours: number | null
           hours_worked: number | null
           id: string
           is_recurring_template: boolean
           manual_rank: number | null
-          origin_department: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
           recurrence_days: number[] | null

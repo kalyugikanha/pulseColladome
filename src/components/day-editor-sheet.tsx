@@ -255,7 +255,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-3xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-5xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {userName}

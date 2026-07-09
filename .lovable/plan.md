@@ -1,25 +1,30 @@
-## Migrate Sandeep to `sandeep.suman@colladome.in`
+## Nuke `sandeep@colladome.in`
 
-### Why the current sign-in fails
-When Sandeep tries to sign in with `sandeep.suman@colladome.in`, our `handle_new_user` trigger finds a `profiles` row already using that email (my earlier rename) but with a different `id`. It then runs a "swap" branch that reparents ~13 tables and deletes the old row. However, ~15 other tables that reference `profiles(id)` — task assignments, comments, mentions, watchers, activity, BD logs, notifications, weekly scores, workflow attributions, etc. — are NOT covered by that swap. On the final `DELETE` those rows either cascade-delete (destroying his history) or SET NULL (blanking his tasks/reviewer attribution). The whole trigger then either raises inside the swap or completes with silent data loss — either way, the Supabase callback bounces him back to `/auth`.
+Wipe the old account and everything cascading from it. Sandeep starts fresh when he signs in as `sandeep.suman@colladome.in`.
 
-### Fix — two-phase migration (safe, no data loss)
+### Single migration
 
-**Phase A (migration, one SQL run):**
-1. Revert `profiles.email` for id `38290b50…` back to `sandeep@colladome.in` so the trigger's swap branch does NOT fire when he next signs in.
-2. Insert a `role_grants` row for `sandeep.suman@colladome.in` with role `employee` and `reporting_manager_email = 'kanishka@colladome.in'`, so the trigger seeds his new profile with the right role and manager instead of defaulting to admin/no-manager.
+Inside one transaction, in this order:
+1. `DELETE FROM public.role_grants WHERE lower(email) = 'sandeep@colladome.in';` — retires the old access grant so it never seeds a re-signup.
+2. `DELETE FROM auth.users WHERE lower(email) = 'sandeep@colladome.in';` — deletes the Supabase auth user for the old Google account.
 
-**Phase B (after Sandeep signs in once with `sandeep.suman@colladome.in` via Google):**
-A second migration that runs a single transaction:
-1. Look up the new auth user id for `sandeep.suman@colladome.in`; abort with a clear error if it doesn't exist yet.
-2. Reparent EVERY table that references `profiles(id)` from old id `38290b50…` → new id, covering all 31 FKs identified (attendance, tasks assignee/reviewer/requester, task_comments/mentions/watchers/activity/review_comments, bd_activity_logs, bd_recurring_items, notifications, weekly_scores, workflow_instances/templates/stages, leave_requests, leave_balances, salaries, punch_sessions, employee_bank/documents, google_calendar_*, team_calendar_bookings, `profiles.reporting_manager_id`, `profiles.onboarding_approved_by`, department_heads, user_roles, super_admins, onboarding_section_state, impersonation_audit, task_ratings, task_attachments, assistant_messages, etc.).
-3. Copy his full profile payload (name, personal_email, phone, address, DOB, department, joined_on, socials, bank details) from old profile → new profile row created by the trigger, so nothing is lost.
-4. Delete the old `auth.users` row for `sandeep@colladome.in` (which cascade-deletes the now-empty old profile).
-5. Delete the old `role_grants` row for `sandeep@colladome.in`.
+Cascade effect of step 2 (`profiles.id` FKs `auth.users` with `ON DELETE CASCADE`, and downstream tables cascade further):
+- Profile row `38290b50…` — deleted
+- Cascade-deleted rows: attendance_logs, bd_activity_logs (user_id), bd_recurring_items (assignee), employee_bank_details, employee_documents, google_calendar_events, google_calendar_tokens, leave_requests, leave_balances, notifications, punch_sessions, salaries, task_comments (author), task_mentions, task_watchers, team_calendar_bookings (created_by), weekly_scores (employee_id), department_heads, user_roles, super_admins, onboarding_section_state, impersonation_audit, task_ratings, task_attachments, assistant_messages, task_review_comments (if FK cascades — otherwise blocks; see below).
+- SET NULL: tasks (assignee/reviewer/requester), bd_activity_logs (assigned_by), bd_recurring_items (created_by), task_activity (actor/approved_by), task_comments (resolved_by), weekly_scores (manager_id), workflow_template_stages (default_reviewer_id/default_assignee_id — if the FK is SET NULL), profiles.reporting_manager_id on his 1 direct report → becomes NULL, profiles.onboarding_approved_by.
+- Potentially BLOCKING FKs (no ON DELETE clause = RESTRICT): `task_review_comments.author_id`, `workflow_instances.started_by`, `workflow_templates.created_by`, `workflow_template_stages.default_assignee_id`. If Sandeep created any of these, the DELETE will fail.
 
-### Deliverables
-- **Phase A migration** — ships now, unblocks his sign-in.
-- **Message to user** — "Ask Sandeep to sign in once with `sandeep.suman@colladome.in`, then tell me — I'll run Phase B to finish the switch."
-- **Phase B migration** — deferred until you confirm he has signed in.
+### Blocking-FK handling
+Before the two DELETEs, run a pre-clean that nulls out or reassigns Sandeep's references in the restrict-FK tables so the cascade can complete:
+- `UPDATE public.workflow_instances SET started_by = NULL WHERE started_by = '38290b50…';` (make the column nullable in the same migration if it isn't — check first; if it must stay NOT NULL, reassign to a super admin instead).
+- `UPDATE public.workflow_templates SET created_by = <super_admin_id> WHERE created_by = '38290b50…';`
+- `UPDATE public.workflow_template_stages SET default_assignee_id = NULL WHERE default_assignee_id = '38290b50…';` (nullable check same as above).
+- `DELETE FROM public.task_review_comments WHERE author_id = '38290b50…';` (his review-comment history is discarded, matching the "nuke" intent).
+
+I'll query each restrict-FK's column nullability and pick NULL vs reassignment accordingly inside the migration.
+
+### After the migration
+- The 1 profile that reported to him gets `reporting_manager_id = NULL` — HR can reassign later. I'll flag which profile in the message.
+- When Sandeep next signs in with `sandeep.suman@colladome.in`, the `handle_new_user` trigger creates a brand-new profile with role `employee`, department `Marketing`, reporting manager `Kanishka`, salary ₹13,000 (from the `role_grants` row already seeded in Phase A).
 
 Preview only, no publish.

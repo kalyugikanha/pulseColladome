@@ -273,7 +273,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
         </div>
 
         <div className="mt-4 space-y-3">
-          <Table>
+          <div className="-mx-6 overflow-x-auto sm:mx-0">
+          <Table className="min-w-[860px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[220px]">Task</TableHead>

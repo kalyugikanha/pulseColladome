@@ -276,6 +276,24 @@ export function TimesheetPage() {
     return Array.from(m.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
   }, [logs, activityRows]);
 
+  // Tasks visible in the day (for Task filter). Merges activity-sourced task_ids
+  // with any log rows that carry a task_id (Stage 1 day-editor now writes it).
+  const tasksInDay = useMemo(() => {
+    const m = new Map<string, { title: string; code: string | null }>();
+    for (const a of activityRows ?? []) {
+      const id = a.task?.id || a.task_id;
+      if (!id || m.has(id)) continue;
+      m.set(id, { title: a.task?.title ?? "Task", code: a.task?.project?.code ?? null });
+    }
+    for (const r of logs ?? []) for (const t of r.tasks ?? []) {
+      const id = t.task_id;
+      if (!id || m.has(id)) continue;
+      m.set(id, { title: t.task_title ?? t.comments ?? "Task", code: t.project_code ?? null });
+    }
+    return Array.from(m.entries()).map(([id, v]) => ({ id, ...v })).sort((a, b) => a.title.localeCompare(b.title));
+  }, [logs, activityRows]);
+
+
   const allDepts = useMemo(() => {
     const s = new Set<string>();
     for (const p of profiles ?? []) if (p.department) s.add(p.department);

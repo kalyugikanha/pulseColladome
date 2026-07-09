@@ -95,7 +95,6 @@ export const createTaskFull = createServerFn({ method: "POST" })
       _priority: data.priority,
       _assignee_id: data.assigneeId,
       _asset_links: data.assetLinks,
-      _domain_id: data.domainId ?? undefined,
       _department_id: data.departmentId ?? undefined,
       _task_type_ids: data.taskTypeIds,
       _estimated_hours: data.estimatedHours ?? undefined,

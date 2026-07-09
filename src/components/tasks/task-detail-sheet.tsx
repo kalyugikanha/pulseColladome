@@ -445,7 +445,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
             {task.workflow_instance_id && (
               <div className="mb-4">
-                <WorkflowTaskPanel taskId={task.id} onChanged={refresh} />
+                <WorkflowTaskPanel taskId={task.id} onChanged={refresh} onOpenTask={(id) => onClose(id)} />
               </div>
             )}
 

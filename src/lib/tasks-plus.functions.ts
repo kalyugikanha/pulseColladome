@@ -95,7 +95,6 @@ export const createTaskFull = createServerFn({ method: "POST" })
       _priority: data.priority,
       _assignee_id: data.assigneeId,
       _asset_links: data.assetLinks,
-      _domain_id: data.domainId ?? undefined,
       _department_id: data.departmentId ?? undefined,
       _task_type_ids: data.taskTypeIds,
       _estimated_hours: data.estimatedHours ?? undefined,
@@ -153,7 +152,7 @@ export const duplicateTask = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: src, error: readErr } = await supabase
       .from("tasks")
-      .select("title, description, project_id, priority, due_date, assignee_id, asset_links, domain_id, department_id, estimated_hours, client_brand, scheduled_post_date, workflow_instance_id, workflow_template_id, stage_index, stage_snapshot, required_fields_values, review_state, reviewer_id, requester_id, origin_department, is_recurring_template, recurrence_freq, recurrence_days, task_types:task_task_types(task_type_id)")
+      .select("title, description, project_id, priority, due_date, assignee_id, asset_links, department_id, estimated_hours, scheduled_post_date, workflow_instance_id, workflow_template_id, stage_index, stage_snapshot, required_fields_values, review_state, reviewer_id, requester_id, is_recurring_template, recurrence_freq, recurrence_days, task_types:task_task_types(task_type_id)")
       .eq("id", data.id)
       .single();
     if (readErr) throw readErr;
@@ -167,7 +166,6 @@ export const duplicateTask = createServerFn({ method: "POST" })
       _priority: src.priority,
       _assignee_id: src.assignee_id ?? context.actingUserId,
       _asset_links: (src.asset_links ?? []) as never,
-      _domain_id: src.domain_id ?? undefined,
       _department_id: src.department_id ?? undefined,
       _task_type_ids: typeIds,
       _estimated_hours: src.estimated_hours ?? undefined,
@@ -176,14 +174,12 @@ export const duplicateTask = createServerFn({ method: "POST" })
     const newId = (task as unknown as { id: string } | null)?.id;
     if (newId) {
       const carry: Record<string, unknown> = {
-        client_brand: src.client_brand ?? null,
         scheduled_post_date: src.scheduled_post_date ?? null,
         workflow_instance_id: src.workflow_instance_id ?? null,
         workflow_template_id: src.workflow_template_id ?? null,
         stage_index: src.stage_index ?? null,
         stage_snapshot: src.stage_snapshot ?? null,
         required_fields_values: src.required_fields_values ?? null,
-        origin_department: src.origin_department ?? null,
         requester_id: src.requester_id ?? null,
         is_recurring_template: src.is_recurring_template ?? false,
         recurrence_freq: src.recurrence_freq ?? "none",
@@ -249,7 +245,7 @@ export const updateTaskFull = createServerFn({ method: "POST" })
     if (data.assigneeId !== undefined) patch.assignee_id = data.assigneeId;
     if (data.projectId !== undefined) patch.project_id = data.projectId;
     if (data.assetLinks !== undefined) patch.asset_links = data.assetLinks;
-    if (data.domainId !== undefined) patch.domain_id = data.domainId;
+    // domain_id column dropped; ignore data.domainId if passed.
     if (data.departmentId !== undefined) patch.department_id = data.departmentId;
     if (data.estimatedHours !== undefined) patch.estimated_hours = data.estimatedHours;
     if (Object.keys(patch).length > 0) {

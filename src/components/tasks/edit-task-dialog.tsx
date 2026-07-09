@@ -19,7 +19,6 @@ type EditableTask = {
   priority: "low" | "medium" | "high";
   due_date: string | null;
   scheduled_post_date: string | null;
-  client_brand: string | null;
   project_id: string | null;
   assignee_id: string | null;
   asset_links: { label: string; url: string }[] | null;
@@ -42,7 +41,7 @@ export function EditTaskDialog({
   const [projectId, setProjectId] = useState<string>("");
   const [deadline, setDeadline] = useState<string>("");
   const [postDate, setPostDate] = useState<string>("");
-  const [client, setClient] = useState<string>("");
+  
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [estimate, setEstimate] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -61,7 +60,7 @@ export function EditTaskDialog({
     setProjectId(task.project_id ?? "");
     setDeadline(task.due_date ?? "");
     setPostDate(task.scheduled_post_date ?? "");
-    setClient(task.client_brand ?? "");
+    
     setLinks(Array.isArray(task.asset_links) ? task.asset_links : []);
     setEstimate(task.estimated_hours == null ? "" : String(task.estimated_hours));
   }, [open, task?.id]);
@@ -88,7 +87,6 @@ export function EditTaskDialog({
           priority,
           due_date: deadline || null,
           scheduled_post_date: postDate || null,
-          client_brand: client.trim() || null,
           project_id: projectId,
           assignee_id: assignee || null,
           asset_links: links.filter((l) => l.url.trim()),
@@ -146,13 +144,8 @@ export function EditTaskDialog({
             <div className="space-y-1"><Label>Deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
             <div className="space-y-1"><Label>Scheduled post date</Label><Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} /></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Client / Brand</Label>
-              <Input value={client} onChange={(e) => setClient(e.target.value)} placeholder="Optional" />
-            </div>
-            <div className="space-y-1"><Label>Estimated hours</Label>
-              <Input type="number" min={0} step={0.25} value={estimate} onChange={(e) => setEstimate(e.target.value)} placeholder="Optional" />
-            </div>
+          <div className="space-y-1"><Label>Estimated hours</Label>
+            <Input type="number" min={0} step={0.25} value={estimate} onChange={(e) => setEstimate(e.target.value)} placeholder="Optional" />
           </div>
           <div className="space-y-1">
             <Label>Asset links</Label>

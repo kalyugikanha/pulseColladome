@@ -4,10 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Lock, Save, CheckCircle2, Info } from "lucide-react";
+import { Plus, Trash2, Lock, Save, CheckCircle2, Info, MessageSquare, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -19,6 +21,7 @@ type Task = {
   hours?: number;
   approved_hours?: number;
   comments?: string;
+  approval_note?: string;
 };
 type Project = { id: string; code: string; name: string };
 type UserTask = { id: string; title: string; project_id: string | null; status: string };

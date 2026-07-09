@@ -745,7 +745,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
             priority: task.priority as "low"|"medium"|"high",
             due_date: (task as { due_date?: string | null }).due_date ?? null,
             scheduled_post_date: (task as { scheduled_post_date?: string | null }).scheduled_post_date ?? null,
-            client_brand: (task as { client_brand?: string | null }).client_brand ?? null,
+            
             project_id: (task as { project_id?: string | null }).project_id ?? null,
             assignee_id: (task as { assignee_id?: string | null }).assignee_id ?? null,
             asset_links: ((task as { asset_links?: { label: string; url: string }[] | null }).asset_links) ?? null,

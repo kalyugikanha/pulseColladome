@@ -133,6 +133,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   async function handleUploadFiles(files: FileList | null) {
     if (!files || !files.length || !taskId) return;
     setUploadBusy(true);
+    let uploaded = 0;
     try {
       for (const file of Array.from(files)) {
         const safeName = file.name.replace(/[^\w.\-]+/g, "_");
@@ -140,16 +141,28 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
         const { error: upErr } = await supabase.storage
           .from("task-attachments")
           .upload(path, file, { contentType: file.type || undefined, upsert: false });
-        if (upErr) throw new Error(upErr.message);
-        await insertAttachmentFn({ data: {
-          taskId, filePath: path, fileName: file.name,
-          contentType: file.type || null, sizeBytes: file.size,
-        }});
+        if (upErr) {
+          console.error("[task-attachment] storage upload failed", { path, file: file.name, error: upErr });
+          throw new Error(`Upload "${file.name}" failed: ${upErr.message}`);
+        }
+        try {
+          await insertAttachmentFn({ data: {
+            taskId, filePath: path, fileName: file.name,
+            contentType: file.type || null, sizeBytes: file.size,
+          }});
+        } catch (insErr) {
+          // Roll back the orphan storage object so the bucket doesn't fill with
+          // files that have no metadata row (and no way to list/delete via UI).
+          console.error("[task-attachment] metadata insert failed", { path, file: file.name, error: insErr });
+          await supabase.storage.from("task-attachments").remove([path]).catch(() => {});
+          throw new Error(`Save "${file.name}" failed: ${(insErr as Error).message}`);
+        }
+        uploaded += 1;
       }
-      toast.success("Attachment uploaded");
+      toast.success(uploaded === 1 ? "Attachment uploaded" : `${uploaded} attachments uploaded`);
       await refresh();
     } catch (e) {
-      toast.error((e as Error).message);
+      toast.error((e as Error).message, { duration: 10000 });
     } finally {
       setUploadBusy(false);
     }

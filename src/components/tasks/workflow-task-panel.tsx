@@ -183,7 +183,10 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
 
   useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email").order("full_name").then(({ data }) => setPeople((data ?? []) as typeof people));
+    // Use the SECURITY DEFINER RPC so the full active roster is visible —
+    // a direct profiles.select() is limited by RLS to self + direct reports
+    // + HR/admin, which hides most teammates from regular employees.
+    supabase.rpc("list_assignable_users").then(({ data }) => setPeople((data ?? []) as typeof people));
   }, []);
 
   const hasBranches = stage.branch_options.length > 0;
@@ -277,7 +280,8 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email").order("full_name").then(({ data }) => setPeople((data ?? []) as typeof people));
+    // See CloseStageDialog above — RPC bypasses RLS so the roster is complete.
+    supabase.rpc("list_assignable_users").then(({ data }) => setPeople((data ?? []) as typeof people));
   }, []);
 
   const hasBranches = stage.branch_options.length > 0 && action === "approve";

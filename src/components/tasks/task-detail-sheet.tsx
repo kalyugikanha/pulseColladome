@@ -395,8 +395,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
               const assigneeId = (task as { assignee_id: string | null }).assignee_id;
               const reviewerId = (task as { reviewer_id: string | null }).reviewer_id;
               const createdBy = (task as { created_by?: string | null }).created_by ?? null;
-              const assigneeProfile = (peopleAll ?? []).find((p) => p.id === assigneeId) as { reporting_manager_id?: string | null } | undefined;
-              const isManager = !!actingUserId && assigneeProfile?.reporting_manager_id === actingUserId;
+              const isManager = !!actingUserId && !!assigneeMgrId && assigneeMgrId === actingUserId;
               const canRate = !!actingUserId && !!assigneeId && actingUserId !== assigneeId
                 && (reviewerId === actingUserId || createdBy === actingUserId || isManager);
               if (!canRate) return null;

@@ -111,6 +111,11 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
   const [markDoneOpen, setMarkDoneOpen] = useState(false);
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [subAddBusy, setSubAddBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [duplicateBusy, setDuplicateBusy] = useState(false);
 
 
   useEffect(() => {
@@ -243,12 +248,15 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   }
 
   async function doReview(decision: "approve" | "request_changes" | "reject") {
+    if (reviewBusy) return;
+    setReviewBusy(true);
     try {
       await reviewFn({ data: { taskId: taskId!, decision, note: reviewNote.trim() || undefined } });
       setReviewNote("");
       toast.success("Review submitted");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setReviewBusy(false); }
   }
 
   async function doSearchDeps(q: string) {
@@ -267,18 +275,22 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   );
 
   async function doDelete() {
-    if (!task) return;
-    const { error } = await supabase.from("tasks").delete().eq("id", task.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Task deleted");
-    setDeleteOpen(false);
-    onClose();
-    await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
-    await qc.invalidateQueries({ queryKey: ["my-tasks"] });
+    if (!task || deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Task deleted");
+      setDeleteOpen(false);
+      onClose();
+      await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
+      await qc.invalidateQueries({ queryKey: ["my-tasks"] });
+    } finally { setDeleteBusy(false); }
   }
 
   async function doDuplicate() {
-    if (!task) return;
+    if (!task || duplicateBusy) return;
+    setDuplicateBusy(true);
     try {
       const created = (await duplicateFn({ data: { id: task.id } })) as { id: string } | null;
       const newId = created?.id;
@@ -288,7 +300,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
       await qc.invalidateQueries({ queryKey: ["my-tasks"] });
       onClose(newId);
     } catch (e) { toast.error((e as Error).message); }
+    finally { setDuplicateBusy(false); }
   }
+
 
   return (
     <Sheet open={!!taskId} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -305,7 +319,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                   {canEditDelete && (
                     <DropdownMenuItem onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={doDuplicate}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
+                  <DropdownMenuItem onClick={doDuplicate} disabled={duplicateBusy}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
                   {canEditDelete && <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>
@@ -362,9 +376,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                 <div className="font-medium text-sm">Waiting for your review</div>
                 <Textarea placeholder="Note to assignee (optional)" rows={2} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />
                 <div className="flex gap-2 flex-wrap">
-                  <Button size="sm" onClick={() => doReview("approve")} className="gradient-primary"><Check className="h-4 w-4 mr-1" />Approve</Button>
-                  <Button size="sm" variant="outline" onClick={() => doReview("request_changes")}>Request changes</Button>
-                  <Button size="sm" variant="destructive" onClick={() => doReview("reject")}><X className="h-4 w-4 mr-1" />Reject</Button>
+                  <Button size="sm" onClick={() => doReview("approve")} disabled={reviewBusy} className="gradient-primary"><Check className="h-4 w-4 mr-1" />Approve</Button>
+                  <Button size="sm" variant="outline" onClick={() => doReview("request_changes")} disabled={reviewBusy}>Request changes</Button>
+                  <Button size="sm" variant="destructive" onClick={() => doReview("reject")} disabled={reviewBusy}><X className="h-4 w-4 mr-1" />Reject</Button>
                 </div>
               </div>
             )}
@@ -458,9 +472,26 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                 <div className="flex gap-2 items-center">
                   <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
                   <Input placeholder="Add checklist item…" value={newSub} onChange={(e) => setNewSub(e.target.value)}
-                    onKeyDown={async (e) => { if (e.key === "Enter" && newSub.trim()) { await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } }); setNewSub(""); await refresh(); } }}
+                    disabled={subAddBusy}
+                    onKeyDown={async (e) => {
+                      if (e.key !== "Enter" || !newSub.trim() || subAddBusy) return;
+                      setSubAddBusy(true);
+                      try {
+                        await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } });
+                        setNewSub("");
+                        await refresh();
+                      } finally { setSubAddBusy(false); }
+                    }}
                     className="h-8" />
-                  <Button size="sm" variant="outline" onClick={async () => { if (!newSub.trim()) return; await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } }); setNewSub(""); await refresh(); }}>Add</Button>
+                  <Button size="sm" variant="outline" disabled={subAddBusy || !newSub.trim()} onClick={async () => {
+                    if (!newSub.trim() || subAddBusy) return;
+                    setSubAddBusy(true);
+                    try {
+                      await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } });
+                      setNewSub("");
+                      await refresh();
+                    } finally { setSubAddBusy(false); }
+                  }}>Add</Button>
                 </div>
                 {(detail?.subtasks?.length ?? 0) > 0 && (
                   <div className="pl-6 space-y-1">
@@ -747,21 +778,26 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
               {/* Add comment box at bottom */}
               <div className="space-y-2 pt-1">
-                <Textarea placeholder="Add a comment. Use @name to mention." rows={3} value={commentBody} onChange={(e) => setCommentBody(e.target.value)} />
+                <Textarea placeholder="Add a comment. Use @name to mention." rows={3} value={commentBody} onChange={(e) => setCommentBody(e.target.value)} disabled={commentBusy} />
                 <div className="flex justify-end">
-                  <Button size="sm" onClick={async () => {
-                    if (!commentBody.trim()) return;
-                    const mentions: string[] = [];
-                    const body = commentBody;
-                    (peopleAll ?? []).forEach((p) => {
-                      if (!p.full_name) return;
-                      const re = new RegExp(`@${p.full_name.split(/\s+/)[0]}\\b`, "i");
-                      if (re.test(body)) mentions.push(p.id);
-                    });
-                    await addCommentFn({ data: { taskId: taskId!, body, mentionUserIds: mentions } });
-                    setCommentBody("");
-                    await refresh();
-                  }}>Post</Button>
+                  <Button size="sm" disabled={commentBusy || !commentBody.trim()} onClick={async () => {
+                    if (!commentBody.trim() || commentBusy) return;
+                    setCommentBusy(true);
+                    try {
+                      const mentions: string[] = [];
+                      const body = commentBody;
+                      (peopleAll ?? []).forEach((p) => {
+                        if (!p.full_name) return;
+                        const re = new RegExp(`@${p.full_name.split(/\s+/)[0]}\\b`, "i");
+                        if (re.test(body)) mentions.push(p.id);
+                      });
+                      await addCommentFn({ data: { taskId: taskId!, body, mentionUserIds: mentions } });
+                      setCommentBody("");
+                      await refresh();
+                    } catch (e) {
+                      toast.error((e as Error).message);
+                    } finally { setCommentBusy(false); }
+                  }}>{commentBusy ? "Posting…" : "Post"}</Button>
                 </div>
               </div>
             </div>
@@ -799,7 +835,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={doDelete}>Delete</AlertDialogAction>
+              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={doDelete} disabled={deleteBusy}>{deleteBusy ? "Deleting…" : "Delete"}</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

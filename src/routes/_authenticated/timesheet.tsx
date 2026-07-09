@@ -334,10 +334,13 @@ export function TimesheetPage() {
           comments: partial ? `${baseComment ?? "Task hours"} · approved ${approvedHrs}/${logged}h` : baseComment,
           source: "activity" as const,
           approval_status: a.approval_status,
+          task_id: a.task?.id ?? a.task_id,
+          task_title: a.task?.title ?? "Task",
         };
       });
       let tasks: Task[] = [...logTasks, ...actTasks];
       if (projSel.size > 0) tasks = tasks.filter((t) => t.project_code && projSel.has(t.project_code));
+      if (taskSel.size > 0) tasks = tasks.filter((t) => t.task_id && taskSel.has(t.task_id));
       const total = tasks.reduce((s, t) => s + (Number(t.hours) || 0), 0);
       const dayApproved = !!log?.approved_at;
       const approvedTotal = tasks.reduce((s, t) => {
@@ -353,7 +356,8 @@ export function TimesheetPage() {
       .sort((a, b) =>
         (a.profile.full_name ?? a.profile.email ?? "").localeCompare(b.profile.full_name ?? b.profile.email ?? "")
       );
-  }, [profiles, logByUser, activityByUser, deptSel, empSel, projSel, showEmpty]);
+  }, [profiles, logByUser, activityByUser, deptSel, empSel, projSel, taskSel, showEmpty]);
+
 
 
   const dayTotal = useMemo(() => empRows.reduce((s, r) => s + r.total, 0), [empRows]);

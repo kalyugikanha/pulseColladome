@@ -78,6 +78,19 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     },
   });
 
+  // Only the assignee's reporting_manager_id is needed for the "rate this work"
+  // manager check. RLS allows the reporting manager to read the assignee's row,
+  // so this quietly returns null for everyone else — which is the intended gate.
+  const assigneeIdForMgr = (detail?.task as { assignee_id?: string | null } | undefined)?.assignee_id ?? null;
+  const { data: assigneeMgrId } = useQuery({
+    queryKey: ["task-assignee-mgr", assigneeIdForMgr],
+    enabled: !!assigneeIdForMgr,
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("reporting_manager_id").eq("id", assigneeIdForMgr!).maybeSingle();
+      return (data?.reporting_manager_id as string | null) ?? null;
+    },
+  });
+
   type Attachment = { id: string; task_id: string; uploader_id: string; file_path: string; file_name: string; content_type: string | null; size_bytes: number | null; created_at: string; url: string | null; uploader: { id: string; full_name: string | null; email: string | null } | null };
   const { data: attachmentsList } = useQuery({
     queryKey: ["task-attachments", taskId ?? null],

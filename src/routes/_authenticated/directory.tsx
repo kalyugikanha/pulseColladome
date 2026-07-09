@@ -68,7 +68,9 @@ export function DirectoryPage() {
   const canHardDelete = !!me && me.isSuperAdmin;
 
 
-  const { deptScope, userScope } = useVisibilityScope(me);
+  // Directory is intentionally company-wide: dept heads / reporting managers
+  // see the full roster (opt into broad mode).
+  const { deptScope, userScope } = useVisibilityScope(me, { mode: "broad" });
 
   const { data: profiles } = useQuery({
     queryKey: ["directory-profiles", deptScope?.join(",") ?? "all", userScope?.join(",") ?? "all"],

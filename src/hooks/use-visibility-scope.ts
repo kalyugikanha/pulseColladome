@@ -5,12 +5,18 @@ import type { CurrentUser } from "./use-current-user";
 /**
  * Client-side visibility scoping for management screens.
  *
- * Admin, super admin, HR admin, finance admin, and project managers are unscoped.
- * Everyone else sees only themselves + their full reporting tree
- * (direct + indirect reports). Department-Head is NOT a visibility grant.
+ * Default ("people" mode): only admin / super admin / HR admin / finance
+ * admin are unscoped. Everyone else — including department heads, reporting
+ * managers, and project managers — is scoped to themselves plus their full
+ * reporting tree (direct + indirect reports). Use this on people-visibility
+ * screens (Team Timesheet, Attendance team panel, Project burn).
+ *
+ * "broad" mode (opt-in): additionally treats project managers, department
+ * heads, and reporting managers as unscoped. Use only on truly company-wide
+ * resources like the employee Directory.
  *
  * `userScope` is a list of user ids to filter `profiles.id` / `*.user_id` on.
- * `isUnscoped` is true when the viewer should see everyone (admin/PM/HR path).
+ * `isUnscoped` is true when the viewer should see everyone.
  */
 export type VisibilityScope = {
   deptScope: string[] | null; // kept for backwards compat; always null now
@@ -18,9 +24,17 @@ export type VisibilityScope = {
   isUnscoped: boolean;
 };
 
-export function getVisibilityScope(me: CurrentUser | null | undefined): VisibilityScope {
+export type VisibilityMode = "people" | "broad";
+
+export function getVisibilityScope(
+  me: CurrentUser | null | undefined,
+  opts: { mode?: VisibilityMode } = {},
+): VisibilityScope {
   if (!me) return { deptScope: null, userScope: null, isUnscoped: false };
-  const unscoped = me.isAdmin || me.isSuperAdmin || me.canManageProjects || me.isHrAdmin || me.isFinanceAdmin;
+  const mode = opts.mode ?? "people";
+  const unscoped = mode === "broad"
+    ? (me.isPeopleUnscoped || me.canManageProjects || me.isDepartmentHead || me.isReportingManager)
+    : me.isPeopleUnscoped;
   if (unscoped) return { deptScope: null, userScope: null, isUnscoped: true };
   const userScope = me.isReportingManager
     ? Array.from(new Set([...(me.directReportIds ?? []), me.id]))
@@ -34,8 +48,11 @@ export function getVisibilityScope(me: CurrentUser | null | undefined): Visibili
  * The recursive walk relies on RLS letting a manager read profiles under
  * their tree (or being unscoped).
  */
-export function useVisibilityScope(me: CurrentUser | null | undefined): VisibilityScope {
-  const base = getVisibilityScope(me);
+export function useVisibilityScope(
+  me: CurrentUser | null | undefined,
+  opts: { mode?: VisibilityMode } = {},
+): VisibilityScope {
+  const base = getVisibilityScope(me, opts);
   const seeds = me?.directReportIds ?? [];
   const enabled = !!me && !base.isUnscoped && seeds.length > 0;
 
@@ -65,3 +82,4 @@ export function useVisibilityScope(me: CurrentUser | null | undefined): Visibili
   const merged = new Set<string>([me.id, ...(tree ?? seeds)]);
   return { deptScope: null, userScope: Array.from(merged), isUnscoped: false };
 }
+

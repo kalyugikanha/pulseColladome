@@ -14,6 +14,15 @@ export type CurrentUser = {
   isFinanceAdmin: boolean;
   isHrAdmin: boolean;
   canManageProjects: boolean;
+  /**
+   * True only for org-wide people visibility: admin, super admin, HR admin,
+   * finance admin. Department heads / reporting managers / project managers
+   * are NOT people-unscoped — they see their reporting tree via
+   * useVisibilityScope. Use this on screens that surface teammate lists,
+   * timesheets, or approvals (e.g. Team Timesheet, Attendance team panel,
+   * Project burn).
+   */
+  isPeopleUnscoped: boolean;
   isDepartmentHead: boolean;
   headOfDepartments: string[];
   isReportingManager: boolean;
@@ -121,6 +130,7 @@ export function useCurrentUser() {
         isFinanceAdmin: vIsFinance,
         isHrAdmin: vIsHr,
         canManageProjects: vCanManageProjects,
+        isPeopleUnscoped: vIsAdmin || vIsSuper || vIsHr || vIsFinance,
         isDepartmentHead: vHeadOf.length > 0,
         headOfDepartments: vHeadOf,
         isReportingManager: vReportIds.length > 0,

@@ -600,13 +600,15 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-          <span className="truncate text-left">
+        <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-auto py-2">
+          <span className="truncate text-left flex-1 min-w-0">
             {selected ? (
-              <>
-                {selected.project?.code && <span className="font-mono text-xs mr-2">{selected.project.code}</span>}
-                {selected.title}
-              </>
+              <span className="flex flex-col min-w-0">
+                <span className="truncate">{selected.title}</span>
+                {selected.project?.name && (
+                  <span className="text-[11px] text-muted-foreground truncate">{selected.project.name}</span>
+                )}
+              </span>
             ) : (
               <span className="text-muted-foreground">Pick one of your tasks</span>
             )}
@@ -616,7 +618,7 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
-          <CommandInput placeholder="Search by task or project code…" />
+          <CommandInput placeholder="Search by task or project…" />
           <CommandList>
             <CommandEmpty>No tasks found.</CommandEmpty>
             {allowNone && (
@@ -649,14 +651,19 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
               const renderItem = (t: TaskComboTask) => (
                 <CommandItem
                   key={t.id}
-                  value={`${t.project?.code ?? ""} ${t.title}`}
+                  value={`${t.title} ${t.project?.name ?? ""} ${t.project?.code ?? ""}`}
                   onSelect={() => { onChange(t.id, t.project_id); setOpen(false); }}
+                  className="items-start"
                 >
-                  <Check className={`h-4 w-4 mr-2 ${value === t.id ? "opacity-100" : "opacity-0"}`} />
-                  {t.project?.code && <span className="font-mono text-xs mr-2">{t.project.code}</span>}
-                  <span className="truncate">{t.title}</span>
+                  <Check className={`h-4 w-4 mr-2 mt-0.5 shrink-0 ${value === t.id ? "opacity-100" : "opacity-0"}`} />
+                  <span className="flex flex-col flex-1 min-w-0">
+                    <span className="truncate">{t.title}</span>
+                    {t.project?.name && (
+                      <span className="text-[11px] text-muted-foreground truncate">{t.project.name}</span>
+                    )}
+                  </span>
                   {t.status && (
-                    <span className={`ml-2 text-[10px] uppercase tracking-wide ${STATUS_COLORS[t.status] ?? "text-muted-foreground"}`}>
+                    <span className={`ml-2 text-[10px] uppercase tracking-wide shrink-0 ${STATUS_COLORS[t.status] ?? "text-muted-foreground"}`}>
                       {STATUS_LABELS[t.status] ?? t.status}
                     </span>
                   )}
@@ -682,3 +689,44 @@ function TaskCombobox({ tasks, value, onChange, allowNone }: {
     </Popover>
   );
 }
+
+function TaskCommentsPreview({ taskId }: { taskId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["punch-task-comments", taskId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("task_comments")
+        .select("id, body, created_at, author:profiles!task_comments_author_id_fkey(full_name)")
+        .eq("task_id", taskId)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      return (data ?? []) as Array<{ id: string; body: string; created_at: string; author: { full_name: string | null } | null }>;
+    },
+    staleTime: 30_000,
+  });
+  return (
+    <div className="rounded-md border border-border/60 bg-background/50 p-2 space-y-1.5">
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+        <MessageSquare className="h-3 w-3" /> Comments on this task
+      </div>
+      {isLoading ? (
+        <p className="text-[11px] text-muted-foreground">Loading…</p>
+      ) : (data?.length ?? 0) === 0 ? (
+        <p className="text-[11px] text-muted-foreground">No comments on this task yet.</p>
+      ) : (
+        <div className="max-h-[180px] overflow-y-auto space-y-2 pr-1">
+          {data!.map((c) => (
+            <div key={c.id} className="text-xs">
+              <div className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">{c.author?.full_name ?? "Someone"}</span>
+                {" · "}{format(new Date(c.created_at), "MMM d, HH:mm")}
+              </div>
+              <div className="whitespace-pre-wrap line-clamp-3">{c.body}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+

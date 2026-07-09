@@ -9,21 +9,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Slider } from "@/components/ui/slider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { Bell, BellOff, Check, X, MessageSquare, ListChecks, GitBranch, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock, Link as LinkIcon, ExternalLink, Copy, Star } from "lucide-react";
+import { Bell, BellOff, Check, X, MessageSquare, Users, History as HistoryIcon, Paperclip, Trash2, MoreVertical, Pencil, Workflow, Clock, Link as LinkIcon, ExternalLink, Copy, Star } from "lucide-react";
 import { EditTaskDialog } from "./edit-task-dialog";
 import { MarkDoneDialog } from "./mark-done-dialog";
 import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
-  addSubtask, toggleSubtask, deleteSubtask, addComment, resolveComment,
-  toggleWatcher, addDependency, removeDependency, rateTask,
+  addComment, resolveComment,
+  toggleWatcher, rateTask,
   listTaskAttachments, insertTaskAttachment, deleteTaskAttachment, updateTaskAssetLinks,
 } from "@/lib/tasks-workflow.functions";
 import { logTaskTime } from "@/lib/workflows.functions";
@@ -45,14 +45,10 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const reviewFn = useServerFn(submitReviewDecision);
   const setReviewerFn = useServerFn(setReviewer);
   const setPctFn = useServerFn(setCompletionPercent);
-  const addSubFn = useServerFn(addSubtask);
-  const toggleSubFn = useServerFn(toggleSubtask);
-  const delSubFn = useServerFn(deleteSubtask);
   const addCommentFn = useServerFn(addComment);
   const resolveCommentFn = useServerFn(resolveComment);
   const watchFn = useServerFn(toggleWatcher);
-  const addDepFn = useServerFn(addDependency);
-  const rmDepFn = useServerFn(removeDependency);
+
   const duplicateFn = useServerFn(duplicateTask);
   const rateFn = useServerFn(rateTask);
   const logTimeFn = useServerFn(logTaskTime);
@@ -99,23 +95,19 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   });
   const [uploadBusy, setUploadBusy] = useState(false);
 
-  const [newSub, setNewSub] = useState("");
   const [commentBody, setCommentBody] = useState("");
   const [reviewNote, setReviewNote] = useState("");
-  const [depQuery, setDepQuery] = useState("");
-  const [depOptions, setDepOptions] = useState<{ id: string; title: string }[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [myDept, setMyDept] = useState<string | null>(null);
-  const [refLabel, setRefLabel] = useState("");
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
   const [markDoneOpen, setMarkDoneOpen] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);
-  const [subAddBusy, setSubAddBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
+
 
 
   useEffect(() => {
@@ -207,17 +199,17 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     await refresh();
   }
   async function addReference() {
-    const label = refLabel.trim();
     let url = refUrl.trim();
-    if (!label || !url) return toast.error("Label and URL required");
+    if (!url) return toast.error("URL required");
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     setRefBusy(true);
     try {
-      await saveAssetLinks([...assetLinks, { label, url }]);
-      setRefLabel(""); setRefUrl("");
+      await saveAssetLinks([...assetLinks, { label: "", url }]);
+      setRefUrl("");
     } catch (e) { toast.error((e as Error).message); }
     finally { setRefBusy(false); }
   }
+
   async function removeReference(idx: number) {
     try { await saveAssetLinks(assetLinks.filter((_, i) => i !== idx)); }
     catch (e) { toast.error((e as Error).message); }
@@ -257,13 +249,6 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
     finally { setReviewBusy(false); }
-  }
-
-  async function doSearchDeps(q: string) {
-    setDepQuery(q);
-    if (q.length < 2) { setDepOptions([]); return; }
-    const { data } = await supabase.from("tasks").select("id, title").neq("id", taskId!).ilike("title", `%${q}%`).limit(10);
-    setDepOptions(data ?? []);
   }
 
   if (!taskId) return null;
@@ -468,52 +453,6 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
               {/* Inline affordances */}
               <div className="rounded-md border border-border/60 p-2 space-y-2 bg-muted/20">
-                {/* Add checklist item */}
-                <div className="flex gap-2 items-center">
-                  <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <Input placeholder="Add checklist item…" value={newSub} onChange={(e) => setNewSub(e.target.value)}
-                    disabled={subAddBusy}
-                    onKeyDown={async (e) => {
-                      if (e.key !== "Enter" || !newSub.trim() || subAddBusy) return;
-                      setSubAddBusy(true);
-                      try {
-                        await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } });
-                        setNewSub("");
-                        await refresh();
-                      } finally { setSubAddBusy(false); }
-                    }}
-                    className="h-8" />
-                  <Button size="sm" variant="outline" disabled={subAddBusy || !newSub.trim()} onClick={async () => {
-                    if (!newSub.trim() || subAddBusy) return;
-                    setSubAddBusy(true);
-                    try {
-                      await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } });
-                      setNewSub("");
-                      await refresh();
-                    } finally { setSubAddBusy(false); }
-                  }}>Add</Button>
-                </div>
-                {(detail?.subtasks?.length ?? 0) > 0 && (
-                  <div className="pl-6 space-y-1">
-                    {(detail?.subtasks ?? []).map((s) => {
-                      const ss = s as { id: string; title: string; done: boolean };
-                      return (
-                        <div key={ss.id} className="flex items-center gap-2">
-                          <Checkbox checked={ss.done} onCheckedChange={async (v) => {
-                            await toggleSubFn({ data: { id: ss.id, done: !!v } });
-                            await refresh();
-                          }} />
-                          <span className={`text-xs flex-1 ${ss.done ? "line-through text-muted-foreground" : ""}`}>{ss.title}</span>
-                          <button className="text-muted-foreground hover:text-destructive" onClick={async () => {
-                            await delSubFn({ data: { id: ss.id } });
-                            await refresh();
-                          }}><Trash2 className="h-3 w-3" /></button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
                 {/* Attachments */}
                 <div className="space-y-2">
                   <div className="flex gap-2 items-center">
@@ -572,63 +511,44 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                   )}
                 </div>
 
-                {/* Add reference */}
-                <div className="flex gap-2 items-center">
-                  <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <Input placeholder="Label" value={refLabel} onChange={(e) => setRefLabel(e.target.value)} className="h-8 w-32" />
-                  <Input placeholder="https://…" value={refUrl} onChange={(e) => setRefUrl(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") addReference(); }} className="h-8 flex-1" />
-                  <Button size="sm" variant="outline" onClick={addReference} disabled={refBusy}>Add</Button>
+                {/* Links */}
+                <div className="space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-xs font-medium">Links</span>
+                    <div className="flex-1" />
+                    <Input
+                      placeholder="https://…"
+                      value={refUrl}
+                      onChange={(e) => setRefUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") addReference(); }}
+                      className="h-8 flex-1 max-w-[280px]"
+                    />
+                    <Button size="sm" variant="outline" onClick={addReference} disabled={refBusy || !refUrl.trim()}>Add</Button>
+                  </div>
+                  {assetLinks.length > 0 && (
+                    <ul className="pl-6 space-y-1">
+                      {assetLinks.map((r, i) => {
+                        let display = r.label || r.url;
+                        if (!r.label) {
+                          try { display = new URL(r.url).hostname.replace(/^www\./, "") + new URL(r.url).pathname.replace(/\/$/, ""); }
+                          catch { display = r.url; }
+                        }
+                        return (
+                          <li key={`${r.url}-${i}`} className="flex items-center gap-2 text-xs">
+                            <a href={r.url} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1 truncate flex-1 min-w-0">
+                              <ExternalLink className="h-3 w-3 opacity-60 shrink-0" />
+                              <span className="truncate">{display}</span>
+                            </a>
+                            <button onClick={() => removeReference(i)} aria-label="Remove link" className="shrink-0">
+                              <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
-                {assetLinks.length > 0 && (
-                  <div className="pl-6 flex flex-wrap gap-2">
-                    {assetLinks.map((r, i) => (
-                      <span key={`${r.url}-${i}`} className="inline-flex items-center gap-1 text-xs rounded-md border border-border/60 px-2 py-0.5">
-                        <a href={r.url} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                          {r.label || r.url}<ExternalLink className="h-3 w-3 opacity-60" />
-                        </a>
-                        <button onClick={() => removeReference(i)} aria-label="Remove reference"><Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" /></button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add dependency */}
-                <div className="flex gap-2 items-center">
-                  <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <Input placeholder="Depend on task (search)…" value={depQuery} onChange={(e) => doSearchDeps(e.target.value)} className="h-8" />
-                </div>
-                {depOptions.length > 0 && (
-                  <div className="ml-6 border border-border/60 rounded-md max-h-40 overflow-y-auto">
-                    {depOptions.map((o) => (
-                      <button key={o.id} className="block w-full text-left px-2 py-1 text-xs hover:bg-accent"
-                        onClick={async () => {
-                          try {
-                            await addDepFn({ data: { taskId: taskId!, dependsOnTaskId: o.id } });
-                            setDepQuery(""); setDepOptions([]);
-                            await refresh();
-                          } catch (e) { toast.error((e as Error).message); }
-                        }}>{o.title}</button>
-                    ))}
-                  </div>
-                )}
-                {(detail?.dependencies?.length ?? 0) > 0 && (
-                  <div className="pl-6 space-y-1">
-                    {(detail?.dependencies ?? []).map((d) => {
-                      const dd = d as { id: string; dep: { id: string; title: string; status: string } | null };
-                      return (
-                        <div key={dd.id} className="flex items-center gap-2 text-xs">
-                          <Badge variant="outline" className="capitalize text-[10px]">{dd.dep?.status}</Badge>
-                          <span className="flex-1 truncate">{dd.dep?.title ?? "(deleted)"}</span>
-                          <button className="text-muted-foreground hover:text-destructive" onClick={async () => {
-                            await rmDepFn({ data: { id: dd.id } });
-                            await refresh();
-                          }}><Trash2 className="h-3 w-3" /></button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
 
                 {/* Watch toggle + current watchers */}
                 <div className="flex items-center gap-2 flex-wrap">
@@ -653,6 +573,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                   )}
                 </div>
               </div>
+
 
               {/* Unified timeline */}
               <div className="space-y-2">
@@ -687,24 +608,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                       ),
                     });
                   }
-                  for (const s of (detail?.subtasks ?? [])) {
-                    const ss = s as { id: string; title: string; done: boolean; created_at?: string };
-                    entries.push({
-                      key: `s-${ss.id}`, at: ss.created_at ? new Date(ss.created_at) : null,
-                      actor: "",
-                      icon: <ListChecks className="h-3 w-3" />,
-                      text: <span><span className="text-muted-foreground">checklist item </span><span className="font-medium">"{ss.title}"</span>{ss.done ? " (done)" : ""}</span>,
-                    });
-                  }
-                  for (const d of (detail?.dependencies ?? [])) {
-                    const dd = d as { id: string; created_at?: string; dep: { title: string } | null };
-                    entries.push({
-                      key: `d-${dd.id}`, at: dd.created_at ? new Date(dd.created_at) : null,
-                      actor: "",
-                      icon: <GitBranch className="h-3 w-3" />,
-                      text: <span><span className="text-muted-foreground">dependency on </span><span className="font-medium">{dd.dep?.title ?? "(deleted)"}</span></span>,
-                    });
-                  }
+                  // Checklist and dependency entries intentionally excluded from the
+                  // timeline — comments here are plain notes, not task-management events.
+
                   for (const w of (detail?.watchers ?? [])) {
                     const ww = w as { id: string; created_at?: string; user: { full_name?: string; email?: string } | null };
                     entries.push({

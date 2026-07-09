@@ -485,11 +485,11 @@ export function TimesheetPage() {
   }
 
   function exportCsv() {
-    const header = ["Employee", "Email", "Department", "Project Code", "Project", "Hours", "Notes", "Status"];
+    const header = ["Employee", "Email", "Department", "Task", "Project Code", "Project", "Hours", "Notes", "Status"];
     const rows: string[][] = [];
     for (const r of empRows) {
       if (r.tasks.length === 0) {
-        rows.push([r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "", "", "", "0", "", r.approved ? "Approved" : "Pending"]);
+        rows.push([r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "", "", "", "", "0", "", r.approved ? "Approved" : "Pending"]);
         continue;
       }
       for (const t of r.tasks) {
@@ -498,6 +498,7 @@ export function TimesheetPage() {
           : (r.approved ? "Approved" : "Pending");
         rows.push([
           r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "",
+          t.task_title ?? "",
           t.project_code ?? "", t.project_name ?? "",
           String(t.hours ?? 0), t.comments ?? "", status,
         ]);
@@ -509,6 +510,7 @@ export function TimesheetPage() {
     const a = document.createElement("a"); a.href = url; a.download = `timesheet-${dateIso}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
+
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!canView) return null;

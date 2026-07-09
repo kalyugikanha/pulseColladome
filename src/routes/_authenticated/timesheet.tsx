@@ -679,28 +679,50 @@ export function TimesheetPage() {
   );
 }
 
+type AddPicked = { taskId: string; title: string; projectCode: string | null; projectName: string | null };
+
 function EmployeeBlock({
-  row, projects, canEdit, canApprove,
+  row, canEdit, canApprove,
   onUpdate, onDelete, onAdd, onToggleApproval, onOpenFull,
 }: {
   row: { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number };
-  projects: Project[];
   canEdit: boolean;
   canApprove: boolean;
   onUpdate: (taskIndex: number, patch: Partial<Task>) => void;
   onDelete: (taskIndex: number) => void;
-  onAdd: (code: string, hours: number) => void;
+  onAdd: (picked: AddPicked, hours: number) => void;
   onToggleApproval: () => void;
   onOpenFull: () => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
-  const [addCode, setAddCode] = useState("");
+  const [addTaskId, setAddTaskId] = useState("");
   const [addHrs, setAddHrs] = useState("");
   const name = row.profile.full_name ?? row.profile.email ?? "—";
   const dept = row.profile.department;
   const locked = row.approved && !canApprove;
   const mayEdit = (canEdit && !row.approved) || canApprove;
-  const rowspan = Math.max(1, row.tasks.length) + (mayEdit && addOpen ? 1 : 0) + 1; // + summary/add trigger
+  const rowspan = Math.max(1, row.tasks.length) + (mayEdit && addOpen ? 1 : 0) + 1;
+
+  // Tasks assignable to this employee, loaded on demand when they open the add row.
+  const { data: userTasks } = useQuery({
+    queryKey: ["ts-user-tasks", row.profile.id],
+    enabled: addOpen,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("tasks")
+        .select("id, title, project_id")
+        .eq("assignee_id", row.profile.id)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      return (data ?? []) as UserTask[];
+    },
+  });
+  const { data: projectsForAdd } = useQuery({
+    queryKey: ["ts-projects-for-add"],
+    enabled: addOpen,
+    queryFn: async () => (await supabase.from("projects").select("id, code, name")).data as { id: string; code: string; name: string }[] ?? [],
+  });
+  const projectById = useMemo(() => new Map((projectsForAdd ?? []).map((p) => [p.id, p])), [projectsForAdd]);
 
   return (
     <>
@@ -728,6 +750,8 @@ function EmployeeBlock({
             if (!isActivity) logCounter++;
             const logIdx = isActivity ? -1 : logCounter;
             const editableRow = mayEdit && !isActivity;
+            const primary = t.task_title ?? (isActivity ? "Task" : (t.project_name ?? "—"));
+            const hasTaskLabel = !!t.task_title;
             return (
               <TableRow key={`${row.profile.id}-${i}`}>
                 {i === 0 && (
@@ -742,14 +766,19 @@ function EmployeeBlock({
                   </TableCell>
                 )}
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Select value={t.project_code ?? ""} onValueChange={(v) => onUpdate(logIdx, { project_code: v })} disabled={!editableRow}>
-                      <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {isActivity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">via task</Badge>}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate">{primary}</span>
+                      {isActivity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">via task</Badge>}
+                      {!isActivity && !hasTaskLabel && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">legacy</Badge>}
+                    </div>
+                    {(t.project_code || t.project_name) && (
+                      <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                        {t.project_code && <span className="font-mono">{t.project_code}</span>}
+                        {t.project_code && t.project_name ? " · " : ""}
+                        {t.project_name}
+                      </div>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -780,10 +809,18 @@ function EmployeeBlock({
       {mayEdit && row.tasks.length > 0 && addOpen && (
         <TableRow className="bg-muted/20">
           <TableCell>
-            <Select value={addCode} onValueChange={setAddCode}>
-              <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
+            <Select value={addTaskId} onValueChange={setAddTaskId}>
+              <SelectTrigger className="h-8"><SelectValue placeholder={userTasks && userTasks.length === 0 ? "No tasks assigned" : "Pick task"} /></SelectTrigger>
               <SelectContent className="max-h-72">
-                {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
+                {(userTasks ?? []).map((t) => {
+                  const proj = t.project_id ? projectById.get(t.project_id) : null;
+                  return (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.title ?? "Task"}
+                      {proj ? ` — ${proj.code}` : ""}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </TableCell>
@@ -794,11 +831,14 @@ function EmployeeBlock({
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => {
                 const h = Number(addHrs);
-                if (!addCode || !h || h <= 0) { toast.error("Pick a project and enter hours"); return; }
-                onAdd(addCode, h);
-                setAddCode(""); setAddHrs(""); setAddOpen(false);
+                if (!addTaskId || !h || h <= 0) { toast.error("Pick a task and enter hours"); return; }
+                const t = (userTasks ?? []).find((x) => x.id === addTaskId);
+                if (!t) { toast.error("Task not found"); return; }
+                const proj = t.project_id ? projectById.get(t.project_id) : null;
+                onAdd({ taskId: t.id, title: t.title ?? "Task", projectCode: proj?.code ?? null, projectName: proj?.name ?? null }, h);
+                setAddTaskId(""); setAddHrs(""); setAddOpen(false);
               }}>Add</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setAddOpen(false); setAddCode(""); setAddHrs(""); }}>Cancel</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setAddOpen(false); setAddTaskId(""); setAddHrs(""); }}>Cancel</Button>
             </div>
           </TableCell>
         </TableRow>
@@ -807,7 +847,7 @@ function EmployeeBlock({
         <TableRow>
           <TableCell colSpan={5}>
             <Button size="sm" variant="ghost" className="h-7 text-muted-foreground" onClick={() => setAddOpen(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add project
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add task
             </Button>
           </TableCell>
         </TableRow>
@@ -815,6 +855,7 @@ function EmployeeBlock({
     </>
   );
 }
+
 
 function taskStatusBadge(row: { approved: boolean }, task?: Task) {
   if (task?.source === "activity") {

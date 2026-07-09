@@ -191,9 +191,9 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
       const myId = userRes.user?.id ?? null;
 
       if (!log?.id) {
-        const filled = rows.filter((r) => r.project_code && Number(r.hours) > 0);
-        if (filled.some((r) => !r.task_id)) {
-          toast.error("Pick a task for every row before approving.");
+        const withHours = rows.filter((r) => Number(r.hours) > 0);
+        if (withHours.some((r) => !r.task_id)) {
+          toast.error("Every row with hours needs a task before approval.");
           setSaving(false);
           return;
         }

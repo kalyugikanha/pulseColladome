@@ -375,6 +375,7 @@ export function TimesheetPage() {
         approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
           ? Number(r.approved_hours) : undefined,
         comments: r.comments?.trim() || undefined,
+        approval_note: r.approval_note?.trim() || undefined,
         task_id: r.task_id || undefined,
         task_title: r.task_title || undefined,
       }));

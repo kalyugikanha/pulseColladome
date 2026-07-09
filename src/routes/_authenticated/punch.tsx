@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Clock, Plus, Trash2, Check, ChevronsUpDown, Send, AlertTriangle, X, MessageSquare } from "lucide-react";
+import { Clock, Trash2, Check, ChevronsUpDown, Send, AlertTriangle, X, MessageSquare } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
 
@@ -49,7 +49,7 @@ type Session = {
   allocations: Allocation[] | null;
 };
 
-type Row = { projectId: string; taskId: string; hours: string; comments: string; atRisk: boolean };
+type Row = { taskId: string; hours: string; comments: string; atRisk: boolean; added?: boolean };
 
 export function PunchPage() {
   const { data: me } = useCurrentUser();
@@ -64,7 +64,7 @@ export function PunchPage() {
   // records the real admin id in on_behalf_of for the audit trail).
   const punchUserId = me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [reqTitle, setReqTitle] = useState("");
@@ -139,6 +139,42 @@ export function PunchPage() {
     staleTime: 60_000,
   });
 
+  // Task ids that this user has already logged hours against in a prior punch session.
+  // Used to hide Done tasks that have already been billed — punch-out is a fresh-entry
+  // surface, not a record-of-truth (the main Tasks view keeps everything visible).
+  const { data: loggedTaskIds } = useQuery({
+    queryKey: ["punch-logged-task-ids", punchUserId],
+    enabled: !!punchUserId,
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("punch_sessions")
+        .select("allocations")
+        .eq("user_id", punchUserId!)
+        .not("punch_out_time", "is", null)
+        .not("allocations", "is", null);
+      const set = new Set<string>();
+      for (const row of (data ?? []) as Array<{ allocations: Array<{ task_id?: string | null }> | null }>) {
+        for (const a of row.allocations ?? []) {
+          if (a?.task_id) set.add(String(a.task_id));
+        }
+      }
+      return set;
+    },
+    staleTime: 60_000,
+  });
+
+  const visibleTasks = useMemo(() => {
+    if (!myTasks) return [];
+    return myTasks.filter((t) => !(t.status === "done" && loggedTaskIds?.has(t.id)));
+  }, [myTasks, loggedTaskIds]);
+
+  const taskById = useMemo(() => {
+    const m = new Map<string, NonNullable<typeof myTasks>[number]>();
+    for (const t of myTasks ?? []) m.set(t.id, t);
+    return m;
+  }, [myTasks]);
+
   const { data: history } = useQuery({
     queryKey: ["punch-history", punchUserId],
     enabled: !!punchUserId,
@@ -203,8 +239,7 @@ export function PunchPage() {
   function openPunchOut() {
     if (!openSession) return;
     const now = new Date();
-    const suggested = Number((differenceInMinutes(now, new Date(openSession.punch_in_time)) / 60).toFixed(2));
-    setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "", atRisk: false }]);
+    setRows(visibleTasks.map((t) => ({ taskId: t.id, hours: "", comments: "", atRisk: false })));
     setPunchOutAt(toLocalDatetimeInput(now));
     setDialogOpen(true);
   }
@@ -212,11 +247,12 @@ export function PunchPage() {
   function updateRow(idx: number, patch: Partial<Row>) {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
-  function addRow() {
-    setRows((prev) => [...prev, { projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
+  function addTaskRow(taskId: string) {
+    if (!taskId) return;
+    setRows((prev) => (prev.some((r) => r.taskId === taskId) ? prev : [...prev, { taskId, hours: "", comments: "", atRisk: false, added: true }]));
   }
   function removeRow(idx: number) {
-    setRows((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
+    setRows((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function performPunchOut(opts: { skip: boolean }) {
@@ -231,25 +267,26 @@ export function PunchPage() {
       punchOutIso = d.toISOString();
     }
 
-    // Skip → send zero allocations. Otherwise, only include rows the user filled in.
-    const usableRows = opts.skip
-      ? []
-      : rows.filter((r) => (r.taskId || r.projectId) && Number(r.hours) > 0);
+    // Skip → send zero allocations. Otherwise, only include rows where the user typed hours.
+    const usableRows = opts.skip ? [] : rows.filter((r) => r.taskId && Number(r.hours) > 0);
 
     if (!opts.skip) {
       for (const [i, r] of usableRows.entries()) {
-        if (requireTask && !r.taskId) { toast.error(`Row ${i + 1}: pick a task (required for your team).`); return; }
-        if (!r.taskId && !r.projectId) { toast.error(`Row ${i + 1}: pick a task or project.`); return; }
+        const t = taskById.get(r.taskId);
+        if (!t?.project_id) { toast.error(`Row ${i + 1}: this task has no project — set one on the task first.`); return; }
       }
     }
 
-    const allocations = usableRows.map((r) => ({
-      projectId: r.projectId,
-      taskId: r.taskId || null,
-      hours: Number(Number(r.hours).toFixed(2)),
-      comments: r.comments.trim(),
-      atRisk: !!r.atRisk,
-    }));
+    const allocations = usableRows.map((r) => {
+      const t = taskById.get(r.taskId);
+      return {
+        projectId: t?.project_id ?? "",
+        taskId: r.taskId,
+        hours: Number(Number(r.hours).toFixed(2)),
+        comments: r.comments.trim(),
+        atRisk: !!r.atRisk,
+      };
+    });
     const totalLogged = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
 
     setSubmitting(true);
@@ -415,9 +452,27 @@ export function PunchPage() {
           <DialogHeader>
             <DialogTitle className="font-display">Log this session</DialogTitle>
             <DialogDescription>
-              {openSession && `Started at ${format(new Date(openSession.punch_in_time), "HH:mm")} — about ${sessionDurationHours.toFixed(2)}h so far. Split the time across the projects you worked on.`}
+              {openSession && `Fill in hours only for the tasks you actually worked on this session.`}
             </DialogDescription>
           </DialogHeader>
+
+          {openSession && (() => {
+            const end = punchOutAt ? new Date(punchOutAt) : new Date(nowTick);
+            const live = Number.isNaN(end.getTime())
+              ? sessionDurationHours
+              : Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2)));
+            return (
+              <div className="rounded-lg border border-border/60 p-4 bg-gradient-to-br from-primary/5 to-transparent">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-4xl font-bold tabular-nums">{live.toFixed(2)}</span>
+                  <span className="text-lg text-muted-foreground">h this session</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Punched in at {format(new Date(openSession.punch_in_time), "HH:mm")} — split across the tasks you worked on.
+                </p>
+              </div>
+            );
+          })()}
 
           {openSession && (
             <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-1.5">
@@ -435,89 +490,87 @@ export function PunchPage() {
 
           <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
 
-            {rows.map((r, idx) => {
-              return (
+            {rows.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground text-center">
+                No tasks assigned to you. Use "+ New task" below to log time against a specific task, or skip and log later.
+              </div>
+            )}
 
-                <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-3 bg-muted/20">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wider text-muted-foreground">Entry {idx + 1}</span>
-                    {rows.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(idx)} className="text-destructive h-7 px-2">
+            {rows.map((r, idx) => {
+              const t = taskById.get(r.taskId);
+              const hasHours = Number(r.hours) > 0;
+              return (
+                <div key={r.taskId || idx} className={`rounded-lg border border-border/60 p-3 space-y-2 ${hasHours ? "bg-muted/30" : "bg-muted/10"}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate">{t?.title ?? "Unknown task"}</div>
+                      {t?.project?.name && (
+                        <div className="text-[11px] text-muted-foreground truncate">{t.project.name}</div>
+                      )}
+                    </div>
+                    <div className="w-[110px] shrink-0">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        placeholder="Hours"
+                        value={r.hours}
+                        onChange={(e) => updateRow(idx, { hours: e.target.value })}
+                        className="h-9"
+                      />
+                    </div>
+                    {r.added && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(idx)} className="text-destructive h-9 px-2 shrink-0">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Task {requireTask && <span className="text-destructive">*</span>}</Label>
-                    <TaskCombobox
-                      tasks={myTasks ?? []}
-                      value={r.taskId}
-                      onChange={(taskId, projectId) => updateRow(idx, { taskId, projectId: projectId ?? "" })}
-                      allowNone={!requireTask}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => { setReqTitle(""); setReqProjectId(""); setReqNote(""); setRequestOpen(true); }}
-                      className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
-                    >
-                      <Send className="h-3 w-3" /> Can't find your task? Request one from your manager
-                    </button>
-                    {requireTask && !myTasks?.length && (
-                      <p className="text-[11px] text-warning">No assigned tasks found — request one above or pick a project below.</p>
-                    )}
-                  </div>
-                  {r.taskId ? (
-                    <div className="space-y-1.5 max-w-[160px]">
-                      <Label className="text-xs">Hours</Label>
-                      <Input type="number" min="0" step="0.25" placeholder="e.g. 2.5" value={r.hours} onChange={(e) => updateRow(idx, { hours: e.target.value })} />
-                    </div>
-                  ) : (
-                    <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Project</Label>
-                        <Select
-                          value={r.projectId}
-                          onValueChange={(v) => updateRow(idx, { projectId: v })}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
-                          <SelectContent>
-                            {projects?.map((p) => (
-                              <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Hours</Label>
-                        <Input type="number" min="0" step="0.25" placeholder="e.g. 2.5" value={r.hours} onChange={(e) => updateRow(idx, { hours: e.target.value })} />
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">What did you work on? <span className="text-muted-foreground">(optional)</span></Label>
-                    <Textarea rows={2} placeholder="Short comment on this entry" value={r.comments} onChange={(e) => updateRow(idx, { comments: e.target.value })} />
-                  </div>
-                  {r.taskId && <TaskCommentsPreview taskId={r.taskId} />}
-                  {r.taskId && (
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                      <Checkbox
-                        checked={r.atRisk}
-                        onCheckedChange={(v) => updateRow(idx, { atRisk: v === true })}
+                  {hasHours && (
+                    <>
+                      <Textarea
+                        rows={2}
+                        placeholder="What did you do on this task? (optional)"
+                        value={r.comments}
+                        onChange={(e) => updateRow(idx, { comments: e.target.value })}
                       />
-                      <span className="inline-flex items-center gap-1">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                        Flag this task as <span className="font-medium text-foreground">at risk</span> — visible to your reporting manager.
-                      </span>
-                    </label>
+                      <TaskCommentsPreview taskId={r.taskId} />
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <Checkbox
+                          checked={r.atRisk}
+                          onCheckedChange={(v) => updateRow(idx, { atRisk: v === true })}
+                        />
+                        <span className="inline-flex items-center gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                          Flag this task as <span className="font-medium text-foreground">at risk</span> — visible to your reporting manager.
+                        </span>
+                      </label>
+                    </>
                   )}
-
                 </div>
               );
             })}
-            <Button type="button" variant="outline" size="sm" onClick={addRow} className="w-full">
-              <Plus className="h-4 w-4 mr-1" /> Add another project
-            </Button>
+
+            <div className="rounded-lg border border-dashed border-border/60 p-3 space-y-2">
+              <Label className="text-xs">+ New task</Label>
+              <TaskCombobox
+                tasks={(myTasks ?? []).filter((t) => !rows.some((r) => r.taskId === t.id))}
+                value=""
+                onChange={(taskId) => addTaskRow(taskId)}
+                allowNone={false}
+              />
+              <button
+                type="button"
+                onClick={() => { setReqTitle(""); setReqProjectId(""); setReqNote(""); setRequestOpen(true); }}
+                className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
+              >
+                <Send className="h-3 w-3" /> Can't find your task? Request one from your manager
+              </button>
+              {requireTask && !myTasks?.length && (
+                <p className="text-[11px] text-warning">No assigned tasks found — request one above.</p>
+              )}
+            </div>
           </div>
+
 
           <div className="flex items-center justify-between text-sm px-1">
             <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{(() => {

@@ -2432,6 +2432,15 @@ export type Database = {
           is_active: boolean
         }[]
       }
+      list_assignable_users: {
+        Args: never
+        Returns: {
+          department: string
+          email: string
+          full_name: string
+          id: string
+        }[]
+      }
       request_task_from_manager: {
         Args: { _note?: string; _project_id?: string; _title: string }
         Returns: string

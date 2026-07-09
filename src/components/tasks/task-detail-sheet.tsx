@@ -95,23 +95,19 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   });
   const [uploadBusy, setUploadBusy] = useState(false);
 
-  const [newSub, setNewSub] = useState("");
   const [commentBody, setCommentBody] = useState("");
   const [reviewNote, setReviewNote] = useState("");
-  const [depQuery, setDepQuery] = useState("");
-  const [depOptions, setDepOptions] = useState<{ id: string; title: string }[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [myDept, setMyDept] = useState<string | null>(null);
-  const [refLabel, setRefLabel] = useState("");
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
   const [markDoneOpen, setMarkDoneOpen] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);
-  const [subAddBusy, setSubAddBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [duplicateBusy, setDuplicateBusy] = useState(false);
+
 
 
   useEffect(() => {

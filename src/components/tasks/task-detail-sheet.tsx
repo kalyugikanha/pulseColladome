@@ -248,12 +248,15 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   }
 
   async function doReview(decision: "approve" | "request_changes" | "reject") {
+    if (reviewBusy) return;
+    setReviewBusy(true);
     try {
       await reviewFn({ data: { taskId: taskId!, decision, note: reviewNote.trim() || undefined } });
       setReviewNote("");
       toast.success("Review submitted");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
+    finally { setReviewBusy(false); }
   }
 
   async function doSearchDeps(q: string) {

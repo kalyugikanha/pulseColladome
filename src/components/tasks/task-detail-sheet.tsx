@@ -778,21 +778,26 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
               {/* Add comment box at bottom */}
               <div className="space-y-2 pt-1">
-                <Textarea placeholder="Add a comment. Use @name to mention." rows={3} value={commentBody} onChange={(e) => setCommentBody(e.target.value)} />
+                <Textarea placeholder="Add a comment. Use @name to mention." rows={3} value={commentBody} onChange={(e) => setCommentBody(e.target.value)} disabled={commentBusy} />
                 <div className="flex justify-end">
-                  <Button size="sm" onClick={async () => {
-                    if (!commentBody.trim()) return;
-                    const mentions: string[] = [];
-                    const body = commentBody;
-                    (peopleAll ?? []).forEach((p) => {
-                      if (!p.full_name) return;
-                      const re = new RegExp(`@${p.full_name.split(/\s+/)[0]}\\b`, "i");
-                      if (re.test(body)) mentions.push(p.id);
-                    });
-                    await addCommentFn({ data: { taskId: taskId!, body, mentionUserIds: mentions } });
-                    setCommentBody("");
-                    await refresh();
-                  }}>Post</Button>
+                  <Button size="sm" disabled={commentBusy || !commentBody.trim()} onClick={async () => {
+                    if (!commentBody.trim() || commentBusy) return;
+                    setCommentBusy(true);
+                    try {
+                      const mentions: string[] = [];
+                      const body = commentBody;
+                      (peopleAll ?? []).forEach((p) => {
+                        if (!p.full_name) return;
+                        const re = new RegExp(`@${p.full_name.split(/\s+/)[0]}\\b`, "i");
+                        if (re.test(body)) mentions.push(p.id);
+                      });
+                      await addCommentFn({ data: { taskId: taskId!, body, mentionUserIds: mentions } });
+                      setCommentBody("");
+                      await refresh();
+                    } catch (e) {
+                      toast.error((e as Error).message);
+                    } finally { setCommentBusy(false); }
+                  }}>{commentBusy ? "Posting…" : "Post"}</Button>
                 </div>
               </div>
             </div>

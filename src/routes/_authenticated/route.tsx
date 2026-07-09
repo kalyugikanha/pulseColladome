@@ -147,7 +147,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="px-2 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-muted-foreground group-data-[collapsible=icon]:hidden">
-          v{APP_VERSION} · {BUILD_ID}
+          v{APP_VERSION} · {BUILD_ID} IST
         </div>
         <div className="flex items-center gap-2 px-1 py-1">
           <Link to="/complete-onboarding" className="flex items-center gap-2 min-w-0 flex-1 rounded-md hover:bg-sidebar-accent px-1 py-1" aria-label="My profile">

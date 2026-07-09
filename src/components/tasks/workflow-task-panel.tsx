@@ -37,11 +37,11 @@ function todayInIndia() {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onChanged?: () => void | Promise<void> }) {
+export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: string; onChanged?: () => void | Promise<void>; onOpenTask?: (id: string) => void }) {
   const { data: me } = useCurrentUser();
   const [task, setTask] = useState<TaskInfo | null>(null);
   const [instance, setInstance] = useState<{ id: string; started_by: string; template_id: string; template_name: string; total_stages: number } | null>(null);
-  const [siblings, setSiblings] = useState<Array<{ id: string; title: string; status: string; stage_index: number | null }>>([]);
+  const [siblings, setSiblings] = useState<Array<{ id: string; title: string; status: string; stage_index: number | null; stage_snapshot: { name?: string } | null }>>([]);
   const [closeOpen, setCloseOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState<"approve" | "request_changes" | "comment" | null>(null);
   const [logOpen, setLogOpen] = useState(false);
@@ -69,10 +69,10 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
           setInstance({ ...i, template_name: i.template?.name ?? "Workflow", total_stages: (sc as unknown as unknown[])?.length ?? 0 });
         }
         const { data: sibs } = await supabase.from("tasks")
-          .select("id, title, status, stage_index")
+          .select("id, title, status, stage_index, stage_snapshot")
           .eq("workflow_instance_id", data.workflow_instance_id)
           .order("stage_index");
-        setSiblings((sibs as unknown as Array<{ id: string; title: string; status: string; stage_index: number | null }>) ?? []);
+        setSiblings((sibs as unknown as Array<{ id: string; title: string; status: string; stage_index: number | null; stage_snapshot: { name?: string } | null }>) ?? []);
       }
     })();
   }, [taskId]);
@@ -101,12 +101,25 @@ export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onCha
 
       {siblings.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {siblings.map((s) => (
-            <span key={s.id} className={`inline-flex items-center gap-1 text-xs rounded-full border px-2 py-0.5 ${s.id === task.id ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"}`}>
-              {s.status === "done" ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
-              #{s.stage_index}
-            </span>
-          ))}
+          {siblings.map((s) => {
+            const isCurrent = s.id === task.id;
+            const stageName = (s as unknown as { stage_snapshot?: { name?: string } }).stage_snapshot?.name;
+            const label = `Stage ${s.stage_index}${stageName ? `: ${stageName}` : ""} · ${s.status.replace("_", " ")}`;
+            const cls = `inline-flex items-center gap-1 text-xs rounded-full border px-2 py-0.5 transition-colors ${
+              isCurrent
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border text-muted-foreground hover:border-primary hover:text-foreground cursor-pointer"
+            }`;
+            const icon = s.status === "done" ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />;
+            if (isCurrent || !onOpenTask) {
+              return <span key={s.id} className={cls} title={label}>{icon}#{s.stage_index}</span>;
+            }
+            return (
+              <button key={s.id} type="button" className={cls} title={`Jump to ${label}`} onClick={() => onOpenTask(s.id)}>
+                {icon}#{s.stage_index}
+              </button>
+            );
+          })}
         </div>
       )}
 

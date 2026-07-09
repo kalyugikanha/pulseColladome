@@ -66,10 +66,29 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     queryFn: () => detailFn({ data: { taskId: taskId! } }),
   });
 
+  // Use the SECURITY DEFINER `list_assignable_users` RPC so employees (whose
+  // profiles RLS only exposes themselves + direct reports) still see the full
+  // active roster in the assignee/reviewer pickers — otherwise the Edit dialog
+  // would show only the current user.
   const { data: peopleAll } = useQuery({
-    queryKey: ["all-profiles-mini"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department, reporting_manager_id").order("full_name")).data ?? [],
+    queryKey: ["assignable-users-mini"],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("list_assignable_users");
+      return (data ?? []) as { id: string; full_name: string | null; email: string | null; department: string | null }[];
+    },
+  });
 
+  // Only the assignee's reporting_manager_id is needed for the "rate this work"
+  // manager check. RLS allows the reporting manager to read the assignee's row,
+  // so this quietly returns null for everyone else — which is the intended gate.
+  const assigneeIdForMgr = (detail?.task as { assignee_id?: string | null } | undefined)?.assignee_id ?? null;
+  const { data: assigneeMgrId } = useQuery({
+    queryKey: ["task-assignee-mgr", assigneeIdForMgr],
+    enabled: !!assigneeIdForMgr,
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("reporting_manager_id").eq("id", assigneeIdForMgr!).maybeSingle();
+      return (data?.reporting_manager_id as string | null) ?? null;
+    },
   });
 
   type Attachment = { id: string; task_id: string; uploader_id: string; file_path: string; file_name: string; content_type: string | null; size_bytes: number | null; created_at: string; url: string | null; uploader: { id: string; full_name: string | null; email: string | null } | null };
@@ -389,8 +408,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
               const assigneeId = (task as { assignee_id: string | null }).assignee_id;
               const reviewerId = (task as { reviewer_id: string | null }).reviewer_id;
               const createdBy = (task as { created_by?: string | null }).created_by ?? null;
-              const assigneeProfile = (peopleAll ?? []).find((p) => p.id === assigneeId) as { reporting_manager_id?: string | null } | undefined;
-              const isManager = !!actingUserId && assigneeProfile?.reporting_manager_id === actingUserId;
+              const isManager = !!actingUserId && !!assigneeMgrId && assigneeMgrId === actingUserId;
               const canRate = !!actingUserId && !!assigneeId && actingUserId !== assigneeId
                 && (reviewerId === actingUserId || createdBy === actingUserId || isManager);
               if (!canRate) return null;
@@ -427,7 +445,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
             {task.workflow_instance_id && (
               <div className="mb-4">
-                <WorkflowTaskPanel taskId={task.id} onChanged={refresh} />
+                <WorkflowTaskPanel taskId={task.id} onChanged={refresh} onOpenTask={(id) => onClose(id)} />
               </div>
             )}
 

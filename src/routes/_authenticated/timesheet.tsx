@@ -548,6 +548,8 @@ export function TimesheetPage() {
           <MultiSelectFilter label="Department" options={allDepts.map((d) => ({ value: d, label: d }))} selected={deptSel} onChange={setDeptSel} includeUnassigned />
           <MultiSelectFilter label="Employee" options={(profiles ?? []).map((p) => ({ value: p.id, label: p.full_name ?? p.email ?? "—", sub: p.email ?? undefined }))} selected={empSel} onChange={setEmpSel} />
           <MultiSelectFilter label="Projects" options={projectsInDay.map((p) => ({ value: p.code, label: p.name, sub: p.code }))} selected={projSel} onChange={setProjSel} />
+          <MultiSelectFilter label="Task" options={tasksInDay.map((t) => ({ value: t.id, label: t.title, sub: t.code ?? undefined }))} selected={taskSel} onChange={setTaskSel} />
+
           <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} disabled={empRows.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Export CSV
           </Button>

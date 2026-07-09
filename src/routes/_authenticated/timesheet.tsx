@@ -37,6 +37,7 @@ type Task = {
   approved_hours?: number;
   logged_hours?: number;
   comments?: string;
+  approval_note?: string;
   source?: "log" | "activity";
   approval_status?: string;
   task_id?: string;

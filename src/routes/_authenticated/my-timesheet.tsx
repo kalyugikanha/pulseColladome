@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { TableProperties, CalendarIcon, Pencil, CheckCircle2, Lock } from "lucide-react";
+import { TableProperties, CalendarIcon, Pencil, CheckCircle2, Lock, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DayEditorSheet } from "@/components/day-editor-sheet";

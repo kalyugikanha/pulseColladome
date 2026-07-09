@@ -1,50 +1,59 @@
-# Stage 2 — Task-primary timesheet views (UI only)
+# Plan — Punch-out picker + Task Detail simplification
 
-Display + filter change only. No query, schema, or persistence changes. Nothing published.
+## 1) Punch-out task picker (`src/routes/_authenticated/punch.tsx`)
 
-## src/routes/_authenticated/timesheet.tsx (manager day grid)
+### Current structure
+- `TaskCombobox` renders each option as `[PROJECT_CODE (mono)] Task title  STATUS`, and the trigger button also leads with the project code. Project code visually dominates.
+- Below the picker, an entry row has a **separate `Project` Select field** (auto-disabled when a task is picked but still visible), plus Hours, comment textarea, and an "at risk" checkbox.
+- There is no view of prior comments on the selected task — the user cannot see what they already reported.
 
-**Header row (line ~579-586)**
-Replace: Employee | Project | Hours | Notes | Status | (menu)
-With: Employee | **Task** | Hours | Notes | Status | (menu)
+### What changes
+- **Combobox item:** two-line layout. Line 1 = task title (primary, normal weight). Line 2 = small muted `project.name` (subtitle). Drop the mono project code from the primary line. Keep status pill on the right.
+- **Combobox trigger (selected state):** same two-line treatment — title on top, tiny muted project subtitle underneath. Placeholder unchanged.
+- **Row layout:** when a task is selected, hide the separate Project Select entirely (project is implied). Keep the Project Select only when no task is picked (allowNone / no assigned tasks fallback). Hours stays; row grid collapses to just Hours when task is chosen.
+- **Inline prior comments:** when `r.taskId` is set, fetch the last ~10 comments for that task and render a compact read-only list directly under the "What did you work on?" textarea:
+  - Query: `supabase.from("task_comments").select("id, body, created_at, author:profiles!author_id(full_name)").eq("task_id", r.taskId).order("created_at", { ascending: false }).limit(10)`
+  - Wrapped in a small `useQuery` hook keyed by `["punch-task-comments", taskId]`, `staleTime: 30_000`.
+  - Empty state: single muted line "No comments on this task yet."
+  - Each item: author name · relative time on one line, body (whitespace-pre-wrap, clamped to ~3 lines) below. Contained in a max-height scroll box (~180px) so a long history doesn't blow up the dialog.
 
-**Task cell (`EmployeeBlock`, line ~699-709)**
-For activity-sourced rows: primary line = task title (from `t.comments` fallback / stored task title), secondary line = `<code>PROJCODE</code> · Project Name` in `text-[10px] text-muted-foreground`. Keep the "via task" badge inline with the title.
-For log-sourced rows (legacy, no task): primary line = "—" (or project name as fallback), secondary line = project code/name. Editable project `Select` is removed from this column; project remains derived and read-only. Existing inline hours/comments editing stays.
-Note: legacy log rows lose their inline project dropdown; project is still shown, and full editing remains via the "Open full editor" (DayEditorSheet) menu item, which is where Stage 1 already made Task primary.
+## 2) Task Detail sheet (`src/components/tasks/task-detail-sheet.tsx`)
 
-**Empty-employee row (line ~668)**
-`colSpan={3}` stays correct (Task + Hours + Notes merged).
+### Current structure (lines 466–802)
+Inside the "Activity" section there is one `bg-muted/20` box that mixes six sub-widgets:
+1. **Add checklist item** input + checklist list with checkboxes + delete
+2. Attachments (upload + grid)
+3. **References** (label input + URL input + Add) rendered as pill list with remove
+4. **Dependencies** — search input + result dropdown + list with badges/remove
+5. Watch toggle + watcher names
+6. Below the box: unified timeline that mixes comments, **checklist items**, **dependencies**, watcher-started events, and activity log; then the comment composer.
 
-**Quick-add row (line ~735-760)**
-Replace project `Select` with a **Task** picker scoped to that employee: query their assigned tasks (via `tasks` where `assignee_id = row.profile.id`, active only) and on pick, derive project code/name from the chosen task. `onAdd` signature extended to carry `taskTitle`/derived `project_code`. Hours input unchanged. Guard: require a task_id before saving (mirrors Stage 1 validation in DayEditorSheet).
-"Add project" trigger button relabels to "Add task".
+### What changes
+**(a) References — collapse to one simple field**
+- Remove the two-field `Label` + `URL` composer. Replace with a single `Input` (URL only) + `Add` button.
+- Enter or click Add appends `{ label: "", url }` (label kept empty; UI uses the hostname or the URL itself as display text — no separate label needed).
+- List display simplifies to a small stacked list of links (`<a>` with hostname, external-link icon, and a trash button). Drop the pill styling.
+- Server call unchanged (`updateTaskAssetLinks` still takes `{label,url}[]`), so no backend change.
 
-**Filters header (line ~505-507)**
-Add a new `MultiSelectFilter` labeled **Task**, options built from tasks visible in the day (unique `task_id`s across `activityRows`, label = task title, sub = project code). New `taskSel: Set<string>` state, applied inside `empRows` alongside `projSel` (activity rows filter by `task_id`; log rows are excluded when a task filter is active since they have no task_id).
-Keep existing Projects filter.
+**(b) Comments — strip checklist / dependency UI from composer and timeline**
+- **Composer area (the `bg-muted/20` box):**
+  - Remove the "Add checklist item" input and the checklist list rendering (lines ~471–515).
+  - Remove the "Add dependency" search input, results dropdown, and dependency list (lines ~596–631).
+  - Keep: Attachments, References (simplified per (a)), Watch toggle + watcher names.
+- **Timeline:**
+  - Stop pushing `subtasks` entries (`s-…`) into the timeline (lines ~690–698).
+  - Stop pushing `dependencies` entries (`d-…`) into the timeline (lines ~699–707).
+  - Comments, watcher-added, and activity-log entries remain. Composer at the bottom stays as-is (plain textarea + Post, with mention parsing intact — that's just text).
+- **Progress card:** since checklist can no longer be added from this UI, the "Auto-computed from checklist" hint becomes rare/unreachable through this sheet. Behavior is unchanged for tasks that already have subtasks from elsewhere — leaving it defensive; only removing the add/toggle UI here.
+- **Imports/state cleanup:** remove `ListChecks`, `GitBranch`, `Checkbox` (if unused elsewhere in the file after removal), `addSubtask`/`toggleSubtask`/`deleteSubtask`/`addDependency`/`removeDependency` server-fn imports and their `useServerFn` wrappers, plus `newSub`, `subAddBusy`, `depQuery`, `depOptions` state. Verify with tsgo.
 
-**CSV export (line ~446-470)**
-Header becomes: `Employee, Email, Department, Task, Project Code, Project, Hours, Notes, Status`.
-Per-row Task column: activity rows → task title; log rows → empty string.
-
-## src/routes/_authenticated/my-timesheet.tsx (my view)
-
-**Header row (line ~197-204)**
-Reorder to: Date | **Task** | Project | Logged | Approved | Status | (edit)
-Task column shows: primary = task title (from `r.comments` for activity source, since it already carries the task title as fallback; blank for legacy log rows). Project cell keeps `code · name` but styled as secondary muted text.
-
-No filter changes on this page (existing project filter stays as-is per your instruction "display/column-order change").
-
-## Out of scope (as requested)
-
-- No changes to Supabase queries, RLS, `attendance_logs.tasks` shape, or `task_activity`.
-- No publish.
-- No changes to DayEditorSheet (Stage 1 already handled it).
+### Not touched
+- Server functions and DB schema — `task_subtasks`, `task_dependencies`, `updateTaskAssetLinks` remain; we're only removing UI. Existing subtasks/deps on old tasks stay in the DB and can be re-exposed later if needed.
+- Kanban/board, EditTaskDialog, MarkDoneDialog, workflow panel — unchanged.
+- The three publish-pending threads — untouched.
 
 ## Verification
+- `bunx tsgo --noEmit` clean.
+- Manual: open a task with existing subtasks/deps → confirm they no longer clutter the sheet; comments still post; references add/remove via single field; punch-out picker shows task-first with project subtitle and prior comments appear when a task with history is selected.
 
-- `bunx tsgo --noEmit` after edits.
-- Visual check in preview at `/timesheet` and `/my-timesheet`.
-
-Waiting for your go-ahead before touching any file.
+Confirm and I'll implement.

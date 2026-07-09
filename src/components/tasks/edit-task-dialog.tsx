@@ -87,7 +87,6 @@ export function EditTaskDialog({
           priority,
           due_date: deadline || null,
           scheduled_post_date: postDate || null,
-          client_brand: client.trim() || null,
           project_id: projectId,
           assignee_id: assignee || null,
           asset_links: links.filter((l) => l.url.trim()),

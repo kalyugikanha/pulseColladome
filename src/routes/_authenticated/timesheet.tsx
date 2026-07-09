@@ -623,7 +623,7 @@ export function TimesheetPage() {
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="min-w-[220px]">Employee</TableHead>
-                    <TableHead className="min-w-[240px]">Project</TableHead>
+                    <TableHead className="min-w-[260px]">Task</TableHead>
                     <TableHead className="w-[120px] text-right tabular-nums">Hours</TableHead>
                     <TableHead className="min-w-[180px]">Notes</TableHead>
                     <TableHead className="w-[110px]">Status</TableHead>
@@ -635,16 +635,16 @@ export function TimesheetPage() {
                     <EmployeeBlock
                       key={row.profile.id}
                       row={row}
-                      projects={projectsAll ?? []}
                       canEdit={canEdit}
                       canApprove={canApprove}
                       onUpdate={(i, p) => updateTask(row, i, p)}
                       onDelete={(i) => deleteTask(row, i)}
-                      onAdd={(code, hrs) => addTask(row, code, hrs)}
+                      onAdd={(picked, hrs) => addTaskEntry(row, picked, hrs)}
                       onToggleApproval={() => toggleApproval(row)}
                       onOpenFull={() => setEditor({ userId: row.profile.id, userName: row.profile.full_name ?? row.profile.email ?? "—", date: dateIso })}
                     />
                   ))}
+
                   <TableRow className="border-t-2 bg-muted/30">
                     <TableCell className="font-semibold">Day total</TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">

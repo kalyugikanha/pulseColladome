@@ -139,6 +139,42 @@ export function PunchPage() {
     staleTime: 60_000,
   });
 
+  // Task ids that this user has already logged hours against in a prior punch session.
+  // Used to hide Done tasks that have already been billed — punch-out is a fresh-entry
+  // surface, not a record-of-truth (the main Tasks view keeps everything visible).
+  const { data: loggedTaskIds } = useQuery({
+    queryKey: ["punch-logged-task-ids", punchUserId],
+    enabled: !!punchUserId,
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("punch_sessions")
+        .select("allocations")
+        .eq("user_id", punchUserId!)
+        .not("punch_out_time", "is", null)
+        .not("allocations", "is", null);
+      const set = new Set<string>();
+      for (const row of (data ?? []) as Array<{ allocations: Array<{ task_id?: string | null }> | null }>) {
+        for (const a of row.allocations ?? []) {
+          if (a?.task_id) set.add(String(a.task_id));
+        }
+      }
+      return set;
+    },
+    staleTime: 60_000,
+  });
+
+  const visibleTasks = useMemo(() => {
+    if (!myTasks) return [];
+    return myTasks.filter((t) => !(t.status === "done" && loggedTaskIds?.has(t.id)));
+  }, [myTasks, loggedTaskIds]);
+
+  const taskById = useMemo(() => {
+    const m = new Map<string, NonNullable<typeof myTasks>[number]>();
+    for (const t of myTasks ?? []) m.set(t.id, t);
+    return m;
+  }, [myTasks]);
+
   const { data: history } = useQuery({
     queryKey: ["punch-history", punchUserId],
     enabled: !!punchUserId,

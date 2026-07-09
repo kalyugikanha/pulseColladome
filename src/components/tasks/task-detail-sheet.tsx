@@ -623,24 +623,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                       ),
                     });
                   }
-                  for (const s of (detail?.subtasks ?? [])) {
-                    const ss = s as { id: string; title: string; done: boolean; created_at?: string };
-                    entries.push({
-                      key: `s-${ss.id}`, at: ss.created_at ? new Date(ss.created_at) : null,
-                      actor: "",
-                      icon: <ListChecks className="h-3 w-3" />,
-                      text: <span><span className="text-muted-foreground">checklist item </span><span className="font-medium">"{ss.title}"</span>{ss.done ? " (done)" : ""}</span>,
-                    });
-                  }
-                  for (const d of (detail?.dependencies ?? [])) {
-                    const dd = d as { id: string; created_at?: string; dep: { title: string } | null };
-                    entries.push({
-                      key: `d-${dd.id}`, at: dd.created_at ? new Date(dd.created_at) : null,
-                      actor: "",
-                      icon: <GitBranch className="h-3 w-3" />,
-                      text: <span><span className="text-muted-foreground">dependency on </span><span className="font-medium">{dd.dep?.title ?? "(deleted)"}</span></span>,
-                    });
-                  }
+                  // Checklist and dependency entries intentionally excluded from the
+                  // timeline — comments here are plain notes, not task-management events.
+
                   for (const w of (detail?.watchers ?? [])) {
                     const ww = w as { id: string; created_at?: string; user: { full_name?: string; email?: string } | null };
                     entries.push({

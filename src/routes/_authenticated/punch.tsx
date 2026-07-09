@@ -108,8 +108,9 @@ export function PunchPage() {
   });
   const requireTask = ((myDept ?? "").toLowerCase() === "marketing" || (myDept ?? "").toLowerCase() === "business development" || (myDept ?? "").toLowerCase() === "bd");
 
-  // Task picker follows the viewed user (me.id) so impersonation shows their tasks.
-  // Sessions still use realId because punches belong to the real authenticated user.
+  // Task picker follows the same viewed user as the session — so a punch
+  // logged on behalf of an employee can only allocate hours to that employee's
+  // own assigned tasks.
   const taskOwnerId = me?.id;
   const { data: myTasks } = useQuery({
     queryKey: ["my-punch-tasks", taskOwnerId],

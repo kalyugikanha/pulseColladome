@@ -60,7 +60,7 @@ export function EditTaskDialog({
     setProjectId(task.project_id ?? "");
     setDeadline(task.due_date ?? "");
     setPostDate(task.scheduled_post_date ?? "");
-    setClient(task.client_brand ?? "");
+    
     setLinks(Array.isArray(task.asset_links) ? task.asset_links : []);
     setEstimate(task.estimated_hours == null ? "" : String(task.estimated_hours));
   }, [open, task?.id]);

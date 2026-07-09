@@ -348,7 +348,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                         value={r.hours ?? 0}
                         onChange={(e) => updateRow(i, { hours: Number(e.target.value) })}
                         disabled={!mayEdit}
-                        className="h-8 text-right font-mono"
+                        className="h-8 w-20 px-2 text-sm text-right font-mono tabular-nums"
                       />
                     </TableCell>
                     {canApprove && (
@@ -357,13 +357,12 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                           <div className="flex items-center gap-1">
                             <Input
                               type="number" min={0} step={0.25}
-                              value={r.approved_hours ?? ""}
-                              placeholder={String(r.hours ?? 0)}
+                              value={r.approved_hours ?? r.hours ?? 0}
                               onChange={(e) => {
                                 const v = e.target.value;
                                 updateRow(i, { approved_hours: v === "" ? undefined : Number(v) });
                               }}
-                              className="h-8 w-20 text-right font-mono"
+                              className="h-8 w-20 px-2 text-sm text-right font-mono tabular-nums"
                             />
                             <Popover>
                               <PopoverTrigger asChild>

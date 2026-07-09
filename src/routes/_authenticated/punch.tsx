@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Clock, Plus, Trash2, Check, ChevronsUpDown, Send, AlertTriangle, X, MessageSquare } from "lucide-react";
+import { Clock, Trash2, Check, ChevronsUpDown, Send, AlertTriangle, X, MessageSquare } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
 

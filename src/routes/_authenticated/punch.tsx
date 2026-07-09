@@ -452,9 +452,27 @@ export function PunchPage() {
           <DialogHeader>
             <DialogTitle className="font-display">Log this session</DialogTitle>
             <DialogDescription>
-              {openSession && `Started at ${format(new Date(openSession.punch_in_time), "HH:mm")} — about ${sessionDurationHours.toFixed(2)}h so far. Split the time across the projects you worked on.`}
+              {openSession && `Fill in hours only for the tasks you actually worked on this session.`}
             </DialogDescription>
           </DialogHeader>
+
+          {openSession && (() => {
+            const end = punchOutAt ? new Date(punchOutAt) : new Date(nowTick);
+            const live = Number.isNaN(end.getTime())
+              ? sessionDurationHours
+              : Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2)));
+            return (
+              <div className="rounded-lg border border-border/60 p-4 bg-gradient-to-br from-primary/5 to-transparent">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-4xl font-bold tabular-nums">{live.toFixed(2)}</span>
+                  <span className="text-lg text-muted-foreground">h this session</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Punched in at {format(new Date(openSession.punch_in_time), "HH:mm")} — split across the tasks you worked on.
+                </p>
+              </div>
+            );
+          })()}
 
           {openSession && (
             <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-1.5">
@@ -472,89 +490,87 @@ export function PunchPage() {
 
           <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
 
-            {rows.map((r, idx) => {
-              return (
+            {rows.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground text-center">
+                No tasks assigned to you. Use "+ New task" below to log time against a specific task, or skip and log later.
+              </div>
+            )}
 
-                <div key={idx} className="rounded-lg border border-border/60 p-3 space-y-3 bg-muted/20">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs uppercase tracking-wider text-muted-foreground">Entry {idx + 1}</span>
-                    {rows.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(idx)} className="text-destructive h-7 px-2">
+            {rows.map((r, idx) => {
+              const t = taskById.get(r.taskId);
+              const hasHours = Number(r.hours) > 0;
+              return (
+                <div key={r.taskId || idx} className={`rounded-lg border border-border/60 p-3 space-y-2 ${hasHours ? "bg-muted/30" : "bg-muted/10"}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate">{t?.title ?? "Unknown task"}</div>
+                      {t?.project?.name && (
+                        <div className="text-[11px] text-muted-foreground truncate">{t.project.name}</div>
+                      )}
+                    </div>
+                    <div className="w-[110px] shrink-0">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        placeholder="Hours"
+                        value={r.hours}
+                        onChange={(e) => updateRow(idx, { hours: e.target.value })}
+                        className="h-9"
+                      />
+                    </div>
+                    {r.added && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeRow(idx)} className="text-destructive h-9 px-2 shrink-0">
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Task {requireTask && <span className="text-destructive">*</span>}</Label>
-                    <TaskCombobox
-                      tasks={myTasks ?? []}
-                      value={r.taskId}
-                      onChange={(taskId, projectId) => updateRow(idx, { taskId, projectId: projectId ?? "" })}
-                      allowNone={!requireTask}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => { setReqTitle(""); setReqProjectId(""); setReqNote(""); setRequestOpen(true); }}
-                      className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
-                    >
-                      <Send className="h-3 w-3" /> Can't find your task? Request one from your manager
-                    </button>
-                    {requireTask && !myTasks?.length && (
-                      <p className="text-[11px] text-warning">No assigned tasks found — request one above or pick a project below.</p>
-                    )}
-                  </div>
-                  {r.taskId ? (
-                    <div className="space-y-1.5 max-w-[160px]">
-                      <Label className="text-xs">Hours</Label>
-                      <Input type="number" min="0" step="0.25" placeholder="e.g. 2.5" value={r.hours} onChange={(e) => updateRow(idx, { hours: e.target.value })} />
-                    </div>
-                  ) : (
-                    <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Project</Label>
-                        <Select
-                          value={r.projectId}
-                          onValueChange={(v) => updateRow(idx, { projectId: v })}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
-                          <SelectContent>
-                            {projects?.map((p) => (
-                              <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Hours</Label>
-                        <Input type="number" min="0" step="0.25" placeholder="e.g. 2.5" value={r.hours} onChange={(e) => updateRow(idx, { hours: e.target.value })} />
-                      </div>
-                    </div>
-                  )}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">What did you work on? <span className="text-muted-foreground">(optional)</span></Label>
-                    <Textarea rows={2} placeholder="Short comment on this entry" value={r.comments} onChange={(e) => updateRow(idx, { comments: e.target.value })} />
-                  </div>
-                  {r.taskId && <TaskCommentsPreview taskId={r.taskId} />}
-                  {r.taskId && (
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                      <Checkbox
-                        checked={r.atRisk}
-                        onCheckedChange={(v) => updateRow(idx, { atRisk: v === true })}
+                  {hasHours && (
+                    <>
+                      <Textarea
+                        rows={2}
+                        placeholder="What did you do on this task? (optional)"
+                        value={r.comments}
+                        onChange={(e) => updateRow(idx, { comments: e.target.value })}
                       />
-                      <span className="inline-flex items-center gap-1">
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                        Flag this task as <span className="font-medium text-foreground">at risk</span> — visible to your reporting manager.
-                      </span>
-                    </label>
+                      <TaskCommentsPreview taskId={r.taskId} />
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <Checkbox
+                          checked={r.atRisk}
+                          onCheckedChange={(v) => updateRow(idx, { atRisk: v === true })}
+                        />
+                        <span className="inline-flex items-center gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                          Flag this task as <span className="font-medium text-foreground">at risk</span> — visible to your reporting manager.
+                        </span>
+                      </label>
+                    </>
                   )}
-
                 </div>
               );
             })}
-            <Button type="button" variant="outline" size="sm" onClick={addRow} className="w-full">
-              <Plus className="h-4 w-4 mr-1" /> Add another project
-            </Button>
+
+            <div className="rounded-lg border border-dashed border-border/60 p-3 space-y-2">
+              <Label className="text-xs">+ New task</Label>
+              <TaskCombobox
+                tasks={(myTasks ?? []).filter((t) => !rows.some((r) => r.taskId === t.id))}
+                value=""
+                onChange={(taskId) => addTaskRow(taskId)}
+                allowNone={false}
+              />
+              <button
+                type="button"
+                onClick={() => { setReqTitle(""); setReqProjectId(""); setReqNote(""); setRequestOpen(true); }}
+                className="text-[11px] text-primary hover:underline inline-flex items-center gap-1"
+              >
+                <Send className="h-3 w-3" /> Can't find your task? Request one from your manager
+              </button>
+              {requireTask && !myTasks?.length && (
+                <p className="text-[11px] text-warning">No assigned tasks found — request one above.</p>
+              )}
+            </div>
           </div>
+
 
           <div className="flex items-center justify-between text-sm px-1">
             <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{(() => {

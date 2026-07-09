@@ -245,10 +245,27 @@ export function MyTimesheetPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono">{r.hours.toFixed(1)}</TableCell>
                       <TableCell className={`text-right font-mono ${reduced ? "text-amber-700" : ""}`}>
-                        {r.approvedHours != null ? r.approvedHours.toFixed(1) : "—"}
+                        <div className="flex items-center justify-end gap-1">
+                          <span>{r.approvedHours != null ? r.approvedHours.toFixed(1) : "—"}</span>
+                          {r.approvalNote?.trim() && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button type="button" className="text-primary hover:text-primary/80" aria-label="Manager note" title="Manager note">
+                                  <StickyNote className="h-3.5 w-3.5" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 text-sm" align="end">
+                                <div className="text-xs font-medium mb-1 text-muted-foreground">Manager note</div>
+                                <div className="whitespace-pre-wrap">{r.approvalNote}</div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
                       </TableCell>
 
-                      <TableCell className="text-xs text-muted-foreground">{r.comments ?? ""}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[260px]">
+                        <div className="truncate" title={r.comments ?? ""}>{r.comments ?? ""}</div>
+                      </TableCell>
                       <TableCell>
                         {r.approved
                           ? (reduced

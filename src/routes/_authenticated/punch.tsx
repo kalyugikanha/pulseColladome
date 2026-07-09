@@ -59,7 +59,10 @@ export function PunchPage() {
   const clearUnloggedServer = useServerFn(clearUnloggedHoursServerFn);
   const requestTaskServer = useServerFn(requestTaskFromManager);
   const today = format(new Date(), "yyyy-MM-dd");
-  const punchUserId = me?.realId ?? me?.id;
+  // Attribution follows the viewed identity: when a super admin uses "View As"
+  // to punch on someone's behalf, the session belongs to that person (server
+  // records the real admin id in on_behalf_of for the audit trail).
+  const punchUserId = me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
   const [submitting, setSubmitting] = useState(false);

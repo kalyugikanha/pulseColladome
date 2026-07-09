@@ -319,7 +319,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                   {canEditDelete && (
                     <DropdownMenuItem onClick={() => setEditOpen(true)}><Pencil className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={doDuplicate}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
+                  <DropdownMenuItem onClick={doDuplicate} disabled={duplicateBusy}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
                   {canEditDelete && <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-2" />Delete</DropdownMenuItem>

@@ -7,8 +7,11 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 // Stamp every build with a fresh identifier so each publish is visibly new
-// even without a manual semver bump. YYYYMMDDHHMM in UTC.
-const BUILD_ID = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
+// even without a manual semver bump. YYYYMMDDHHMM in IST (Asia/Kolkata, UTC+5:30, no DST).
+const BUILD_ID = (() => {
+  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  return ist.toISOString().replace(/[-:T]/g, "").slice(0, 12);
+})();
 
 export default defineConfig({
   tanstackStart: {

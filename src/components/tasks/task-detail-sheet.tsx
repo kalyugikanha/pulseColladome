@@ -376,9 +376,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                 <div className="font-medium text-sm">Waiting for your review</div>
                 <Textarea placeholder="Note to assignee (optional)" rows={2} value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />
                 <div className="flex gap-2 flex-wrap">
-                  <Button size="sm" onClick={() => doReview("approve")} className="gradient-primary"><Check className="h-4 w-4 mr-1" />Approve</Button>
-                  <Button size="sm" variant="outline" onClick={() => doReview("request_changes")}>Request changes</Button>
-                  <Button size="sm" variant="destructive" onClick={() => doReview("reject")}><X className="h-4 w-4 mr-1" />Reject</Button>
+                  <Button size="sm" onClick={() => doReview("approve")} disabled={reviewBusy} className="gradient-primary"><Check className="h-4 w-4 mr-1" />Approve</Button>
+                  <Button size="sm" variant="outline" onClick={() => doReview("request_changes")} disabled={reviewBusy}>Request changes</Button>
+                  <Button size="sm" variant="destructive" onClick={() => doReview("reject")} disabled={reviewBusy}><X className="h-4 w-4 mr-1" />Reject</Button>
                 </div>
               </div>
             )}

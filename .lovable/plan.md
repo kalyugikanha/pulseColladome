@@ -1,30 +1,50 @@
-## Nuke `sandeep@colladome.in`
+# Stage 2 — Task-primary timesheet views (UI only)
 
-Wipe the old account and everything cascading from it. Sandeep starts fresh when he signs in as `sandeep.suman@colladome.in`.
+Display + filter change only. No query, schema, or persistence changes. Nothing published.
 
-### Single migration
+## src/routes/_authenticated/timesheet.tsx (manager day grid)
 
-Inside one transaction, in this order:
-1. `DELETE FROM public.role_grants WHERE lower(email) = 'sandeep@colladome.in';` — retires the old access grant so it never seeds a re-signup.
-2. `DELETE FROM auth.users WHERE lower(email) = 'sandeep@colladome.in';` — deletes the Supabase auth user for the old Google account.
+**Header row (line ~579-586)**
+Replace: Employee | Project | Hours | Notes | Status | (menu)
+With: Employee | **Task** | Hours | Notes | Status | (menu)
 
-Cascade effect of step 2 (`profiles.id` FKs `auth.users` with `ON DELETE CASCADE`, and downstream tables cascade further):
-- Profile row `38290b50…` — deleted
-- Cascade-deleted rows: attendance_logs, bd_activity_logs (user_id), bd_recurring_items (assignee), employee_bank_details, employee_documents, google_calendar_events, google_calendar_tokens, leave_requests, leave_balances, notifications, punch_sessions, salaries, task_comments (author), task_mentions, task_watchers, team_calendar_bookings (created_by), weekly_scores (employee_id), department_heads, user_roles, super_admins, onboarding_section_state, impersonation_audit, task_ratings, task_attachments, assistant_messages, task_review_comments (if FK cascades — otherwise blocks; see below).
-- SET NULL: tasks (assignee/reviewer/requester), bd_activity_logs (assigned_by), bd_recurring_items (created_by), task_activity (actor/approved_by), task_comments (resolved_by), weekly_scores (manager_id), workflow_template_stages (default_reviewer_id/default_assignee_id — if the FK is SET NULL), profiles.reporting_manager_id on his 1 direct report → becomes NULL, profiles.onboarding_approved_by.
-- Potentially BLOCKING FKs (no ON DELETE clause = RESTRICT): `task_review_comments.author_id`, `workflow_instances.started_by`, `workflow_templates.created_by`, `workflow_template_stages.default_assignee_id`. If Sandeep created any of these, the DELETE will fail.
+**Task cell (`EmployeeBlock`, line ~699-709)**
+For activity-sourced rows: primary line = task title (from `t.comments` fallback / stored task title), secondary line = `<code>PROJCODE</code> · Project Name` in `text-[10px] text-muted-foreground`. Keep the "via task" badge inline with the title.
+For log-sourced rows (legacy, no task): primary line = "—" (or project name as fallback), secondary line = project code/name. Editable project `Select` is removed from this column; project remains derived and read-only. Existing inline hours/comments editing stays.
+Note: legacy log rows lose their inline project dropdown; project is still shown, and full editing remains via the "Open full editor" (DayEditorSheet) menu item, which is where Stage 1 already made Task primary.
 
-### Blocking-FK handling
-Before the two DELETEs, run a pre-clean that nulls out or reassigns Sandeep's references in the restrict-FK tables so the cascade can complete:
-- `UPDATE public.workflow_instances SET started_by = NULL WHERE started_by = '38290b50…';` (make the column nullable in the same migration if it isn't — check first; if it must stay NOT NULL, reassign to a super admin instead).
-- `UPDATE public.workflow_templates SET created_by = <super_admin_id> WHERE created_by = '38290b50…';`
-- `UPDATE public.workflow_template_stages SET default_assignee_id = NULL WHERE default_assignee_id = '38290b50…';` (nullable check same as above).
-- `DELETE FROM public.task_review_comments WHERE author_id = '38290b50…';` (his review-comment history is discarded, matching the "nuke" intent).
+**Empty-employee row (line ~668)**
+`colSpan={3}` stays correct (Task + Hours + Notes merged).
 
-I'll query each restrict-FK's column nullability and pick NULL vs reassignment accordingly inside the migration.
+**Quick-add row (line ~735-760)**
+Replace project `Select` with a **Task** picker scoped to that employee: query their assigned tasks (via `tasks` where `assignee_id = row.profile.id`, active only) and on pick, derive project code/name from the chosen task. `onAdd` signature extended to carry `taskTitle`/derived `project_code`. Hours input unchanged. Guard: require a task_id before saving (mirrors Stage 1 validation in DayEditorSheet).
+"Add project" trigger button relabels to "Add task".
 
-### After the migration
-- The 1 profile that reported to him gets `reporting_manager_id = NULL` — HR can reassign later. I'll flag which profile in the message.
-- When Sandeep next signs in with `sandeep.suman@colladome.in`, the `handle_new_user` trigger creates a brand-new profile with role `employee`, department `Marketing`, reporting manager `Kanishka`, salary ₹13,000 (from the `role_grants` row already seeded in Phase A).
+**Filters header (line ~505-507)**
+Add a new `MultiSelectFilter` labeled **Task**, options built from tasks visible in the day (unique `task_id`s across `activityRows`, label = task title, sub = project code). New `taskSel: Set<string>` state, applied inside `empRows` alongside `projSel` (activity rows filter by `task_id`; log rows are excluded when a task filter is active since they have no task_id).
+Keep existing Projects filter.
 
-Preview only, no publish.
+**CSV export (line ~446-470)**
+Header becomes: `Employee, Email, Department, Task, Project Code, Project, Hours, Notes, Status`.
+Per-row Task column: activity rows → task title; log rows → empty string.
+
+## src/routes/_authenticated/my-timesheet.tsx (my view)
+
+**Header row (line ~197-204)**
+Reorder to: Date | **Task** | Project | Logged | Approved | Status | (edit)
+Task column shows: primary = task title (from `r.comments` for activity source, since it already carries the task title as fallback; blank for legacy log rows). Project cell keeps `code · name` but styled as secondary muted text.
+
+No filter changes on this page (existing project filter stays as-is per your instruction "display/column-order change").
+
+## Out of scope (as requested)
+
+- No changes to Supabase queries, RLS, `attendance_logs.tasks` shape, or `task_activity`.
+- No publish.
+- No changes to DayEditorSheet (Stage 1 already handled it).
+
+## Verification
+
+- `bunx tsgo --noEmit` after edits.
+- Visual check in preview at `/timesheet` and `/my-timesheet`.
+
+Waiting for your go-ahead before touching any file.

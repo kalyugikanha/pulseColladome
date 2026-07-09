@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/my-timesheet")({
   component: MyTimesheetPage,
 });
 
-type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string };
+type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string; task_id?: string; task_title?: string };
 type LogRow = { id: string; date: string; tasks: Task[] | null; approved_at: string | null };
 
 type ViewMode = "month" | "range" | "day";
@@ -88,7 +88,7 @@ export function MyTimesheetPage() {
 
 
   // Flatten to (date, project, hours, comments)
-  type Row = { date: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
+  type Row = { date: string; taskTitle?: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const l of logs ?? []) {
@@ -98,9 +98,9 @@ export function MyTimesheetPage() {
         const isApproved = !!l.approved_at;
         const ah = t.approved_hours != null ? Number(t.approved_hours) : null;
         out.push({
-          date: l.date, code, name: t.project_name || code, hours: h,
+          date: l.date, taskTitle: t.task_title, code, name: t.project_name || code, hours: h,
           approvedHours: isApproved ? (ah ?? h) : null,
-          comments: t.comments, approved: isApproved,
+          comments: t.comments, approved: isApproved, taskId: t.task_id,
         });
       }
     }
@@ -114,9 +114,9 @@ export function MyTimesheetPage() {
       const approved = a.approval_status === "approved" || a.approval_status === "auto";
       const appHrs = approved ? Number(a.approved_hours ?? h) : null;
       out.push({
-        date, code, name, hours: h,
+        date, taskTitle: a.task?.title ?? undefined, code, name, hours: h,
         approvedHours: appHrs,
-        comments: a.note ?? a.task?.title ?? undefined,
+        comments: a.note ?? undefined,
         approved,
         pending: !approved,
         taskId: a.task_id,
@@ -125,6 +125,7 @@ export function MyTimesheetPage() {
 
     return out.sort((a, b) => b.date.localeCompare(a.date));
   }, [logs, activityRows]);
+
 
   const distinctProjects = useMemo(() => {
     const map = new Map<string, string>();
@@ -219,7 +220,9 @@ export function MyTimesheetPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead><TableHead>Project</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Task</TableHead>
+                  <TableHead>Project</TableHead>
                   <TableHead className="text-right">Logged</TableHead>
                   <TableHead className="text-right">Approved</TableHead>
                   <TableHead>Comments</TableHead><TableHead>Status</TableHead>
@@ -232,11 +235,19 @@ export function MyTimesheetPage() {
                   return (
                     <TableRow key={`${r.date}-${r.code}-${i}`}>
                       <TableCell className="text-xs">{format(new Date(r.date + "T00:00:00"), "d MMM")}</TableCell>
-                      <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium truncate max-w-[280px]">{r.taskTitle ?? (r.taskId ? "Task" : <span className="text-muted-foreground italic">—</span>)}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs text-muted-foreground truncate max-w-[220px]">
+                          <span className="font-mono mr-1">{r.code}</span>{r.name}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right font-mono">{r.hours.toFixed(1)}</TableCell>
                       <TableCell className={`text-right font-mono ${reduced ? "text-amber-700" : ""}`}>
                         {r.approvedHours != null ? r.approvedHours.toFixed(1) : "—"}
                       </TableCell>
+
                       <TableCell className="text-xs text-muted-foreground">{r.comments ?? ""}</TableCell>
                       <TableCell>
                         {r.approved

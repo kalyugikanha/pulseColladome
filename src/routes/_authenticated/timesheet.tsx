@@ -39,14 +39,18 @@ type Task = {
   comments?: string;
   source?: "log" | "activity";
   approval_status?: string;
+  task_id?: string;
+  task_title?: string;
 };
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
+type UserTask = { id: string; title: string | null; project_id: string | null };
 type ActivityRow = {
   id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
   note: string | null; completion_date: string | null; created_at: string; approval_status: string;
   task: { id: string; title: string | null; project: { id: string; code: string | null; name: string | null } | null } | null;
 };
+
 
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -89,9 +93,11 @@ export function TimesheetPage() {
 
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
   const [projSel, setProjSel] = useState<Set<string>>(new Set());
+  const [taskSel, setTaskSel] = useState<Set<string>>(new Set());
   const [empSel, setEmpSel] = useState<Set<string>>(new Set());
   const [showEmpty, setShowEmpty] = useState(false);
   const [editor, setEditor] = useState<{ userId: string; userName: string; date: string } | null>(null);
+
 
   useEffect(() => {
     if (!meLoading && me && !(me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager)) {
@@ -270,6 +276,24 @@ export function TimesheetPage() {
     return Array.from(m.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
   }, [logs, activityRows]);
 
+  // Tasks visible in the day (for Task filter). Merges activity-sourced task_ids
+  // with any log rows that carry a task_id (Stage 1 day-editor now writes it).
+  const tasksInDay = useMemo(() => {
+    const m = new Map<string, { title: string; code: string | null }>();
+    for (const a of activityRows ?? []) {
+      const id = a.task?.id || a.task_id;
+      if (!id || m.has(id)) continue;
+      m.set(id, { title: a.task?.title ?? "Task", code: a.task?.project?.code ?? null });
+    }
+    for (const r of logs ?? []) for (const t of r.tasks ?? []) {
+      const id = t.task_id;
+      if (!id || m.has(id)) continue;
+      m.set(id, { title: t.task_title ?? t.comments ?? "Task", code: t.project_code ?? null });
+    }
+    return Array.from(m.entries()).map(([id, v]) => ({ id, ...v })).sort((a, b) => a.title.localeCompare(b.title));
+  }, [logs, activityRows]);
+
+
   const allDepts = useMemo(() => {
     const s = new Set<string>();
     for (const p of profiles ?? []) if (p.department) s.add(p.department);
@@ -310,10 +334,13 @@ export function TimesheetPage() {
           comments: partial ? `${baseComment ?? "Task hours"} · approved ${approvedHrs}/${logged}h` : baseComment,
           source: "activity" as const,
           approval_status: a.approval_status,
+          task_id: a.task?.id ?? a.task_id,
+          task_title: a.task?.title ?? "Task",
         };
       });
       let tasks: Task[] = [...logTasks, ...actTasks];
       if (projSel.size > 0) tasks = tasks.filter((t) => t.project_code && projSel.has(t.project_code));
+      if (taskSel.size > 0) tasks = tasks.filter((t) => t.task_id && taskSel.has(t.task_id));
       const total = tasks.reduce((s, t) => s + (Number(t.hours) || 0), 0);
       const dayApproved = !!log?.approved_at;
       const approvedTotal = tasks.reduce((s, t) => {
@@ -329,7 +356,8 @@ export function TimesheetPage() {
       .sort((a, b) =>
         (a.profile.full_name ?? a.profile.email ?? "").localeCompare(b.profile.full_name ?? b.profile.email ?? "")
       );
-  }, [profiles, logByUser, activityByUser, deptSel, empSel, projSel, showEmpty]);
+  }, [profiles, logByUser, activityByUser, deptSel, empSel, projSel, taskSel, showEmpty]);
+
 
 
   const dayTotal = useMemo(() => empRows.reduce((s, r) => s + r.total, 0), [empRows]);
@@ -346,7 +374,10 @@ export function TimesheetPage() {
         approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
           ? Number(r.approved_hours) : undefined,
         comments: r.comments?.trim() || undefined,
+        task_id: r.task_id || undefined,
+        task_title: r.task_title || undefined,
       }));
+
     const totalHrs = cleaned.reduce((s, r) => s + (r.hours ?? 0), 0);
     const isApprovedNow = opts && "approvedAt" in opts
       ? !!opts.approvedAt
@@ -413,9 +444,18 @@ export function TimesheetPage() {
     }
   }
 
-  async function addTask(row: EmpRow, code: string, hours: number) {
-    if (!code || hours <= 0) return;
-    const full = [...(row.log?.tasks ?? []).map((t) => ({ ...t })), { project_code: code, project_name: projectByCode.get(code)?.name || code, hours }];
+  async function addTaskEntry(
+    row: EmpRow,
+    picked: { taskId: string; title: string; projectCode: string | null; projectName: string | null },
+    hours: number,
+  ) {
+    if (!picked.taskId || hours <= 0) return;
+    const code = picked.projectCode ?? "";
+    const name = picked.projectName ?? (code ? projectByCode.get(code)?.name ?? code : "");
+    const full = [
+      ...(row.log?.tasks ?? []).map((t) => ({ ...t })),
+      { project_code: code, project_name: name, hours, task_id: picked.taskId, task_title: picked.title },
+    ];
     try {
       await persistTasks(row.profile.id, row.log, full);
       await refetchLogs();
@@ -425,6 +465,7 @@ export function TimesheetPage() {
       toast.error(e instanceof Error ? e.message : "Add failed");
     }
   }
+
 
   async function toggleApproval(row: EmpRow) {
     try {
@@ -444,11 +485,11 @@ export function TimesheetPage() {
   }
 
   function exportCsv() {
-    const header = ["Employee", "Email", "Department", "Project Code", "Project", "Hours", "Notes", "Status"];
+    const header = ["Employee", "Email", "Department", "Task", "Project Code", "Project", "Hours", "Notes", "Status"];
     const rows: string[][] = [];
     for (const r of empRows) {
       if (r.tasks.length === 0) {
-        rows.push([r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "", "", "", "0", "", r.approved ? "Approved" : "Pending"]);
+        rows.push([r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "", "", "", "", "0", "", r.approved ? "Approved" : "Pending"]);
         continue;
       }
       for (const t of r.tasks) {
@@ -457,6 +498,7 @@ export function TimesheetPage() {
           : (r.approved ? "Approved" : "Pending");
         rows.push([
           r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "",
+          t.task_title ?? "",
           t.project_code ?? "", t.project_name ?? "",
           String(t.hours ?? 0), t.comments ?? "", status,
         ]);
@@ -468,6 +510,7 @@ export function TimesheetPage() {
     const a = document.createElement("a"); a.href = url; a.download = `timesheet-${dateIso}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
+
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!canView) return null;
@@ -505,6 +548,8 @@ export function TimesheetPage() {
           <MultiSelectFilter label="Department" options={allDepts.map((d) => ({ value: d, label: d }))} selected={deptSel} onChange={setDeptSel} includeUnassigned />
           <MultiSelectFilter label="Employee" options={(profiles ?? []).map((p) => ({ value: p.id, label: p.full_name ?? p.email ?? "—", sub: p.email ?? undefined }))} selected={empSel} onChange={setEmpSel} />
           <MultiSelectFilter label="Projects" options={projectsInDay.map((p) => ({ value: p.code, label: p.name, sub: p.code }))} selected={projSel} onChange={setProjSel} />
+          <MultiSelectFilter label="Task" options={tasksInDay.map((t) => ({ value: t.id, label: t.title, sub: t.code ?? undefined }))} selected={taskSel} onChange={setTaskSel} />
+
           <Button variant="outline" size="sm" className="h-9" onClick={exportCsv} disabled={empRows.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Export CSV
           </Button>
@@ -578,7 +623,7 @@ export function TimesheetPage() {
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="min-w-[220px]">Employee</TableHead>
-                    <TableHead className="min-w-[240px]">Project</TableHead>
+                    <TableHead className="min-w-[260px]">Task</TableHead>
                     <TableHead className="w-[120px] text-right tabular-nums">Hours</TableHead>
                     <TableHead className="min-w-[180px]">Notes</TableHead>
                     <TableHead className="w-[110px]">Status</TableHead>
@@ -590,16 +635,16 @@ export function TimesheetPage() {
                     <EmployeeBlock
                       key={row.profile.id}
                       row={row}
-                      projects={projectsAll ?? []}
                       canEdit={canEdit}
                       canApprove={canApprove}
                       onUpdate={(i, p) => updateTask(row, i, p)}
                       onDelete={(i) => deleteTask(row, i)}
-                      onAdd={(code, hrs) => addTask(row, code, hrs)}
+                      onAdd={(picked, hrs) => addTaskEntry(row, picked, hrs)}
                       onToggleApproval={() => toggleApproval(row)}
                       onOpenFull={() => setEditor({ userId: row.profile.id, userName: row.profile.full_name ?? row.profile.email ?? "—", date: dateIso })}
                     />
                   ))}
+
                   <TableRow className="border-t-2 bg-muted/30">
                     <TableCell className="font-semibold">Day total</TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">
@@ -634,28 +679,50 @@ export function TimesheetPage() {
   );
 }
 
+type AddPicked = { taskId: string; title: string; projectCode: string | null; projectName: string | null };
+
 function EmployeeBlock({
-  row, projects, canEdit, canApprove,
+  row, canEdit, canApprove,
   onUpdate, onDelete, onAdd, onToggleApproval, onOpenFull,
 }: {
   row: { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number };
-  projects: Project[];
   canEdit: boolean;
   canApprove: boolean;
   onUpdate: (taskIndex: number, patch: Partial<Task>) => void;
   onDelete: (taskIndex: number) => void;
-  onAdd: (code: string, hours: number) => void;
+  onAdd: (picked: AddPicked, hours: number) => void;
   onToggleApproval: () => void;
   onOpenFull: () => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
-  const [addCode, setAddCode] = useState("");
+  const [addTaskId, setAddTaskId] = useState("");
   const [addHrs, setAddHrs] = useState("");
   const name = row.profile.full_name ?? row.profile.email ?? "—";
   const dept = row.profile.department;
   const locked = row.approved && !canApprove;
   const mayEdit = (canEdit && !row.approved) || canApprove;
-  const rowspan = Math.max(1, row.tasks.length) + (mayEdit && addOpen ? 1 : 0) + 1; // + summary/add trigger
+  const rowspan = Math.max(1, row.tasks.length) + (mayEdit && addOpen ? 1 : 0) + 1;
+
+  // Tasks assignable to this employee, loaded on demand when they open the add row.
+  const { data: userTasks } = useQuery({
+    queryKey: ["ts-user-tasks", row.profile.id],
+    enabled: addOpen,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("tasks")
+        .select("id, title, project_id")
+        .eq("assignee_id", row.profile.id)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      return (data ?? []) as UserTask[];
+    },
+  });
+  const { data: projectsForAdd } = useQuery({
+    queryKey: ["ts-projects-for-add"],
+    enabled: addOpen,
+    queryFn: async () => (await supabase.from("projects").select("id, code, name")).data as { id: string; code: string; name: string }[] ?? [],
+  });
+  const projectById = useMemo(() => new Map((projectsForAdd ?? []).map((p) => [p.id, p])), [projectsForAdd]);
 
   return (
     <>
@@ -683,6 +750,8 @@ function EmployeeBlock({
             if (!isActivity) logCounter++;
             const logIdx = isActivity ? -1 : logCounter;
             const editableRow = mayEdit && !isActivity;
+            const primary = t.task_title ?? (isActivity ? "Task" : (t.project_name ?? "—"));
+            const hasTaskLabel = !!t.task_title;
             return (
               <TableRow key={`${row.profile.id}-${i}`}>
                 {i === 0 && (
@@ -697,14 +766,19 @@ function EmployeeBlock({
                   </TableCell>
                 )}
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Select value={t.project_code ?? ""} onValueChange={(v) => onUpdate(logIdx, { project_code: v })} disabled={!editableRow}>
-                      <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {isActivity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">via task</Badge>}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate">{primary}</span>
+                      {isActivity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">via task</Badge>}
+                      {!isActivity && !hasTaskLabel && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">legacy</Badge>}
+                    </div>
+                    {(t.project_code || t.project_name) && (
+                      <div className="text-[10px] text-muted-foreground truncate mt-0.5">
+                        {t.project_code && <span className="font-mono">{t.project_code}</span>}
+                        {t.project_code && t.project_name ? " · " : ""}
+                        {t.project_name}
+                      </div>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -735,10 +809,18 @@ function EmployeeBlock({
       {mayEdit && row.tasks.length > 0 && addOpen && (
         <TableRow className="bg-muted/20">
           <TableCell>
-            <Select value={addCode} onValueChange={setAddCode}>
-              <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
+            <Select value={addTaskId} onValueChange={setAddTaskId}>
+              <SelectTrigger className="h-8"><SelectValue placeholder={userTasks && userTasks.length === 0 ? "No tasks assigned" : "Pick task"} /></SelectTrigger>
               <SelectContent className="max-h-72">
-                {projects.map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
+                {(userTasks ?? []).map((t) => {
+                  const proj = t.project_id ? projectById.get(t.project_id) : null;
+                  return (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.title ?? "Task"}
+                      {proj ? ` — ${proj.code}` : ""}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </TableCell>
@@ -749,11 +831,14 @@ function EmployeeBlock({
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => {
                 const h = Number(addHrs);
-                if (!addCode || !h || h <= 0) { toast.error("Pick a project and enter hours"); return; }
-                onAdd(addCode, h);
-                setAddCode(""); setAddHrs(""); setAddOpen(false);
+                if (!addTaskId || !h || h <= 0) { toast.error("Pick a task and enter hours"); return; }
+                const t = (userTasks ?? []).find((x) => x.id === addTaskId);
+                if (!t) { toast.error("Task not found"); return; }
+                const proj = t.project_id ? projectById.get(t.project_id) : null;
+                onAdd({ taskId: t.id, title: t.title ?? "Task", projectCode: proj?.code ?? null, projectName: proj?.name ?? null }, h);
+                setAddTaskId(""); setAddHrs(""); setAddOpen(false);
               }}>Add</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setAddOpen(false); setAddCode(""); setAddHrs(""); }}>Cancel</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setAddOpen(false); setAddTaskId(""); setAddHrs(""); }}>Cancel</Button>
             </div>
           </TableCell>
         </TableRow>
@@ -762,7 +847,7 @@ function EmployeeBlock({
         <TableRow>
           <TableCell colSpan={5}>
             <Button size="sm" variant="ghost" className="h-7 text-muted-foreground" onClick={() => setAddOpen(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add project
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add task
             </Button>
           </TableCell>
         </TableRow>
@@ -770,6 +855,7 @@ function EmployeeBlock({
     </>
   );
 }
+
 
 function taskStatusBadge(row: { approved: boolean }, task?: Task) {
   if (task?.source === "activity") {

@@ -45,14 +45,10 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const reviewFn = useServerFn(submitReviewDecision);
   const setReviewerFn = useServerFn(setReviewer);
   const setPctFn = useServerFn(setCompletionPercent);
-  const addSubFn = useServerFn(addSubtask);
-  const toggleSubFn = useServerFn(toggleSubtask);
-  const delSubFn = useServerFn(deleteSubtask);
   const addCommentFn = useServerFn(addComment);
   const resolveCommentFn = useServerFn(resolveComment);
   const watchFn = useServerFn(toggleWatcher);
-  const addDepFn = useServerFn(addDependency);
-  const rmDepFn = useServerFn(removeDependency);
+
   const duplicateFn = useServerFn(duplicateTask);
   const rateFn = useServerFn(rateTask);
   const logTimeFn = useServerFn(logTaskTime);

@@ -145,7 +145,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
   const [projects, setProjects] = useState<Array<{ id: string; code: string; name: string }>>([]);
   useEffect(() => { setName(initial.name); setStages(initial.stages); }, [initial]);
   useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email").order("full_name").then(({ data }) => setPeople((data ?? []) as typeof people));
+    supabase.rpc("list_assignable_users").then(({ data }) => setPeople(((data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>)));
     supabase.from("projects").select("id, code, name").eq("status", "active").order("code").then(({ data }) => setProjects((data ?? []) as typeof projects));
   }, []);
 

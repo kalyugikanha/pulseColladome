@@ -171,16 +171,21 @@ export function AttendanceTeamPanel() {
     URL.revokeObjectURL(url);
   }
 
+  const [decideBusy, setDecideBusy] = useState<string | null>(null);
   async function decide(id: string, status: "approved" | "rejected", adminComment?: string) {
-    const { error } = await supabase
-      .from("leave_requests")
-      .update({ status, admin_comment: adminComment || null, decided_by: me!.realId, decided_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success(`Leave ${status}`);
-    setCommentFor(null);
-    setComment("");
-    qc.invalidateQueries();
+    if (decideBusy) return;
+    setDecideBusy(id);
+    try {
+      const { error } = await supabase
+        .from("leave_requests")
+        .update({ status, admin_comment: adminComment || null, decided_by: me!.realId, decided_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) return toast.error(error.message);
+      toast.success(`Leave ${status}`);
+      setCommentFor(null);
+      setComment("");
+      qc.invalidateQueries();
+    } finally { setDecideBusy(null); }
   }
 
   return (

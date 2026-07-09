@@ -260,8 +260,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="min-w-[220px]">Task</TableHead>
                 <TableHead className="min-w-[160px]">Project</TableHead>
-                <TableHead className="min-w-[180px]">Task</TableHead>
                 <TableHead className="w-[90px] text-right">Hours</TableHead>
                 {canApprove && <TableHead className="w-[100px] text-right">Approved</TableHead>}
                 <TableHead>Comments</TableHead>
@@ -273,43 +273,44 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                 <TableRow><TableCell colSpan={canApprove ? 6 : 5} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
               )}
               {rows.map((r, i) => {
-                const options = tasksForProject(r.project_code);
-                const legacyTaskMissing = r.task_id && !options.some((t) => t.id === r.task_id);
+                const legacyTaskMissing = !!r.task_id && !taskById.has(r.task_id);
+                const derivedProject = r.project_code
+                  ? `${r.project_code}${r.project_name ? " · " + r.project_name : ""}`
+                  : "";
                 return (
                   <TableRow key={i}>
                     <TableCell>
                       <Select
-                        value={r.project_code ?? ""}
-                        onValueChange={(v) => updateRow(i, { project_code: v, project_name: projectByCode.get(v)?.name ?? v, task_id: "", task_title: "" })}
+                        value={r.task_id ?? ""}
+                        onValueChange={(v) => pickTask(i, v)}
                         disabled={!mayEdit}
                       >
-                        <SelectTrigger className="h-8"><SelectValue placeholder="Pick project" /></SelectTrigger>
-                        <SelectContent className="max-h-72">
-                          {(projects ?? []).map((p) => <SelectItem key={p.code} value={p.code}>{p.code} · {p.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={r.task_id ?? ""}
-                        onValueChange={(v) => updateRow(i, { task_id: v, task_title: taskById.get(v)?.title ?? "" })}
-                        disabled={!mayEdit || !r.project_code}
-                      >
                         <SelectTrigger className={`h-8 ${!r.task_id && Number(r.hours) > 0 ? "border-destructive/60" : ""}`}>
-                          <SelectValue placeholder={r.project_code ? "Pick task" : "Pick project first"} />
+                          <SelectValue placeholder="Pick a task" />
                         </SelectTrigger>
                         <SelectContent className="max-h-72">
                           {legacyTaskMissing && r.task_title && (
                             <SelectItem value={r.task_id!}>{r.task_title} (legacy)</SelectItem>
                           )}
-                          {options.length === 0 && !legacyTaskMissing && (
-                            <div className="px-3 py-2 text-xs text-muted-foreground">No tasks on this project assigned to you.</div>
+                          {(userTasks ?? []).length === 0 && !legacyTaskMissing && (
+                            <div className="px-3 py-2 text-xs text-muted-foreground">No tasks assigned to you.</div>
                           )}
-                          {options.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
-                          ))}
+                          {(userTasks ?? []).map((t) => {
+                            const proj = t.project_id ? projectById.get(t.project_id) : undefined;
+                            return (
+                              <SelectItem key={t.id} value={t.id}>
+                                {proj?.code && <span className="font-mono text-xs mr-2 text-muted-foreground">{proj.code}</span>}
+                                {t.title}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-8 flex items-center text-sm text-muted-foreground truncate">
+                        {derivedProject || <span className="italic">—</span>}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <Input

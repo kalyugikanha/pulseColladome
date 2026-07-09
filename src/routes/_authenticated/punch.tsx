@@ -239,8 +239,7 @@ export function PunchPage() {
   function openPunchOut() {
     if (!openSession) return;
     const now = new Date();
-    const suggested = Number((differenceInMinutes(now, new Date(openSession.punch_in_time)) / 60).toFixed(2));
-    setRows([{ projectId: "", taskId: "", hours: suggested > 0 ? String(suggested) : "", comments: "", atRisk: false }]);
+    setRows(visibleTasks.map((t) => ({ taskId: t.id, hours: "", comments: "", atRisk: false })));
     setPunchOutAt(toLocalDatetimeInput(now));
     setDialogOpen(true);
   }
@@ -248,11 +247,12 @@ export function PunchPage() {
   function updateRow(idx: number, patch: Partial<Row>) {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   }
-  function addRow() {
-    setRows((prev) => [...prev, { projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
+  function addTaskRow(taskId: string) {
+    if (!taskId) return;
+    setRows((prev) => (prev.some((r) => r.taskId === taskId) ? prev : [...prev, { taskId, hours: "", comments: "", atRisk: false, added: true }]));
   }
   function removeRow(idx: number) {
-    setRows((prev) => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
+    setRows((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function performPunchOut(opts: { skip: boolean }) {
@@ -267,25 +267,26 @@ export function PunchPage() {
       punchOutIso = d.toISOString();
     }
 
-    // Skip → send zero allocations. Otherwise, only include rows the user filled in.
-    const usableRows = opts.skip
-      ? []
-      : rows.filter((r) => (r.taskId || r.projectId) && Number(r.hours) > 0);
+    // Skip → send zero allocations. Otherwise, only include rows where the user typed hours.
+    const usableRows = opts.skip ? [] : rows.filter((r) => r.taskId && Number(r.hours) > 0);
 
     if (!opts.skip) {
       for (const [i, r] of usableRows.entries()) {
-        if (requireTask && !r.taskId) { toast.error(`Row ${i + 1}: pick a task (required for your team).`); return; }
-        if (!r.taskId && !r.projectId) { toast.error(`Row ${i + 1}: pick a task or project.`); return; }
+        const t = taskById.get(r.taskId);
+        if (!t?.project_id) { toast.error(`Row ${i + 1}: this task has no project — set one on the task first.`); return; }
       }
     }
 
-    const allocations = usableRows.map((r) => ({
-      projectId: r.projectId,
-      taskId: r.taskId || null,
-      hours: Number(Number(r.hours).toFixed(2)),
-      comments: r.comments.trim(),
-      atRisk: !!r.atRisk,
-    }));
+    const allocations = usableRows.map((r) => {
+      const t = taskById.get(r.taskId);
+      return {
+        projectId: t?.project_id ?? "",
+        taskId: r.taskId,
+        hours: Number(Number(r.hours).toFixed(2)),
+        comments: r.comments.trim(),
+        atRisk: !!r.atRisk,
+      };
+    });
     const totalLogged = Number(allocations.reduce((s, a) => s + a.hours, 0).toFixed(2));
 
     setSubmitting(true);

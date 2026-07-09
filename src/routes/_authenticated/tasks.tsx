@@ -280,13 +280,10 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   });
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const { data: people } = useQuery({
-    queryKey: ["people-lite-all"],
+    queryKey: ["assignable-users"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, department")
-        .order("full_name");
-      return data ?? [];
+      const { data } = await supabase.rpc("list_assignable_users");
+      return (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null; department: string | null }>;
     },
   });
   const filteredPeople = (people ?? []).filter((p) => {

@@ -472,9 +472,26 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                 <div className="flex gap-2 items-center">
                   <ListChecks className="h-4 w-4 text-muted-foreground shrink-0" />
                   <Input placeholder="Add checklist item…" value={newSub} onChange={(e) => setNewSub(e.target.value)}
-                    onKeyDown={async (e) => { if (e.key === "Enter" && newSub.trim()) { await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } }); setNewSub(""); await refresh(); } }}
+                    disabled={subAddBusy}
+                    onKeyDown={async (e) => {
+                      if (e.key !== "Enter" || !newSub.trim() || subAddBusy) return;
+                      setSubAddBusy(true);
+                      try {
+                        await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } });
+                        setNewSub("");
+                        await refresh();
+                      } finally { setSubAddBusy(false); }
+                    }}
                     className="h-8" />
-                  <Button size="sm" variant="outline" onClick={async () => { if (!newSub.trim()) return; await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } }); setNewSub(""); await refresh(); }}>Add</Button>
+                  <Button size="sm" variant="outline" disabled={subAddBusy || !newSub.trim()} onClick={async () => {
+                    if (!newSub.trim() || subAddBusy) return;
+                    setSubAddBusy(true);
+                    try {
+                      await addSubFn({ data: { taskId: taskId!, title: newSub.trim() } });
+                      setNewSub("");
+                      await refresh();
+                    } finally { setSubAddBusy(false); }
+                  }}>Add</Button>
                 </div>
                 {(detail?.subtasks?.length ?? 0) > 0 && (
                   <div className="pl-6 space-y-1">

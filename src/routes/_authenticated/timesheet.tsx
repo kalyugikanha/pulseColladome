@@ -441,9 +441,18 @@ export function TimesheetPage() {
     }
   }
 
-  async function addTask(row: EmpRow, code: string, hours: number) {
-    if (!code || hours <= 0) return;
-    const full = [...(row.log?.tasks ?? []).map((t) => ({ ...t })), { project_code: code, project_name: projectByCode.get(code)?.name || code, hours }];
+  async function addTaskEntry(
+    row: EmpRow,
+    picked: { taskId: string; title: string; projectCode: string | null; projectName: string | null },
+    hours: number,
+  ) {
+    if (!picked.taskId || hours <= 0) return;
+    const code = picked.projectCode ?? "";
+    const name = picked.projectName ?? (code ? projectByCode.get(code)?.name ?? code : "");
+    const full = [
+      ...(row.log?.tasks ?? []).map((t) => ({ ...t })),
+      { project_code: code, project_name: name, hours, task_id: picked.taskId, task_title: picked.title },
+    ];
     try {
       await persistTasks(row.profile.id, row.log, full);
       await refetchLogs();
@@ -453,6 +462,7 @@ export function TimesheetPage() {
       toast.error(e instanceof Error ? e.message : "Add failed");
     }
   }
+
 
   async function toggleApproval(row: EmpRow) {
     try {

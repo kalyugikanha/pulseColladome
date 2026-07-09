@@ -118,10 +118,12 @@ export function TimesheetPage() {
   const dateLabel = format(day, "EEEE, d MMM yyyy");
 
   // Visibility model shared with the Pending panel:
-  // - Admins / PMs / super admins: use dept/user scope, else all.
-  // - Managers: use dept/user scope, else fall back to direct reports.
+  // - People-unscoped (admin / super admin / HR / finance): see everyone in
+  //   the current scope (or all when no scope is set).
+  // - Everyone else (dept heads / reporting managers / PMs): scoped to their
+  //   reporting tree via useVisibilityScope, which is now narrow by default.
   const directReportIds = me?.directReportIds ?? [];
-  const pendingIsAdmin = !!me && (me.isAdmin || me.canManageProjects || me.isSuperAdmin);
+  const pendingIsAdmin = !!me && me.isPeopleUnscoped;
   const hasScope = !!deptScope || !!userScope;
   // IDs to restrict profiles/activity to when no dept/user scope is set.
   const fallbackActorIds: string[] | null = pendingIsAdmin ? null : directReportIds;

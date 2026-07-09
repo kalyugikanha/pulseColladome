@@ -69,10 +69,10 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
           setInstance({ ...i, template_name: i.template?.name ?? "Workflow", total_stages: (sc as unknown as unknown[])?.length ?? 0 });
         }
         const { data: sibs } = await supabase.from("tasks")
-          .select("id, title, status, stage_index")
+          .select("id, title, status, stage_index, stage_snapshot")
           .eq("workflow_instance_id", data.workflow_instance_id)
           .order("stage_index");
-        setSiblings((sibs as unknown as Array<{ id: string; title: string; status: string; stage_index: number | null }>) ?? []);
+        setSiblings((sibs as unknown as Array<{ id: string; title: string; status: string; stage_index: number | null; stage_snapshot: { name?: string } | null }>) ?? []);
       }
     })();
   }, [taskId]);

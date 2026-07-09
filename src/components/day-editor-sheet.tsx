@@ -4,10 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Lock, Save, CheckCircle2, Info } from "lucide-react";
+import { Plus, Trash2, Lock, Save, CheckCircle2, Info, MessageSquare, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -19,6 +21,7 @@ type Task = {
   hours?: number;
   approved_hours?: number;
   comments?: string;
+  approval_note?: string;
 };
 type Project = { id: string; code: string; name: string };
 type UserTask = { id: string; title: string; project_id: string | null; status: string };
@@ -127,6 +130,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
         approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
           ? Number(r.approved_hours) : undefined,
         comments: r.comments?.trim() || undefined,
+        approval_note: r.approval_note?.trim() || undefined,
       }));
   }
 
@@ -278,39 +282,52 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                 const derivedProject = r.project_code
                   ? `${r.project_code}${r.project_name ? " · " + r.project_name : ""}`
                   : "";
+                const loggedH = Number(r.hours) || 0;
+                const apprH = r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
+                  ? Number(r.approved_hours) : null;
+                const reduced = apprH != null && apprH < loggedH;
+                const readOnlyTask = canApprove || !mayEdit;
+                const showTaskAsText = readOnlyTask;
                 return (
                   <TableRow key={i}>
                     <TableCell>
-                      <Select
-                        value={r.task_id ?? ""}
-                        onValueChange={(v) => pickTask(i, v)}
-                        disabled={!mayEdit}
-                      >
-                        <SelectTrigger className={`h-8 ${!r.task_id && Number(r.hours) > 0 ? "border-destructive/60" : ""}`}>
-                          <SelectValue placeholder="Pick a task" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-72">
-                          {legacyTaskMissing && r.task_title && (
-                            <SelectItem value={r.task_id!}>{r.task_title} (legacy)</SelectItem>
+                      {showTaskAsText ? (
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">
+                            {r.task_title ?? (r.task_id ? "Task" : <span className="italic text-muted-foreground">Pick a task</span>)}
+                          </div>
+                          {legacyTaskMissing && (
+                            <div className="text-[10px] text-muted-foreground mt-0.5">legacy · no longer assigned</div>
                           )}
-                          {(userTasks ?? []).length === 0 && !legacyTaskMissing && (
-                            <div className="px-3 py-2 text-xs text-muted-foreground">No tasks assigned to you.</div>
-                          )}
-                          {(userTasks ?? []).map((t) => {
-                            const proj = t.project_id ? projectById.get(t.project_id) : undefined;
-                            return (
-                              <SelectItem key={t.id} value={t.id}>
-                                {proj?.code && <span className="font-mono text-xs mr-2 text-muted-foreground">{proj.code}</span>}
-                                {t.title}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+                        </div>
+                      ) : (
+                        <Select
+                          value={r.task_id ?? ""}
+                          onValueChange={(v) => pickTask(i, v)}
+                          disabled={!mayEdit || readOnlyTask}
+                        >
+                          <SelectTrigger className={`h-8 ${!r.task_id && Number(r.hours) > 0 ? "border-destructive/60" : ""}`}>
+                            <SelectValue placeholder="Pick a task" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            {(userTasks ?? []).length === 0 && (
+                              <div className="px-3 py-2 text-xs text-muted-foreground">No tasks assigned to you.</div>
+                            )}
+                            {(userTasks ?? []).map((t) => (
+                              <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="h-8 flex items-center text-sm text-muted-foreground truncate">
-                        {derivedProject || <span className="italic">—</span>}
+                        {derivedProject ? (
+                          <>
+                            <span className="font-mono mr-1">{r.project_code}</span>
+                            {r.project_name && <span className="truncate">{r.project_name}</span>}
+                          </>
+                        ) : <span className="italic">—</span>}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -324,26 +341,80 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                     </TableCell>
                     {canApprove && (
                       <TableCell className="text-right">
-                        <Input
-                          type="number" min={0} step={0.25}
-                          value={r.approved_hours ?? ""}
-                          placeholder={String(r.hours ?? 0)}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            updateRow(i, { approved_hours: v === "" ? undefined : Number(v) });
-                          }}
-                          className="h-8 text-right font-mono"
-                        />
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number" min={0} step={0.25}
+                              value={r.approved_hours ?? ""}
+                              placeholder={String(r.hours ?? 0)}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                updateRow(i, { approved_hours: v === "" ? undefined : Number(v) });
+                              }}
+                              className="h-8 w-20 text-right font-mono"
+                            />
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className={`h-7 w-7 shrink-0 ${r.approval_note?.trim() ? "text-primary" : "text-muted-foreground"}`}
+                                  aria-label="Manager note"
+                                  title={r.approval_note?.trim() ? "Manager note (click to edit)" : "Add manager note"}
+                                >
+                                  <StickyNote className="h-3.5 w-3.5" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80" align="end">
+                                <div className="space-y-2">
+                                  <div className="text-xs font-medium">Manager note (visible to employee)</div>
+                                  <Textarea
+                                    value={r.approval_note ?? ""}
+                                    onChange={(e) => updateRow(i, { approval_note: e.target.value })}
+                                    placeholder={reduced ? "e.g. Adjusted to 1h — task scope estimated at 1h." : "Explain any adjustment or add a review note…"}
+                                    rows={4}
+                                    className="text-sm"
+                                  />
+                                  <p className="text-[10px] text-muted-foreground">Saved when you save the day. Distinct from the employee's own comment.</p>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          {reduced && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-amber-700 border-amber-500/60">
+                              Adjusted −{(loggedH - (apprH ?? 0)).toFixed(2)}h
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                     <TableCell>
-                      <Input
-                        value={r.comments ?? ""}
-                        onChange={(e) => updateRow(i, { comments: e.target.value })}
-                        disabled={!mayEdit}
-                        className="h-8"
-                        placeholder="Optional"
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="h-8 w-full text-left text-sm border rounded-md px-2 hover:bg-muted/40 focus:outline-none focus:ring-1 focus:ring-ring truncate"
+                            title={r.comments || "Click to view / edit"}
+                          >
+                            {r.comments?.trim()
+                              ? <span className="truncate block">{r.comments}</span>
+                              : <span className="text-muted-foreground italic">{mayEdit ? "Add comment…" : "—"}</span>}
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80" align="start">
+                          <div className="space-y-2">
+                            <div className="text-xs font-medium">Employee comment</div>
+                            <Textarea
+                              value={r.comments ?? ""}
+                              onChange={(e) => updateRow(i, { comments: e.target.value })}
+                              placeholder="Optional context about this entry"
+                              rows={4}
+                              className="text-sm"
+                              disabled={!mayEdit}
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                     <TableCell>
                       <Button size="icon" variant="ghost" className="h-8 w-8" disabled={!mayEdit} onClick={() => deleteRow(i)}>

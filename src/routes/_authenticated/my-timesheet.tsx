@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { TableProperties, CalendarIcon, Pencil, CheckCircle2, Lock } from "lucide-react";
+import { TableProperties, CalendarIcon, Pencil, CheckCircle2, Lock, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DayEditorSheet } from "@/components/day-editor-sheet";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/my-timesheet")({
   component: MyTimesheetPage,
 });
 
-type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string; task_id?: string; task_title?: string };
+type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string; approval_note?: string; task_id?: string; task_title?: string };
 type LogRow = { id: string; date: string; tasks: Task[] | null; approved_at: string | null };
 
 type ViewMode = "month" | "range" | "day";
@@ -88,7 +88,7 @@ export function MyTimesheetPage() {
 
 
   // Flatten to (date, project, hours, comments)
-  type Row = { date: string; taskTitle?: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
+  type Row = { date: string; taskTitle?: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approvalNote?: string; approved: boolean; pending?: boolean; taskId?: string };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const l of logs ?? []) {
@@ -100,7 +100,7 @@ export function MyTimesheetPage() {
         out.push({
           date: l.date, taskTitle: t.task_title, code, name: t.project_name || code, hours: h,
           approvedHours: isApproved ? (ah ?? h) : null,
-          comments: t.comments, approved: isApproved, taskId: t.task_id,
+          comments: t.comments, approvalNote: t.approval_note, approved: isApproved, taskId: t.task_id,
         });
       }
     }
@@ -245,10 +245,27 @@ export function MyTimesheetPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono">{r.hours.toFixed(1)}</TableCell>
                       <TableCell className={`text-right font-mono ${reduced ? "text-amber-700" : ""}`}>
-                        {r.approvedHours != null ? r.approvedHours.toFixed(1) : "—"}
+                        <div className="flex items-center justify-end gap-1">
+                          <span>{r.approvedHours != null ? r.approvedHours.toFixed(1) : "—"}</span>
+                          {r.approvalNote?.trim() && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button type="button" className="text-primary hover:text-primary/80" aria-label="Manager note" title="Manager note">
+                                  <StickyNote className="h-3.5 w-3.5" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 text-sm" align="end">
+                                <div className="text-xs font-medium mb-1 text-muted-foreground">Manager note</div>
+                                <div className="whitespace-pre-wrap">{r.approvalNote}</div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
                       </TableCell>
 
-                      <TableCell className="text-xs text-muted-foreground">{r.comments ?? ""}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[260px]">
+                        <div className="truncate" title={r.comments ?? ""}>{r.comments ?? ""}</div>
+                      </TableCell>
                       <TableCell>
                         {r.approved
                           ? (reduced

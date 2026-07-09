@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, Check, X, Clock } from "lucide-react";
+import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, Check, X, Clock, StickyNote } from "lucide-react";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ type Task = {
   approved_hours?: number;
   logged_hours?: number;
   comments?: string;
+  approval_note?: string;
   source?: "log" | "activity";
   approval_status?: string;
   task_id?: string;
@@ -374,6 +375,7 @@ export function TimesheetPage() {
         approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
           ? Number(r.approved_hours) : undefined,
         comments: r.comments?.trim() || undefined,
+        approval_note: r.approval_note?.trim() || undefined,
         task_id: r.task_id || undefined,
         task_title: r.task_title || undefined,
       }));
@@ -785,7 +787,24 @@ function EmployeeBlock({
                   <InlineNumber value={Number(t.hours) || 0} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { hours: v })} />
                 </TableCell>
                 <TableCell>
-                  <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { comments: v })} placeholder="Optional" />
+                  <div className="flex items-center gap-1">
+                    <div className="flex-1 min-w-0">
+                      <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { comments: v })} placeholder="Optional" />
+                    </div>
+                    {t.approval_note?.trim() && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button type="button" className="text-primary hover:text-primary/80 shrink-0" aria-label="Manager note" title="Manager note">
+                            <StickyNote className="h-3.5 w-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72 text-sm" align="end">
+                          <div className="text-xs font-medium mb-1 text-muted-foreground">Manager note</div>
+                          <div className="whitespace-pre-wrap">{t.approval_note}</div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   {taskStatusBadge(row, t)}

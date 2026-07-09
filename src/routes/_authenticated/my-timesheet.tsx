@@ -220,7 +220,9 @@ export function MyTimesheetPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead><TableHead>Project</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Task</TableHead>
+                  <TableHead>Project</TableHead>
                   <TableHead className="text-right">Logged</TableHead>
                   <TableHead className="text-right">Approved</TableHead>
                   <TableHead>Comments</TableHead><TableHead>Status</TableHead>
@@ -233,11 +235,19 @@ export function MyTimesheetPage() {
                   return (
                     <TableRow key={`${r.date}-${r.code}-${i}`}>
                       <TableCell className="text-xs">{format(new Date(r.date + "T00:00:00"), "d MMM")}</TableCell>
-                      <TableCell><span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>{r.name}</TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium truncate max-w-[280px]">{r.taskTitle ?? (r.taskId ? "Task" : <span className="text-muted-foreground italic">—</span>)}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs text-muted-foreground truncate max-w-[220px]">
+                          <span className="font-mono mr-1">{r.code}</span>{r.name}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right font-mono">{r.hours.toFixed(1)}</TableCell>
                       <TableCell className={`text-right font-mono ${reduced ? "text-amber-700" : ""}`}>
                         {r.approvedHours != null ? r.approvedHours.toFixed(1) : "—"}
                       </TableCell>
+
                       <TableCell className="text-xs text-muted-foreground">{r.comments ?? ""}</TableCell>
                       <TableCell>
                         {r.approved

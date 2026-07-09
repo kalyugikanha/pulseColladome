@@ -19,7 +19,7 @@ type EditableTask = {
   priority: "low" | "medium" | "high";
   due_date: string | null;
   scheduled_post_date: string | null;
-  client_brand: string | null;
+  project_id: string | null;
   project_id: string | null;
   assignee_id: string | null;
   asset_links: { label: string; url: string }[] | null;

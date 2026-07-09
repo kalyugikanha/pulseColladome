@@ -130,6 +130,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
         approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
           ? Number(r.approved_hours) : undefined,
         comments: r.comments?.trim() || undefined,
+        approval_note: r.approval_note?.trim() || undefined,
       }));
   }
 

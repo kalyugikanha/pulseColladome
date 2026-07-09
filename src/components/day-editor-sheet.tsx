@@ -83,7 +83,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
   }, [log, open]);
 
   const projectByCode = useMemo(() => new Map((projects ?? []).map((p) => [p.code, p])), [projects]);
-  const projectIdByCode = useMemo(() => new Map((projects ?? []).map((p) => [p.code, p.id])), [projects]);
+  
   const taskById = useMemo(() => new Map((userTasks ?? []).map((t) => [t.id, t])), [userTasks]);
   const isApproved = !!log?.approved_at;
   const locked = isApproved && !canApprove;

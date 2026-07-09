@@ -82,8 +82,19 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
 
   useEffect(() => {
     if (!open) return;
-    setRows(((log?.tasks as Task[] | null) ?? []).map((t) => ({ ...t })));
-  }, [log, open]);
+    const src = ((log?.tasks as Task[] | null) ?? []).map((t) => ({ ...t }));
+    // Pre-fill approved_hours with logged hours for approvers so the field
+    // shows a real, committed starting value rather than an ambiguous placeholder.
+    const prepped = canApprove
+      ? src.map((r) => ({
+          ...r,
+          approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
+            ? Number(r.approved_hours)
+            : (Number(r.hours) || 0),
+        }))
+      : src;
+    setRows(prepped);
+  }, [log, open, canApprove]);
 
   const projectByCode = useMemo(() => new Map((projects ?? []).map((p) => [p.code, p])), [projects]);
   
@@ -244,7 +255,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-3xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-5xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {userName}
@@ -262,7 +273,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
         </div>
 
         <div className="mt-4 space-y-3">
-          <Table>
+          <div className="-mx-6 overflow-x-auto sm:mx-0">
+          <Table className="min-w-[860px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[220px]">Task</TableHead>
@@ -336,7 +348,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                         value={r.hours ?? 0}
                         onChange={(e) => updateRow(i, { hours: Number(e.target.value) })}
                         disabled={!mayEdit}
-                        className="h-8 text-right font-mono"
+                        className="h-8 w-20 px-2 text-sm text-right font-mono tabular-nums"
                       />
                     </TableCell>
                     {canApprove && (
@@ -345,13 +357,12 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                           <div className="flex items-center gap-1">
                             <Input
                               type="number" min={0} step={0.25}
-                              value={r.approved_hours ?? ""}
-                              placeholder={String(r.hours ?? 0)}
+                              value={r.approved_hours ?? r.hours ?? 0}
                               onChange={(e) => {
                                 const v = e.target.value;
                                 updateRow(i, { approved_hours: v === "" ? undefined : Number(v) });
                               }}
-                              className="h-8 w-20 text-right font-mono"
+                              className="h-8 w-20 px-2 text-sm text-right font-mono tabular-nums"
                             />
                             <Popover>
                               <PopoverTrigger asChild>
@@ -426,6 +437,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
               })}
             </TableBody>
           </Table>
+          </div>
+
 
           <div className="flex items-center justify-between gap-2 pt-2">
             <Button variant="outline" size="sm" onClick={addRow} disabled={!mayEdit}>

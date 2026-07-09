@@ -66,10 +66,16 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     queryFn: () => detailFn({ data: { taskId: taskId! } }),
   });
 
+  // Use the SECURITY DEFINER `list_assignable_users` RPC so employees (whose
+  // profiles RLS only exposes themselves + direct reports) still see the full
+  // active roster in the assignee/reviewer pickers — otherwise the Edit dialog
+  // would show only the current user.
   const { data: peopleAll } = useQuery({
-    queryKey: ["all-profiles-mini"],
-    queryFn: async () => (await supabase.from("profiles").select("id, full_name, email, department, reporting_manager_id").order("full_name")).data ?? [],
-
+    queryKey: ["assignable-users-mini"],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("list_assignable_users");
+      return (data ?? []) as { id: string; full_name: string | null; email: string | null; department: string | null }[];
+    },
   });
 
   type Attachment = { id: string; task_id: string; uploader_id: string; file_path: string; file_name: string; content_type: string | null; size_bytes: number | null; created_at: string; url: string | null; uploader: { id: string; full_name: string | null; email: string | null } | null };

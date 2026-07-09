@@ -275,18 +275,22 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   );
 
   async function doDelete() {
-    if (!task) return;
-    const { error } = await supabase.from("tasks").delete().eq("id", task.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Task deleted");
-    setDeleteOpen(false);
-    onClose();
-    await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
-    await qc.invalidateQueries({ queryKey: ["my-tasks"] });
+    if (!task || deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Task deleted");
+      setDeleteOpen(false);
+      onClose();
+      await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
+      await qc.invalidateQueries({ queryKey: ["my-tasks"] });
+    } finally { setDeleteBusy(false); }
   }
 
   async function doDuplicate() {
-    if (!task) return;
+    if (!task || duplicateBusy) return;
+    setDuplicateBusy(true);
     try {
       const created = (await duplicateFn({ data: { id: task.id } })) as { id: string } | null;
       const newId = created?.id;
@@ -296,7 +300,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
       await qc.invalidateQueries({ queryKey: ["my-tasks"] });
       onClose(newId);
     } catch (e) { toast.error((e as Error).message); }
+    finally { setDuplicateBusy(false); }
   }
+
 
   return (
     <Sheet open={!!taskId} onOpenChange={(o) => { if (!o) onClose(); }}>

@@ -227,17 +227,18 @@ export const punchIn = createServerFn({ method: "POST" })
   });
 
 export const punchOut = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, impersonationMiddleware])
   .inputValidator((input: PunchOutInput) => normalizePunchOutInput(input))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { db, targetUserId, onBehalfOf, isImpersonating } = await resolvePunchIdentity(context);
+    const supabase = db as any;
 
     // Fetch open session up front so we can compute duration for both allocation and skip modes.
     const { data: openRow, error: openErr } = await supabase
       .from("punch_sessions")
-      .select("punch_in_time")
+      .select("punch_in_time, user_id, on_behalf_of")
       .eq("id", data.sessionId)
-      .eq("user_id", userId)
+      .eq("user_id", targetUserId)
       .is("punch_out_time", null)
       .maybeSingle();
     if (openErr) throw new Error(openErr.message);
@@ -309,6 +310,11 @@ export const punchOut = createServerFn({ method: "POST" })
     const shortfall = Number(Math.max(0, sessionDurationHours - loggedHours).toFixed(2));
     const first = allocations[0];
 
+    // Preserve existing on_behalf_of if the session was opened during impersonation
+    // but is being closed by the same impersonated identity, or update if we are
+    // now impersonating.
+    const preservedOnBehalfOf = isImpersonating ? onBehalfOf : (openRow.on_behalf_of ?? null);
+
     const { data: updated, error } = await supabase
       .from("punch_sessions")
       .update({
@@ -325,9 +331,10 @@ export const punchOut = createServerFn({ method: "POST" })
             ? first.comments
             : allocations.map((row) => `[${row.project_code ?? ""}] ${row.hours}h — ${row.comments}`).join("\n"),
         allocations,
+        on_behalf_of: preservedOnBehalfOf,
       })
       .eq("id", data.sessionId)
-      .eq("user_id", userId)
+      .eq("user_id", targetUserId)
       .is("punch_out_time", null)
       .select("*")
       .maybeSingle();
@@ -341,15 +348,15 @@ export const punchOut = createServerFn({ method: "POST" })
       await supabase.from("tasks").update({ at_risk: true } as never).in("id", atRiskTaskIds);
     }
 
-    // Update the user's rolling unlogged-hours balance.
-    const prior = await readUnlogged(supabase, userId);
+    // Update the target user's rolling unlogged-hours balance (the person the hours belong to).
+    const prior = await readUnlogged(supabase, targetUserId);
     const newBalance = Number((prior.balance + shortfall).toFixed(2));
     const newSince = prior.since ?? (shortfall > 0 ? (updated as any).session_date : null);
     if (shortfall > 0) {
       await supabase.from("profiles").update({
         unlogged_hours_balance: newBalance,
         unlogged_hours_since: newSince,
-      } as never).eq("id", userId);
+      } as never).eq("id", targetUserId);
     }
 
     return {

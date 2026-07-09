@@ -245,7 +245,7 @@ export const updateTaskFull = createServerFn({ method: "POST" })
     if (data.assigneeId !== undefined) patch.assignee_id = data.assigneeId;
     if (data.projectId !== undefined) patch.project_id = data.projectId;
     if (data.assetLinks !== undefined) patch.asset_links = data.assetLinks;
-    if (data.domainId !== undefined) patch.domain_id = data.domainId;
+    // domain_id column dropped; ignore data.domainId if passed.
     if (data.departmentId !== undefined) patch.department_id = data.departmentId;
     if (data.estimatedHours !== undefined) patch.estimated_hours = data.estimatedHours;
     if (Object.keys(patch).length > 0) {

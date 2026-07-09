@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { impersonationMiddleware } from "@/lib/impersonation.middleware";
 
 type PunchAllocationInput = {
   projectId: string;
@@ -140,16 +141,46 @@ async function readUnlogged(supabase: any, userId: string) {
   };
 }
 
+/**
+ * Resolve the DB client + attribution identity for punch writes.
+ *
+ * When an admin is impersonating another user via "View As", the punch
+ * session must be attributed to the impersonated user (session.user_id =
+ * actingUserId) and stamped with on_behalf_of = the real admin id, so the
+ * audit trail shows the admin logged it on the employee's behalf.
+ *
+ * RLS on punch_sessions only allows a user to write their own rows, so on
+ * the impersonation path we swap in the service-role client to bypass RLS
+ * — the middleware already verified the caller is a super admin.
+ */
+async function resolvePunchIdentity(context: {
+  supabase: unknown;
+  userId: string;
+  actingUserId?: string;
+  impersonatedBy?: string | null;
+  isImpersonating?: boolean;
+}) {
+  const isImpersonating = !!context.isImpersonating && !!context.actingUserId && context.actingUserId !== context.userId;
+  const targetUserId = isImpersonating ? (context.actingUserId as string) : context.userId;
+  const onBehalfOf = isImpersonating ? (context.impersonatedBy ?? context.userId) : null;
+  if (isImpersonating) {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    return { db: supabaseAdmin as unknown as typeof context.supabase, targetUserId, onBehalfOf, isImpersonating };
+  }
+  return { db: context.supabase, targetUserId, onBehalfOf, isImpersonating };
+}
+
 export const punchIn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, impersonationMiddleware])
   .inputValidator((input: PunchInInput) => ({ sessionDate: requireIsoDate(input.sessionDate) }))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { db, targetUserId, onBehalfOf } = await resolvePunchIdentity(context);
+    const supabase = db as any;
 
     const { data: existingToday, error: existingError } = await supabase
       .from("punch_sessions")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", targetUserId)
       .eq("session_date", data.sessionDate)
       .is("punch_out_time", null)
       .order("punch_in_time", { ascending: false })
@@ -157,7 +188,7 @@ export const punchIn = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existingError) throw new Error(existingError.message);
 
-    const unlogged = await readUnlogged(supabase, userId);
+    const unlogged = await readUnlogged(supabase, targetUserId);
 
     if (existingToday) {
       return { status: "already_open" as const, session: toPunchSession(existingToday), unloggedBalance: unlogged.balance, unloggedSince: unlogged.since } satisfies PunchInResult;
@@ -166,9 +197,10 @@ export const punchIn = createServerFn({ method: "POST" })
     const { data: inserted, error } = await supabase
       .from("punch_sessions")
       .insert({
-        user_id: userId,
+        user_id: targetUserId,
         session_date: data.sessionDate,
         punch_in_time: new Date().toISOString(),
+        on_behalf_of: onBehalfOf,
       })
       .select("*")
       .single();
@@ -180,7 +212,7 @@ export const punchIn = createServerFn({ method: "POST" })
       const { data: openSession, error: openError } = await supabase
         .from("punch_sessions")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", targetUserId)
         .is("punch_out_time", null)
         .order("punch_in_time", { ascending: false })
         .limit(1)
@@ -195,17 +227,18 @@ export const punchIn = createServerFn({ method: "POST" })
   });
 
 export const punchOut = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, impersonationMiddleware])
   .inputValidator((input: PunchOutInput) => normalizePunchOutInput(input))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
+    const { db, targetUserId, onBehalfOf, isImpersonating } = await resolvePunchIdentity(context);
+    const supabase = db as any;
 
     // Fetch open session up front so we can compute duration for both allocation and skip modes.
     const { data: openRow, error: openErr } = await supabase
       .from("punch_sessions")
-      .select("punch_in_time")
+      .select("punch_in_time, user_id, on_behalf_of")
       .eq("id", data.sessionId)
-      .eq("user_id", userId)
+      .eq("user_id", targetUserId)
       .is("punch_out_time", null)
       .maybeSingle();
     if (openErr) throw new Error(openErr.message);
@@ -277,6 +310,11 @@ export const punchOut = createServerFn({ method: "POST" })
     const shortfall = Number(Math.max(0, sessionDurationHours - loggedHours).toFixed(2));
     const first = allocations[0];
 
+    // Preserve existing on_behalf_of if the session was opened during impersonation
+    // but is being closed by the same impersonated identity, or update if we are
+    // now impersonating.
+    const preservedOnBehalfOf = isImpersonating ? onBehalfOf : (openRow.on_behalf_of ?? null);
+
     const { data: updated, error } = await supabase
       .from("punch_sessions")
       .update({
@@ -293,9 +331,10 @@ export const punchOut = createServerFn({ method: "POST" })
             ? first.comments
             : allocations.map((row) => `[${row.project_code ?? ""}] ${row.hours}h — ${row.comments}`).join("\n"),
         allocations,
+        on_behalf_of: preservedOnBehalfOf,
       })
       .eq("id", data.sessionId)
-      .eq("user_id", userId)
+      .eq("user_id", targetUserId)
       .is("punch_out_time", null)
       .select("*")
       .maybeSingle();
@@ -309,15 +348,15 @@ export const punchOut = createServerFn({ method: "POST" })
       await supabase.from("tasks").update({ at_risk: true } as never).in("id", atRiskTaskIds);
     }
 
-    // Update the user's rolling unlogged-hours balance.
-    const prior = await readUnlogged(supabase, userId);
+    // Update the target user's rolling unlogged-hours balance (the person the hours belong to).
+    const prior = await readUnlogged(supabase, targetUserId);
     const newBalance = Number((prior.balance + shortfall).toFixed(2));
     const newSince = prior.since ?? (shortfall > 0 ? (updated as any).session_date : null);
     if (shortfall > 0) {
       await supabase.from("profiles").update({
         unlogged_hours_balance: newBalance,
         unlogged_hours_since: newSince,
-      } as never).eq("id", userId);
+      } as never).eq("id", targetUserId);
     }
 
     return {

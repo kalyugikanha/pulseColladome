@@ -59,7 +59,10 @@ export function PunchPage() {
   const clearUnloggedServer = useServerFn(clearUnloggedHoursServerFn);
   const requestTaskServer = useServerFn(requestTaskFromManager);
   const today = format(new Date(), "yyyy-MM-dd");
-  const punchUserId = me?.realId ?? me?.id;
+  // Attribution follows the viewed identity: when a super admin uses "View As"
+  // to punch on someone's behalf, the session belongs to that person (server
+  // records the real admin id in on_behalf_of for the audit trail).
+  const punchUserId = me?.id;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>([{ projectId: "", taskId: "", hours: "", comments: "", atRisk: false }]);
   const [submitting, setSubmitting] = useState(false);
@@ -105,8 +108,9 @@ export function PunchPage() {
   });
   const requireTask = ((myDept ?? "").toLowerCase() === "marketing" || (myDept ?? "").toLowerCase() === "business development" || (myDept ?? "").toLowerCase() === "bd");
 
-  // Task picker follows the viewed user (me.id) so impersonation shows their tasks.
-  // Sessions still use realId because punches belong to the real authenticated user.
+  // Task picker follows the same viewed user as the session — so a punch
+  // logged on behalf of an employee can only allocate hours to that employee's
+  // own assigned tasks.
   const taskOwnerId = me?.id;
   const { data: myTasks } = useQuery({
     queryKey: ["my-punch-tasks", taskOwnerId],

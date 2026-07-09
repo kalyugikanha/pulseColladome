@@ -199,17 +199,17 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     await refresh();
   }
   async function addReference() {
-    const label = refLabel.trim();
     let url = refUrl.trim();
-    if (!label || !url) return toast.error("Label and URL required");
+    if (!url) return toast.error("URL required");
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     setRefBusy(true);
     try {
-      await saveAssetLinks([...assetLinks, { label, url }]);
-      setRefLabel(""); setRefUrl("");
+      await saveAssetLinks([...assetLinks, { label: "", url }]);
+      setRefUrl("");
     } catch (e) { toast.error((e as Error).message); }
     finally { setRefBusy(false); }
   }
+
   async function removeReference(idx: number) {
     try { await saveAssetLinks(assetLinks.filter((_, i) => i !== idx)); }
     catch (e) { toast.error((e as Error).message); }

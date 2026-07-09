@@ -117,11 +117,11 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
 
   function cleanRows(): Task[] {
     return rows
-      .filter((r) => r.project_code && Number(r.hours) > 0)
+      .filter((r) => r.task_id && Number(r.hours) > 0)
       .map((r) => ({
         project_code: r.project_code,
-        project_name: r.project_name || projectByCode.get(r.project_code!)?.name || r.project_code,
-        task_id: r.task_id || undefined,
+        project_name: r.project_name || (r.project_code ? projectByCode.get(r.project_code)?.name : undefined) || r.project_code,
+        task_id: r.task_id,
         task_title: r.task_title || (r.task_id ? taskById.get(r.task_id)?.title : undefined),
         hours: Number(r.hours) || 0,
         approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
@@ -137,13 +137,14 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
   async function save() {
     setSaving(true);
     try {
-      const filled = rows.filter((r) => r.project_code && Number(r.hours) > 0);
-      if (filled.some((r) => !r.task_id)) {
-        toast.error("Pick a task for every hour you log — hours must be tied to a task.");
+      const withHours = rows.filter((r) => Number(r.hours) > 0);
+      if (withHours.some((r) => !r.task_id)) {
+        toast.error("Every hour must be tied to a task. If the task isn't listed, use the 'Request a task' flow on Punch.");
         setSaving(false);
         return;
       }
       const cleaned = cleanRows();
+
       const totalHrs = cleaned.reduce((s, r) => s + (r.hours ?? 0), 0);
       const { data: userRes } = await supabase.auth.getUser();
       const myId = userRes.user?.id ?? null;
@@ -190,9 +191,9 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
       const myId = userRes.user?.id ?? null;
 
       if (!log?.id) {
-        const filled = rows.filter((r) => r.project_code && Number(r.hours) > 0);
-        if (filled.some((r) => !r.task_id)) {
-          toast.error("Pick a task for every row before approving.");
+        const withHours = rows.filter((r) => Number(r.hours) > 0);
+        if (withHours.some((r) => !r.task_id)) {
+          toast.error("Every row with hours needs a task before approval.");
           setSaving(false);
           return;
         }

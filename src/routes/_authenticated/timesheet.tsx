@@ -93,9 +93,11 @@ export function TimesheetPage() {
 
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
   const [projSel, setProjSel] = useState<Set<string>>(new Set());
+  const [taskSel, setTaskSel] = useState<Set<string>>(new Set());
   const [empSel, setEmpSel] = useState<Set<string>>(new Set());
   const [showEmpty, setShowEmpty] = useState(false);
   const [editor, setEditor] = useState<{ userId: string; userName: string; date: string } | null>(null);
+
 
   useEffect(() => {
     if (!meLoading && me && !(me.isAdmin || me.canManageProjects || me.isDepartmentHead || me.isReportingManager)) {

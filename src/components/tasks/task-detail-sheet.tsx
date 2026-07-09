@@ -251,13 +251,6 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     finally { setReviewBusy(false); }
   }
 
-  async function doSearchDeps(q: string) {
-    setDepQuery(q);
-    if (q.length < 2) { setDepOptions([]); return; }
-    const { data } = await supabase.from("tasks").select("id, title").neq("id", taskId!).ilike("title", `%${q}%`).limit(10);
-    setDepOptions(data ?? []);
-  }
-
   if (!taskId) return null;
 
   const canEditDelete = !!task && !!me && (

@@ -441,7 +441,7 @@ export function AttendanceTeamPanel() {
                       }}
                     >
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" disabled={decideBusy === r.id}>
                           <X className="h-4 w-4 mr-1" /> Reject
                         </Button>
                       </DialogTrigger>
@@ -453,16 +453,17 @@ export function AttendanceTeamPanel() {
                           placeholder="Optional reason"
                           value={comment}
                           onChange={(e) => setComment(e.target.value)}
+                          disabled={decideBusy === r.id}
                         />
                         <DialogFooter>
-                          <Button variant="destructive" onClick={() => decide(r.id, "rejected", comment)}>
-                            Reject
+                          <Button variant="destructive" disabled={decideBusy === r.id} onClick={() => decide(r.id, "rejected", comment)}>
+                            {decideBusy === r.id ? "Rejecting…" : "Reject"}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
-                    <Button size="sm" className="gradient-primary" onClick={() => decide(r.id, "approved")}>
-                      <Check className="h-4 w-4 mr-1" /> Approve
+                    <Button size="sm" className="gradient-primary" disabled={decideBusy === r.id} onClick={() => decide(r.id, "approved")}>
+                      <Check className="h-4 w-4 mr-1" /> {decideBusy === r.id ? "Approving…" : "Approve"}
                     </Button>
                   </div>
                 </div>

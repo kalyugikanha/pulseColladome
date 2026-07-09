@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Project managers manage all attendance" ON public.attendance_logs;

@@ -88,7 +88,7 @@ export function MyTimesheetPage() {
 
 
   // Flatten to (date, project, hours, comments)
-  type Row = { date: string; taskTitle?: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approved: boolean; pending?: boolean; taskId?: string };
+  type Row = { date: string; taskTitle?: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approvalNote?: string; approved: boolean; pending?: boolean; taskId?: string };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
     for (const l of logs ?? []) {
@@ -100,7 +100,7 @@ export function MyTimesheetPage() {
         out.push({
           date: l.date, taskTitle: t.task_title, code, name: t.project_name || code, hours: h,
           approvedHours: isApproved ? (ah ?? h) : null,
-          comments: t.comments, approved: isApproved, taskId: t.task_id,
+          comments: t.comments, approvalNote: t.approval_note, approved: isApproved, taskId: t.task_id,
         });
       }
     }

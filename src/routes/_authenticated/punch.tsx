@@ -466,31 +466,38 @@ export function PunchPage() {
                       <p className="text-[11px] text-warning">No assigned tasks found — request one above or pick a project below.</p>
                     )}
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Project {requireTask && <span className="text-muted-foreground text-[11px]">(auto from task)</span>}</Label>
-                      <Select
-                        value={r.projectId}
-                        onValueChange={(v) => updateRow(idx, { projectId: v })}
-                        disabled={requireTask && !!pickedTask}
-                      >
-                        <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
-                        <SelectContent>
-                          {projects?.map((p) => (
-                            <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
+                  {r.taskId ? (
+                    <div className="space-y-1.5 max-w-[160px]">
                       <Label className="text-xs">Hours</Label>
                       <Input type="number" min="0" step="0.25" placeholder="e.g. 2.5" value={r.hours} onChange={(e) => updateRow(idx, { hours: e.target.value })} />
                     </div>
-                  </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Project</Label>
+                        <Select
+                          value={r.projectId}
+                          onValueChange={(v) => updateRow(idx, { projectId: v })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                          <SelectContent>
+                            {projects?.map((p) => (
+                              <SelectItem key={p.id} value={p.id}><span className="font-mono text-xs mr-2">{p.code}</span>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Hours</Label>
+                        <Input type="number" min="0" step="0.25" placeholder="e.g. 2.5" value={r.hours} onChange={(e) => updateRow(idx, { hours: e.target.value })} />
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     <Label className="text-xs">What did you work on? <span className="text-muted-foreground">(optional)</span></Label>
                     <Textarea rows={2} placeholder="Short comment on this entry" value={r.comments} onChange={(e) => updateRow(idx, { comments: e.target.value })} />
                   </div>
+                  {r.taskId && <TaskCommentsPreview taskId={r.taskId} />}
                   {r.taskId && (
                     <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                       <Checkbox
@@ -503,6 +510,7 @@ export function PunchPage() {
                       </span>
                     </label>
                   )}
+
                 </div>
               );
             })}

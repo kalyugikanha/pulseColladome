@@ -37,7 +37,7 @@ function todayInIndia() {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-export function WorkflowTaskPanel({ taskId, onChanged }: { taskId: string; onChanged?: () => void | Promise<void> }) {
+export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: string; onChanged?: () => void | Promise<void>; onOpenTask?: (id: string) => void }) {
   const { data: me } = useCurrentUser();
   const [task, setTask] = useState<TaskInfo | null>(null);
   const [instance, setInstance] = useState<{ id: string; started_by: string; template_id: string; template_name: string; total_stages: number } | null>(null);

@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { Slider } from "@/components/ui/slider";
+
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ import { MarkDoneDialog } from "./mark-done-dialog";
 import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
 import {
-  getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer, setCompletionPercent,
+  getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer,
   addComment, resolveComment,
   toggleWatcher, rateTask,
   listTaskAttachments, insertTaskAttachment, deleteTaskAttachment, updateTaskAssetLinks,
@@ -45,7 +45,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const setStatusFn = useServerFn(setTaskStatus);
   const reviewFn = useServerFn(submitReviewDecision);
   const setReviewerFn = useServerFn(setReviewer);
-  const setPctFn = useServerFn(setCompletionPercent);
+  
   const addCommentFn = useServerFn(addComment);
   const resolveCommentFn = useServerFn(resolveComment);
   const watchFn = useServerFn(toggleWatcher);
@@ -139,7 +139,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     () => !!detail?.watchers?.some((w) => (w as { user_id: string }).user_id === me?.id),
     [detail?.watchers, me?.id],
   );
-  const subtasksExist = (detail?.subtasks?.length ?? 0) > 0;
+  
 
   async function refresh() {
     await qc.invalidateQueries({ queryKey: ["task-detail", taskId] });
@@ -340,24 +340,6 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
               </Button>
             </div>
 
-            <div className="rounded-lg border border-border/60 p-3 mb-4 space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Progress</span>
-                <span>{task.completion_percent ?? 0}%</span>
-              </div>
-              <Progress value={task.completion_percent ?? 0} />
-              {!subtasksExist && (isAssignee || isReviewer) && (
-                <Slider
-                  min={0} max={100} step={5}
-                  value={[task.completion_percent ?? 0]}
-                  onValueCommit={async (v) => {
-                    await setPctFn({ data: { taskId: taskId!, percent: v[0] } });
-                    await refresh();
-                  }}
-                />
-              )}
-              {subtasksExist && <p className="text-xs text-muted-foreground">Auto-computed from checklist</p>}
-            </div>
 
             {isReviewer && task.status === "review" && !task.workflow_instance_id && (
               <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 mb-4 space-y-2">

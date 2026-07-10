@@ -118,13 +118,13 @@ export function PunchPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("tasks")
-        .select("id, title, status, project_id, updated_at, project:projects(id, code, name)")
+        .select("id, title, status, project_id, updated_at, due_date, project:projects(id, code, name)")
         .eq("assignee_id", taskOwnerId!)
         .in("status", ["todo", "in_progress", "review", "done"])
         .not("project_id", "is", null)
         .order("updated_at", { ascending: false })
         .limit(500);
-      const rows = (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; updated_at: string | null; project: { id: string; code: string; name: string } | null }>;
+      const rows = (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; updated_at: string | null; due_date: string | null; project: { id: string; code: string; name: string } | null }>;
       // Hide Done tasks last updated more than ~3 days ago — pure visibility filter,
       // the underlying task/status/history/hours are untouched.
       const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
@@ -138,6 +138,7 @@ export function PunchPage() {
     },
     staleTime: 60_000,
   });
+
 
   // Task ids that this user has already logged hours against in a prior punch session.
   // Used to hide Done tasks that have already been billed — punch-out is a fresh-entry
@@ -169,11 +170,28 @@ export function PunchPage() {
     return myTasks.filter((t) => !(t.status === "done" && loggedTaskIds?.has(t.id)));
   }, [myTasks, loggedTaskIds]);
 
+  // Punch-out dialog default: only tasks marked Done today.
+  const doneTodayTasks = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const startMs = start.getTime();
+    return visibleTasks.filter(
+      (t) => t.status === "done" && !!t.updated_at && new Date(t.updated_at).getTime() >= startMs,
+    );
+  }, [visibleTasks]);
+
+  // Available for the "Add another task" picker: everything else that's visible.
+  const otherAvailableTasks = useMemo(() => {
+    const doneTodayIds = new Set(doneTodayTasks.map((t) => t.id));
+    return visibleTasks.filter((t) => !doneTodayIds.has(t.id));
+  }, [visibleTasks, doneTodayTasks]);
+
   const taskById = useMemo(() => {
     const m = new Map<string, NonNullable<typeof myTasks>[number]>();
     for (const t of myTasks ?? []) m.set(t.id, t);
     return m;
   }, [myTasks]);
+
 
   const { data: history } = useQuery({
     queryKey: ["punch-history", punchUserId],
@@ -239,7 +257,8 @@ export function PunchPage() {
   function openPunchOut() {
     if (!openSession) return;
     const now = new Date();
-    setRows(visibleTasks.map((t) => ({ taskId: t.id, hours: "", comments: "", atRisk: false })));
+    setRows(doneTodayTasks.map((t) => ({ taskId: t.id, hours: "", comments: "", atRisk: false })));
+
     setPunchOutAt(toLocalDatetimeInput(now));
     setDialogOpen(true);
   }
@@ -448,65 +467,81 @@ export function PunchPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
+          <DialogHeader className="px-6 pt-6 shrink-0">
             <DialogTitle className="font-display">Log this session</DialogTitle>
             <DialogDescription>
               {openSession && `Fill in hours only for the tasks you actually worked on this session.`}
             </DialogDescription>
           </DialogHeader>
 
-          {openSession && (() => {
-            const end = punchOutAt ? new Date(punchOutAt) : new Date(nowTick);
-            const live = Number.isNaN(end.getTime())
-              ? sessionDurationHours
-              : Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2)));
-            return (
-              <div className="rounded-lg border border-border/60 p-4 bg-gradient-to-br from-primary/5 to-transparent">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-display text-4xl font-bold tabular-nums">{live.toFixed(2)}</span>
-                  <span className="text-lg text-muted-foreground">h this session</span>
+          <div className="px-6 pt-4 space-y-4 shrink-0">
+            {openSession && (() => {
+              const end = punchOutAt ? new Date(punchOutAt) : new Date(nowTick);
+              const live = Number.isNaN(end.getTime())
+                ? sessionDurationHours
+                : Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2)));
+              return (
+                <div className="rounded-lg border border-border/60 p-4 bg-gradient-to-br from-primary/5 to-transparent">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-4xl font-bold tabular-nums">{live.toFixed(2)}</span>
+                    <span className="text-lg text-muted-foreground">h this session</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Punched in at {format(new Date(openSession.punch_in_time), "HH:mm")} — split across the tasks you worked on.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Punched in at {format(new Date(openSession.punch_in_time), "HH:mm")} — split across the tasks you worked on.
-                </p>
+              );
+            })()}
+
+            {openSession && (
+              <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-1.5">
+                <Label className="text-xs">Punch-out date & time</Label>
+                <Input
+                  type="datetime-local"
+                  value={punchOutAt}
+                  min={toLocalDatetimeInput(new Date(openSession.punch_in_time))}
+                  max={toLocalDatetimeInput(new Date())}
+                  onChange={(e) => setPunchOutAt(e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground">Default is now. Change it if you're logging a session from a previous day or an earlier time.</p>
               </div>
-            );
-          })()}
+            )}
+          </div>
 
-          {openSession && (
-            <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-1.5">
-              <Label className="text-xs">Punch-out date & time</Label>
-              <Input
-                type="datetime-local"
-                value={punchOutAt}
-                min={toLocalDatetimeInput(new Date(openSession.punch_in_time))}
-                max={toLocalDatetimeInput(new Date())}
-                onChange={(e) => setPunchOutAt(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground">Default is now. Change it if you're logging a session from a previous day or an earlier time.</p>
-            </div>
-          )}
-
-          <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-3">
 
             {rows.length === 0 && (
               <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground text-center">
-                No tasks assigned to you. Use "+ New task" below to log time against a specific task, or skip and log later.
+                No tasks marked Done today. Use "Add another task" below to log time against a specific task, or skip and log later.
               </div>
             )}
 
             {rows.map((r, idx) => {
               const t = taskById.get(r.taskId);
               const hasHours = Number(r.hours) > 0;
+              const dateLabel = t
+                ? t.status === "done" && t.updated_at
+                  ? `Done · ${format(new Date(t.updated_at), "MMM d")}`
+                  : t.due_date
+                    ? `Due ${format(new Date(t.due_date), "MMM d")}`
+                    : "No due date"
+                : null;
               return (
                 <div key={r.taskId || idx} className={`rounded-lg border border-border/60 p-3 space-y-2 ${hasHours ? "bg-muted/30" : "bg-muted/10"}`}>
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="font-medium truncate">{t?.title ?? "Unknown task"}</div>
-                      {t?.project?.name && (
-                        <div className="text-[11px] text-muted-foreground truncate">{t.project.name}</div>
-                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {t?.project?.name && (
+                          <span className="text-[11px] text-muted-foreground truncate">{t.project.name}</span>
+                        )}
+                        {dateLabel && (
+                          <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-border/60 ${t?.status === "done" ? "text-success" : "text-muted-foreground"}`}>
+                            {dateLabel}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="w-[110px] shrink-0">
                       <Input
@@ -551,13 +586,16 @@ export function PunchPage() {
             })}
 
             <div className="rounded-lg border border-dashed border-border/60 p-3 space-y-2">
-              <Label className="text-xs">+ New task</Label>
+              <Label className="text-xs">Add another task</Label>
               <TaskCombobox
-                tasks={(myTasks ?? []).filter((t) => !rows.some((r) => r.taskId === t.id))}
+                tasks={otherAvailableTasks.filter((t) => !rows.some((r) => r.taskId === t.id))}
                 value=""
                 onChange={(taskId) => addTaskRow(taskId)}
                 allowNone={false}
               />
+              <p className="text-[11px] text-muted-foreground">
+                In Progress, To Do, or Done in the last 3 days.
+              </p>
               <button
                 type="button"
                 onClick={() => { setReqTitle(""); setReqProjectId(""); setReqNote(""); setRequestOpen(true); }}
@@ -571,31 +609,33 @@ export function PunchPage() {
             </div>
           </div>
 
-
-          <div className="flex items-center justify-between text-sm px-1">
-            <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{(() => {
-              if (!openSession) return sessionDurationHours.toFixed(2);
-              const end = punchOutAt ? new Date(punchOutAt) : new Date(nowTick);
-              if (Number.isNaN(end.getTime())) return sessionDurationHours.toFixed(2);
-              return Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2))).toFixed(2);
-            })()}h</span></span>
-            <span className="font-semibold text-foreground">
-              Logging: {allocatedTotal.toFixed(2)}h <span className="text-muted-foreground font-normal">(doesn't have to match)</span>
-            </span>
-          </div>
-
-          <DialogFooter className="gap-2 sm:justify-between">
-            <Button variant="ghost" onClick={skipPunchOut} disabled={submitting} className="text-muted-foreground">
-              Skip for now
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>
-              <Button onClick={submitPunchOut} disabled={submitting} className="gradient-primary">
-                {submitting ? "Saving…" : "Punch out & log hours"}
-              </Button>
+          <div className="shrink-0 border-t border-border/60 bg-background px-6 py-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Session length: <span className="font-semibold text-foreground">{(() => {
+                if (!openSession) return sessionDurationHours.toFixed(2);
+                const end = punchOutAt ? new Date(punchOutAt) : new Date(nowTick);
+                if (Number.isNaN(end.getTime())) return sessionDurationHours.toFixed(2);
+                return Math.max(0, Number((differenceInMinutes(end, new Date(openSession.punch_in_time)) / 60).toFixed(2))).toFixed(2);
+              })()}h</span></span>
+              <span className="font-semibold text-foreground">
+                Logging: {allocatedTotal.toFixed(2)}h <span className="text-muted-foreground font-normal">(doesn't have to match)</span>
+              </span>
             </div>
-          </DialogFooter>
+
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button variant="ghost" onClick={skipPunchOut} disabled={submitting} className="text-muted-foreground">
+                Skip for now
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>
+                <Button onClick={submitPunchOut} disabled={submitting} className="gradient-primary">
+                  {submitting ? "Saving…" : "Punch out & log hours"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </div>
         </DialogContent>
+
       </Dialog>
 
       <Dialog open={requestOpen} onOpenChange={setRequestOpen}>

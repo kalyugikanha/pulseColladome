@@ -10,8 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CheckCircle2, Circle, Workflow, Clock, Star } from "lucide-react";
-import { closeTask, reviewTask, listTaskReviewComments, logTaskTime, type WorkflowStageInput } from "@/lib/workflows.functions";
+import { CheckCircle2, Circle, Workflow, Star } from "lucide-react";
+import { closeTask, reviewTask, listTaskReviewComments, type WorkflowStageInput } from "@/lib/workflows.functions";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
 import { format } from "date-fns";
@@ -26,16 +26,6 @@ type TaskInfo = {
   project: { code: string | null; name: string | null } | null;
 };
 
-function todayInIndia() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
 
 export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: string; onChanged?: () => void | Promise<void>; onOpenTask?: (id: string) => void }) {
   const { data: me } = useCurrentUser();
@@ -44,7 +34,7 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
   const [siblings, setSiblings] = useState<Array<{ id: string; title: string; status: string; stage_index: number | null; stage_snapshot: { name?: string } | null }>>([]);
   const [closeOpen, setCloseOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState<"approve" | "request_changes" | "comment" | null>(null);
-  const [logOpen, setLogOpen] = useState(false);
+  const closeFn = useServerFn(closeTask);
 
   const listComments = useServerFn(listTaskReviewComments);
   const { data: comments, refetch: refetchComments } = useQuery({
@@ -125,11 +115,28 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
 
       <div className="flex flex-wrap gap-2">
         {isAssignee && task.status !== "done" && (
-          <Button size="sm" className="gradient-primary" onClick={() => setCloseOpen(true)}>
+          <Button
+            size="sm"
+            className="gradient-primary"
+            onClick={async () => {
+              const needsDialog =
+                (stage.required_fields ?? []).length > 0 ||
+                (stage.branch_options ?? []).length > 0;
+              if (needsDialog) {
+                setCloseOpen(true);
+                return;
+              }
+              try {
+                await closeFn({ data: { taskId: task.id } });
+                toast.success("Stage closed");
+                await refetchComments();
+                await onChanged?.();
+              } catch (e) { toast.error((e as Error).message); }
+            }}
+          >
             Close this stage
           </Button>
         )}
-        {isAssignee && <Button size="sm" variant="outline" onClick={() => setLogOpen(true)}><Clock className="h-3 w-3 mr-1" />Log time</Button>}
         {isReviewer && (
           <>
             <Button size="sm" className="gradient-primary" onClick={() => setReviewOpen("approve")}>Approve</Button>
@@ -165,19 +172,15 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
           onDone={async () => { setReviewOpen(null); await refetchComments(); await onChanged?.(); }}
         />
       )}
-      {logOpen && (
-        <LogTimeDialog taskId={taskId} onClose={() => setLogOpen(false)} onDone={async () => { setLogOpen(false); await onChanged?.(); }} />
-      )}
+
     </div>
   );
 }
 
 function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
-  const [hours, setHours] = useState("");
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
-  const [date, setDate] = useState(todayInIndia);
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
@@ -190,15 +193,13 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
   }, []);
 
   const hasBranches = stage.branch_options.length > 0;
+  const missingRequired = (stage.required_fields ?? []).some((f) => f.required && !values[f.key]);
 
   async function submit() {
     setBusy(true);
     try {
-      const h = hours.trim() === "" ? null : Number(hours);
       await close({ data: {
         taskId: task.id,
-        actualHours: h && !Number.isNaN(h) ? h : null,
-        date,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
         requiredFieldValues: values,
@@ -215,19 +216,10 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Close: {stage.name}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Actual hours *</Label>
-            <Input type="number" min={0.25} step={0.25} value={hours} onChange={(e) => setHours(e.target.value)} placeholder="e.g. 3.5" autoFocus />
-            <p className="text-[10px] text-muted-foreground">Hours land in your timesheet once approved.</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Work date</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
           {(stage.required_fields ?? []).map((f) => (
             <div key={f.key} className="space-y-1">
               <Label className="text-xs">{f.label}{f.required ? " *" : ""}</Label>
-              <Input value={values[f.key] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} placeholder={f.kind === "url" ? "https://..." : f.kind === "attachment" ? "Paste link to file" : ""} />
+              <Input value={values[f.key] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} placeholder={f.kind === "url" ? "https://..." : f.kind === "attachment" ? "Paste link to file" : ""} autoFocus />
             </div>
           ))}
           {hasBranches && (
@@ -257,13 +249,14 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="gradient-primary" onClick={submit}
-            disabled={busy || (hasBranches && !branchKey) || !(Number(hours) > 0)}
+            disabled={busy || (hasBranches && !branchKey) || missingRequired}
           >Close stage</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 function ReviewDialog({ action, task, stage, onClose, onDone }: {
   action: "approve" | "request_changes" | "comment"; task: TaskInfo; stage: WorkflowStageInput;
@@ -367,44 +360,3 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
   );
 }
 
-
-function LogTimeDialog({ taskId, onClose, onDone }: { taskId: string; onClose: () => void; onDone: () => void | Promise<void> }) {
-  const log = useServerFn(logTaskTime);
-  const [hours, setHours] = useState("");
-  const [date, setDate] = useState(todayInIndia);
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Log time</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Hours *</Label>
-            <Input type="number" min={0.25} step={0.25} value={hours} onChange={(e) => setHours(e.target.value)} autoFocus />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Work date</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Note</Label>
-            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" disabled={busy || !hours} onClick={async () => {
-            const h = Number(hours);
-            if (!h || h <= 0) return toast.error("Enter valid hours");
-            setBusy(true);
-            try { await log({ data: { taskId, hours: h, note: note || null, date } }); toast.success("Time logged"); await onDone(); }
-            catch (e) { toast.error((e as Error).message); }
-            finally { setBusy(false); }
-          }}>Log</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-
-}

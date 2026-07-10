@@ -199,13 +199,12 @@ export const closeTask = createServerFn({ method: "POST" })
   .middleware([impersonationMiddleware])
   .inputValidator((d: {
     taskId: string;
-    actualHours?: number | null;
-    date?: string | null;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
     requiredFieldValues?: Record<string, unknown>;
     rating?: number | null;
   }) => d)
+
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const actingUserId = context.actingUserId;

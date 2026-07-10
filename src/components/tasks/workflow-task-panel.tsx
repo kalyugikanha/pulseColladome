@@ -125,11 +125,28 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
 
       <div className="flex flex-wrap gap-2">
         {isAssignee && task.status !== "done" && (
-          <Button size="sm" className="gradient-primary" onClick={() => setCloseOpen(true)}>
+          <Button
+            size="sm"
+            className="gradient-primary"
+            onClick={async () => {
+              const needsDialog =
+                (stage.required_fields ?? []).length > 0 ||
+                (stage.branch_options ?? []).length > 0;
+              if (needsDialog) {
+                setCloseOpen(true);
+                return;
+              }
+              try {
+                await closeFn({ data: { taskId: task.id } });
+                toast.success("Stage closed");
+                await refetchComments();
+                await onChanged?.();
+              } catch (e) { toast.error((e as Error).message); }
+            }}
+          >
             Close this stage
           </Button>
         )}
-        {isAssignee && <Button size="sm" variant="outline" onClick={() => setLogOpen(true)}><Clock className="h-3 w-3 mr-1" />Log time</Button>}
         {isReviewer && (
           <>
             <Button size="sm" className="gradient-primary" onClick={() => setReviewOpen("approve")}>Approve</Button>
@@ -165,9 +182,7 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
           onDone={async () => { setReviewOpen(null); await refetchComments(); await onChanged?.(); }}
         />
       )}
-      {logOpen && (
-        <LogTimeDialog taskId={taskId} onClose={() => setLogOpen(false)} onDone={async () => { setLogOpen(false); await onChanged?.(); }} />
-      )}
+
     </div>
   );
 }

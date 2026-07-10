@@ -232,19 +232,9 @@ export const closeTask = createServerFn({ method: "POST" })
       }
     }
 
-    // Log actual hours to task_activity as pending manager approval.
-    if (data.actualHours && data.actualHours > 0) {
-      const today = data.date ?? new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Kolkata",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
-      await supabase.from("task_activity" as never).insert({
-        task_id: task.id, actor_id: actingUserId, kind: "task_completed",
-        hours: data.actualHours, approval_status: "pending", completion_date: today,
-      } as never);
-    }
+    // Hours are captured exclusively via punch-in/punch-out now; closing a
+    // stage no longer writes to task_activity.
+
 
     // Persist required-field values
     if (data.requiredFieldValues) {

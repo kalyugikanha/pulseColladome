@@ -170,11 +170,28 @@ export function PunchPage() {
     return myTasks.filter((t) => !(t.status === "done" && loggedTaskIds?.has(t.id)));
   }, [myTasks, loggedTaskIds]);
 
+  // Punch-out dialog default: only tasks marked Done today.
+  const doneTodayTasks = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const startMs = start.getTime();
+    return visibleTasks.filter(
+      (t) => t.status === "done" && !!t.updated_at && new Date(t.updated_at).getTime() >= startMs,
+    );
+  }, [visibleTasks]);
+
+  // Available for the "Add another task" picker: everything else that's visible.
+  const otherAvailableTasks = useMemo(() => {
+    const doneTodayIds = new Set(doneTodayTasks.map((t) => t.id));
+    return visibleTasks.filter((t) => !doneTodayIds.has(t.id));
+  }, [visibleTasks, doneTodayTasks]);
+
   const taskById = useMemo(() => {
     const m = new Map<string, NonNullable<typeof myTasks>[number]>();
     for (const t of myTasks ?? []) m.set(t.id, t);
     return m;
   }, [myTasks]);
+
 
   const { data: history } = useQuery({
     queryKey: ["punch-history", punchUserId],

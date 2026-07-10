@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Check, X, CalendarIcon, Download, Users, Plane, LogIn, UserX } from "lucide-react";
+import { Check, X, CalendarIcon, Download, Users, Plane, LogIn, LogOut, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
@@ -138,9 +138,11 @@ export function AttendanceTeamPanel() {
   const counts = useMemo(() => {
     const total = overview?.people.length ?? 0;
     const onLeave = overviewRows.filter((r) => r.status === "leave").length;
-    const punched = overviewRows.filter((r) => r.status === "in" || r.status === "out").length;
+    const punchedIn = overviewRows.filter((r) => r.status === "in").length;
+    const punchedOut = overviewRows.filter((r) => r.status === "out").length;
+    const punched = punchedIn + punchedOut;
     const notPunched = Math.max(0, total - onLeave - punched);
-    return { total, onLeave, punched, notPunched };
+    return { total, onLeave, punched, punchedIn, punchedOut, notPunched };
   }, [overview, overviewRows]);
 
   function exportOverviewCsv() {
@@ -239,10 +241,11 @@ export function AttendanceTeamPanel() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
                 <SummaryCard icon={<Users className="h-4 w-4" />} label="Total employees" value={counts.total} caption="in your scope" />
                 <SummaryCard icon={<Plane className="h-4 w-4" />} label="On leave" value={counts.onLeave} caption={`of ${counts.total}`} tone="amber" />
-                <SummaryCard icon={<LogIn className="h-4 w-4" />} label="Punched in" value={counts.punched} caption={`of ${counts.total}`} tone="green" />
+                <SummaryCard icon={<LogIn className="h-4 w-4" />} label="Punched in" value={counts.punchedIn} caption={`of ${counts.total}`} tone="green" />
+                <SummaryCard icon={<LogOut className="h-4 w-4" />} label="Punched out" value={counts.punchedOut} caption={`of ${counts.total}`} tone="green" />
                 <SummaryCard icon={<UserX className="h-4 w-4" />} label="Not punched in" value={counts.notPunched} caption="excluding leave" tone="red" />
               </div>
 

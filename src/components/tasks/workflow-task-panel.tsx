@@ -44,7 +44,7 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
   const [siblings, setSiblings] = useState<Array<{ id: string; title: string; status: string; stage_index: number | null; stage_snapshot: { name?: string } | null }>>([]);
   const [closeOpen, setCloseOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState<"approve" | "request_changes" | "comment" | null>(null);
-  const [logOpen, setLogOpen] = useState(false);
+  const closeFn = useServerFn(closeTask);
 
   const listComments = useServerFn(listTaskReviewComments);
   const { data: comments, refetch: refetchComments } = useQuery({

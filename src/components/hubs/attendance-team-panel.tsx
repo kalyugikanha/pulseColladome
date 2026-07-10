@@ -241,10 +241,11 @@ export function AttendanceTeamPanel() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
                 <SummaryCard icon={<Users className="h-4 w-4" />} label="Total employees" value={counts.total} caption="in your scope" />
                 <SummaryCard icon={<Plane className="h-4 w-4" />} label="On leave" value={counts.onLeave} caption={`of ${counts.total}`} tone="amber" />
-                <SummaryCard icon={<LogIn className="h-4 w-4" />} label="Punched in" value={counts.punched} caption={`of ${counts.total}`} tone="green" />
+                <SummaryCard icon={<LogIn className="h-4 w-4" />} label="Punched in" value={counts.punchedIn} caption={`of ${counts.total}`} tone="green" />
+                <SummaryCard icon={<LogOut className="h-4 w-4" />} label="Punched out" value={counts.punchedOut} caption={`of ${counts.total}`} tone="green" />
                 <SummaryCard icon={<UserX className="h-4 w-4" />} label="Not punched in" value={counts.notPunched} caption="excluding leave" tone="red" />
               </div>
 

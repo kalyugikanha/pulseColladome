@@ -101,6 +101,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [myDept, setMyDept] = useState<string | null>(null);
+  const [refLabel, setRefLabel] = useState("");
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
   const [markDoneOpen, setMarkDoneOpen] = useState(false);

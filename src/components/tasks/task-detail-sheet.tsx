@@ -27,7 +27,7 @@ import {
   toggleWatcher, rateTask,
   listTaskAttachments, insertTaskAttachment, deleteTaskAttachment, updateTaskAssetLinks,
 } from "@/lib/tasks-workflow.functions";
-import { logTaskTime } from "@/lib/workflows.functions";
+
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
@@ -52,7 +52,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
   const duplicateFn = useServerFn(duplicateTask);
   const rateFn = useServerFn(rateTask);
-  const logTimeFn = useServerFn(logTaskTime);
+  
   const listAttachmentsFn = useServerFn(listTaskAttachments);
   const insertAttachmentFn = useServerFn(insertTaskAttachment);
   const deleteAttachmentFn = useServerFn(deleteTaskAttachment);
@@ -230,14 +230,11 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     } catch (e) { toast.error((e as Error).message); }
   }
 
-  async function confirmMarkDone(v: { hours: number; note?: string }) {
+  async function confirmMarkDone() {
     try {
-      if (v.hours && v.hours > 0) {
-        await logTimeFn({ data: { taskId: taskId!, hours: v.hours, note: v.note ?? null } });
-      }
       await setStatusFn({ data: { taskId: taskId!, status: "done" } });
       setMarkDoneOpen(false);
-      toast.success(v.hours > 0 ? "Marked done — hours sent for approval" : "Marked done");
+      toast.success("Marked done");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
   }
@@ -753,7 +750,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
             creatorId: (task as { created_by?: string | null }).created_by ?? null,
           } : null}
           onClose={() => setMarkDoneOpen(false)}
-          onConfirm={(v) => confirmMarkDone({ hours: v.hours, note: v.note })}
+          onConfirm={() => confirmMarkDone()}
         />
       </SheetContent>
     </Sheet>

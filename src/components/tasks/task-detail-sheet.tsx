@@ -520,23 +520,14 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                     <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="text-xs font-medium">Links</span>
                     <div className="flex-1" />
-                    <Input
-                      placeholder="https://…"
-                      value={refUrl}
-                      onChange={(e) => setRefUrl(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") addReference(); }}
-                      className="h-8 flex-1 max-w-[280px]"
-                    />
-                    <Button size="sm" variant="outline" onClick={addReference} disabled={refBusy || !refUrl.trim()}>Add</Button>
                   </div>
                   {assetLinks.length > 0 && (
                     <ul className="pl-6 space-y-1">
                       {assetLinks.map((r, i) => {
-                        let display = r.label || r.url;
-                        if (!r.label) {
-                          try { display = new URL(r.url).hostname.replace(/^www\./, "") + new URL(r.url).pathname.replace(/\/$/, ""); }
-                          catch { display = r.url; }
-                        }
+                        let fallback = r.url;
+                        try { fallback = new URL(r.url).hostname.replace(/^www\./, "") + new URL(r.url).pathname.replace(/\/$/, ""); }
+                        catch { fallback = r.url; }
+                        const display = r.label.trim() || fallback;
                         return (
                           <li key={`${r.url}-${i}`} className="flex items-center gap-2 text-xs">
                             <a href={r.url} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1 truncate flex-1 min-w-0">
@@ -551,6 +542,31 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                       })}
                     </ul>
                   )}
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-[11px]">Label</Label>
+                      <Input
+                        placeholder="e.g. Figma file"
+                        value={refLabel}
+                        onChange={(e) => setRefLabel(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") addReference(); }}
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="flex-[2] space-y-1">
+                      <Label className="text-[11px]">Link</Label>
+                      <Input
+                        placeholder="https://…"
+                        value={refUrl}
+                        onChange={(e) => setRefUrl(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") addReference(); }}
+                        className="h-8"
+                      />
+                    </div>
+                    <div className="pt-5">
+                      <Button size="sm" variant="outline" onClick={addReference} disabled={refBusy || !refUrl.trim()}>Add</Button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Watch toggle + current watchers */}

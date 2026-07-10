@@ -138,9 +138,11 @@ export function AttendanceTeamPanel() {
   const counts = useMemo(() => {
     const total = overview?.people.length ?? 0;
     const onLeave = overviewRows.filter((r) => r.status === "leave").length;
-    const punched = overviewRows.filter((r) => r.status === "in" || r.status === "out").length;
+    const punchedIn = overviewRows.filter((r) => r.status === "in").length;
+    const punchedOut = overviewRows.filter((r) => r.status === "out").length;
+    const punched = punchedIn + punchedOut;
     const notPunched = Math.max(0, total - onLeave - punched);
-    return { total, onLeave, punched, notPunched };
+    return { total, onLeave, punched, punchedIn, punchedOut, notPunched };
   }, [overview, overviewRows]);
 
   function exportOverviewCsv() {

@@ -350,33 +350,6 @@ export const reviewTask = createServerFn({ method: "POST" })
 
 
 
-/** Log time from a task (self, on own task). */
-export const logTaskTime = createServerFn({ method: "POST" })
-  .middleware([impersonationMiddleware])
-  .inputValidator((d: { taskId: string; hours: number; note?: string | null; date?: string | null}) => d)
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const actingUserId = context.actingUserId;
-    const { data: t, error: tErr } = await supabase.from("tasks").select("assignee_id").eq("id", data.taskId).single();
-    if (tErr) throw tErr;
-    if ((t as { assignee_id: string | null }).assignee_id !== actingUserId) {
-      throw new Error("You can only log time on tasks assigned to you.");
-    }
-    const date = data.date ?? new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-    const { error } = await supabase.from("task_activity" as never).insert({
-      task_id: data.taskId, actor_id: actingUserId, kind: "time_logged",
-      hours: data.hours, note: data.note ?? null,
-      approval_status: "pending", completion_date: date,
-    } as never);
-    if (error) throw error;
-    return { ok: true };
-  });
-
 
 /** ---------- helpers ---------- */
 async function spawnNextStage(

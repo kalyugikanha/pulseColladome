@@ -257,7 +257,8 @@ export function PunchPage() {
   function openPunchOut() {
     if (!openSession) return;
     const now = new Date();
-    setRows(visibleTasks.map((t) => ({ taskId: t.id, hours: "", comments: "", atRisk: false })));
+    setRows(doneTodayTasks.map((t) => ({ taskId: t.id, hours: "", comments: "", atRisk: false })));
+
     setPunchOutAt(toLocalDatetimeInput(now));
     setDialogOpen(true);
   }

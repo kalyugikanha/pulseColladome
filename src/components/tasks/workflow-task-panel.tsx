@@ -189,10 +189,8 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
 
 function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
-  const [hours, setHours] = useState("");
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
-  const [date, setDate] = useState(todayInIndia);
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
@@ -205,15 +203,13 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
   }, []);
 
   const hasBranches = stage.branch_options.length > 0;
+  const missingRequired = (stage.required_fields ?? []).some((f) => f.required && !values[f.key]);
 
   async function submit() {
     setBusy(true);
     try {
-      const h = hours.trim() === "" ? null : Number(hours);
       await close({ data: {
         taskId: task.id,
-        actualHours: h && !Number.isNaN(h) ? h : null,
-        date,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
         requiredFieldValues: values,
@@ -230,19 +226,10 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Close: {stage.name}</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Actual hours *</Label>
-            <Input type="number" min={0.25} step={0.25} value={hours} onChange={(e) => setHours(e.target.value)} placeholder="e.g. 3.5" autoFocus />
-            <p className="text-[10px] text-muted-foreground">Hours land in your timesheet once approved.</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Work date</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
           {(stage.required_fields ?? []).map((f) => (
             <div key={f.key} className="space-y-1">
               <Label className="text-xs">{f.label}{f.required ? " *" : ""}</Label>
-              <Input value={values[f.key] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} placeholder={f.kind === "url" ? "https://..." : f.kind === "attachment" ? "Paste link to file" : ""} />
+              <Input value={values[f.key] ?? ""} onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))} placeholder={f.kind === "url" ? "https://..." : f.kind === "attachment" ? "Paste link to file" : ""} autoFocus />
             </div>
           ))}
           {hasBranches && (
@@ -272,13 +259,14 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="gradient-primary" onClick={submit}
-            disabled={busy || (hasBranches && !branchKey) || !(Number(hours) > 0)}
+            disabled={busy || (hasBranches && !branchKey) || missingRequired}
           >Close stage</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 function ReviewDialog({ action, task, stage, onClose, onDone }: {
   action: "approve" | "request_changes" | "comment"; task: TaskInfo; stage: WorkflowStageInput;

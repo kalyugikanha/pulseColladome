@@ -118,13 +118,13 @@ export function PunchPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("tasks")
-        .select("id, title, status, project_id, updated_at, project:projects(id, code, name)")
+        .select("id, title, status, project_id, updated_at, due_date, project:projects(id, code, name)")
         .eq("assignee_id", taskOwnerId!)
         .in("status", ["todo", "in_progress", "review", "done"])
         .not("project_id", "is", null)
         .order("updated_at", { ascending: false })
         .limit(500);
-      const rows = (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; updated_at: string | null; project: { id: string; code: string; name: string } | null }>;
+      const rows = (data ?? []) as Array<{ id: string; title: string; status: string; project_id: string | null; updated_at: string | null; due_date: string | null; project: { id: string; code: string; name: string } | null }>;
       // Hide Done tasks last updated more than ~3 days ago — pure visibility filter,
       // the underlying task/status/history/hours are untouched.
       const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
@@ -138,6 +138,7 @@ export function PunchPage() {
     },
     staleTime: 60_000,
   });
+
 
   // Task ids that this user has already logged hours against in a prior punch session.
   // Used to hide Done tasks that have already been billed — punch-out is a fresh-entry

@@ -230,14 +230,11 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     } catch (e) { toast.error((e as Error).message); }
   }
 
-  async function confirmMarkDone(v: { hours: number; note?: string }) {
+  async function confirmMarkDone() {
     try {
-      if (v.hours && v.hours > 0) {
-        await logTimeFn({ data: { taskId: taskId!, hours: v.hours, note: v.note ?? null } });
-      }
       await setStatusFn({ data: { taskId: taskId!, status: "done" } });
       setMarkDoneOpen(false);
-      toast.success(v.hours > 0 ? "Marked done — hours sent for approval" : "Marked done");
+      toast.success("Marked done");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
   }

@@ -206,7 +206,8 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
     setRefBusy(true);
     try {
-      await saveAssetLinks([...assetLinks, { label: "", url }]);
+      await saveAssetLinks([...assetLinks, { label: refLabel.trim(), url }]);
+      setRefLabel("");
       setRefUrl("");
     } catch (e) { toast.error((e as Error).message); }
     finally { setRefBusy(false); }

@@ -101,8 +101,45 @@ export function ProjectBurnPage() {
     },
   });
 
+  // Unfiltered logged hours (all punched days, regardless of approval).
+  // Displayed alongside approved totals for comparison — never used for burn.
+  const { data: loggedLogs } = useQuery({
+    queryKey: ["pb-logged-logs", month, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      let q = supabase.from("attendance_logs").select("user_id, date, tasks")
+        .gte("date", start).lt("date", end).order("date");
+      if (hasScope) q = q.in("user_id", visibleUserIds);
+      return (await q).data as LogRow[] ?? [];
+    },
+  });
+
   // Combined (previously merged approved task_activity — now dead).
   const combinedLogs = useMemo<LogRow[]>(() => (logs ?? []).slice(), [logs]);
+
+  // Logged (unapproved-inclusive) hours per project code, scoped by dept/emp
+  // filters so it stays comparable to the approved totals on the same row.
+  const loggedHoursByProject = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of loggedLogs ?? []) {
+      if (profileIdSet.size > 0 && !profileIdSet.has(row.user_id)) continue;
+      if (!passesDept(row.user_id)) continue;
+      if (empSel.size > 0 && !empSel.has(row.user_id)) continue;
+      for (const t of row.tasks ?? []) {
+        const code = t.project_code?.trim();
+        const h = Number(t.hours) || 0;
+        if (!code || h <= 0) continue;
+        if (projectFilter !== "all" && code !== projectFilter) continue;
+        map.set(code, (map.get(code) ?? 0) + h);
+      }
+    }
+    return map;
+    // profileIdSet / passesDept depend on profiles/deptSel/deptById/empSel/projectFilter
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedLogs, profileIdSet, deptSel, deptById, empSel, projectFilter]);
 
 
 

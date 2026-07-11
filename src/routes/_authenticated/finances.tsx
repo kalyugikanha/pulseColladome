@@ -16,6 +16,8 @@ import { Wallet, IndianRupee, Users, UserPlus, Loader2, Flame } from "lucide-rea
 import { provisionPendingUsers } from "@/lib/admin-users.functions";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { SalaryBankExport } from "@/components/finances/salary-bank-export";
+import { ExpensesPanel } from "@/components/finances/expenses-panel";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,

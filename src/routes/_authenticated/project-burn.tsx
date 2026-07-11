@@ -10,6 +10,7 @@ import { Flame, IndianRupee, TrendingUp, CalendarDays } from "lucide-react";
 import { format } from "date-fns";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
   beforeLoad: () => {
@@ -546,39 +547,69 @@ export function ProjectBurnPage() {
           {employeeSeries.length === 0 ? (
             <div className="text-sm text-muted-foreground py-8 text-center">No logged hours for the current filters.</div>
           ) : (
-            <div className="space-y-2">
-              {employeeSeries.map((emp) => {
-                const val = showCosts ? emp.burn : emp.hours;
-                const pct = (val / employeeSeriesMax) * 100;
-                const barWidth = Math.max(pct, val > 0 ? 1.5 : 0);
-                const totalTitle = `${emp.name} — total ${emp.hours.toFixed(1)}h${showCosts ? ` · ${inr(emp.burn)}` : ""}`;
-                return (
-                  <div key={emp.userId} className="flex items-center gap-3">
-                    <div className="w-40 shrink-0 text-xs font-medium truncate" title={emp.name}>{emp.name}</div>
-                    <div className="flex-1 h-6 bg-muted/40 rounded overflow-hidden" title={totalTitle}>
-                      <div className="flex h-full w-full" style={{ width: `${barWidth}%` }}>
-                        {emp.segments.map((seg) => {
-                          const segVal = showCosts ? seg.burn : seg.hours;
-                          const empTotal = showCosts ? emp.burn : emp.hours;
-                          const segPct = empTotal > 0 ? (segVal / empTotal) * 100 : 0;
-                          return (
-                            <div
-                              key={seg.code}
-                              className="h-full"
-                              style={{ width: `${segPct}%`, background: colorForProject(seg.code) }}
-                              title={`${seg.name} (${seg.code}) — ${seg.hours.toFixed(1)}h${showCosts ? ` · ${inr(seg.burn)}` : ""}`}
-                            />
-                          );
-                        })}
+            <TooltipProvider delayDuration={100}>
+              {projectColorOrder.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-4 pb-3 border-b">
+                  {projectColorOrder.map((code) => {
+                    const name = projects.find((p) => p.code === code)?.name ?? code;
+                    return (
+                      <div key={code} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className="inline-block h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: colorForProject(code) }} />
+                        <span className="truncate max-w-[180px]" title={`${name} (${code})`}>{name}</span>
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="space-y-2">
+                {employeeSeries.map((emp) => {
+                  const val = showCosts ? emp.burn : emp.hours;
+                  const pct = (val / employeeSeriesMax) * 100;
+                  const barWidth = Math.max(pct, val > 0 ? 1.5 : 0);
+                  const empTotal = showCosts ? emp.burn : emp.hours;
+                  return (
+                    <div key={emp.userId} className="flex items-center gap-3">
+                      <div className="w-40 shrink-0 text-xs font-medium truncate" title={emp.name}>{emp.name}</div>
+                      <div className="flex-1 h-6 bg-muted/40 rounded overflow-hidden">
+                        <div className="flex h-full" style={{ width: `${barWidth}%` }}>
+                          {emp.segments.map((seg) => {
+                            const segVal = showCosts ? seg.burn : seg.hours;
+                            const segPct = empTotal > 0 ? (segVal / empTotal) * 100 : 0;
+                            return (
+                              <Tooltip key={seg.code}>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className="h-full cursor-default hover:brightness-110 transition"
+                                    style={{ width: `${segPct}%`, background: colorForProject(seg.code) }}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                  <div className="font-medium">{seg.name}</div>
+                                  <div className="text-muted-foreground">{seg.code}</div>
+                                  <div className="mt-1 tabular-nums">{seg.hours.toFixed(1)}h{showCosts ? ` · ${inr(seg.burn)}` : ""}</div>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="w-40 shrink-0 text-xs text-muted-foreground text-right tabular-nums cursor-default">
+                            {emp.hours.toFixed(1)}h{showCosts ? ` · ${inr(emp.burn)}` : ""}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="text-xs">
+                          <div className="font-medium">{emp.name}</div>
+                          <div className="mt-1 tabular-nums">Total {emp.hours.toFixed(1)}h{showCosts ? ` · ${inr(emp.burn)}` : ""}</div>
+                          <div className="text-muted-foreground">{emp.segments.length} project{emp.segments.length === 1 ? "" : "s"}</div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
-                    <div className="w-40 shrink-0 text-xs text-muted-foreground text-right tabular-nums" title={totalTitle}>
-                      {emp.hours.toFixed(1)}h{showCosts ? ` · ${inr(emp.burn)}` : ""}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           )}
         </CardContent>
       </Card>

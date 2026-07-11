@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/access")({
   beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "access" } }); },
 });
 
-type GrantRole = "admin" | "employee" | "project_manager";
+type GrantRole = "admin" | "employee" | "project_manager" | "learning_admin";
 
 export function AccessPage() {
   const { data: me } = useCurrentUser();

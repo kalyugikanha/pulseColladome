@@ -357,7 +357,20 @@ function ProjectsPage() {
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Time log · {logFor?.name}</DialogTitle>
-            <div className="text-xs text-muted-foreground"><span className="font-mono">{logFor?.code}</span> · Logged: <span className="font-semibold text-foreground">{loggedTotal.toFixed(2)} h</span> · Approved: <span className={`font-semibold ${approvedTotal < loggedTotal ? "text-amber-700" : "text-foreground"}`}>{approvedTotal.toFixed(2)} h</span> across {timeLog?.length ?? 0} entries</div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <div>
+                <span className="font-mono">{logFor?.code}</span> ·{" "}
+                <span title="All punched hours on this project, regardless of manager approval">Logged: <span className="font-semibold text-foreground">{loggedTotal.toFixed(2)} h</span></span> ·{" "}
+                <span title="Manager-approved days only — the figure that feeds Project Burn and Finances">Approved: <span className={`font-semibold ${approvedTotal < loggedTotal ? "text-amber-700" : "text-foreground"}`}>{approvedTotal.toFixed(2)} h</span></span>
+                {me?.isFinanceAdmin && (
+                  <> · <span title="Approved-hours-based salary-share burn for this project, same math as Project Burn">Total burn: <span className="font-semibold text-foreground">{inr(projectBurnTotal)}</span></span></>
+                )}
+                {" "}across {timeLog?.length ?? 0} entries
+              </div>
+              <div className="text-[11px] text-muted-foreground/80 leading-snug">
+                <span className="font-medium">Legend:</span> <b>Logged</b> = raw punched hours (unfiltered). <b>Approved</b> = only days a manager marked approved; burn and finances use this.
+              </div>
+            </div>
           </DialogHeader>
           <div className="space-y-2 mt-2">
             {(timeLog?.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">No time logged on this project yet.</p>}

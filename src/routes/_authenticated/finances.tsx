@@ -88,7 +88,39 @@ function FinancesPage() {
     },
   });
 
+  // Unfiltered logged hours (all punched days) — shown alongside approved
+  // totals in the by-project view, never used for burn calculations.
+  const { data: loggedLogsAll } = useQuery({
+    queryKey: ["finances-logged-logs", month],
+    enabled: !!me?.isFinanceAdmin,
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("attendance_logs")
+        .select("user_id, date, tasks")
+        .gte("date", start)
+        .lt("date", end);
+      if (error) throw error;
+      return (data ?? []) as LogRow[];
+    },
+  });
+
   const combinedLogs = useMemo<LogRow[]>(() => (logs ?? []).slice(), [logs]);
+
+  const loggedHoursByProject = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of loggedLogsAll ?? []) {
+      for (const t of row.tasks ?? []) {
+        const code = t.project_code?.trim();
+        const h = Number(t.hours) || 0;
+        if (!code || h <= 0) continue;
+        map.set(code, (map.get(code) ?? 0) + h);
+      }
+    }
+    return map;
+  }, [loggedLogsAll]);
 
 
   const { data: unpaidLeaves } = useQuery({

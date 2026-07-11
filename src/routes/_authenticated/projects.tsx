@@ -252,7 +252,7 @@ function ProjectsPage() {
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Time log · {logFor?.name}</DialogTitle>
-            <div className="text-xs text-muted-foreground"><span className="font-mono">{logFor?.code}</span> · Total: <span className="font-semibold text-foreground">{logTotal.toFixed(2)} h</span> across {timeLog?.length ?? 0} entries</div>
+            <div className="text-xs text-muted-foreground"><span className="font-mono">{logFor?.code}</span> · Logged: <span className="font-semibold text-foreground">{loggedTotal.toFixed(2)} h</span> · Approved: <span className={`font-semibold ${approvedTotal < loggedTotal ? "text-amber-700" : "text-foreground"}`}>{approvedTotal.toFixed(2)} h</span> across {timeLog?.length ?? 0} entries</div>
           </DialogHeader>
           <div className="space-y-2 mt-2">
             {(timeLog?.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">No time logged on this project yet.</p>}

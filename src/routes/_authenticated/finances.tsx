@@ -695,6 +695,11 @@ function FinancesPage() {
           })()}
         </CardContent>
       </Card>
+        </TabsContent>
+        <TabsContent value="expenses" className="mt-4">
+          <ExpensesPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

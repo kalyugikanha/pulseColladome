@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, Check, X, Clock, StickyNote } from "lucide-react";
+import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, StickyNote } from "lucide-react";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -38,19 +38,12 @@ type Task = {
   logged_hours?: number;
   comments?: string;
   approval_note?: string;
-  source?: "log" | "activity";
-  approval_status?: string;
   task_id?: string;
   task_title?: string;
 };
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
 type UserTask = { id: string; title: string | null; project_id: string | null };
-type ActivityRow = {
-  id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
-  note: string | null; completion_date: string | null; created_at: string; approval_status: string;
-  task: { id: string; title: string | null; project: { id: string; code: string | null; name: string | null } | null } | null;
-};
 
 
 function ymd(d: Date) {
@@ -63,24 +56,6 @@ function addDays(d: Date, n: number) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
   return x;
-}
-
-function ymdInTimeZone(d: Date, timeZone = "Asia/Kolkata") {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(d);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
-
-function activityWorkDate(row: Pick<ActivityRow, "completion_date" | "created_at">) {
-  const createdUtcDay = row.created_at.slice(0, 10);
-  const createdLocalDay = ymdInTimeZone(new Date(row.created_at));
-  if (row.completion_date && row.completion_date !== createdUtcDay) return row.completion_date;
-  return createdLocalDay || row.completion_date || createdUtcDay;
 }
 
 export function TimesheetPage() {
@@ -167,134 +142,32 @@ export function TimesheetPage() {
     queryFn: async () => (await supabase.from("projects").select("code, name").order("code")).data as Project[] ?? [],
   });
 
-  // Kanban-logged task hours (task_activity) for the visible team on the selected day.
-  const { data: rawActivityRows } = useQuery({
-    queryKey: ["ts-activity", dateIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
-    enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
-    queryFn: async () => {
-      let q = supabase
-        .from("task_activity" as never)
-        .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
-        .not("hours", "is", null)
-        .neq("approval_status", "rejected")
-        .gte("completion_date", prevDayIso).lt("completion_date", afterNextDayIso);
-      if (hasScope || fallbackActorIds) q = q.in("actor_id", visibleUserIds);
-      const { data, error } = await q;
-      if (error) throw error;
-      return ((data ?? []) as unknown as ActivityRow[]);
-    },
-  });
-
-  const activityRows = useMemo(
-    () => (rawActivityRows ?? []).filter((row) => activityWorkDate(row) === dateIso),
-    [rawActivityRows, dateIso],
-  );
-
-  const pendingActorIds = pendingIsAdmin
-    ? (hasScope ? visibleUserIds : null) // null = unscoped, no in() filter
-    : directReportIds;
-  const pendingEnabled = !!me?.id && (
-    pendingIsAdmin
-      ? (!hasScope || visibleUserIds.length > 0)
-      : directReportIds.length > 0
-  );
-
-  const { data: pendingHours, refetch: refetchPending } = useQuery({
-    queryKey: ["ts-pending-task-hours", me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
-    enabled: pendingEnabled,
-    queryFn: async () => {
-      let q = supabase
-        .from("task_activity" as never)
-        .select("id, task_id, actor_id, hours, note, completion_date, created_at, kind, task:tasks(id, title, project:projects(id, code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email)")
-        .eq("approval_status", "pending")
-        .not("hours", "is", null)
-        .order("created_at", { ascending: false });
-      if (pendingActorIds && pendingActorIds.length > 0) q = q.in("actor_id", pendingActorIds);
-      const { data, error } = await q;
-      if (error) throw error;
-      return ((data ?? []) as unknown as Array<{
-        id: string; task_id: string; actor_id: string; hours: number | null; note: string | null;
-        completion_date: string | null; created_at: string; kind: string;
-        task: { id: string; title: string | null; project: { code: string | null; name: string | null } | null } | null;
-        actor: { id: string; full_name: string | null; email: string | null } | null;
-      }>);
-    },
-  });
-
-
-  async function decidePending(id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) {
-    try {
-      const { data: userRes } = await supabase.auth.getUser();
-      const myId = userRes.user?.id ?? null;
-      const patch: Record<string, unknown> = {
-        approval_status: decide,
-        approved_by: myId,
-        approved_at: new Date().toISOString(),
-        approved_hours: decide === "approved" ? (approvedHours ?? null) : null,
-      };
-      if (decide === "rejected") patch.rejected_reason = reason ?? null;
-      const { error } = await supabase.from("task_activity" as never).update(patch as never).eq("id", id);
-      if (error) throw error;
-      toast.success(decide === "approved" ? "Approved" : "Rejected");
-      await refetchPending();
-      qc.invalidateQueries({ queryKey: ["ts-activity"] });
-      qc.invalidateQueries({ queryKey: ["ts-logs"] });
-      qc.invalidateQueries({ queryKey: ["my-ts-activity"] });
-      qc.invalidateQueries({ queryKey: ["my-performance"] });
-      qc.invalidateQueries({ queryKey: ["pb-activity"] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
-    }
-  }
-
-
   const projectByCode = useMemo(() => new Map((projectsAll ?? []).map((p) => [p.code, p])), [projectsAll]);
 
   const profileById = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p])), [profiles]);
   const logByUser = useMemo(() => new Map((logs ?? []).map((r) => [r.user_id, r])), [logs]);
 
-  // Group activity rows by actor for merging into empRows.
-  const activityByUser = useMemo(() => {
-    const m = new Map<string, ActivityRow[]>();
-    for (const a of activityRows ?? []) {
-      if (!a.actor_id) continue;
-      const arr = m.get(a.actor_id) ?? [];
-      arr.push(a);
-      m.set(a.actor_id, arr);
-    }
-    return m;
-  }, [activityRows]);
 
-  // Projects that actually appear in the day (for filter list) — from both sources.
+  // Projects that actually appear in the day (for filter list).
   const projectsInDay = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of logs ?? []) for (const t of r.tasks ?? []) {
       const code = t.project_code?.trim();
       if (code && !m.has(code)) m.set(code, t.project_name || code);
     }
-    for (const a of activityRows ?? []) {
-      const code = a.task?.project?.code?.trim();
-      if (code && !m.has(code)) m.set(code, a.task?.project?.name || code);
-    }
     return Array.from(m.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
-  }, [logs, activityRows]);
+  }, [logs]);
 
-  // Tasks visible in the day (for Task filter). Merges activity-sourced task_ids
-  // with any log rows that carry a task_id (Stage 1 day-editor now writes it).
+  // Tasks visible in the day (for Task filter).
   const tasksInDay = useMemo(() => {
     const m = new Map<string, { title: string; code: string | null }>();
-    for (const a of activityRows ?? []) {
-      const id = a.task?.id || a.task_id;
-      if (!id || m.has(id)) continue;
-      m.set(id, { title: a.task?.title ?? "Task", code: a.task?.project?.code ?? null });
-    }
     for (const r of logs ?? []) for (const t of r.tasks ?? []) {
       const id = t.task_id;
       if (!id || m.has(id)) continue;
       m.set(id, { title: t.task_title ?? t.comments ?? "Task", code: t.project_code ?? null });
     }
     return Array.from(m.entries()).map(([id, v]) => ({ id, ...v })).sort((a, b) => a.title.localeCompare(b.title));
-  }, [logs, activityRows]);
+  }, [logs]);
 
 
   const allDepts = useMemo(() => {
@@ -303,7 +176,7 @@ export function TimesheetPage() {
     return Array.from(s).sort();
   }, [profiles]);
 
-  // Build rows: employees (filtered) with their tasks for the day (log + activity).
+  // Build rows: employees (filtered) with their tasks for the day.
   type EmpRow = { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number; approvedTotal: number };
   const empRows = useMemo<EmpRow[]>(() => {
     const src = (profiles ?? []).filter((p) => {
@@ -316,42 +189,16 @@ export function TimesheetPage() {
     });
     const out: EmpRow[] = src.map((p) => {
       const log = logByUser.get(p.id) ?? null;
-      const logTasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t, source: "log" as const }));
-      const acts = activityByUser.get(p.id) ?? [];
-      const actTasks: Task[] = acts.map((a) => {
-        const proj = a.task?.project;
-        const code = proj?.code?.trim() || "—";
-        const name = proj?.name || a.task?.title || "Task";
-        const logged = Number(a.hours) || 0;
-        const approved = a.approval_status === "approved" || a.approval_status === "auto";
-        const approvedHrs = Number(a.approved_hours ?? logged) || 0;
-        const shownHrs = approved ? approvedHrs : logged;
-        const baseComment = a.note ?? a.task?.title ?? undefined;
-        const partial = approved && approvedHrs < logged;
-        return {
-          project_code: code,
-          project_name: name,
-          hours: shownHrs,
-          logged_hours: logged,
-          approved_hours: approved ? approvedHrs : undefined,
-          comments: partial ? `${baseComment ?? "Task hours"} · approved ${approvedHrs}/${logged}h` : baseComment,
-          source: "activity" as const,
-          approval_status: a.approval_status,
-          task_id: a.task?.id ?? a.task_id,
-          task_title: a.task?.title ?? "Task",
-        };
-      });
-      let tasks: Task[] = [...logTasks, ...actTasks];
+      let tasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t }));
       if (projSel.size > 0) tasks = tasks.filter((t) => t.project_code && projSel.has(t.project_code));
       if (taskSel.size > 0) tasks = tasks.filter((t) => t.task_id && taskSel.has(t.task_id));
       const total = tasks.reduce((s, t) => s + (Number(t.hours) || 0), 0);
       const dayApproved = !!log?.approved_at;
-      const approvedTotal = tasks.reduce((s, t) => {
-        if (t.source === "activity") return s + (t.approved_hours != null ? Number(t.approved_hours) : 0);
-        // log-sourced task: day-approval stamps everything
-        if (!dayApproved) return s;
-        return s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0));
-      }, 0);
+      // Day-level approval is the source of truth. When the day is approved,
+      // every row contributes its approved_hours (fallback: logged hours).
+      const approvedTotal = dayApproved
+        ? tasks.reduce((s, t) => s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0)), 0)
+        : 0;
       return { profile: p, log, tasks, approved: dayApproved, total, approvedTotal };
     });
     return out
@@ -359,7 +206,8 @@ export function TimesheetPage() {
       .sort((a, b) =>
         (a.profile.full_name ?? a.profile.email ?? "").localeCompare(b.profile.full_name ?? b.profile.email ?? "")
       );
-  }, [profiles, logByUser, activityByUser, deptSel, empSel, projSel, taskSel, showEmpty]);
+  }, [profiles, logByUser, deptSel, empSel, projSel, taskSel, showEmpty]);
+
 
 
 
@@ -497,9 +345,7 @@ export function TimesheetPage() {
         continue;
       }
       for (const t of r.tasks) {
-        const status = t.source === "activity"
-          ? (t.approval_status === "approved" || t.approval_status === "auto" ? "Approved" : t.approval_status === "pending" ? "Pending" : t.approval_status ?? "Pending")
-          : (r.approved ? "Approved" : "Pending");
+        const status = r.approved ? "Approved" : "Pending";
         rows.push([
           r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "",
           t.task_title ?? "",
@@ -560,47 +406,8 @@ export function TimesheetPage() {
         </div>
       </header>
 
-      {pendingEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              Task hours awaiting your approval
-              {pendingHours && pendingHours.length > 0 && (
-                <Badge variant="outline" className="ml-1">{pendingHours.length}</Badge>
-              )}
-            </CardTitle>
-            <CardDescription>Hours logged on tasks by your team. Approve or reject each entry.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!pendingHours || pendingHours.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending. Nice.</div>
-            ) : (
-              <div className="grid gap-3 lg:grid-cols-2">
-                {pendingHours.map((r) => {
-                  const date = activityWorkDate(r);
-                  const proj = r.task?.project;
-                  const logged = Number(r.hours ?? 0);
-                  return (
-                    <PendingCard
-                      key={r.id}
-                      id={r.id}
-                      name={r.actor?.full_name ?? r.actor?.email ?? "—"}
-                      title={r.task?.title ?? "Task"}
-                      projCode={proj?.code ?? null}
-                      projName={proj?.name ?? null}
-                      date={date}
-                      logged={logged}
-                      note={r.note}
-                      onDecide={decidePending}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+
+
 
 
 
@@ -628,7 +435,8 @@ export function TimesheetPage() {
                   <TableRow>
                     <TableHead className="min-w-[220px]">Employee</TableHead>
                     <TableHead className="min-w-[260px]">Task</TableHead>
-                    <TableHead className="w-[120px] text-right tabular-nums">Hours</TableHead>
+                    <TableHead className="w-[110px] text-right tabular-nums">Hours</TableHead>
+                    <TableHead className="w-[110px] text-right tabular-nums">Approved</TableHead>
                     <TableHead className="min-w-[180px]">Notes</TableHead>
                     <TableHead className="w-[110px]">Status</TableHead>
                     <TableHead className="w-[52px]" />
@@ -655,6 +463,7 @@ export function TimesheetPage() {
                       Approved {dayApprovedTotal.toFixed(1)} / Logged {dayTotal.toFixed(1)}
                     </TableCell>
                     <TableCell className="text-right text-lg font-bold tabular-nums">{dayTotal.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-0.5">h</span></TableCell>
+                    <TableCell className="text-right text-lg font-bold tabular-nums">{dayApprovedTotal.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-0.5">h</span></TableCell>
                     <TableCell colSpan={3} />
                   </TableRow>
 
@@ -736,7 +545,7 @@ function EmployeeBlock({
             <div className="font-medium">{name}</div>
             {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
           </TableCell>
-          <TableCell colSpan={3}>
+          <TableCell colSpan={4}>
             <span className="text-sm text-muted-foreground italic">No entries</span>
           </TableCell>
           <TableCell>
@@ -748,14 +557,14 @@ function EmployeeBlock({
         </TableRow>
       ) : (
         (() => {
-          let logCounter = -1;
           return row.tasks.map((t, i) => {
-            const isActivity = t.source === "activity";
-            if (!isActivity) logCounter++;
-            const logIdx = isActivity ? -1 : logCounter;
-            const editableRow = mayEdit && !isActivity;
-            const primary = t.task_title ?? (isActivity ? "Task" : (t.project_name ?? "—"));
+            const editableRow = mayEdit;
+            const primary = t.task_title ?? (t.project_name ?? "—");
             const hasTaskLabel = !!t.task_title;
+            const loggedH = Number(t.hours) || 0;
+            const apprH = row.approved
+              ? (t.approved_hours != null ? Number(t.approved_hours) : loggedH)
+              : null;
             return (
               <TableRow key={`${row.profile.id}-${i}`}>
                 {i === 0 && (
@@ -773,8 +582,7 @@ function EmployeeBlock({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium truncate">{primary}</span>
-                      {isActivity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">via task</Badge>}
-                      {!isActivity && !hasTaskLabel && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">legacy</Badge>}
+                      {!hasTaskLabel && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">legacy</Badge>}
                     </div>
                     {(t.project_code || t.project_name) && (
                       <div className="text-[10px] text-muted-foreground truncate mt-0.5">
@@ -786,12 +594,19 @@ function EmployeeBlock({
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
-                  <InlineNumber value={Number(t.hours) || 0} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { hours: v })} />
+                  <InlineNumber value={loggedH} disabled={!editableRow} onCommit={(v) => onUpdate(i, { hours: v })} />
+                </TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-sm">
+                  {apprH != null ? (
+                    <span className={apprH < loggedH ? "text-amber-700" : ""}>{apprH.toFixed(1)}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <div className="flex-1 min-w-0">
-                      <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { comments: v })} placeholder="Optional" />
+                      <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(i, { comments: v })} placeholder="Optional" />
                     </div>
                     {t.approval_note?.trim() && (
                       <Popover>
@@ -809,16 +624,14 @@ function EmployeeBlock({
                   </div>
                 </TableCell>
                 <TableCell>
-                  {taskStatusBadge(row, t)}
-                  {locked && !isActivity && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
+                  {taskStatusBadge(row)}
+                  {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 justify-end">
-                    {!isActivity && (
-                      <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!editableRow} onClick={() => onDelete(logIdx)} aria-label="Delete row">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+                    <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!editableRow} onClick={() => onDelete(i)} aria-label="Delete row">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                     {i === 0 && <RowMenu canApprove={canApprove} approved={row.approved} onToggleApproval={onToggleApproval} onOpenFull={onOpenFull} />}
                   </div>
                 </TableCell>
@@ -848,7 +661,7 @@ function EmployeeBlock({
           <TableCell className="text-right">
             <Input type="number" min={0} step={0.25} value={addHrs} onChange={(e) => setAddHrs(e.target.value)} className="h-8 text-right font-mono" placeholder="0" />
           </TableCell>
-          <TableCell colSpan={3}>
+          <TableCell colSpan={4}>
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => {
                 const h = Number(addHrs);
@@ -866,7 +679,7 @@ function EmployeeBlock({
       )}
       {mayEdit && row.tasks.length > 0 && !addOpen && (
         <TableRow>
-          <TableCell colSpan={5}>
+          <TableCell colSpan={6}>
             <Button size="sm" variant="ghost" className="h-7 text-muted-foreground" onClick={() => setAddOpen(true)}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Add task
             </Button>
@@ -878,20 +691,7 @@ function EmployeeBlock({
 }
 
 
-function taskStatusBadge(row: { approved: boolean }, task?: Task) {
-  if (task?.source === "activity") {
-    const approved = task.approval_status === "approved" || task.approval_status === "auto";
-    if (approved) {
-      const partial = task.logged_hours != null && task.approved_hours != null && task.approved_hours < task.logged_hours;
-      return (
-        <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300">
-          <CheckCircle2 className="h-3 w-3" /> {partial ? `${task.approved_hours}/${task.logged_hours}h` : "Approved"}
-        </Badge>
-      );
-    }
-    return <Badge variant="outline">Pending</Badge>;
-  }
-
+function taskStatusBadge(row: { approved: boolean }) {
   return row.approved
     ? <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"><CheckCircle2 className="h-3 w-3" /> Approved</Badge>
     : <Badge variant="outline">Pending</Badge>;
@@ -948,86 +748,7 @@ function InlineText({ value, disabled, onCommit, placeholder }: { value: string;
   );
 }
 
-function PendingCard({
-  id, name, title, projCode, projName, date, logged, note, onDecide,
-}: {
-  id: string; name: string; title: string;
-  projCode: string | null; projName: string | null;
-  date: string; logged: number; note: string | null;
-  onDecide: (id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) => void;
-}) {
-  const [approve, setApprove] = useState<string>(String(logged));
-  const [busy, setBusy] = useState(false);
-  const approveNum = Number(approve);
-  const valid = !Number.isNaN(approveNum) && approveNum >= 0 && approveNum <= logged;
-  const reduced = valid && approveNum < logged;
 
-  async function act(decision: "approved" | "rejected") {
-    if (decision === "rejected") {
-      const reason = window.prompt("Reason for rejection (optional):") ?? undefined;
-      setBusy(true);
-      try { await onDecide(id, "rejected", reason || undefined); } finally { setBusy(false); }
-      return;
-    }
-    if (!valid) return;
-    setBusy(true);
-    try { await onDecide(id, "approved", undefined, approveNum); } finally { setBusy(false); }
-  }
 
-  return (
-    <div className="rounded-lg border border-border/60 bg-card p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">{name}</div>
-          <div className="text-sm truncate mt-0.5">{title}</div>
-          {projCode && (
-            <div className="text-[11px] text-muted-foreground font-mono truncate">
-              {projCode} · {projName}
-            </div>
-          )}
-        </div>
-        <Badge variant="outline" className="shrink-0 whitespace-nowrap">
-          {format(new Date(date + "T00:00:00"), "d MMM")}
-        </Badge>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 rounded-md bg-muted/40 px-3 py-2.5">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Logged</div>
-          <div className="text-2xl font-semibold tabular-nums leading-tight">
-            {logged.toFixed(2)}<span className="text-sm font-normal text-muted-foreground ml-0.5">h</span>
-          </div>
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Approve</div>
-          <div className="flex items-center gap-1">
-            <Input
-              type="number" min={0} max={logged} step={0.25}
-              value={approve}
-              onChange={(e) => setApprove(e.target.value)}
-              className={`h-9 w-20 text-right font-mono tabular-nums text-lg ${!valid ? "border-destructive/60" : reduced ? "border-amber-500/60" : ""}`}
-            />
-            <span className="text-sm text-muted-foreground">h</span>
-          </div>
-          {reduced && <div className="text-[10px] text-amber-700 mt-0.5">of {logged.toFixed(2)}</div>}
-        </div>
-      </div>
-
-      {note && (
-        <div className="text-xs text-muted-foreground border-l-2 border-border/60 pl-2">{note}</div>
-      )}
-
-      <div className="flex items-center justify-end gap-2 pt-1">
-        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-          disabled={busy} onClick={() => act("rejected")}>
-          <X className="h-4 w-4 mr-1" /> Reject
-        </Button>
-        <Button size="sm" disabled={!valid || busy} onClick={() => act("approved")} className="gap-1">
-          <Check className="h-4 w-4" /> Approve {valid ? `${approveNum.toFixed(approveNum % 1 === 0 ? 0 : 2)}h` : ""}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 

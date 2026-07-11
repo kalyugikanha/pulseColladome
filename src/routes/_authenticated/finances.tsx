@@ -25,7 +25,7 @@ type Profile = { id: string; full_name: string | null; email: string | null; dep
 type Salary = { id: string; user_id: string; monthly_salary: number | null; hourly_rate: number | null; comp_type: "monthly" | "hourly"; currency: string; effective_from: string };
 type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly"; department: string | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
-type TaskHourRow = { actor_id: string; hours: number | string | null; approved_hours: number | string | null; completion_date: string | null; created_at: string; task: { id: string; title: string; project: { id: string; code: string; name: string } | null } | null };
+
 
 function monthKey(d: string | Date) {
   const dt = typeof d === "string" ? new Date(d) : d;
@@ -76,9 +76,11 @@ function FinancesPage() {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      // Day-level approval gates finances: only approved days contribute.
       const { data, error } = await supabase
         .from("attendance_logs")
         .select("user_id, date, tasks")
+        .not("approved_at", "is", null)
         .gte("date", start)
         .lt("date", end);
       if (error) throw error;
@@ -86,39 +88,8 @@ function FinancesPage() {
     },
   });
 
-  const { data: taskLoggedHours } = useQuery({
-    queryKey: ["finances-task-hours", month],
-    enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => {
-      const [y, m] = month.split("-").map(Number);
-      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
-      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-      const { data, error } = await supabase
-        .from("task_activity" as any)
-        .select("actor_id, hours, approved_hours, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
-        .eq("approval_status", "approved")
-        .not("hours", "is", null)
-        .gte("completion_date", start)
-        .lt("completion_date", end);
-      if (error) throw error;
-      return (data ?? []) as unknown as TaskHourRow[];
-    },
-  });
+  const combinedLogs = useMemo<LogRow[]>(() => (logs ?? []).slice(), [logs]);
 
-  const combinedLogs = useMemo<LogRow[]>(() => {
-    const base = (logs ?? []).slice();
-    for (const r of taskLoggedHours ?? []) {
-      const project = r.task?.project;
-      const hrs = Number(r.approved_hours ?? r.hours) || 0;
-      if (!project?.code || hrs <= 0) continue;
-      base.push({
-        user_id: r.actor_id,
-        date: r.completion_date ?? r.created_at.slice(0, 10),
-        tasks: [{ project_code: project.code, project_name: project.name, hours: hrs }],
-      });
-    }
-    return base;
-  }, [logs, taskLoggedHours]);
 
   const { data: unpaidLeaves } = useQuery({
     queryKey: ["finances-unpaid-leaves", month],
@@ -244,21 +215,24 @@ function FinancesPage() {
   const totalBurn = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.burn, 0), [burnByProject]);
   const totalHours = useMemo(() => Array.from(burnByProject.values()).reduce((s, r) => s + r.hours, 0), [burnByProject]);
 
+  // Derive per-project hours breakdown from approved attendance logs
+  // (kept for the additive "hours by project" view below).
   const taskHoursByProject = useMemo(() => {
     const map = new Map<string, { code: string; name: string; hours: number; users: Set<string>; entries: number }>();
-    for (const r of taskLoggedHours ?? []) {
-      const p = r.task?.project;
-      if (!p) continue;
-      const hrs = Number(r.approved_hours ?? r.hours) || 0;
-      if (hrs <= 0) continue;
-      const cur = map.get(p.code) ?? { code: p.code, name: p.name, hours: 0, users: new Set<string>(), entries: 0 };
-      cur.hours += hrs;
-      cur.entries += 1;
-      if (r.actor_id) cur.users.add(r.actor_id);
-      map.set(p.code, cur);
+    for (const row of combinedLogs ?? []) {
+      for (const t of row.tasks ?? []) {
+        const code = t.project_code?.trim();
+        const hrs = Number(t.hours) || 0;
+        if (!code || hrs <= 0) continue;
+        const cur = map.get(code) ?? { code, name: t.project_name || code, hours: 0, users: new Set<string>(), entries: 0 };
+        cur.hours += hrs;
+        cur.entries += 1;
+        if (row.user_id) cur.users.add(row.user_id);
+        map.set(code, cur);
+      }
     }
     return map;
-  }, [taskLoggedHours]);
+  }, [combinedLogs]);
 
   const userHoursThisMonth = useMemo(() => {
     const m = new Map<string, number>();
@@ -630,8 +604,8 @@ function FinancesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Task-logged hours — {month}</CardTitle>
-          <CardDescription>Hours captured on task stage moves (from Kanban) grouped by the task's project. Additive view — does not affect salary-share burn above.</CardDescription>
+          <CardTitle>Hours by project — {month}</CardTitle>
+          <CardDescription>Approved timesheet hours grouped by project. View only — burn allocation is above.</CardDescription>
         </CardHeader>
         <CardContent>
           {taskHoursByProject.size === 0 ? (

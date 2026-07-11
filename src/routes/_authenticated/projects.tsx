@@ -49,7 +49,7 @@ function ProjectsPage() {
     queryKey: ["project-time-log", logFor?.code],
     enabled: !!logFor && !!me?.canManageProjects,
     queryFn: async () => {
-      const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks");
+      const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks, approved_at").not("approved_at", "is", null);
       const { data: profs } = await supabase.from("profiles").select("id, full_name, email");
       const nameOf = (uid: string) => profs?.find((p) => p.id === uid)?.full_name ?? profs?.find((p) => p.id === uid)?.email ?? "Unknown";
       const rows: { date: string; user: string; hours: number; comments: string }[] = [];

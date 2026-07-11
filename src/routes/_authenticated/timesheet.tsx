@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
-import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, Check, X, Clock, StickyNote } from "lucide-react";
+import { TableProperties, Download, CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, MoreHorizontal, Plus, Trash2, Pencil, StickyNote } from "lucide-react";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -38,19 +38,12 @@ type Task = {
   logged_hours?: number;
   comments?: string;
   approval_note?: string;
-  source?: "log" | "activity";
-  approval_status?: string;
   task_id?: string;
   task_title?: string;
 };
 type LogRow = { id: string; user_id: string; date: string; tasks: Task[] | null; approved_at: string | null; approved_by: string | null };
 type Project = { code: string; name: string };
 type UserTask = { id: string; title: string | null; project_id: string | null };
-type ActivityRow = {
-  id: string; task_id: string; actor_id: string; hours: number | null; approved_hours: number | null;
-  note: string | null; completion_date: string | null; created_at: string; approval_status: string;
-  task: { id: string; title: string | null; project: { id: string; code: string | null; name: string | null } | null } | null;
-};
 
 
 function ymd(d: Date) {
@@ -63,24 +56,6 @@ function addDays(d: Date, n: number) {
   const x = new Date(d);
   x.setDate(x.getDate() + n);
   return x;
-}
-
-function ymdInTimeZone(d: Date, timeZone = "Asia/Kolkata") {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(d);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
-
-function activityWorkDate(row: Pick<ActivityRow, "completion_date" | "created_at">) {
-  const createdUtcDay = row.created_at.slice(0, 10);
-  const createdLocalDay = ymdInTimeZone(new Date(row.created_at));
-  if (row.completion_date && row.completion_date !== createdUtcDay) return row.completion_date;
-  return createdLocalDay || row.completion_date || createdUtcDay;
 }
 
 export function TimesheetPage() {

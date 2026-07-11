@@ -637,35 +637,54 @@ function FinancesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Hours by project — {month}</CardTitle>
-          <CardDescription>Approved timesheet hours grouped by project. View only — burn allocation is above.</CardDescription>
+          <CardDescription>
+            Logged = all punched hours (unfiltered). Approved = manager-approved days only. Burn above uses Approved.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {taskHoursByProject.size === 0 ? (
-            <div className="text-sm text-muted-foreground py-8 text-center">No task-logged hours this month yet.</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead className="text-right">People</TableHead>
-                  <TableHead className="text-right">Hours</TableHead>
-                  <TableHead className="text-right">Log entries</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from(taskHoursByProject.values()).sort((a, b) => b.hours - a.hours).map((r) => (
-                  <TableRow key={r.code}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="font-mono text-xs">{r.code}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.users.size}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.hours.toFixed(1)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.entries}</TableCell>
+          {(() => {
+            const merged = new Map<string, { code: string; name: string; approvedHours: number; loggedHours: number; users: number; entries: number }>();
+            for (const r of taskHoursByProject.values()) {
+              merged.set(r.code, { code: r.code, name: r.name, approvedHours: r.hours, loggedHours: loggedHoursByProject.get(r.code) ?? 0, users: r.users.size, entries: r.entries });
+            }
+            for (const [code, hrs] of loggedHoursByProject) {
+              if (merged.has(code)) continue;
+              merged.set(code, { code, name: code, approvedHours: 0, loggedHours: hrs, users: 0, entries: 0 });
+            }
+            const rows = Array.from(merged.values()).sort((a, b) => b.approvedHours - a.approvedHours || b.loggedHours - a.loggedHours);
+            if (rows.length === 0) return <div className="text-sm text-muted-foreground py-8 text-center">No task-logged hours this month yet.</div>;
+            return (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead className="text-right">People</TableHead>
+                    <TableHead className="text-right" title="All punched hours, unfiltered">Logged hrs</TableHead>
+                    <TableHead className="text-right" title="Manager-approved days only">Approved hrs</TableHead>
+                    <TableHead className="text-right">Log entries</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r) => {
+                    const pending = r.loggedHours > r.approvedHours + 0.0001;
+                    return (
+                      <TableRow key={r.code}>
+                        <TableCell className="font-medium">{r.name}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.code}</TableCell>
+                        <TableCell className="text-right tabular-nums">{r.users}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">{r.loggedHours.toFixed(1)}</TableCell>
+                        <TableCell className={`text-right tabular-nums font-medium ${pending ? "text-amber-700" : ""}`} title={pending ? `${(r.loggedHours - r.approvedHours).toFixed(1)}h logged not yet approved` : undefined}>
+                          {r.approvedHours.toFixed(1)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{r.entries}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>

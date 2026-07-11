@@ -135,20 +135,25 @@ export function SalaryBankExport() {
   });
 
   const { data: taskHours } = useQuery({
-    queryKey: ["salary-export-task-hours", month],
+    queryKey: ["salary-export-approved-hours", month],
     queryFn: async () => {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
-        .from("task_activity")
-        .select("actor_id, hours, approved_hours, completion_date")
-        .eq("approval_status", "approved")
-        .not("hours", "is", null)
-        .gte("completion_date", start)
-        .lt("completion_date", end);
-      return (data ?? []) as Array<{ actor_id: string; hours: number | string | null; approved_hours: number | string | null; completion_date: string | null }>;
+      // Only approved days count toward hourly salary.
+      const { data } = await supabase
+        .from("attendance_logs")
+        .select("user_id, tasks")
+        .not("approved_at", "is", null)
+        .gte("date", start)
+        .lt("date", end);
+      const out: Array<{ actor_id: string; hours: number }> = [];
+      for (const row of (data ?? []) as Array<{ user_id: string; tasks: Array<{ hours?: number; approved_hours?: number }> | null }>) {
+        let sum = 0;
+        for (const t of row.tasks ?? []) sum += Number(t.approved_hours ?? t.hours) || 0;
+        if (sum > 0) out.push({ actor_id: row.user_id, hours: sum });
+      }
+      return out;
     },
   });
 
@@ -182,10 +187,10 @@ export function SalaryBankExport() {
       unpaid.set(lr.user_id, (unpaid.get(lr.user_id) ?? 0) + d);
     }
 
-    // Hours per user for hourly comp
+    // Hours per user for hourly comp (approved days only)
     const hoursByUser = new Map<string, number>();
     for (const r of taskHours ?? []) {
-      const h = Number(r.approved_hours ?? r.hours) || 0;
+      const h = Number(r.hours) || 0;
       if (h > 0) hoursByUser.set(r.actor_id, (hoursByUser.get(r.actor_id) ?? 0) + h);
     }
 

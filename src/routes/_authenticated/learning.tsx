@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { BookOpen, ExternalLink, Upload, CheckCircle2, Clock3, AlertTriangle, Ban, RotateCcw } from "lucide-react";
+import { BookOpen, ExternalLink, Upload, CheckCircle2, Clock3, AlertTriangle, Ban, RotateCcw, Trophy } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/learning")({ component: LearningPage });
 

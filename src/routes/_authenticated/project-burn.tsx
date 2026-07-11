@@ -13,7 +13,7 @@ import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
   beforeLoad: () => {
-    throw redirect({ to: "/finances", search: { tab: "project-burn" } });
+    throw redirect({ href: "/finances?tab=project-burn" });
   },
   component: () => null,
 });

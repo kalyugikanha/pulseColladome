@@ -435,7 +435,8 @@ export function TimesheetPage() {
                   <TableRow>
                     <TableHead className="min-w-[220px]">Employee</TableHead>
                     <TableHead className="min-w-[260px]">Task</TableHead>
-                    <TableHead className="w-[120px] text-right tabular-nums">Hours</TableHead>
+                    <TableHead className="w-[110px] text-right tabular-nums">Hours</TableHead>
+                    <TableHead className="w-[110px] text-right tabular-nums">Approved</TableHead>
                     <TableHead className="min-w-[180px]">Notes</TableHead>
                     <TableHead className="w-[110px]">Status</TableHead>
                     <TableHead className="w-[52px]" />
@@ -462,6 +463,7 @@ export function TimesheetPage() {
                       Approved {dayApprovedTotal.toFixed(1)} / Logged {dayTotal.toFixed(1)}
                     </TableCell>
                     <TableCell className="text-right text-lg font-bold tabular-nums">{dayTotal.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-0.5">h</span></TableCell>
+                    <TableCell className="text-right text-lg font-bold tabular-nums">{dayApprovedTotal.toFixed(1)}<span className="text-xs font-normal text-muted-foreground ml-0.5">h</span></TableCell>
                     <TableCell colSpan={3} />
                   </TableRow>
 

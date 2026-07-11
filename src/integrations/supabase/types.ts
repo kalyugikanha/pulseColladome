@@ -2442,7 +2442,12 @@ export type Database = {
       user_onboarding_gate: { Args: { _uid: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "employee" | "project_manager" | "hr_admin"
+      app_role:
+        | "admin"
+        | "employee"
+        | "project_manager"
+        | "hr_admin"
+        | "learning_admin"
       bd_frequency: "daily" | "weekly"
       bd_log_status: "pending" | "done" | "carried_forward"
       employee_doc_type:
@@ -2610,7 +2615,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "employee", "project_manager", "hr_admin"],
+      app_role: [
+        "admin",
+        "employee",
+        "project_manager",
+        "hr_admin",
+        "learning_admin",
+      ],
       bd_frequency: ["daily", "weekly"],
       bd_log_status: ["pending", "done", "carried_forward"],
       employee_doc_type: [

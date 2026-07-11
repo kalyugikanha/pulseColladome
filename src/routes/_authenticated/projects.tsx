@@ -49,21 +49,25 @@ function ProjectsPage() {
     queryKey: ["project-time-log", logFor?.code],
     enabled: !!logFor && !!me?.canManageProjects,
     queryFn: async () => {
-      const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks, approved_at").not("approved_at", "is", null);
+      // Fetch all entries; approval is per-day. We surface both logged and
+      // approved totals so nothing is hidden while still flagging the
+      // approved subset (the only one that feeds burn/finances).
+      const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks, approved_at");
       const { data: profs } = await supabase.from("profiles").select("id, full_name, email");
       const nameOf = (uid: string) => profs?.find((p) => p.id === uid)?.full_name ?? profs?.find((p) => p.id === uid)?.email ?? "Unknown";
-      const rows: { date: string; user: string; hours: number; comments: string }[] = [];
+      const rows: { date: string; user: string; hours: number; comments: string; approved: boolean }[] = [];
       (data ?? []).forEach((log: any) => {
         (log.tasks ?? []).forEach((t: any) => {
           if (t.project_code === logFor!.code || t.project_id === logFor!.id) {
-            rows.push({ date: log.date, user: nameOf(log.user_id), hours: Number(t.hours) || 0, comments: t.comments ?? "" });
+            rows.push({ date: log.date, user: nameOf(log.user_id), hours: Number(t.hours) || 0, comments: t.comments ?? "", approved: !!log.approved_at });
           }
         });
       });
       return rows.sort((a, b) => b.date.localeCompare(a.date));
     },
   });
-  const logTotal = (timeLog ?? []).reduce((s, r) => s + r.hours, 0);
+  const loggedTotal = (timeLog ?? []).reduce((s, r) => s + r.hours, 0);
+  const approvedTotal = (timeLog ?? []).filter((r) => r.approved).reduce((s, r) => s + r.hours, 0);
 
   const { data: vendorPayments } = useQuery({
     queryKey: ["vendor-payments-by-project"],

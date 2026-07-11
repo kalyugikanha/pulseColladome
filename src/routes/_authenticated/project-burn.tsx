@@ -10,6 +10,7 @@ import { Flame, IndianRupee, TrendingUp, CalendarDays } from "lucide-react";
 import { format } from "date-fns";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
   beforeLoad: () => {

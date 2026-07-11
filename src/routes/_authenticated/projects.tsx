@@ -383,10 +383,29 @@ function ProjectsPage() {
                   <div className="font-medium">{r.user}</div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{format(new Date(r.date), "EEE, MMM d")}</span>
-                    <Badge variant="outline">{r.hours.toFixed(2)}h logged</Badge>
-                    {r.approved
-                      ? <Badge variant="secondary" className="text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300">approved</Badge>
-                      : <Badge variant="outline" className="text-amber-700 border-amber-500/60">pending approval</Badge>}
+                    {(() => {
+                      const apr = r.approvedHours;
+                      const reduced = r.approved && apr != null && apr !== r.hours;
+                      if (reduced) {
+                        return (
+                          <Badge
+                            variant="outline"
+                            className="text-amber-700 border-amber-500/60"
+                            title="Manager approved fewer (or more) hours than were logged for this row"
+                          >
+                            {r.hours.toFixed(2)}h logged → {apr!.toFixed(2)}h approved
+                          </Badge>
+                        );
+                      }
+                      return (
+                        <>
+                          <Badge variant="outline">{r.hours.toFixed(2)}h logged</Badge>
+                          {r.approved
+                            ? <Badge variant="secondary" className="text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300">approved</Badge>
+                            : <Badge variant="outline" className="text-amber-700 border-amber-500/60">pending approval</Badge>}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
                 {r.comments && <div className="mt-1 text-xs text-muted-foreground">{r.comments}</div>}

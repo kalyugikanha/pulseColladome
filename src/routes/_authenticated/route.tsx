@@ -126,6 +126,14 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
+                {isLearningAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/learning-admin")}>
+                      <Link to="/learning-admin"><BookOpen /><span>Learning Admin</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+
 
                 {isSuperAdmin && (
                   <>

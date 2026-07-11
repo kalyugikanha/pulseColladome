@@ -142,103 +142,11 @@ export function TimesheetPage() {
     queryFn: async () => (await supabase.from("projects").select("code, name").order("code")).data as Project[] ?? [],
   });
 
-  // Kanban-logged task hours (task_activity) for the visible team on the selected day.
-  const { data: rawActivityRows } = useQuery({
-    queryKey: ["ts-activity", dateIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
-    enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
-    queryFn: async () => {
-      let q = supabase
-        .from("task_activity" as never)
-        .select("id, task_id, actor_id, hours, approved_hours, note, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
-        .not("hours", "is", null)
-        .neq("approval_status", "rejected")
-        .gte("completion_date", prevDayIso).lt("completion_date", afterNextDayIso);
-      if (hasScope || fallbackActorIds) q = q.in("actor_id", visibleUserIds);
-      const { data, error } = await q;
-      if (error) throw error;
-      return ((data ?? []) as unknown as ActivityRow[]);
-    },
-  });
-
-  const activityRows = useMemo(
-    () => (rawActivityRows ?? []).filter((row) => activityWorkDate(row) === dateIso),
-    [rawActivityRows, dateIso],
-  );
-
-  const pendingActorIds = pendingIsAdmin
-    ? (hasScope ? visibleUserIds : null) // null = unscoped, no in() filter
-    : directReportIds;
-  const pendingEnabled = !!me?.id && (
-    pendingIsAdmin
-      ? (!hasScope || visibleUserIds.length > 0)
-      : directReportIds.length > 0
-  );
-
-  const { data: pendingHours, refetch: refetchPending } = useQuery({
-    queryKey: ["ts-pending-task-hours", me?.id, pendingIsAdmin ? "admin" : "mgr", (pendingActorIds ?? ["*"]).join(",")],
-    enabled: pendingEnabled,
-    queryFn: async () => {
-      let q = supabase
-        .from("task_activity" as never)
-        .select("id, task_id, actor_id, hours, note, completion_date, created_at, kind, task:tasks(id, title, project:projects(id, code, name)), actor:profiles!task_activity_actor_id_fkey(id, full_name, email)")
-        .eq("approval_status", "pending")
-        .not("hours", "is", null)
-        .order("created_at", { ascending: false });
-      if (pendingActorIds && pendingActorIds.length > 0) q = q.in("actor_id", pendingActorIds);
-      const { data, error } = await q;
-      if (error) throw error;
-      return ((data ?? []) as unknown as Array<{
-        id: string; task_id: string; actor_id: string; hours: number | null; note: string | null;
-        completion_date: string | null; created_at: string; kind: string;
-        task: { id: string; title: string | null; project: { code: string | null; name: string | null } | null } | null;
-        actor: { id: string; full_name: string | null; email: string | null } | null;
-      }>);
-    },
-  });
-
-
-  async function decidePending(id: string, decide: "approved" | "rejected", reason?: string, approvedHours?: number | null) {
-    try {
-      const { data: userRes } = await supabase.auth.getUser();
-      const myId = userRes.user?.id ?? null;
-      const patch: Record<string, unknown> = {
-        approval_status: decide,
-        approved_by: myId,
-        approved_at: new Date().toISOString(),
-        approved_hours: decide === "approved" ? (approvedHours ?? null) : null,
-      };
-      if (decide === "rejected") patch.rejected_reason = reason ?? null;
-      const { error } = await supabase.from("task_activity" as never).update(patch as never).eq("id", id);
-      if (error) throw error;
-      toast.success(decide === "approved" ? "Approved" : "Rejected");
-      await refetchPending();
-      qc.invalidateQueries({ queryKey: ["ts-activity"] });
-      qc.invalidateQueries({ queryKey: ["ts-logs"] });
-      qc.invalidateQueries({ queryKey: ["my-ts-activity"] });
-      qc.invalidateQueries({ queryKey: ["my-performance"] });
-      qc.invalidateQueries({ queryKey: ["pb-activity"] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
-    }
-  }
-
-
   const projectByCode = useMemo(() => new Map((projectsAll ?? []).map((p) => [p.code, p])), [projectsAll]);
 
   const profileById = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p])), [profiles]);
   const logByUser = useMemo(() => new Map((logs ?? []).map((r) => [r.user_id, r])), [logs]);
 
-  // Group activity rows by actor for merging into empRows.
-  const activityByUser = useMemo(() => {
-    const m = new Map<string, ActivityRow[]>();
-    for (const a of activityRows ?? []) {
-      if (!a.actor_id) continue;
-      const arr = m.get(a.actor_id) ?? [];
-      arr.push(a);
-      m.set(a.actor_id, arr);
-    }
-    return m;
-  }, [activityRows]);
 
   // Projects that actually appear in the day (for filter list) — from both sources.
   const projectsInDay = useMemo(() => {

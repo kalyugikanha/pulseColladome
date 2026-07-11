@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Flame, IndianRupee, TrendingUp, CalendarDays } from "lucide-react";
-import { format, getDaysInMonth } from "date-fns";
+import { format } from "date-fns";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
@@ -323,10 +323,6 @@ export function ProjectBurnPage() {
     return (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())).length;
   }, [profiles, grants]);
 
-  const daysInMonth = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    return getDaysInMonth(new Date(y, m - 1, 1));
-  }, [month]);
 
   // Employees present in the filtered view, sorted by total metric desc for stable colors + legend order.
   const employeeSeries = useMemo(() => {
@@ -349,27 +345,10 @@ export function ProjectBurnPage() {
     return EMP_COLORS[(idx < 0 ? 0 : idx) % EMP_COLORS.length];
   };
 
-  // Daily stacked series: per-day per-user hours + burn.
-  const dailyTrend = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const arr = Array.from({ length: daysInMonth }, (_, i) => {
-      const d = `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`;
-      return { date: d, total: 0, perUser: new Map<string, { hours: number; burn: number }>() };
-    });
-    for (const r of filteredDaily) {
-      const idx = Number(r.date.slice(8, 10)) - 1;
-      if (!arr[idx]) continue;
-      const cell = arr[idx];
-      const cur = cell.perUser.get(r.user_id) ?? { hours: 0, burn: 0 };
-      cur.hours += r.hours; cur.burn += r.burn;
-      cell.perUser.set(r.user_id, cur);
-      cell.total += showCosts ? r.burn : r.hours;
-    }
-    return arr;
-  }, [filteredDaily, month, daysInMonth, showCosts]);
-  const trendMax = Math.max(1, ...dailyTrend.map((d) => d.total));
-  const distinctLoggedDates = useMemo(() => new Set(filteredDaily.map((r) => r.date)).size, [filteredDaily]);
-  const lowGranularity = distinctLoggedDates > 0 && distinctLoggedDates < 3;
+  const employeeSeriesMax = useMemo(
+    () => Math.max(1, ...employeeSeries.map((e) => (showCosts ? e.burn : e.hours))),
+    [employeeSeries, showCosts],
+  );
 
   // Burn by project rollup (respects month/dept/employee/project filters).
   const projectRollup = useMemo(() => {
@@ -541,57 +520,38 @@ export function ProjectBurnPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{showCosts ? `Daily burn — ${month}` : `Daily hours — ${month}`}</CardTitle>
+          <CardTitle>{showCosts ? `Burn by employee — ${month}` : `Hours by employee — ${month}`}</CardTitle>
           <CardDescription>{projectFilter === "all" ? "All projects" : projects.find((p) => p.code === projectFilter)?.name}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {lowGranularity && (
-            <div className="rounded-md border border-amber-300/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-              Limited daily granularity for this month — only {distinctLoggedDates} distinct date{distinctLoggedDates === 1 ? "" : "s"} logged (likely a bulk historical import stamped to a single day). The chart shows a spike on that day; totals below are accurate.
-            </div>
-          )}
-          <div className="flex items-end gap-1 h-40">
-            {dailyTrend.map((d) => {
-              const totalPct = (d.total / trendMax) * 100;
-              return (
-                <div key={d.date} className="flex-1 flex flex-col items-center justify-end gap-1">
-                  <div className="w-full flex flex-col-reverse rounded-t overflow-hidden" style={{ height: `${totalPct}%`, minHeight: d.total > 0 ? 2 : 0 }}>
-                    {employeeSeries.map((emp) => {
-                      const cell = d.perUser.get(emp.userId);
-                      if (!cell) return null;
-                      const val = showCosts ? cell.burn : cell.hours;
-                      if (val <= 0) return null;
-                      const segPct = d.total > 0 ? (val / d.total) * 100 : 0;
-                      return (
-                        <div
-                          key={emp.userId}
-                          style={{ height: `${segPct}%`, background: colorFor(emp.userId) }}
-                          title={`${emp.name} — ${d.date}: ${cell.hours.toFixed(1)}h${showCosts ? ` · ${inr(cell.burn)}` : ""}`}
-                        />
-                      );
-                    })}
+        <CardContent>
+          {employeeSeries.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">No logged hours for the current filters.</div>
+          ) : (
+            <div className="space-y-2">
+              {employeeSeries.map((emp) => {
+                const val = showCosts ? emp.burn : emp.hours;
+                const pct = (val / employeeSeriesMax) * 100;
+                return (
+                  <div key={emp.userId} className="flex items-center gap-3">
+                    <div className="w-40 shrink-0 text-xs font-medium truncate" title={emp.name}>{emp.name}</div>
+                    <div className="flex-1 h-6 bg-muted/40 rounded overflow-hidden">
+                      <div
+                        className="h-full rounded"
+                        style={{ width: `${Math.max(pct, val > 0 ? 1.5 : 0)}%`, background: colorFor(emp.userId) }}
+                        title={`${emp.name} — ${emp.hours.toFixed(1)}h${showCosts ? ` · ${inr(emp.burn)}` : ""}`}
+                      />
+                    </div>
+                    <div className="w-40 shrink-0 text-xs text-muted-foreground text-right tabular-nums">
+                      {emp.hours.toFixed(1)}h{showCosts ? ` · ${inr(emp.burn)}` : ""}
+                    </div>
                   </div>
-                  <span className="text-[9px] text-muted-foreground">{Number(d.date.slice(8, 10))}</span>
-                </div>
-              );
-            })}
-          </div>
-          {employeeSeries.length > 0 && (
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-2 border-t">
-              {employeeSeries.map((emp) => (
-                <div key={emp.userId} className="flex items-center gap-1.5 text-xs">
-                  <span className="inline-block w-3 h-3 rounded-sm" style={{ background: colorFor(emp.userId) }} />
-                  <span className="font-medium">{emp.name}</span>
-                  <span className="text-muted-foreground">
-                    {emp.hours.toFixed(1)}h{showCosts ? ` · ${inr(emp.burn)}` : ""}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
-
       </Card>
+
 
 
       <Card>

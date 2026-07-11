@@ -151,12 +151,16 @@ export function TimesheetPage() {
       let q = supabase.from("attendance_logs")
         .select("id, user_id, date, tasks, total_hours")
         .is("approved_at", null)
+        .gt("total_hours", 0)
         .gte("date", pendingSinceIso)
         .order("date", { ascending: false });
       if (hasScope || fallbackActorIds) q = q.in("user_id", visibleUserIds);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; user_id: string; date: string; tasks: Task[] | null; total_hours: number | null }>;
+      // Belt-and-suspenders: also drop rows whose task hours sum to 0 even
+      // if total_hours was stored as > 0 (legacy / stale totals).
+      const rows = (data ?? []) as Array<{ id: string; user_id: string; date: string; tasks: Task[] | null; total_hours: number | null }>;
+      return rows.filter((r) => (r.tasks ?? []).some((t) => Number(t.hours) > 0));
     },
   });
 

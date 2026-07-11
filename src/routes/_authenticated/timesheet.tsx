@@ -136,6 +136,31 @@ export function TimesheetPage() {
     },
   });
 
+  // Pending approvals report — every attendance_logs day within scope where
+  // approved_at IS NULL. Bounded to the last 60 days so the list stays
+  // scannable (older un-approved days are noise, not a work queue).
+  const pendingSinceIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 60);
+    return ymd(d);
+  }, []);
+  const { data: pendingRows } = useQuery({
+    queryKey: ["ts-pending", pendingSinceIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
+    enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
+    queryFn: async () => {
+      let q = supabase.from("attendance_logs")
+        .select("id, user_id, date, tasks, total_hours")
+        .is("approved_at", null)
+        .gte("date", pendingSinceIso)
+        .order("date", { ascending: false });
+      if (hasScope || fallbackActorIds) q = q.in("user_id", visibleUserIds);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; user_id: string; date: string; tasks: Task[] | null; total_hours: number | null }>;
+    },
+  });
+
+
   const { data: projectsAll } = useQuery({
     queryKey: ["ts-projects-all"],
     enabled: canView,

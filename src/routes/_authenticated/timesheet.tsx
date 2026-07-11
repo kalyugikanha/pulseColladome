@@ -345,9 +345,7 @@ export function TimesheetPage() {
         continue;
       }
       for (const t of r.tasks) {
-        const status = t.source === "activity"
-          ? (t.approval_status === "approved" || t.approval_status === "auto" ? "Approved" : t.approval_status === "pending" ? "Pending" : t.approval_status ?? "Pending")
-          : (r.approved ? "Approved" : "Pending");
+        const status = r.approved ? "Approved" : "Pending";
         rows.push([
           r.profile.full_name ?? "", r.profile.email ?? "", r.profile.department ?? "",
           t.task_title ?? "",
@@ -408,47 +406,8 @@ export function TimesheetPage() {
         </div>
       </header>
 
-      {pendingEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              Task hours awaiting your approval
-              {pendingHours && pendingHours.length > 0 && (
-                <Badge variant="outline" className="ml-1">{pendingHours.length}</Badge>
-              )}
-            </CardTitle>
-            <CardDescription>Hours logged on tasks by your team. Approve or reject each entry.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!pendingHours || pendingHours.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending. Nice.</div>
-            ) : (
-              <div className="grid gap-3 lg:grid-cols-2">
-                {pendingHours.map((r) => {
-                  const date = activityWorkDate(r);
-                  const proj = r.task?.project;
-                  const logged = Number(r.hours ?? 0);
-                  return (
-                    <PendingCard
-                      key={r.id}
-                      id={r.id}
-                      name={r.actor?.full_name ?? r.actor?.email ?? "—"}
-                      title={r.task?.title ?? "Task"}
-                      projCode={proj?.code ?? null}
-                      projName={proj?.name ?? null}
-                      date={date}
-                      logged={logged}
-                      note={r.note}
-                      onDecide={decidePending}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+
+
 
 
 

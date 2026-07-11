@@ -559,20 +559,26 @@ export function ProjectBurnPage() {
           <CardDescription>
             Totals for {month} grouped by project across every department in view.
           </CardDescription>
-          <p className="text-[11px] text-muted-foreground/80 mt-1"><span className="font-medium">Legend:</span> <b title="Every punched hour on this project, regardless of manager approval">Logged hrs</b> = raw punched hours (unfiltered). <b title="Only days a manager approved — the figure that feeds burn calculations">Approved hrs</b> = manager-approved days only; burn uses this.</p>
+          <p className="text-[11px] text-muted-foreground/80 mt-1"><span className="font-medium">Legend:</span> <b title="Every punched hour on this project, regardless of manager approval">Logged hrs</b> = raw punched hours (unfiltered). <b title="Only days a manager approved — the figure that feeds burn calculations">Approved hrs</b> = manager-approved days only; burn uses this. {showCosts && <><b title="Salary-share allocation from approved hours">Salary burn</b> + <b title="Project-scoped expenses this month plus this project's equal share of any department- or company-wide expenses">Expenses</b> = <b>Total burn</b>.</>}</p>
         </CardHeader>
         <CardContent>
           {(() => {
             // Merge approved rollup with logged-only projects so nothing punched-in disappears.
-            const merged = new Map<string, { code: string; name: string; approvedHours: number; loggedHours: number; contributors: number; burn: number }>();
+            const merged = new Map<string, { code: string; name: string; approvedHours: number; loggedHours: number; contributors: number; burn: number; expenses: number }>();
             for (const r of projectRollup) {
-              merged.set(r.code, { code: r.code, name: r.name, approvedHours: r.hours, loggedHours: loggedHoursByProject.get(r.code) ?? 0, contributors: r.contributors, burn: r.burn });
+              merged.set(r.code, { code: r.code, name: r.name, approvedHours: r.hours, loggedHours: loggedHoursByProject.get(r.code) ?? 0, contributors: r.contributors, burn: r.burn, expenses: expenseByProject.byCode.get(r.code) ?? 0 });
             }
             for (const [code, hrs] of loggedHoursByProject) {
               if (merged.has(code)) continue;
-              merged.set(code, { code, name: code, approvedHours: 0, loggedHours: hrs, contributors: 0, burn: 0 });
+              merged.set(code, { code, name: code, approvedHours: 0, loggedHours: hrs, contributors: 0, burn: 0, expenses: expenseByProject.byCode.get(code) ?? 0 });
             }
-            const rows = Array.from(merged.values()).sort((a, b) => (showCosts ? b.burn - a.burn : b.approvedHours - a.approvedHours) || b.loggedHours - a.loggedHours);
+            // Ensure projects that only received expense allocation (no hours) still appear.
+            for (const [code, amt] of expenseByProject.byCode) {
+              if (merged.has(code)) continue;
+              const proj = (activeProjects ?? []).find((p) => p.code === code);
+              merged.set(code, { code, name: proj?.name ?? code, approvedHours: 0, loggedHours: 0, contributors: 0, burn: 0, expenses: amt });
+            }
+            const rows = Array.from(merged.values()).sort((a, b) => (showCosts ? (b.burn + b.expenses) - (a.burn + a.expenses) : b.approvedHours - a.approvedHours) || b.loggedHours - a.loggedHours);
             if (rows.length === 0) return <div className="text-sm text-muted-foreground py-8 text-center">No entries.</div>;
             return (
               <div className="max-h-[480px] overflow-y-auto">
@@ -582,7 +588,9 @@ export function ProjectBurnPage() {
                     <TableHead className="text-right" title="All punched hours, unfiltered">Logged hrs</TableHead>
                     <TableHead className="text-right" title="Manager-approved days only — used for burn">Approved hrs</TableHead>
                     <TableHead className="text-right">Contributors</TableHead>
-                    {showCosts && <TableHead className="text-right">Burn</TableHead>}
+                    {showCosts && <TableHead className="text-right" title="Salary-share allocation from approved hours">Salary burn</TableHead>}
+                    {showCosts && <TableHead className="text-right" title="Project expenses + share of dept/company expenses">Expenses</TableHead>}
+                    {showCosts && <TableHead className="text-right" title="Salary burn + expenses">Total burn</TableHead>}
                   </TableRow></TableHeader>
                   <TableBody>
                     {rows.map((r) => {
@@ -598,10 +606,20 @@ export function ProjectBurnPage() {
                             {r.approvedHours.toFixed(1)}
                           </TableCell>
                           <TableCell className="text-right">{r.contributors}</TableCell>
-                          {showCosts && <TableCell className="text-right">{inr(r.burn)}</TableCell>}
+                          {showCosts && <TableCell className="text-right tabular-nums">{inr(r.burn)}</TableCell>}
+                          {showCosts && <TableCell className="text-right tabular-nums text-muted-foreground">{r.expenses > 0 ? inr(r.expenses) : "—"}</TableCell>}
+                          {showCosts && <TableCell className="text-right tabular-nums font-semibold">{inr(r.burn + r.expenses)}</TableCell>}
                         </TableRow>
                       );
                     })}
+                    {showCosts && expenseByProject.unallocated > 0 && (
+                      <TableRow className="bg-muted/40">
+                        <TableCell className="text-muted-foreground italic" colSpan={4}>Unallocated expenses — no active project matched (dept/company scope with no eligible team)</TableCell>
+                        <TableCell className="text-right text-muted-foreground">—</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">{inr(expenseByProject.unallocated)}</TableCell>
+                        <TableCell className="text-right tabular-nums font-semibold text-muted-foreground">{inr(expenseByProject.unallocated)}</TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -609,6 +627,7 @@ export function ProjectBurnPage() {
           })()}
         </CardContent>
       </Card>
+
 
 
       <Card>

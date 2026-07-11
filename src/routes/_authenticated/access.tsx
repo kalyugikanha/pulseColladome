@@ -219,6 +219,7 @@ export function AccessPage() {
                 <SelectContent>
                   <SelectItem value="employee">Employee</SelectItem>
                   <SelectItem value="project_manager">Project Manager</SelectItem>
+                  <SelectItem value="learning_admin">Learning Admin</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>

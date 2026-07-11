@@ -501,6 +501,65 @@ export type Database = {
           },
         ]
       }
+      expenses: {
+        Row: {
+          amount_inr: number
+          category: string
+          created_at: string
+          created_by: string | null
+          department: string | null
+          description: string | null
+          expense_date: string
+          id: string
+          project_id: string | null
+          proof_path: string | null
+          recurring: boolean
+          scope: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          amount_inr: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          expense_date: string
+          id?: string
+          project_id?: string | null
+          proof_path?: string | null
+          recurring?: boolean
+          scope: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          amount_inr?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          expense_date?: string
+          id?: string
+          project_id?: string | null
+          proof_path?: string | null
+          recurring?: boolean
+          scope?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_calendar_events: {
         Row: {
           all_day: boolean

@@ -16,6 +16,8 @@ import { Wallet, IndianRupee, Users, UserPlus, Loader2, Flame } from "lucide-rea
 import { provisionPendingUsers } from "@/lib/admin-users.functions";
 import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter";
 import { SalaryBankExport } from "@/components/finances/salary-bank-export";
+import { ExpensesPanel } from "@/components/finances/expenses-panel";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_authenticated/finances")({
   component: FinancesPage,
@@ -458,6 +460,13 @@ function FinancesPage() {
         </div>
       </div>
 
+      <Tabs defaultValue="salary">
+        <TabsList>
+          <TabsTrigger value="salary">Salary &amp; Burn</TabsTrigger>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
+        </TabsList>
+        <TabsContent value="salary" className="space-y-6 mt-4">
+
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
         <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Project allocated burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} project hrs`} />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Unallocated salary" value={inr(totalUnallocated)} sub={totalUnallocated > 0 ? "salary with no project hours" : "fully allocated"} />
@@ -686,6 +695,11 @@ function FinancesPage() {
           })()}
         </CardContent>
       </Card>
+        </TabsContent>
+        <TabsContent value="expenses" className="mt-4">
+          <ExpensesPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

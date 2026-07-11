@@ -218,6 +218,26 @@ export function ProjectBurnPage() {
   const profileIdSet = useMemo(() => new Set((profiles ?? []).map((p) => p.id)), [profiles]);
   const scopedLogs = useMemo(() => combinedLogs.filter((r) => profileIdSet.size === 0 || profileIdSet.has(r.user_id)), [combinedLogs, profileIdSet]);
 
+  // Logged (unapproved-inclusive) hours per project code, scoped by the same
+  // dept/emp/project filters as the approved rollup so numbers stay comparable.
+  const loggedHoursByProject = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of loggedLogs ?? []) {
+      if (profileIdSet.size > 0 && !profileIdSet.has(row.user_id)) continue;
+      if (!passesDept(row.user_id)) continue;
+      if (empSel.size > 0 && !empSel.has(row.user_id)) continue;
+      for (const t of row.tasks ?? []) {
+        const code = t.project_code?.trim();
+        const h = Number(t.hours) || 0;
+        if (!code || h <= 0) continue;
+        if (projectFilter !== "all" && code !== projectFilter) continue;
+        map.set(code, (map.get(code) ?? 0) + h);
+      }
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedLogs, profileIdSet, deptSel, deptById, empSel, projectFilter]);
+
   // Daily rows: [date, project_code, user_id, hours, burn]
   type DailyRow = { date: string; code: string; name: string; user_id: string; hours: number; burn: number };
   const dailyRows: DailyRow[] = useMemo(() => {

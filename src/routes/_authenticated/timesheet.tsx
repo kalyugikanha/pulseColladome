@@ -545,7 +545,7 @@ function EmployeeBlock({
             <div className="font-medium">{name}</div>
             {dept && <div className="text-[10px] text-muted-foreground">{dept}</div>}
           </TableCell>
-          <TableCell colSpan={3}>
+          <TableCell colSpan={4}>
             <span className="text-sm text-muted-foreground italic">No entries</span>
           </TableCell>
           <TableCell>

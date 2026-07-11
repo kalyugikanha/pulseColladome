@@ -48,7 +48,6 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
     { title: "Projects", url: "/projects", icon: FolderKanban, match: "/projects" },
     { title: "Team", url: "/team", icon: Users, match: "/team|/leave|/calendar|/directory" },
     { title: "Performance", url: "/performance", icon: Star },
-    ...(isBd ? [{ title: "Business Development", url: "/bd", icon: Briefcase } as NavItem] : []),
     { title: "Learning", url: "/learning", icon: BookOpen, match: "/learning" },
     { title: "Resource Hub", url: "/resources", icon: Layers },
   ];

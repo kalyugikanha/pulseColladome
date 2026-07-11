@@ -325,14 +325,27 @@ export function ProjectBurnPage() {
 
 
   // Employees present in the filtered view, sorted by total metric desc for stable colors + legend order.
+  // Each employee carries per-project segments so we can render a stacked bar.
   const employeeSeries = useMemo(() => {
-    const map = new Map<string, { userId: string; name: string; hours: number; burn: number }>();
+    type Seg = { code: string; name: string; hours: number; burn: number };
+    const map = new Map<string, { userId: string; name: string; hours: number; burn: number; segments: Map<string, Seg> }>();
     for (const r of filteredDaily) {
-      const cur = map.get(r.user_id) ?? { userId: r.user_id, name: nameById.get(r.user_id) ?? "—", hours: 0, burn: 0 };
+      const cur = map.get(r.user_id) ?? { userId: r.user_id, name: nameById.get(r.user_id) ?? "—", hours: 0, burn: 0, segments: new Map<string, Seg>() };
       cur.hours += r.hours; cur.burn += r.burn;
+      const seg = cur.segments.get(r.code) ?? { code: r.code, name: r.name, hours: 0, burn: 0 };
+      seg.hours += r.hours; seg.burn += r.burn;
+      cur.segments.set(r.code, seg);
       map.set(r.user_id, cur);
     }
-    return Array.from(map.values()).sort((a, b) => (showCosts ? b.burn - a.burn : b.hours - a.hours));
+    return Array.from(map.values())
+      .map((e) => ({
+        userId: e.userId,
+        name: e.name,
+        hours: e.hours,
+        burn: e.burn,
+        segments: Array.from(e.segments.values()).sort((a, b) => (showCosts ? b.burn - a.burn : b.hours - a.hours)),
+      }))
+      .sort((a, b) => (showCosts ? b.burn - a.burn : b.hours - a.hours));
   }, [filteredDaily, nameById, showCosts]);
 
   const EMP_COLORS = [
@@ -340,8 +353,14 @@ export function ProjectBurnPage() {
     "hsl(280 87% 65%)", "hsl(190 90% 45%)", "hsl(340 82% 60%)", "hsl(120 60% 45%)",
     "hsl(20 90% 55%)", "hsl(260 70% 60%)", "hsl(180 70% 40%)", "hsl(50 90% 50%)",
   ];
-  const colorFor = (userId: string) => {
-    const idx = employeeSeries.findIndex((e) => e.userId === userId);
+  // Stable color per project code across the visible view (ordered by project size).
+  const projectColorOrder = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const r of filteredDaily) totals.set(r.code, (totals.get(r.code) ?? 0) + (showCosts ? r.burn : r.hours));
+    return Array.from(totals.entries()).sort((a, b) => b[1] - a[1]).map(([code]) => code);
+  }, [filteredDaily, showCosts]);
+  const colorForProject = (code: string) => {
+    const idx = projectColorOrder.indexOf(code);
     return EMP_COLORS[(idx < 0 ? 0 : idx) % EMP_COLORS.length];
   };
 
@@ -531,17 +550,29 @@ export function ProjectBurnPage() {
               {employeeSeries.map((emp) => {
                 const val = showCosts ? emp.burn : emp.hours;
                 const pct = (val / employeeSeriesMax) * 100;
+                const barWidth = Math.max(pct, val > 0 ? 1.5 : 0);
+                const totalTitle = `${emp.name} — total ${emp.hours.toFixed(1)}h${showCosts ? ` · ${inr(emp.burn)}` : ""}`;
                 return (
                   <div key={emp.userId} className="flex items-center gap-3">
                     <div className="w-40 shrink-0 text-xs font-medium truncate" title={emp.name}>{emp.name}</div>
-                    <div className="flex-1 h-6 bg-muted/40 rounded overflow-hidden">
-                      <div
-                        className="h-full rounded"
-                        style={{ width: `${Math.max(pct, val > 0 ? 1.5 : 0)}%`, background: colorFor(emp.userId) }}
-                        title={`${emp.name} — ${emp.hours.toFixed(1)}h${showCosts ? ` · ${inr(emp.burn)}` : ""}`}
-                      />
+                    <div className="flex-1 h-6 bg-muted/40 rounded overflow-hidden" title={totalTitle}>
+                      <div className="flex h-full w-full" style={{ width: `${barWidth}%` }}>
+                        {emp.segments.map((seg) => {
+                          const segVal = showCosts ? seg.burn : seg.hours;
+                          const empTotal = showCosts ? emp.burn : emp.hours;
+                          const segPct = empTotal > 0 ? (segVal / empTotal) * 100 : 0;
+                          return (
+                            <div
+                              key={seg.code}
+                              className="h-full"
+                              style={{ width: `${segPct}%`, background: colorForProject(seg.code) }}
+                              title={`${seg.name} (${seg.code}) — ${seg.hours.toFixed(1)}h${showCosts ? ` · ${inr(seg.burn)}` : ""}`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="w-40 shrink-0 text-xs text-muted-foreground text-right tabular-nums">
+                    <div className="w-40 shrink-0 text-xs text-muted-foreground text-right tabular-nums" title={totalTitle}>
                       {emp.hours.toFixed(1)}h{showCosts ? ` · ${inr(emp.burn)}` : ""}
                     </div>
                   </div>

@@ -287,7 +287,16 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
+                  <div className="flex flex-col items-center gap-2">
+                    <span>No entries for this day.</span>
+                    {mayEdit && (
+                      <Button variant="outline" size="sm" onClick={addRow}>
+                        <Plus className="h-4 w-4 mr-1" /> Add first task
+                      </Button>
+                    )}
+                  </div>
+                </TableCell></TableRow>
               )}
               {rows.map((r, i) => {
                 const legacyTaskMissing = !!r.task_id && !taskById.has(r.task_id);

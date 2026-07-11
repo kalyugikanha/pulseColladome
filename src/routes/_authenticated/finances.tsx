@@ -46,6 +46,8 @@ function FinancesPage() {
   const qc = useQueryClient();
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
+  const search = useRouterState({ select: (s) => s.location.search }) as { tab?: Tab };
+  const navigate = useNavigate({ from: "/finances" });
 
   const { data: profiles } = useQuery({
     queryKey: ["finances-profiles"],

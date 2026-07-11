@@ -55,11 +55,11 @@ function ProjectsPage() {
       const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks, approved_at");
       const { data: profs } = await supabase.from("profiles").select("id, full_name, email");
       const nameOf = (uid: string) => profs?.find((p) => p.id === uid)?.full_name ?? profs?.find((p) => p.id === uid)?.email ?? "Unknown";
-      const rows: { date: string; user: string; hours: number; comments: string; approved: boolean }[] = [];
+      const rows: { date: string; userId: string; user: string; hours: number; comments: string; approved: boolean }[] = [];
       (data ?? []).forEach((log: any) => {
         (log.tasks ?? []).forEach((t: any) => {
           if (t.project_code === logFor!.code || t.project_id === logFor!.id) {
-            rows.push({ date: log.date, user: nameOf(log.user_id), hours: Number(t.hours) || 0, comments: t.comments ?? "", approved: !!log.approved_at });
+            rows.push({ date: log.date, userId: log.user_id, user: nameOf(log.user_id), hours: Number(t.hours) || 0, comments: t.comments ?? "", approved: !!log.approved_at });
           }
         });
       });
@@ -68,6 +68,111 @@ function ProjectsPage() {
   });
   const loggedTotal = (timeLog ?? []).reduce((s, r) => s + r.hours, 0);
   const approvedTotal = (timeLog ?? []).filter((r) => r.approved).reduce((s, r) => s + r.hours, 0);
+
+  // Approved-hours-based project burn — same salary-share math as
+  // project-burn.tsx, scoped to just this project across every month it
+  // touches. Admin-only: costs are visible only to finance admins.
+  const approvedUserMonths = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of timeLog ?? []) if (r.approved) s.add(`${r.userId}|${r.date.slice(0, 7)}`);
+    return s;
+  }, [timeLog]);
+  const monthsInvolved = useMemo(() => Array.from(new Set(Array.from(approvedUserMonths).map((k) => k.split("|")[1]))).sort(), [approvedUserMonths]);
+  const usersInvolved = useMemo(() => Array.from(new Set(Array.from(approvedUserMonths).map((k) => k.split("|")[0]))), [approvedUserMonths]);
+
+  const { data: burnCtx } = useQuery({
+    queryKey: ["project-burn-ctx", logFor?.code, monthsInvolved.join(","), usersInvolved.join(",")],
+    enabled: !!logFor && !!me?.isFinanceAdmin && usersInvolved.length > 0 && monthsInvolved.length > 0,
+    queryFn: async () => {
+      // Range covering all months involved (inclusive).
+      const [ys, ms] = monthsInvolved[0].split("-").map(Number);
+      const last = monthsInvolved[monthsInvolved.length - 1];
+      const [ye, me2] = last.split("-").map(Number);
+      const start = new Date(Date.UTC(ys, ms - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(ye, me2, 1)).toISOString().slice(0, 10);
+      const [{ data: approvedLogs }, { data: salariesRaw }, { data: unpaidRaw }] = await Promise.all([
+        supabase.from("attendance_logs").select("user_id, date, tasks").not("approved_at", "is", null).in("user_id", usersInvolved).gte("date", start).lt("date", end),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from("salaries").select("user_id, monthly_salary, effective_from").in("user_id", usersInvolved).order("effective_from", { ascending: false }),
+        supabase.from("leave_requests").select("user_id, start_date, end_date").eq("leave_type", "unpaid").eq("status", "approved").in("user_id", usersInvolved),
+      ]);
+      return {
+        approvedLogs: (approvedLogs ?? []) as Array<{ user_id: string; date: string; tasks: Array<{ project_code?: string; hours?: number }> | null }>,
+        salaries: (salariesRaw ?? []) as Array<{ user_id: string; monthly_salary: number; effective_from: string }>,
+        unpaid: (unpaidRaw ?? []) as Array<{ user_id: string; start_date: string; end_date: string }>,
+      };
+    },
+  });
+
+  const projectBurnTotal = useMemo(() => {
+    if (!burnCtx || !logFor) return 0;
+    // Effective raw monthly salary for (user, month) — latest row with effective_from <= end-of-month.
+    const rawSalaryFor = (uid: string, month: string) => {
+      const [y, m] = month.split("-").map(Number);
+      const cutoff = new Date(Date.UTC(y, m, 0));
+      for (const s of burnCtx.salaries) {
+        if (s.user_id !== uid) continue;
+        if (new Date(s.effective_from) > cutoff) continue;
+        return { monthly_salary: Number(s.monthly_salary), effective_from: s.effective_from };
+      }
+      return null;
+    };
+    // Pro-rated monthly salary matching /finances + /project-burn.
+    const proratedSalary = (uid: string, month: string) => {
+      const raw = rawSalaryFor(uid, month);
+      if (!raw) return 0;
+      const [y, m] = month.split("-").map(Number);
+      const daysInMo = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const monthStart = new Date(Date.UTC(y, m - 1, 1));
+      const monthEnd = new Date(Date.UTC(y, m, 0));
+      const eff = new Date(raw.effective_from);
+      const startDay = eff > monthStart ? eff.getUTCDate() : 1;
+      const effectiveDays = daysInMo - startDay + 1;
+      // Unpaid leave days overlapping this month.
+      const DAY = 86400000;
+      let unpaidDays = 0;
+      for (const lr of burnCtx.unpaid) {
+        if (lr.user_id !== uid) continue;
+        const s = Date.parse(lr.start_date);
+        const e = Date.parse(lr.end_date);
+        if (isNaN(s) || isNaN(e)) continue;
+        const from = Math.max(s, monthStart.getTime());
+        const to = Math.min(e, monthEnd.getTime());
+        if (to < from) continue;
+        unpaidDays += Math.round((to - from) / DAY) + 1;
+      }
+      const payableDays = Math.max(0, effectiveDays - unpaidDays);
+      if (payableDays <= 0) return 0;
+      return raw.monthly_salary * payableDays / daysInMo;
+    };
+    // Per-(user, month) total approved hours across every project.
+    const monthlyTotals = new Map<string, number>(); // "uid|YYYY-MM" -> hours
+    for (const row of burnCtx.approvedLogs) {
+      const key = `${row.user_id}|${row.date.slice(0, 7)}`;
+      let h = 0;
+      for (const t of row.tasks ?? []) h += Number(t.hours) || 0;
+      monthlyTotals.set(key, (monthlyTotals.get(key) ?? 0) + h);
+    }
+    // Sum burn for entries on THIS project only.
+    let total = 0;
+    for (const row of burnCtx.approvedLogs) {
+      const month = row.date.slice(0, 7);
+      const key = `${row.user_id}|${month}`;
+      const monthlyHrs = monthlyTotals.get(key) ?? 0;
+      if (monthlyHrs <= 0) continue;
+      const salary = proratedSalary(row.user_id, month);
+      if (salary <= 0) continue;
+      for (const t of row.tasks ?? []) {
+        if (t.project_code !== logFor.code) continue;
+        const h = Number(t.hours) || 0;
+        if (h <= 0) continue;
+        total += (h / monthlyHrs) * salary;
+      }
+    }
+    return total;
+  }, [burnCtx, logFor]);
+
+  const inr = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 
   const { data: vendorPayments } = useQuery({
     queryKey: ["vendor-payments-by-project"],

@@ -58,10 +58,11 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
     { title: "Team", url: "/team", icon: Users, match: "/team|/leave|/calendar|/directory" },
     { title: "Performance", url: "/performance", icon: Star },
     ...(isBd ? [{ title: "Business Development", url: "/bd", icon: Briefcase } as NavItem] : []),
-    { title: "Resource Hub", url: "/resources", icon: BookOpen },
+    { title: "Learning", url: "/learning", icon: BookOpen, match: "/learning" },
+    { title: "Resource Hub", url: "/resources", icon: Layers },
   ];
 
-  const showAdminGroup = isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin || isReportingManager;
+  const showAdminGroup = isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin || isReportingManager || isLearningAdmin;
   const isActive = (item: NavItem) => {
     if (item.match) return item.match.split("|").some((p) => pathname === p || pathname.startsWith(p + "/"));
     return pathname === item.url || pathname.startsWith(item.url + "/");

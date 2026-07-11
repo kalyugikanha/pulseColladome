@@ -460,6 +460,13 @@ function FinancesPage() {
         </div>
       </div>
 
+      <Tabs defaultValue="salary">
+        <TabsList>
+          <TabsTrigger value="salary">Salary &amp; Burn</TabsTrigger>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
+        </TabsList>
+        <TabsContent value="salary" className="space-y-6 mt-4">
+
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
         <StatCard icon={<IndianRupee className="h-4 w-4" />} label="Project allocated burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} project hrs`} />
         <StatCard icon={<Wallet className="h-4 w-4" />} label="Unallocated salary" value={inr(totalUnallocated)} sub={totalUnallocated > 0 ? "salary with no project hours" : "fully allocated"} />

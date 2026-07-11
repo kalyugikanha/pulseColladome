@@ -117,6 +117,30 @@ export function ProjectBurnPage() {
     },
   });
 
+  // Expenses this month (admin-only). Feed the burn-by-project rollup below.
+  const { data: expenses } = useQuery({
+    queryKey: ["pb-expenses", month],
+    enabled: canView && showCosts,
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("expenses")
+        .select("id, amount_inr, scope, project_id, department, expense_date")
+        .gte("expense_date", start).lt("expense_date", end);
+      return (data ?? []) as Array<{ id: string; amount_inr: number; scope: "project" | "department" | "company"; project_id: string | null; department: string | null; expense_date: string }>;
+    },
+  });
+
+  const { data: activeProjects } = useQuery({
+    queryKey: ["pb-active-projects"],
+    enabled: canView && showCosts,
+    queryFn: async () => (await supabase.from("projects").select("id, code, name, status").eq("status", "active")).data as Array<{ id: string; code: string; name: string; status: string }> ?? [],
+  });
+
+
+
   // Combined (previously merged approved task_activity — now dead).
   const combinedLogs = useMemo<LogRow[]>(() => (logs ?? []).slice(), [logs]);
 

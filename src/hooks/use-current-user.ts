@@ -13,6 +13,7 @@ export type CurrentUser = {
   isSuperAdmin: boolean;
   isFinanceAdmin: boolean;
   isHrAdmin: boolean;
+  isLearningAdmin: boolean;
   canManageProjects: boolean;
   /**
    * True only for org-wide people visibility: admin, super admin, HR admin,
@@ -83,6 +84,7 @@ export function useCurrentUser() {
       const realFinance = isSuperAdmin || (!!email && FINANCE_EMAILS.includes(email.toLowerCase()));
 
       const realIsHrAdmin = !!roles?.some((r) => r.role === "hr_admin");
+      const realIsLearning = !!roles?.some((r) => r.role === "learning_admin");
 
       // View-as override: only super admins can impersonate view. Data queries keep the real id.
       let viewingAs = false;
@@ -92,6 +94,7 @@ export function useCurrentUser() {
       let vIsSuper = isSuperAdmin;
       let vIsFinance = realFinance;
       let vIsHr = realIsHrAdmin;
+      let vIsLearning = realIsLearning;
       let vCanManageProjects = realAdmin || realIsHrAdmin || realHeadOf.length > 0 || !!roles?.some((r) => r.role === "project_manager");
       let vHeadOf = realHeadOf;
       let vReportIds = realReportIds;
@@ -113,6 +116,7 @@ export function useCurrentUser() {
           vIsAdmin = vIsSuper || !!otherRoles?.some((r) => r.role === "admin");
           vIsFinance = vIsSuper || (!!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase()));
           vIsHr = !!otherRoles?.some((r) => r.role === "hr_admin");
+          vIsLearning = !!otherRoles?.some((r) => r.role === "learning_admin");
           vHeadOf = (otherHeadRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
           vCanManageProjects = vIsAdmin || vIsHr || vHeadOf.length > 0 || !!otherRoles?.some((r) => r.role === "project_manager");
           vReportIds = ((otherReports ?? []) as Array<{ id: string }>).map((r) => r.id);
@@ -129,6 +133,7 @@ export function useCurrentUser() {
         isSuperAdmin: vIsSuper,
         isFinanceAdmin: vIsFinance,
         isHrAdmin: vIsHr,
+        isLearningAdmin: vIsLearning || vIsSuper || vIsAdmin,
         canManageProjects: vCanManageProjects,
         isPeopleUnscoped: vIsAdmin || vIsSuper || vIsHr || vIsFinance,
         isDepartmentHead: vHeadOf.length > 0,

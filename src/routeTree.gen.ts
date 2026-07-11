@@ -32,6 +32,8 @@ import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authentic
 import { Route as AuthenticatedMyTimesheetRouteImport } from './routes/_authenticated/my-timesheet'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
+import { Route as AuthenticatedLearningAdminRouteImport } from './routes/_authenticated/learning-admin'
+import { Route as AuthenticatedLearningRouteImport } from './routes/_authenticated/learning'
 import { Route as AuthenticatedHrAdminRouteImport } from './routes/_authenticated/hr-admin'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
 import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
@@ -172,6 +174,17 @@ const AuthenticatedLeaveRoute = AuthenticatedLeaveRouteImport.update({
   path: '/leave',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLearningAdminRoute =
+  AuthenticatedLearningAdminRouteImport.update({
+    id: '/learning-admin',
+    path: '/learning-admin',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedLearningRoute = AuthenticatedLearningRouteImport.update({
+  id: '/learning',
+  path: '/learning',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedHrAdminRoute = AuthenticatedHrAdminRouteImport.update({
   id: '/hr-admin',
   path: '/hr-admin',
@@ -299,6 +312,8 @@ export interface FileRoutesByFullPath {
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hr-admin': typeof AuthenticatedHrAdminRoute
+  '/learning': typeof AuthenticatedLearningRoute
+  '/learning-admin': typeof AuthenticatedLearningAdminRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
@@ -343,6 +358,8 @@ export interface FileRoutesByTo {
   '/directory': typeof AuthenticatedDirectoryRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hr-admin': typeof AuthenticatedHrAdminRoute
+  '/learning': typeof AuthenticatedLearningRoute
+  '/learning-admin': typeof AuthenticatedLearningAdminRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/my-timesheet': typeof AuthenticatedMyTimesheetRoute
@@ -390,6 +407,8 @@ export interface FileRoutesById {
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/hr-admin': typeof AuthenticatedHrAdminRoute
+  '/_authenticated/learning': typeof AuthenticatedLearningRoute
+  '/_authenticated/learning-admin': typeof AuthenticatedLearningAdminRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/my-timesheet': typeof AuthenticatedMyTimesheetRoute
@@ -437,6 +456,8 @@ export interface FileRouteTypes {
     | '/directory'
     | '/finances'
     | '/hr-admin'
+    | '/learning'
+    | '/learning-admin'
     | '/leave'
     | '/meetings'
     | '/my-timesheet'
@@ -481,6 +502,8 @@ export interface FileRouteTypes {
     | '/directory'
     | '/finances'
     | '/hr-admin'
+    | '/learning'
+    | '/learning-admin'
     | '/leave'
     | '/meetings'
     | '/my-timesheet'
@@ -527,6 +550,8 @@ export interface FileRouteTypes {
     | '/_authenticated/directory'
     | '/_authenticated/finances'
     | '/_authenticated/hr-admin'
+    | '/_authenticated/learning'
+    | '/_authenticated/learning-admin'
     | '/_authenticated/leave'
     | '/_authenticated/meetings'
     | '/_authenticated/my-timesheet'
@@ -733,6 +758,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLeaveRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/learning-admin': {
+      id: '/_authenticated/learning-admin'
+      path: '/learning-admin'
+      fullPath: '/learning-admin'
+      preLoaderRoute: typeof AuthenticatedLearningAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/learning': {
+      id: '/_authenticated/learning'
+      path: '/learning'
+      fullPath: '/learning'
+      preLoaderRoute: typeof AuthenticatedLearningRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/hr-admin': {
       id: '/_authenticated/hr-admin'
       path: '/hr-admin'
@@ -913,6 +952,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedHrAdminRoute: typeof AuthenticatedHrAdminRoute
+  AuthenticatedLearningRoute: typeof AuthenticatedLearningRoute
+  AuthenticatedLearningAdminRoute: typeof AuthenticatedLearningAdminRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedMyTimesheetRoute: typeof AuthenticatedMyTimesheetRoute
@@ -944,6 +985,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedHrAdminRoute: AuthenticatedHrAdminRoute,
+  AuthenticatedLearningRoute: AuthenticatedLearningRoute,
+  AuthenticatedLearningAdminRoute: AuthenticatedLearningAdminRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedMyTimesheetRoute: AuthenticatedMyTimesheetRoute,

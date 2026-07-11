@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 type NavItem = { title: string; url: string; icon: typeof LayoutDashboard; match?: string };
 
-function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; userId: string; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearningAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; isLearningAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; userId: string; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();
@@ -58,10 +58,11 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
     { title: "Team", url: "/team", icon: Users, match: "/team|/leave|/calendar|/directory" },
     { title: "Performance", url: "/performance", icon: Star },
     ...(isBd ? [{ title: "Business Development", url: "/bd", icon: Briefcase } as NavItem] : []),
-    { title: "Resource Hub", url: "/resources", icon: BookOpen },
+    { title: "Learning", url: "/learning", icon: BookOpen, match: "/learning" },
+    { title: "Resource Hub", url: "/resources", icon: Layers },
   ];
 
-  const showAdminGroup = isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin || isReportingManager;
+  const showAdminGroup = isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin || isReportingManager || isLearningAdmin;
   const isActive = (item: NavItem) => {
     if (item.match) return item.match.split("|").some((p) => pathname === p || pathname.startsWith(p + "/"));
     return pathname === item.url || pathname.startsWith(item.url + "/");
@@ -125,6 +126,14 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, canManag
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
+                {isLearningAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/learning-admin")}>
+                      <Link to="/learning-admin"><BookOpen /><span>Learning Admin</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+
 
                 {isSuperAdmin && (
                   <>
@@ -200,7 +209,7 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} isReportingManager={user.isReportingManager} headOfDepartments={user.headOfDepartments} userId={user.realId} fullName={user.fullName} email={user.email} />
+        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} isLearningAdmin={user.isLearningAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} isReportingManager={user.isReportingManager} headOfDepartments={user.headOfDepartments} userId={user.realId} fullName={user.fullName} email={user.email} />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />

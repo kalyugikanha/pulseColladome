@@ -91,56 +91,19 @@ export function ProjectBurnPage() {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-      let q = supabase.from("attendance_logs").select("user_id, date, tasks").gte("date", start).lt("date", end).order("date");
+      // Day-level approval is the source of truth — burn shows nothing
+      // until a manager has approved that day.
+      let q = supabase.from("attendance_logs").select("user_id, date, tasks")
+        .not("approved_at", "is", null)
+        .gte("date", start).lt("date", end).order("date");
       if (hasScope) q = q.in("user_id", visibleUserIds);
       return (await q).data as LogRow[] ?? [];
     },
   });
 
-  // Approved task_activity hours in this month, attributed to actor + linked project.
-  const { data: activityLogs } = useQuery({
-    queryKey: ["pb-activity", month, hasScope ? visibleUserIds.join(",") : "all"],
-    enabled: canView && (!hasScope || visibleUserIds.length > 0),
-    queryFn: async () => {
-      const [y, m] = month.split("-").map(Number);
-      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
-      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-      let q = supabase
-        .from("task_activity" as never)
-        .select("actor_id, hours, approved_hours, completion_date, created_at, approval_status, task:tasks(project:projects(code, name))")
-        .eq("approval_status", "approved")
-        .not("hours", "is", null)
-        .gte("completion_date", start)
-        .lt("completion_date", end);
-      if (hasScope) q = q.in("actor_id", visibleUserIds);
-      const { data, error } = await q;
-      if (error) throw error;
-      return ((data ?? []) as unknown as Array<{
-        actor_id: string; hours: number | null; approved_hours: number | null;
-        completion_date: string | null; created_at: string;
-        task: { project: { code: string | null; name: string | null } | null } | null;
-      }>);
-    },
-  });
+  // Combined (previously merged approved task_activity — now dead).
+  const combinedLogs = useMemo<LogRow[]>(() => (logs ?? []).slice(), [logs]);
 
-  // Combine attendance-log entries with approved task_activity, reshaped into LogRow form.
-  const combinedLogs = useMemo<LogRow[]>(() => {
-    const base = (logs ?? []).slice();
-    for (const a of activityLogs ?? []) {
-      const h = Number(a.approved_hours ?? a.hours) || 0;
-      if (h <= 0) continue;
-      const code = a.task?.project?.code?.trim();
-      if (!code) continue; // no project = can't attribute to a project's burn
-      const date = a.completion_date ?? a.created_at.slice(0, 10);
-      base.push({
-        user_id: a.actor_id,
-        date,
-        tasks: [{ project_code: code, project_name: a.task?.project?.name ?? code, hours: h }],
-      });
-    }
-
-    return base;
-  }, [logs, activityLogs]);
 
 
 

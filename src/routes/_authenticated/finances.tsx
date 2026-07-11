@@ -76,9 +76,11 @@ function FinancesPage() {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      // Day-level approval gates finances: only approved days contribute.
       const { data, error } = await supabase
         .from("attendance_logs")
         .select("user_id, date, tasks")
+        .not("approved_at", "is", null)
         .gte("date", start)
         .lt("date", end);
       if (error) throw error;
@@ -86,39 +88,8 @@ function FinancesPage() {
     },
   });
 
-  const { data: taskLoggedHours } = useQuery({
-    queryKey: ["finances-task-hours", month],
-    enabled: !!me?.isFinanceAdmin,
-    queryFn: async () => {
-      const [y, m] = month.split("-").map(Number);
-      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
-      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
-      const { data, error } = await supabase
-        .from("task_activity" as any)
-        .select("actor_id, hours, approved_hours, completion_date, created_at, approval_status, task:tasks(id, title, project:projects(id, code, name))")
-        .eq("approval_status", "approved")
-        .not("hours", "is", null)
-        .gte("completion_date", start)
-        .lt("completion_date", end);
-      if (error) throw error;
-      return (data ?? []) as unknown as TaskHourRow[];
-    },
-  });
+  const combinedLogs = useMemo<LogRow[]>(() => (logs ?? []).slice(), [logs]);
 
-  const combinedLogs = useMemo<LogRow[]>(() => {
-    const base = (logs ?? []).slice();
-    for (const r of taskLoggedHours ?? []) {
-      const project = r.task?.project;
-      const hrs = Number(r.approved_hours ?? r.hours) || 0;
-      if (!project?.code || hrs <= 0) continue;
-      base.push({
-        user_id: r.actor_id,
-        date: r.completion_date ?? r.created_at.slice(0, 10),
-        tasks: [{ project_code: project.code, project_name: project.name, hours: hrs }],
-      });
-    }
-    return base;
-  }, [logs, taskLoggedHours]);
 
   const { data: unpaidLeaves } = useQuery({
     queryKey: ["finances-unpaid-leaves", month],

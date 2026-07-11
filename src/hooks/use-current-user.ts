@@ -133,6 +133,7 @@ export function useCurrentUser() {
         isSuperAdmin: vIsSuper,
         isFinanceAdmin: vIsFinance,
         isHrAdmin: vIsHr,
+        isLearningAdmin: vIsLearning || vIsSuper || vIsAdmin,
         canManageProjects: vCanManageProjects,
         isPeopleUnscoped: vIsAdmin || vIsSuper || vIsHr || vIsFinance,
         isDepartmentHead: vHeadOf.length > 0,

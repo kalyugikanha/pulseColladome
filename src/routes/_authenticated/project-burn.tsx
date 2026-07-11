@@ -12,7 +12,10 @@ import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter"
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
-  component: ProjectBurnPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/finances", search: { tab: "project-burn" } });
+  },
+  component: () => null,
 });
 
 type Salary = { user_id: string; monthly_salary: number; effective_from: string };

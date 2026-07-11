@@ -12,7 +12,10 @@ import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter"
 import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 export const Route = createFileRoute("/_authenticated/project-burn")({
-  component: ProjectBurnPage,
+  beforeLoad: () => {
+    throw redirect({ href: "/finances?tab=project-burn" });
+  },
+  component: () => null,
 });
 
 type Salary = { user_id: string; monthly_salary: number; effective_from: string };
@@ -365,6 +368,8 @@ export function ProjectBurnPage() {
     return arr;
   }, [filteredDaily, month, daysInMonth, showCosts]);
   const trendMax = Math.max(1, ...dailyTrend.map((d) => d.total));
+  const distinctLoggedDates = useMemo(() => new Set(filteredDaily.map((r) => r.date)).size, [filteredDaily]);
+  const lowGranularity = distinctLoggedDates > 0 && distinctLoggedDates < 3;
 
   // Burn by project rollup (respects month/dept/employee/project filters).
   const projectRollup = useMemo(() => {
@@ -540,6 +545,11 @@ export function ProjectBurnPage() {
           <CardDescription>{projectFilter === "all" ? "All projects" : projects.find((p) => p.code === projectFilter)?.name}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {lowGranularity && (
+            <div className="rounded-md border border-amber-300/50 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+              Limited daily granularity for this month — only {distinctLoggedDates} distinct date{distinctLoggedDates === 1 ? "" : "s"} logged (likely a bulk historical import stamped to a single day). The chart shows a spike on that day; totals below are accurate.
+            </div>
+          )}
           <div className="flex items-end gap-1 h-40">
             {dailyTrend.map((d) => {
               const totalPct = (d.total / trendMax) * 100;

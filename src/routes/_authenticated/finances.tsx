@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -18,8 +18,15 @@ import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter"
 import { SalaryBankExport } from "@/components/finances/salary-bank-export";
 import { ExpensesPanel } from "@/components/finances/expenses-panel";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ProjectBurnPage } from "./project-burn";
+
+type Tab = "salary" | "expenses" | "project-burn";
 
 export const Route = createFileRoute("/_authenticated/finances")({
+  validateSearch: (s: Record<string, unknown>): { tab?: Tab } => {
+    const t = s.tab;
+    return { tab: t === "salary" || t === "expenses" || t === "project-burn" ? t : undefined };
+  },
   component: FinancesPage,
 });
 
@@ -39,6 +46,8 @@ function FinancesPage() {
   const qc = useQueryClient();
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [deptSel, setDeptSel] = useState<Set<string>>(new Set());
+  const search = useRouterState({ select: (s) => s.location.search }) as { tab?: Tab };
+  const navigate = useNavigate({ from: "/finances" });
 
   const { data: profiles } = useQuery({
     queryKey: ["finances-profiles"],
@@ -430,9 +439,12 @@ function FinancesPage() {
 
 
   if (meLoading) return <div className="text-muted-foreground">Loading…</div>;
-  if (!me?.isFinanceAdmin) {
+  const canViewProjectBurn = !!me && (me.isFinanceAdmin || me.isDepartmentHead || me.isReportingManager);
+  if (!me?.isFinanceAdmin && !canViewProjectBurn) {
     throw redirect({ to: "/dashboard" });
   }
+  const tab: Tab = search.tab ?? (me?.isFinanceAdmin ? "salary" : "project-burn");
+  const setTab = (t: Tab) => navigate({ search: { tab: t }, replace: true });
 
   const inr = (n: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 
@@ -441,29 +453,29 @@ function FinancesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold flex items-center gap-2"><Wallet className="h-6 w-6" /> Finances</h1>
-          <p className="text-sm text-muted-foreground">Salaries and monthly project burn (salary-share allocation).</p>
+          <p className="text-sm text-muted-foreground">Salaries, expenses, and monthly project burn.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link to="/project-burn"><Flame className="h-3.5 w-3.5 mr-1.5" />Detailed project burn</Link>
-          </Button>
-          {me?.realIsSuperAdmin && <ProvisionButton pendingCount={pendingGrants.length} />}
-          <MultiSelectFilter
-            label="Department"
-            options={Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort().map((d) => ({ value: d, label: d }))}
-            selected={deptSel}
-            onChange={setDeptSel}
-            includeUnassigned
-          />
-          <Label htmlFor="month" className="text-xs text-muted-foreground">Month</Label>
-          <Input id="month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
-        </div>
+        {me?.isFinanceAdmin && tab !== "project-burn" && (
+          <div className="flex items-center gap-2">
+            {me?.realIsSuperAdmin && <ProvisionButton pendingCount={pendingGrants.length} />}
+            <MultiSelectFilter
+              label="Department"
+              options={Array.from(new Set((profiles ?? []).map((p) => p.department).filter(Boolean) as string[])).sort().map((d) => ({ value: d, label: d }))}
+              selected={deptSel}
+              onChange={setDeptSel}
+              includeUnassigned
+            />
+            <Label htmlFor="month" className="text-xs text-muted-foreground">Month</Label>
+            <Input id="month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-40" />
+          </div>
+        )}
       </div>
 
-      <Tabs defaultValue="salary">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
-          <TabsTrigger value="salary">Salary &amp; Burn</TabsTrigger>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
+          {me?.isFinanceAdmin && <TabsTrigger value="salary">Salary &amp; Burn</TabsTrigger>}
+          {me?.isFinanceAdmin && <TabsTrigger value="expenses">Expenses</TabsTrigger>}
+          {canViewProjectBurn && <TabsTrigger value="project-burn"><Flame className="h-3.5 w-3.5 mr-1" />Project Burn</TabsTrigger>}
         </TabsList>
         <TabsContent value="salary" className="space-y-6 mt-4">
 
@@ -698,6 +710,9 @@ function FinancesPage() {
         </TabsContent>
         <TabsContent value="expenses" className="mt-4">
           <ExpensesPanel />
+        </TabsContent>
+        <TabsContent value="project-burn" className="mt-4">
+          <ProjectBurnPage />
         </TabsContent>
       </Tabs>
     </div>

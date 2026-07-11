@@ -373,6 +373,66 @@ export function ProjectBurnPage() {
       .sort((a, b) => (showCosts ? b.burn - a.burn : b.hours - a.hours));
   }, [filteredDaily, showCosts]);
 
+  // Expense allocation: project-scope → single project; department-scope →
+  // equal split across active projects with any team member (this month) in
+  // that dept; company-scope → equal split across every active project with
+  // any team member this month. Team membership uses ALL punched (logged)
+  // hours this month, not only approved days, so projects with no approved
+  // hours yet still absorb their share.
+  const expenseByProject = useMemo(() => {
+    const out = new Map<string, number>();
+    let unallocated = 0;
+    if (!expenses || !expenses.length || !activeProjects || !showCosts) {
+      return { byCode: out, unallocated };
+    }
+    const activeCodeById = new Map(activeProjects.map((p) => [p.id, p.code] as const));
+    const activeCodes = new Set(activeProjects.map((p) => p.code));
+    const teamByCode = new Map<string, Set<string>>();
+    for (const row of loggedLogs ?? []) {
+      for (const t of row.tasks ?? []) {
+        const code = t.project_code?.trim();
+        const h = Number(t.hours) || 0;
+        if (!code || h <= 0 || !activeCodes.has(code)) continue;
+        if (!teamByCode.has(code)) teamByCode.set(code, new Set());
+        teamByCode.get(code)!.add(row.user_id);
+      }
+    }
+    const deptByCode = new Map<string, Set<string>>();
+    for (const [code, uids] of teamByCode) {
+      const depts = new Set<string>();
+      for (const uid of uids) {
+        const d = deptById.get(uid);
+        if (d) depts.add(d);
+      }
+      deptByCode.set(code, depts);
+    }
+    const activeWithTeam = Array.from(teamByCode.keys());
+    for (const e of expenses) {
+      const amt = Number(e.amount_inr) || 0;
+      if (amt <= 0) continue;
+      let targets: string[] = [];
+      if (e.scope === "project") {
+        const code = e.project_id ? activeCodeById.get(e.project_id) : undefined;
+        if (code) targets = [code];
+      } else if (e.scope === "department" && e.department) {
+        targets = activeWithTeam.filter((c) => deptByCode.get(c)?.has(e.department!));
+      } else if (e.scope === "company") {
+        targets = activeWithTeam;
+      }
+      if (targets.length === 0) {
+        unallocated += amt;
+        continue;
+      }
+      const share = amt / targets.length;
+      for (const code of targets) out.set(code, (out.get(code) ?? 0) + share);
+    }
+    return { byCode: out, unallocated };
+  }, [expenses, activeProjects, loggedLogs, deptById, showCosts]);
+
+  const totalExpenses = useMemo(() => (expenses ?? []).reduce((s, e) => s + (Number(e.amount_inr) || 0), 0), [expenses]);
+
+
+
 
   if (isLoading) return <div className="text-muted-foreground">Loading…</div>;
   if (!canView) throw redirect({ to: "/dashboard" });

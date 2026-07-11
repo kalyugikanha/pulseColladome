@@ -218,7 +218,7 @@ function LearningPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {canSubmit && (
-                      <Button size="sm" variant="outline" onClick={() => { setUploadFor(course); setFile(null); }}>
+                      <Button size="sm" variant="outline" onClick={() => openUpload(course, sub)}>
                         <Upload className="h-3.5 w-3.5 mr-1" />
                         {sub ? "Resubmit" : "Submit proof"}
                       </Button>

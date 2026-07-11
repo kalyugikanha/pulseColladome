@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { BookOpen, ExternalLink, Upload, CheckCircle2, Clock3, AlertTriangle, Ban, RotateCcw } from "lucide-react";
+import { BookOpen, ExternalLink, Upload, CheckCircle2, Clock3, AlertTriangle, Ban, RotateCcw, Trophy } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/learning")({ component: LearningPage });
 
@@ -202,6 +202,9 @@ function LearningPage() {
         </CardContent>
       </Card>
 
+      <LeaderboardCard />
+
+
       <Dialog open={!!uploadFor} onOpenChange={(o) => { if (!o) { setUploadFor(null); setFile(null); } }}>
         <DialogContent>
           <DialogHeader>
@@ -221,3 +224,70 @@ function LearningPage() {
     </div>
   );
 }
+
+function fiscalQuarterRange(d = new Date()) {
+  const y = d.getFullYear(), m = d.getMonth();
+  let startM: number;
+  if (m >= 6 && m <= 8) startM = 6;
+  else if (m >= 9 && m <= 11) startM = 9;
+  else if (m >= 0 && m <= 2) startM = 0;
+  else startM = 3;
+  const start = new Date(y, startM, 1);
+  const end = new Date(y, startM + 3, 1);
+  const label = `${format(start, "MMM yyyy")} – ${format(new Date(end.getTime() - 1), "MMM yyyy")}`;
+  return { start, end, label };
+}
+
+function LeaderboardCard() {
+  const q = fiscalQuarterRange();
+  const { data: rows = [] } = useQuery({
+    queryKey: ["learning-leaderboard", q.start.toISOString()],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("course_submissions")
+        .select("user_id, reviewed_at, status")
+        .eq("status", "approved")
+        .gte("reviewed_at", q.start.toISOString())
+        .lt("reviewed_at", q.end.toISOString());
+      return (data ?? []) as { user_id: string; reviewed_at: string; status: string }[];
+    },
+  });
+  const { data: people = [] } = useQuery({
+    queryKey: ["learning-people-public"],
+    queryFn: async () => {
+      const { data } = await supabase.rpc("list_assignable_users");
+      return (data ?? []) as { id: string; full_name: string | null; email: string | null }[];
+    },
+  });
+  const nameOf = (id: string) => {
+    const p = people.find((x) => x.id === id);
+    return p?.full_name ?? p?.email ?? "Unknown";
+  };
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) m.set(r.user_id, (m.get(r.user_id) ?? 0) + 1);
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
+  }, [rows]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2"><Trophy className="h-4 w-4 text-amber-500" />Completion leaderboard</CardTitle>
+        <CardDescription>Fiscal quarter: {q.label}. Raw count of courses approved in the quarter.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {counts.length === 0 && <p className="text-sm text-muted-foreground">No completions this quarter yet.</p>}
+        <div className="divide-y">
+          {counts.map(([uid, n], i) => (
+            <div key={uid} className="flex items-center py-2 gap-3">
+              <div className="w-8 text-center font-mono text-sm text-muted-foreground">#{i + 1}</div>
+              <div className="flex-1 min-w-0 truncate">{nameOf(uid)}</div>
+              <Badge variant="outline">{n} completed</Badge>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+

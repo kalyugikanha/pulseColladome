@@ -323,10 +323,6 @@ export function ProjectBurnPage() {
     return (grants ?? []).filter((g) => !profileEmails.has(g.email.toLowerCase())).length;
   }, [profiles, grants]);
 
-  const daysInMonth = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    return getDaysInMonth(new Date(y, m - 1, 1));
-  }, [month]);
 
   // Employees present in the filtered view, sorted by total metric desc for stable colors + legend order.
   const employeeSeries = useMemo(() => {

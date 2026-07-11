@@ -310,12 +310,11 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                 const apprH = r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
                   ? Number(r.approved_hours) : null;
                 const reduced = apprH != null && apprH < loggedH;
-                const readOnlyTask = canApprove || !mayEdit;
-                const showTaskAsText = readOnlyTask;
+                const readOnlyTask = !mayEdit;
                 return (
                   <TableRow key={i}>
                     <TableCell>
-                      {showTaskAsText ? (
+                      {readOnlyTask ? (
                         <div className="min-w-0">
                           <div className="text-sm font-medium truncate">
                             {r.task_title ?? (r.task_id ? "Task" : <span className="italic text-muted-foreground">Pick a task</span>)}
@@ -325,23 +324,17 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                           )}
                         </div>
                       ) : (
-                        <Select
+                        <TaskPickerCell
                           value={r.task_id ?? ""}
-                          onValueChange={(v) => pickTask(i, v)}
-                          disabled={!mayEdit || readOnlyTask}
-                        >
-                          <SelectTrigger className={`h-8 ${!r.task_id && Number(r.hours) > 0 ? "border-destructive/60" : ""}`}>
-                            <SelectValue placeholder="Pick a task" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-72">
-                            {(userTasks ?? []).length === 0 && (
-                              <div className="px-3 py-2 text-xs text-muted-foreground">No tasks assigned to you.</div>
-                            )}
-                            {(userTasks ?? []).map((t) => (
-                              <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          title={r.task_title ?? ""}
+                          invalid={!r.task_id && Number(r.hours) > 0}
+                          legacyTaskMissing={legacyTaskMissing}
+                          tasks={userTasks ?? []}
+                          projects={projects ?? []}
+                          projectById={projectById}
+                          assigneeId={userId}
+                          onPick={(id) => pickTask(i, id)}
+                        />
                       )}
                     </TableCell>
                     <TableCell>

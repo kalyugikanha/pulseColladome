@@ -517,9 +517,14 @@ export type Database = {
           description: string | null
           expense_date: string
           id: string
+          paid_by: string | null
+          payment_method: string | null
           project_id: string | null
           proof_path: string | null
+          recurrence_end_date: string | null
           recurring: boolean
+          recurring_frequency: string | null
+          reimbursement_status: string
           scope: string
           title: string
           updated_at: string
@@ -533,9 +538,14 @@ export type Database = {
           description?: string | null
           expense_date: string
           id?: string
+          paid_by?: string | null
+          payment_method?: string | null
           project_id?: string | null
           proof_path?: string | null
+          recurrence_end_date?: string | null
           recurring?: boolean
+          recurring_frequency?: string | null
+          reimbursement_status?: string
           scope: string
           title: string
           updated_at?: string
@@ -549,14 +559,26 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          paid_by?: string | null
+          payment_method?: string | null
           project_id?: string | null
           proof_path?: string | null
+          recurrence_end_date?: string | null
           recurring?: boolean
+          recurring_frequency?: string | null
+          reimbursement_status?: string
           scope?: string
           title?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_paid_by_fkey"
+            columns: ["paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_project_id_fkey"
             columns: ["project_id"]

@@ -117,7 +117,9 @@ export function ProjectBurnPage() {
     },
   });
 
-  // Expenses this month (admin-only). Feed the burn-by-project rollup below.
+  // Expenses that hit this month (admin-only): one-off dated in this month +
+  // recurring items whose window (expense_date … recurrence_end_date) covers
+  // this month. Recurring items are amortized to a monthly-equivalent figure.
   const { data: expenses } = useQuery({
     queryKey: ["pb-expenses", month],
     enabled: canView && showCosts,
@@ -125,11 +127,17 @@ export function ProjectBurnPage() {
       const [y, m] = month.split("-").map(Number);
       const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
       const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      const endInclusive = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any).from("expenses")
-        .select("id, amount_inr, scope, project_id, department, expense_date")
-        .gte("expense_date", start).lt("expense_date", end);
-      return (data ?? []) as Array<{ id: string; amount_inr: number; scope: "project" | "department" | "company"; project_id: string | null; department: string | null; expense_date: string }>;
+        .select("id, amount_inr, scope, project_id, department, expense_date, recurring, recurring_frequency, recurrence_end_date")
+        .or(
+          `and(recurring.eq.false,expense_date.gte.${start},expense_date.lt.${end}),` +
+          `and(recurring.eq.true,expense_date.lte.${endInclusive})`
+        );
+      type Row = { id: string; amount_inr: number; scope: "project" | "department" | "company"; project_id: string | null; department: string | null; expense_date: string; recurring: boolean; recurring_frequency: "weekly" | "monthly" | "quarterly" | "yearly" | null; recurrence_end_date: string | null };
+      const rows = (data ?? []) as Row[];
+      return rows.filter((e) => !e.recurring || !e.recurrence_end_date || e.recurrence_end_date >= start);
     },
   });
 
@@ -408,8 +416,17 @@ export function ProjectBurnPage() {
     }
     const activeWithTeam = Array.from(teamByCode.keys());
     for (const e of expenses) {
-      const amt = Number(e.amount_inr) || 0;
-      if (amt <= 0) continue;
+      const raw = Number(e.amount_inr) || 0;
+      if (raw <= 0) continue;
+      let amt = raw;
+      if (e.recurring && e.recurring_frequency) {
+        switch (e.recurring_frequency) {
+          case "weekly": amt = raw * (52 / 12); break;
+          case "monthly": amt = raw; break;
+          case "quarterly": amt = raw / 3; break;
+          case "yearly": amt = raw / 12; break;
+        }
+      }
       let targets: string[] = [];
       if (e.scope === "project") {
         const code = e.project_id ? activeCodeById.get(e.project_id) : undefined;
@@ -429,7 +446,20 @@ export function ProjectBurnPage() {
     return { byCode: out, unallocated };
   }, [expenses, activeProjects, loggedLogs, deptById, showCosts]);
 
-  const totalExpenses = useMemo(() => (expenses ?? []).reduce((s, e) => s + (Number(e.amount_inr) || 0), 0), [expenses]);
+  const totalExpenses = useMemo(() => {
+    let total = 0;
+    for (const e of expenses ?? []) {
+      const raw = Number(e.amount_inr) || 0;
+      if (!e.recurring || !e.recurring_frequency) { total += raw; continue; }
+      switch (e.recurring_frequency) {
+        case "weekly": total += raw * (52 / 12); break;
+        case "monthly": total += raw; break;
+        case "quarterly": total += raw / 3; break;
+        case "yearly": total += raw / 12; break;
+      }
+    }
+    return total;
+  }, [expenses]);
 
 
 
@@ -496,7 +526,7 @@ export function ProjectBurnPage() {
 
       <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-5">
         {showCosts && <Stat icon={<IndianRupee className="h-4 w-4" />} label="Salary burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs`} />}
-        {showCosts && <Stat icon={<IndianRupee className="h-4 w-4" />} label="Expenses" value={inr(totalExpenses)} sub={`${(expenses ?? []).length} entr${(expenses ?? []).length === 1 ? "y" : "ies"}`} />}
+        {showCosts && <Stat icon={<IndianRupee className="h-4 w-4" />} label="Expenses" value={inr(totalExpenses)} sub={`${(expenses ?? []).length} entr${(expenses ?? []).length === 1 ? "y" : "ies"} · monthly-equiv`} />}
         {showCosts && <Stat icon={<Flame className="h-4 w-4" />} label="Total burn" value={inr(totalBurn + totalExpenses)} sub="salary + expenses" />}
         {showCosts && <Stat icon={<TrendingUp className="h-4 w-4" />} label="Salary pool" value={inr(totalSalaryPool)} sub={`${salaryByUser.size} active${pendingCount ? ` · ${pendingCount} pending` : ""}`} />}
         {!showCosts && <Stat icon={<CalendarDays className="h-4 w-4" />} label="Hours this month" value={totalHours.toFixed(1)} sub={`${(profiles ?? []).length} teammates`} />}

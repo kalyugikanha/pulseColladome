@@ -787,3 +787,75 @@ function InlineText({ value, disabled, onCommit, placeholder }: { value: string;
 
 
 
+
+function PendingApprovalsCard({
+  rows,
+  profiles,
+  onOpenDay,
+}: {
+  rows: Array<{ id: string; user_id: string; date: string; tasks: Task[] | null; total_hours: number | null }>;
+  profiles: Profile[];
+  onOpenDay: (userId: string, date: string) => void;
+}) {
+  const nameOf = (uid: string) => {
+    const p = profiles.find((x) => x.id === uid);
+    return p?.full_name ?? p?.email ?? "—";
+  };
+  const daysPending = (dateIso: string) => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const d = parseYmd(dateIso); d.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.round((today.getTime() - d.getTime()) / 86400000));
+  };
+  const sorted = [...rows].sort((a, b) => daysPending(b.date) - daysPending(a.date) || a.date.localeCompare(b.date));
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">Pending approvals
+          <Badge variant={sorted.length === 0 ? "outline" : "secondary"} className={sorted.length === 0 ? "" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"}>
+            {sorted.length}
+          </Badge>
+        </CardTitle>
+        <CardDescription>
+          Every un-approved day in the last 60 days within your scope. These hours don't count toward Project Burn or Finances until approved.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {sorted.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending — you're all caught up.</div>
+        ) : (
+          <div className="max-h-[320px] overflow-auto border rounded-md">
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                  <TableHead className="min-w-[220px]">Employee</TableHead>
+                  <TableHead className="w-[140px]">Date</TableHead>
+                  <TableHead className="w-[110px] text-right tabular-nums">Logged hrs</TableHead>
+                  <TableHead className="w-[110px] text-right tabular-nums">Days pending</TableHead>
+                  <TableHead className="w-[100px]" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sorted.map((r) => {
+                  const dp = daysPending(r.date);
+                  const hrs = Number(r.total_hours ?? 0) || (r.tasks ?? []).reduce((s, t) => s + (Number(t.hours) || 0), 0);
+                  const urgent = dp >= 7;
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{nameOf(r.user_id)}</TableCell>
+                      <TableCell className="text-sm">{format(parseYmd(r.date), "EEE, d MMM")}</TableCell>
+                      <TableCell className="text-right tabular-nums">{hrs.toFixed(1)}</TableCell>
+                      <TableCell className={`text-right tabular-nums ${urgent ? "text-amber-700 font-semibold" : ""}`}>{dp}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" onClick={() => onOpenDay(r.user_id, r.date)}>Review</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

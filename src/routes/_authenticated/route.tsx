@@ -31,15 +31,6 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { data: myDept } = useQuery({
-    queryKey: ["my-dept", userId], staleTime: 5 * 60_000,
-    queryFn: async () => (await supabase.from("profiles").select("department").eq("id", userId).maybeSingle()).data?.department ?? null,
-  });
-  const deptLower = (myDept ?? "").toLowerCase();
-  const isBd = deptLower === "business development"
-    || headOfDepartments.some((d) => d.toLowerCase() === "business development")
-    || isAdmin || isSuperAdmin
-    || isReportingManager;
 
   async function signOut() {
     await qc.cancelQueries();

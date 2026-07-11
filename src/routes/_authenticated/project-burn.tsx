@@ -368,6 +368,8 @@ export function ProjectBurnPage() {
     return arr;
   }, [filteredDaily, month, daysInMonth, showCosts]);
   const trendMax = Math.max(1, ...dailyTrend.map((d) => d.total));
+  const distinctLoggedDates = useMemo(() => new Set(filteredDaily.map((r) => r.date)).size, [filteredDaily]);
+  const lowGranularity = distinctLoggedDates > 0 && distinctLoggedDates < 3;
 
   // Burn by project rollup (respects month/dept/employee/project filters).
   const projectRollup = useMemo(() => {

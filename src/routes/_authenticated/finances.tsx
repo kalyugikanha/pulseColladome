@@ -25,7 +25,7 @@ type Profile = { id: string; full_name: string | null; email: string | null; dep
 type Salary = { id: string; user_id: string; monthly_salary: number | null; hourly_rate: number | null; comp_type: "monthly" | "hourly"; currency: string; effective_from: string };
 type Grant = { email: string; role: string; default_monthly_salary: number | null; default_hourly_rate: number | null; comp_type: "monthly" | "hourly"; department: string | null };
 type LogRow = { user_id: string; date: string; tasks: Array<{ project_code?: string; project_name?: string; hours?: number }> | null };
-type TaskHourRow = { actor_id: string; hours: number | string | null; approved_hours: number | string | null; completion_date: string | null; created_at: string; task: { id: string; title: string; project: { id: string; code: string; name: string } | null } | null };
+
 
 function monthKey(d: string | Date) {
   const dt = typeof d === "string" ? new Date(d) : d;

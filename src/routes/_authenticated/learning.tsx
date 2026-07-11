@@ -29,7 +29,9 @@ type Submission = {
   id: string;
   course_id: string;
   user_id: string;
-  screenshot_path: string;
+  screenshot_path: string | null;
+  screenshot_paths: string[] | null;
+  learner_comment: string | null;
   status: "submitted" | "approved" | "rejected";
   rejection_note: string | null;
   submitted_at: string;
@@ -111,32 +113,59 @@ function LearningPage() {
   }, [assigned, subByCourse]);
 
   const [uploadFor, setUploadFor] = useState<Course | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
 
+  function openUpload(course: Course, existing: Submission | undefined) {
+    setUploadFor(course);
+    setFiles([]);
+    setComment(existing?.learner_comment ?? "");
+  }
+
   async function submitProof() {
-    if (!me || !uploadFor || !file) return;
+    if (!me || !uploadFor || files.length === 0) return;
     setBusy(true);
     try {
-      const path = `${me.id}/${uploadFor.id}-${Date.now()}-${file.name}`.replace(/\s+/g, "_");
-      const up = await supabase.storage.from("learning-proofs").upload(path, file, { upsert: true });
-      if (up.error) throw up.error;
+      const paths: string[] = [];
+      for (const f of files) {
+        const path = `${me.id}/${uploadFor.id}-${Date.now()}-${f.name}`.replace(/\s+/g, "_");
+        const up = await supabase.storage.from("learning-proofs").upload(path, f, { upsert: true });
+        if (up.error) throw up.error;
+        paths.push(path);
+      }
       const existing = subByCourse.get(uploadFor.id);
       if (existing) {
         const { error } = await supabase
           .from("course_submissions")
-          .update({ screenshot_path: path, status: "submitted", rejection_note: null, submitted_at: new Date().toISOString(), reviewed_at: null, reviewed_by: null })
+          .update({
+            screenshot_path: paths[0],
+            screenshot_paths: paths,
+            learner_comment: comment.trim() || null,
+            status: "submitted",
+            rejection_note: null,
+            submitted_at: new Date().toISOString(),
+            reviewed_at: null,
+            reviewed_by: null,
+          })
           .eq("id", existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("course_submissions")
-          .insert({ course_id: uploadFor.id, user_id: me.id, screenshot_path: path });
+          .insert({
+            course_id: uploadFor.id,
+            user_id: me.id,
+            screenshot_path: paths[0],
+            screenshot_paths: paths,
+            learner_comment: comment.trim() || null,
+          });
         if (error) throw error;
       }
       toast.success("Submitted for review");
       setUploadFor(null);
-      setFile(null);
+      setFiles([]);
+      setComment("");
       qc.invalidateQueries({ queryKey: ["my-submissions", me.id] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
@@ -189,7 +218,7 @@ function LearningPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {canSubmit && (
-                      <Button size="sm" variant="outline" onClick={() => { setUploadFor(course); setFile(null); }}>
+                      <Button size="sm" variant="outline" onClick={() => openUpload(course, sub)}>
                         <Upload className="h-3.5 w-3.5 mr-1" />
                         {sub ? "Resubmit" : "Submit proof"}
                       </Button>
@@ -205,22 +234,42 @@ function LearningPage() {
       <LeaderboardCard />
 
 
-      <Dialog open={!!uploadFor} onOpenChange={(o) => { if (!o) { setUploadFor(null); setFile(null); } }}>
+      <Dialog open={!!uploadFor} onOpenChange={(o) => { if (!o) { setUploadFor(null); setFiles([]); setComment(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Submit proof — {uploadFor?.title}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>Screenshot (image or PDF)</Label>
-            <Input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Screenshots or PDFs (you can select multiple)</Label>
+              <Input
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])}
+              />
+              {files.length > 0 && (
+                <p className="text-xs text-muted-foreground">{files.length} file{files.length === 1 ? "" : "s"} selected</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label>What did you learn? <span className="text-muted-foreground font-normal">(shown to the reviewer)</span></Label>
+              <textarea
+                className="w-full min-h-[90px] rounded-md border bg-background p-2 text-sm"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="A couple of sentences on your key takeaways…"
+              />
+            </div>
             <p className="text-xs text-muted-foreground">A Learning Admin will review and approve or reject.</p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setUploadFor(null); setFile(null); }}>Cancel</Button>
-            <Button disabled={!file || busy} onClick={submitProof}>{busy ? "Uploading…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => { setUploadFor(null); setFiles([]); setComment(""); }}>Cancel</Button>
+            <Button disabled={files.length === 0 || busy} onClick={submitProof}>{busy ? "Uploading…" : "Submit"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

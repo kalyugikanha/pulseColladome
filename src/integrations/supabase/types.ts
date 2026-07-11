@@ -276,10 +276,12 @@ export type Database = {
           course_id: string
           created_at: string
           id: string
+          learner_comment: string | null
           rejection_note: string | null
           reviewed_at: string | null
           reviewed_by: string | null
-          screenshot_path: string
+          screenshot_path: string | null
+          screenshot_paths: string[]
           status: string
           submitted_at: string
           updated_at: string
@@ -289,10 +291,12 @@ export type Database = {
           course_id: string
           created_at?: string
           id?: string
+          learner_comment?: string | null
           rejection_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
-          screenshot_path: string
+          screenshot_path?: string | null
+          screenshot_paths?: string[]
           status?: string
           submitted_at?: string
           updated_at?: string
@@ -302,10 +306,12 @@ export type Database = {
           course_id?: string
           created_at?: string
           id?: string
+          learner_comment?: string | null
           rejection_note?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
-          screenshot_path?: string
+          screenshot_path?: string | null
+          screenshot_paths?: string[]
           status?: string
           submitted_at?: string
           updated_at?: string

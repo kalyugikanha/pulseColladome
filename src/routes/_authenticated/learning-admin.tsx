@@ -22,7 +22,10 @@ type Course = { id: string; title: string; description: string | null; resource_
 type Target = { id: string; course_id: string; user_id: string | null; department: string | null };
 type Person = { id: string; full_name: string | null; email: string | null; department: string | null };
 type Submission = {
-  id: string; course_id: string; user_id: string; screenshot_path: string;
+  id: string; course_id: string; user_id: string;
+  screenshot_path: string | null;
+  screenshot_paths: string[] | null;
+  learner_comment: string | null;
   status: "submitted" | "approved" | "rejected"; rejection_note: string | null;
   submitted_at: string; reviewed_at: string | null;
 };
@@ -326,14 +329,27 @@ function ReviewTab() {
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c] as const)), [courses]);
   const personById = useMemo(() => new Map(people.map((p) => [p.id, p] as const)), [people]);
 
-  const [preview, setPreview] = useState<{ sub: Submission; url: string } | null>(null);
+  const [preview, setPreview] = useState<{ sub: Submission; urls: { path: string; url: string }[] } | null>(null);
   const [rejecting, setRejecting] = useState<Submission | null>(null);
   const [note, setNote] = useState("");
 
+  function proofPaths(sub: Submission): string[] {
+    const arr = sub.screenshot_paths ?? [];
+    if (arr.length > 0) return arr;
+    return sub.screenshot_path ? [sub.screenshot_path] : [];
+  }
+
   async function openPreview(sub: Submission) {
-    const { data, error } = await supabase.storage.from("learning-proofs").createSignedUrl(sub.screenshot_path, 600);
-    if (error || !data) return toast.error("Could not open file");
-    setPreview({ sub, url: data.signedUrl });
+    const paths = proofPaths(sub);
+    if (paths.length === 0) return toast.error("No proof files attached");
+    const results = await Promise.all(paths.map((p) => supabase.storage.from("learning-proofs").createSignedUrl(p, 600)));
+    const urls: { path: string; url: string }[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.error || !r.data) return toast.error("Could not open one of the files");
+      urls.push({ path: paths[i], url: r.data.signedUrl });
+    }
+    setPreview({ sub, urls });
   }
 
   async function approve(sub: Submission) {
@@ -373,15 +389,21 @@ function ReviewTab() {
           {subs.map((s) => {
             const c = courseById.get(s.course_id);
             const p = personById.get(s.user_id);
+            const nFiles = proofPaths(s).length;
             return (
-              <div key={s.id} className="p-3 flex flex-col sm:flex-row sm:items-center gap-2">
+              <div key={s.id} className="p-3 flex flex-col sm:flex-row sm:items-start gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{c?.title ?? "(deleted course)"}</div>
                   <div className="text-xs text-muted-foreground">
-                    {p?.full_name ?? p?.email ?? "Unknown"} · submitted {format(parseISO(s.submitted_at), "d MMM, HH:mm")}
+                    {p?.full_name ?? p?.email ?? "Unknown"} · submitted {format(parseISO(s.submitted_at), "d MMM, HH:mm")} · {nFiles} file{nFiles === 1 ? "" : "s"}
                   </div>
+                  {s.learner_comment && (
+                    <div className="mt-1 text-xs whitespace-pre-wrap rounded border bg-muted/40 p-2">
+                      <span className="font-medium">Notes: </span>{s.learner_comment}
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   <Button size="sm" variant="outline" onClick={() => openPreview(s)}>View proof</Button>
                   <Button size="sm" onClick={() => approve(s)}><Check className="h-3.5 w-3.5 mr-1" />Approve</Button>
                   <Button size="sm" variant="destructive" onClick={() => { setRejecting(s); setNote(""); }}><X className="h-3.5 w-3.5 mr-1" />Reject</Button>
@@ -395,10 +417,23 @@ function ReviewTab() {
       <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
         <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>Proof</DialogTitle></DialogHeader>
+          {preview?.sub.learner_comment && (
+            <div className="text-sm whitespace-pre-wrap rounded border bg-muted/40 p-3">
+              <div className="font-medium mb-1">Learner notes</div>
+              {preview.sub.learner_comment}
+            </div>
+          )}
           {preview && (
-            preview.sub.screenshot_path.toLowerCase().endsWith(".pdf")
-              ? <iframe src={preview.url} className="w-full h-[70vh] rounded border" title="proof" />
-              : <img src={preview.url} alt="proof" className="max-h-[70vh] w-auto mx-auto rounded" />
+            <div className="space-y-3 max-h-[70vh] overflow-auto">
+              {preview.urls.map(({ path, url }, i) => (
+                <div key={path} className="space-y-1">
+                  <div className="text-xs text-muted-foreground">File {i + 1} of {preview.urls.length}</div>
+                  {path.toLowerCase().endsWith(".pdf")
+                    ? <iframe src={url} className="w-full h-[60vh] rounded border" title={`proof-${i}`} />
+                    : <img src={url} alt={`proof-${i}`} className="max-h-[60vh] w-auto mx-auto rounded border" />}
+                </div>
+              ))}
+            </div>
           )}
           {preview && (
             <DialogFooter>

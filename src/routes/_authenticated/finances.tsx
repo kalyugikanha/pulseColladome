@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -18,8 +18,15 @@ import { MultiSelectFilter, UNASSIGNED } from "@/components/multi-select-filter"
 import { SalaryBankExport } from "@/components/finances/salary-bank-export";
 import { ExpensesPanel } from "@/components/finances/expenses-panel";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ProjectBurnPage } from "./project-burn";
+
+type Tab = "salary" | "expenses" | "project-burn";
 
 export const Route = createFileRoute("/_authenticated/finances")({
+  validateSearch: (s: Record<string, unknown>): { tab?: Tab } => {
+    const t = s.tab;
+    return { tab: t === "salary" || t === "expenses" || t === "project-burn" ? t : undefined };
+  },
   component: FinancesPage,
 });
 

@@ -280,14 +280,14 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                 <TableHead className="min-w-[220px]">Task</TableHead>
                 <TableHead className="min-w-[160px]">Project</TableHead>
                 <TableHead className="w-[90px] text-right">Hours</TableHead>
-                {canApprove && <TableHead className="w-[100px] text-right">Approved</TableHead>}
+                <TableHead className="w-[100px] text-right">Approved</TableHead>
                 <TableHead>Comments</TableHead>
                 <TableHead className="w-[40px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
-                <TableRow><TableCell colSpan={canApprove ? 6 : 5} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">No entries.</TableCell></TableRow>
               )}
               {rows.map((r, i) => {
                 const legacyTaskMissing = !!r.task_id && !taskById.has(r.task_id);
@@ -351,7 +351,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                         className="h-8 w-20 px-2 text-sm text-right font-mono tabular-nums"
                       />
                     </TableCell>
-                    {canApprove && (
+                    {canApprove ? (
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end gap-1">
                           <div className="flex items-center gap-1">
@@ -397,6 +397,14 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                             </Badge>
                           )}
                         </div>
+                      </TableCell>
+                    ) : (
+                      <TableCell className="text-right font-mono tabular-nums text-sm">
+                        {isApproved ? (
+                          <span className={reduced ? "text-amber-700" : ""}>{(apprH ?? loggedH).toFixed(1)}</span>
+                        ) : (
+                          <span className="text-muted-foreground" title="Approved once the manager approves this day">—</span>
+                        )}
                       </TableCell>
                     )}
                     <TableCell>

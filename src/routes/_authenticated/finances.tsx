@@ -604,8 +604,8 @@ function FinancesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Task-logged hours — {month}</CardTitle>
-          <CardDescription>Hours captured on task stage moves (from Kanban) grouped by the task's project. Additive view — does not affect salary-share burn above.</CardDescription>
+          <CardTitle>Hours by project — {month}</CardTitle>
+          <CardDescription>Approved timesheet hours grouped by project. View only — burn allocation is above.</CardDescription>
         </CardHeader>
         <CardContent>
           {taskHoursByProject.size === 0 ? (

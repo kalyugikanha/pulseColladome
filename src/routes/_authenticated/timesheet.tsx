@@ -557,14 +557,14 @@ function EmployeeBlock({
         </TableRow>
       ) : (
         (() => {
-          let logCounter = -1;
           return row.tasks.map((t, i) => {
-            const isActivity = t.source === "activity";
-            if (!isActivity) logCounter++;
-            const logIdx = isActivity ? -1 : logCounter;
-            const editableRow = mayEdit && !isActivity;
-            const primary = t.task_title ?? (isActivity ? "Task" : (t.project_name ?? "—"));
+            const editableRow = mayEdit;
+            const primary = t.task_title ?? (t.project_name ?? "—");
             const hasTaskLabel = !!t.task_title;
+            const loggedH = Number(t.hours) || 0;
+            const apprH = row.approved
+              ? (t.approved_hours != null ? Number(t.approved_hours) : loggedH)
+              : null;
             return (
               <TableRow key={`${row.profile.id}-${i}`}>
                 {i === 0 && (
@@ -582,8 +582,7 @@ function EmployeeBlock({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium truncate">{primary}</span>
-                      {isActivity && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">via task</Badge>}
-                      {!isActivity && !hasTaskLabel && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">legacy</Badge>}
+                      {!hasTaskLabel && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">legacy</Badge>}
                     </div>
                     {(t.project_code || t.project_name) && (
                       <div className="text-[10px] text-muted-foreground truncate mt-0.5">
@@ -595,12 +594,19 @@ function EmployeeBlock({
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
-                  <InlineNumber value={Number(t.hours) || 0} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { hours: v })} />
+                  <InlineNumber value={loggedH} disabled={!editableRow} onCommit={(v) => onUpdate(i, { hours: v })} />
+                </TableCell>
+                <TableCell className="text-right font-mono tabular-nums text-sm">
+                  {apprH != null ? (
+                    <span className={apprH < loggedH ? "text-amber-700" : ""}>{apprH.toFixed(1)}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <div className="flex-1 min-w-0">
-                      <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(logIdx, { comments: v })} placeholder="Optional" />
+                      <InlineText value={t.comments ?? ""} disabled={!editableRow} onCommit={(v) => onUpdate(i, { comments: v })} placeholder="Optional" />
                     </div>
                     {t.approval_note?.trim() && (
                       <Popover>
@@ -618,16 +624,14 @@ function EmployeeBlock({
                   </div>
                 </TableCell>
                 <TableCell>
-                  {taskStatusBadge(row, t)}
-                  {locked && !isActivity && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
+                  {taskStatusBadge(row)}
+                  {locked && <div className="text-[10px] text-muted-foreground mt-1">Locked</div>}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 justify-end">
-                    {!isActivity && (
-                      <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!editableRow} onClick={() => onDelete(logIdx)} aria-label="Delete row">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+                    <Button size="icon" variant="ghost" className="h-7 w-7" disabled={!editableRow} onClick={() => onDelete(i)} aria-label="Delete row">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                     {i === 0 && <RowMenu canApprove={canApprove} approved={row.approved} onToggleApproval={onToggleApproval} onOpenFull={onOpenFull} />}
                   </div>
                 </TableCell>
@@ -657,7 +661,7 @@ function EmployeeBlock({
           <TableCell className="text-right">
             <Input type="number" min={0} step={0.25} value={addHrs} onChange={(e) => setAddHrs(e.target.value)} className="h-8 text-right font-mono" placeholder="0" />
           </TableCell>
-          <TableCell colSpan={3}>
+          <TableCell colSpan={4}>
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => {
                 const h = Number(addHrs);
@@ -675,7 +679,7 @@ function EmployeeBlock({
       )}
       {mayEdit && row.tasks.length > 0 && !addOpen && (
         <TableRow>
-          <TableCell colSpan={5}>
+          <TableCell colSpan={6}>
             <Button size="sm" variant="ghost" className="h-7 text-muted-foreground" onClick={() => setAddOpen(true)}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Add task
             </Button>

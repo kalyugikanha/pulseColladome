@@ -55,11 +55,14 @@ function ProjectsPage() {
       const { data } = await supabase.from("attendance_logs").select("date, user_id, tasks, approved_at");
       const { data: profs } = await supabase.from("profiles").select("id, full_name, email");
       const nameOf = (uid: string) => profs?.find((p) => p.id === uid)?.full_name ?? profs?.find((p) => p.id === uid)?.email ?? "Unknown";
-      const rows: { date: string; userId: string; user: string; hours: number; comments: string; approved: boolean }[] = [];
+      const rows: { date: string; userId: string; user: string; hours: number; approvedHours: number | null; comments: string; approved: boolean }[] = [];
       (data ?? []).forEach((log: any) => {
         (log.tasks ?? []).forEach((t: any) => {
           if (t.project_code === logFor!.code || t.project_id === logFor!.id) {
-            rows.push({ date: log.date, userId: log.user_id, user: nameOf(log.user_id), hours: Number(t.hours) || 0, comments: t.comments ?? "", approved: !!log.approved_at });
+            const logged = Number(t.hours) || 0;
+            const approvedRaw = t.approved_hours;
+            const approvedH = approvedRaw != null && !Number.isNaN(Number(approvedRaw)) ? Number(approvedRaw) : null;
+            rows.push({ date: log.date, userId: log.user_id, user: nameOf(log.user_id), hours: logged, approvedHours: approvedH, comments: t.comments ?? "", approved: !!log.approved_at });
           }
         });
       });
@@ -67,7 +70,7 @@ function ProjectsPage() {
     },
   });
   const loggedTotal = (timeLog ?? []).reduce((s, r) => s + r.hours, 0);
-  const approvedTotal = (timeLog ?? []).filter((r) => r.approved).reduce((s, r) => s + r.hours, 0);
+  const approvedTotal = (timeLog ?? []).filter((r) => r.approved).reduce((s, r) => s + (r.approvedHours ?? r.hours), 0);
 
   // Approved-hours-based project burn — same salary-share math as
   // project-burn.tsx, scoped to just this project across every month it

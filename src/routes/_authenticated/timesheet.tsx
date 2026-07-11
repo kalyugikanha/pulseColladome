@@ -436,14 +436,24 @@ export function TimesheetPage() {
 
 
 
+      <PendingApprovalsCard
+        rows={pendingRows ?? []}
+        profiles={profiles ?? []}
+        onOpenDay={(uid, date) => {
+          const p = (profiles ?? []).find((x) => x.id === uid);
+          setEditor({ userId: uid, userName: p?.full_name ?? p?.email ?? "—", date });
+        }}
+      />
+
       <Card>
 
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
             <CardTitle>{dateLabel}</CardTitle>
             <CardDescription>
-              {empRows.length} employee{empRows.length === 1 ? "" : "s"} · {entryCount} entr{entryCount === 1 ? "y" : "ies"} · Logged {dayTotal.toFixed(1)} hrs · Approved {dayApprovedTotal.toFixed(1)} hrs{dayApprovedTotal < dayTotal ? ` · Gap ${(dayTotal - dayApprovedTotal).toFixed(1)} hrs` : ""}
+              {empRows.length} employee{empRows.length === 1 ? "" : "s"} · {entryCount} entr{entryCount === 1 ? "y" : "ies"} · <span title="All punched hours, unfiltered">Logged {dayTotal.toFixed(1)} hrs</span> · <span title="Manager-approved days only — feeds burn/finances">Approved {dayApprovedTotal.toFixed(1)} hrs</span>{dayApprovedTotal < dayTotal ? ` · Gap ${(dayTotal - dayApprovedTotal).toFixed(1)} hrs` : ""}
             </CardDescription>
+            <p className="text-[11px] text-muted-foreground/80 mt-1"><span className="font-medium">Legend:</span> <b>Logged</b> = raw punched hours. <b>Approved</b> = manager-approved days only; only these feed Project Burn and Finances.</p>
           </div>
           <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
             <Checkbox checked={showEmpty} onCheckedChange={(v) => setShowEmpty(!!v)} />

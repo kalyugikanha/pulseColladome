@@ -550,17 +550,29 @@ export function ProjectBurnPage() {
               {employeeSeries.map((emp) => {
                 const val = showCosts ? emp.burn : emp.hours;
                 const pct = (val / employeeSeriesMax) * 100;
+                const barWidth = Math.max(pct, val > 0 ? 1.5 : 0);
+                const totalTitle = `${emp.name} — total ${emp.hours.toFixed(1)}h${showCosts ? ` · ${inr(emp.burn)}` : ""}`;
                 return (
                   <div key={emp.userId} className="flex items-center gap-3">
                     <div className="w-40 shrink-0 text-xs font-medium truncate" title={emp.name}>{emp.name}</div>
-                    <div className="flex-1 h-6 bg-muted/40 rounded overflow-hidden">
-                      <div
-                        className="h-full rounded"
-                        style={{ width: `${Math.max(pct, val > 0 ? 1.5 : 0)}%`, background: colorFor(emp.userId) }}
-                        title={`${emp.name} — ${emp.hours.toFixed(1)}h${showCosts ? ` · ${inr(emp.burn)}` : ""}`}
-                      />
+                    <div className="flex-1 h-6 bg-muted/40 rounded overflow-hidden" title={totalTitle}>
+                      <div className="flex h-full w-full" style={{ width: `${barWidth}%` }}>
+                        {emp.segments.map((seg) => {
+                          const segVal = showCosts ? seg.burn : seg.hours;
+                          const empTotal = showCosts ? emp.burn : emp.hours;
+                          const segPct = empTotal > 0 ? (segVal / empTotal) * 100 : 0;
+                          return (
+                            <div
+                              key={seg.code}
+                              className="h-full"
+                              style={{ width: `${segPct}%`, background: colorForProject(seg.code) }}
+                              title={`${seg.name} (${seg.code}) — ${seg.hours.toFixed(1)}h${showCosts ? ` · ${inr(seg.burn)}` : ""}`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="w-40 shrink-0 text-xs text-muted-foreground text-right tabular-nums">
+                    <div className="w-40 shrink-0 text-xs text-muted-foreground text-right tabular-nums" title={totalTitle}>
                       {emp.hours.toFixed(1)}h{showCosts ? ` · ${inr(emp.burn)}` : ""}
                     </div>
                   </div>

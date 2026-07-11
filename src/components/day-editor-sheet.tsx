@@ -476,3 +476,177 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
     </Sheet>
   );
 }
+
+function TaskPickerCell({
+  value, title, invalid, legacyTaskMissing, tasks, projects, projectById, assigneeId, onPick,
+}: {
+  value: string;
+  title: string;
+  invalid: boolean;
+  legacyTaskMissing: boolean;
+  tasks: UserTask[];
+  projects: Project[];
+  projectById: Map<string, Project>;
+  assigneeId: string;
+  onPick: (taskId: string) => void;
+}) {
+  const qc = useQueryClient();
+  const createTask = useServerFn(createTaskFull);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [mode, setMode] = useState<"pick" | "create">("pick");
+  const [newTitle, setNewTitle] = useState("");
+  const [newProject, setNewProject] = useState<string>("");
+  const [creating, setCreating] = useState(false);
+
+  const selected = tasks.find((t) => t.id === value) ?? null;
+  const displayTitle = selected?.title ?? title ?? "";
+
+  function startCreate(prefill: string) {
+    setNewTitle(prefill);
+    setNewProject("");
+    setMode("create");
+  }
+
+  async function submitCreate() {
+    const t = newTitle.trim();
+    if (!t) { toast.error("Title required"); return; }
+    if (!newProject) { toast.error("Pick a project"); return; }
+    setCreating(true);
+    try {
+      const created = await createTask({
+        data: {
+          projectId: newProject,
+          title: t,
+          priority: "medium",
+          assigneeId,
+          assetLinks: [],
+          domainId: null,
+          departmentId: null,
+          taskTypeIds: [],
+        },
+      });
+      const newId = (created as { id: string }).id;
+      const proj = projectById.get(newProject);
+      // Optimistically inject so pickTask can resolve title/project before
+      // the query refetch completes.
+      qc.setQueryData(["day-editor-user-tasks", assigneeId], (prev: UserTask[] | undefined) => {
+        const list = prev ?? [];
+        return [{ id: newId, title: t, project_id: newProject, status: "todo" }, ...list];
+      });
+      await qc.invalidateQueries({ queryKey: ["day-editor-user-tasks", assigneeId] });
+      onPick(newId);
+      toast.success(proj ? `Created in ${proj.code}` : "Task created");
+      setOpen(false);
+      setMode("pick");
+      setSearch("");
+      setNewTitle("");
+      setNewProject("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Create failed");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) { setMode("pick"); setSearch(""); }
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          className={`h-8 w-full justify-between font-normal px-2 ${invalid ? "border-destructive/60" : ""}`}
+        >
+          <span className="truncate text-left flex-1 min-w-0 text-sm">
+            {displayTitle
+              ? <span className="truncate">{displayTitle}{legacyTaskMissing && <span className="text-[10px] text-muted-foreground ml-1">· legacy</span>}</span>
+              : <span className="text-muted-foreground italic">Pick a task</span>}
+          </span>
+          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50 shrink-0 ml-1" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[340px] p-0" align="start">
+        {mode === "pick" ? (
+          <Command>
+            <CommandInput
+              placeholder="Search tasks…"
+              value={search}
+              onValueChange={setSearch}
+            />
+            <CommandList>
+              <CommandEmpty>
+                <div className="px-2 py-3 text-xs text-muted-foreground">
+                  {tasks.length === 0 ? "No tasks assigned to you yet." : "No matches."}
+                </div>
+              </CommandEmpty>
+              {tasks.length > 0 && (
+                <CommandGroup heading="Your assigned tasks">
+                  {tasks.map((t) => {
+                    const proj = t.project_id ? projectById.get(t.project_id) : undefined;
+                    return (
+                      <CommandItem
+                        key={t.id}
+                        value={`${t.title} ${proj?.code ?? ""} ${proj?.name ?? ""}`}
+                        onSelect={() => { onPick(t.id); setOpen(false); setSearch(""); }}
+                        className="items-start"
+                      >
+                        <Check className={`h-4 w-4 mr-2 mt-0.5 shrink-0 ${value === t.id ? "opacity-100" : "opacity-0"}`} />
+                        <span className="flex flex-col min-w-0 flex-1">
+                          <span className="truncate">{t.title}</span>
+                          {proj && <span className="text-[11px] text-muted-foreground truncate">{proj.code} · {proj.name}</span>}
+                        </span>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              )}
+              <CommandGroup>
+                <CommandItem
+                  value="__create__"
+                  onSelect={() => startCreate(search)}
+                  className="text-primary"
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-2" />
+                  {search.trim() ? <>Create task "<span className="font-medium truncate">{search.trim()}</span>"</> : "Create new task…"}
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        ) : (
+          <div className="p-3 space-y-2">
+            <div className="text-xs font-medium">Create task (assigned to this person)</div>
+            <Input
+              autoFocus
+              placeholder="Task title"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="h-8 text-sm"
+            />
+            <Select value={newProject} onValueChange={setNewProject}>
+              <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Pick project" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.code} · {p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" size="sm" variant="ghost" onClick={() => setMode("pick")} disabled={creating}>Back</Button>
+              <Button type="button" size="sm" onClick={submitCreate} disabled={creating || !newTitle.trim() || !newProject}>
+                {creating ? "Creating…" : "Create & pick"}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Same as creating from the Tasks page — priority defaults to Medium, no due date. You can edit later.</p>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}

@@ -113,32 +113,59 @@ function LearningPage() {
   }, [assigned, subByCourse]);
 
   const [uploadFor, setUploadFor] = useState<Course | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
 
+  function openUpload(course: Course, existing: Submission | undefined) {
+    setUploadFor(course);
+    setFiles([]);
+    setComment(existing?.learner_comment ?? "");
+  }
+
   async function submitProof() {
-    if (!me || !uploadFor || !file) return;
+    if (!me || !uploadFor || files.length === 0) return;
     setBusy(true);
     try {
-      const path = `${me.id}/${uploadFor.id}-${Date.now()}-${file.name}`.replace(/\s+/g, "_");
-      const up = await supabase.storage.from("learning-proofs").upload(path, file, { upsert: true });
-      if (up.error) throw up.error;
+      const paths: string[] = [];
+      for (const f of files) {
+        const path = `${me.id}/${uploadFor.id}-${Date.now()}-${f.name}`.replace(/\s+/g, "_");
+        const up = await supabase.storage.from("learning-proofs").upload(path, f, { upsert: true });
+        if (up.error) throw up.error;
+        paths.push(path);
+      }
       const existing = subByCourse.get(uploadFor.id);
       if (existing) {
         const { error } = await supabase
           .from("course_submissions")
-          .update({ screenshot_path: path, status: "submitted", rejection_note: null, submitted_at: new Date().toISOString(), reviewed_at: null, reviewed_by: null })
+          .update({
+            screenshot_path: paths[0],
+            screenshot_paths: paths,
+            learner_comment: comment.trim() || null,
+            status: "submitted",
+            rejection_note: null,
+            submitted_at: new Date().toISOString(),
+            reviewed_at: null,
+            reviewed_by: null,
+          })
           .eq("id", existing.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("course_submissions")
-          .insert({ course_id: uploadFor.id, user_id: me.id, screenshot_path: path });
+          .insert({
+            course_id: uploadFor.id,
+            user_id: me.id,
+            screenshot_path: paths[0],
+            screenshot_paths: paths,
+            learner_comment: comment.trim() || null,
+          });
         if (error) throw error;
       }
       toast.success("Submitted for review");
       setUploadFor(null);
-      setFile(null);
+      setFiles([]);
+      setComment("");
       qc.invalidateQueries({ queryKey: ["my-submissions", me.id] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");

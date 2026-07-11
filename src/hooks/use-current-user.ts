@@ -116,6 +116,7 @@ export function useCurrentUser() {
           vIsAdmin = vIsSuper || !!otherRoles?.some((r) => r.role === "admin");
           vIsFinance = vIsSuper || (!!other.email && FINANCE_EMAILS.includes(other.email.toLowerCase()));
           vIsHr = !!otherRoles?.some((r) => r.role === "hr_admin");
+          vIsLearning = !!otherRoles?.some((r) => r.role === "learning_admin");
           vHeadOf = (otherHeadRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
           vCanManageProjects = vIsAdmin || vIsHr || vHeadOf.length > 0 || !!otherRoles?.some((r) => r.role === "project_manager");
           vReportIds = ((otherReports ?? []) as Array<{ id: string }>).map((r) => r.id);

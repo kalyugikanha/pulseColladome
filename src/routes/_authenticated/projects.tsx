@@ -260,9 +260,12 @@ function ProjectsPage() {
               <div key={i} className="rounded-lg border border-border/60 p-3">
                 <div className="flex items-center justify-between text-sm">
                   <div className="font-medium">{r.user}</div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{format(new Date(r.date), "EEE, MMM d")}</span>
-                    <Badge variant="outline">{r.hours.toFixed(2)}h</Badge>
+                    <Badge variant="outline">{r.hours.toFixed(2)}h logged</Badge>
+                    {r.approved
+                      ? <Badge variant="secondary" className="text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300">approved</Badge>
+                      : <Badge variant="outline" className="text-amber-700 border-amber-500/60">pending approval</Badge>}
                   </div>
                 </div>
                 {r.comments && <div className="mt-1 text-xs text-muted-foreground">{r.comments}</div>}

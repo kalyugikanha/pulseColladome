@@ -416,8 +416,17 @@ export function ProjectBurnPage() {
     }
     const activeWithTeam = Array.from(teamByCode.keys());
     for (const e of expenses) {
-      const amt = Number(e.amount_inr) || 0;
-      if (amt <= 0) continue;
+      const raw = Number(e.amount_inr) || 0;
+      if (raw <= 0) continue;
+      let amt = raw;
+      if (e.recurring && e.recurring_frequency) {
+        switch (e.recurring_frequency) {
+          case "weekly": amt = raw * (52 / 12); break;
+          case "monthly": amt = raw; break;
+          case "quarterly": amt = raw / 3; break;
+          case "yearly": amt = raw / 12; break;
+        }
+      }
       let targets: string[] = [];
       if (e.scope === "project") {
         const code = e.project_id ? activeCodeById.get(e.project_id) : undefined;
@@ -437,7 +446,20 @@ export function ProjectBurnPage() {
     return { byCode: out, unallocated };
   }, [expenses, activeProjects, loggedLogs, deptById, showCosts]);
 
-  const totalExpenses = useMemo(() => (expenses ?? []).reduce((s, e) => s + (Number(e.amount_inr) || 0), 0), [expenses]);
+  const totalExpenses = useMemo(() => {
+    let total = 0;
+    for (const e of expenses ?? []) {
+      const raw = Number(e.amount_inr) || 0;
+      if (!e.recurring || !e.recurring_frequency) { total += raw; continue; }
+      switch (e.recurring_frequency) {
+        case "weekly": total += raw * (52 / 12); break;
+        case "monthly": total += raw; break;
+        case "quarterly": total += raw / 3; break;
+        case "yearly": total += raw / 12; break;
+      }
+    }
+    return total;
+  }, [expenses]);
 
 
 

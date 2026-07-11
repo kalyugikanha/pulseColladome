@@ -22,7 +22,10 @@ type Course = { id: string; title: string; description: string | null; resource_
 type Target = { id: string; course_id: string; user_id: string | null; department: string | null };
 type Person = { id: string; full_name: string | null; email: string | null; department: string | null };
 type Submission = {
-  id: string; course_id: string; user_id: string; screenshot_path: string;
+  id: string; course_id: string; user_id: string;
+  screenshot_path: string | null;
+  screenshot_paths: string[] | null;
+  learner_comment: string | null;
   status: "submitted" | "approved" | "rejected"; rejection_note: string | null;
   submitted_at: string; reviewed_at: string | null;
 };

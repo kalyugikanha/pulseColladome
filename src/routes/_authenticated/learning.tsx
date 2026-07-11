@@ -29,7 +29,9 @@ type Submission = {
   id: string;
   course_id: string;
   user_id: string;
-  screenshot_path: string;
+  screenshot_path: string | null;
+  screenshot_paths: string[] | null;
+  learner_comment: string | null;
   status: "submitted" | "approved" | "rejected";
   rejection_note: string | null;
   submitted_at: string;

@@ -202,6 +202,9 @@ function LearningPage() {
         </CardContent>
       </Card>
 
+      <LeaderboardCard />
+
+
       <Dialog open={!!uploadFor} onOpenChange={(o) => { if (!o) { setUploadFor(null); setFile(null); } }}>
         <DialogContent>
           <DialogHeader>

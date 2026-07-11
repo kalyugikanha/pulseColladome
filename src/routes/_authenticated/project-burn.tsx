@@ -526,7 +526,7 @@ export function ProjectBurnPage() {
 
       <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-5">
         {showCosts && <Stat icon={<IndianRupee className="h-4 w-4" />} label="Salary burn" value={inr(totalBurn)} sub={`${totalHours.toFixed(1)} hrs`} />}
-        {showCosts && <Stat icon={<IndianRupee className="h-4 w-4" />} label="Expenses" value={inr(totalExpenses)} sub={`${(expenses ?? []).length} entr${(expenses ?? []).length === 1 ? "y" : "ies"}`} />}
+        {showCosts && <Stat icon={<IndianRupee className="h-4 w-4" />} label="Expenses" value={inr(totalExpenses)} sub={`${(expenses ?? []).length} entr${(expenses ?? []).length === 1 ? "y" : "ies"} · monthly-equiv`} />}
         {showCosts && <Stat icon={<Flame className="h-4 w-4" />} label="Total burn" value={inr(totalBurn + totalExpenses)} sub="salary + expenses" />}
         {showCosts && <Stat icon={<TrendingUp className="h-4 w-4" />} label="Salary pool" value={inr(totalSalaryPool)} sub={`${salaryByUser.size} active${pendingCount ? ` · ${pendingCount} pending` : ""}`} />}
         {!showCosts && <Stat icon={<CalendarDays className="h-4 w-4" />} label="Hours this month" value={totalHours.toFixed(1)} sub={`${(profiles ?? []).length} teammates`} />}

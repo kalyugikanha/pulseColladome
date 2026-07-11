@@ -101,8 +101,25 @@ export function ProjectBurnPage() {
     },
   });
 
+  // Unfiltered logged hours (all punched days, regardless of approval).
+  // Displayed alongside approved totals for comparison — never used for burn.
+  const { data: loggedLogs } = useQuery({
+    queryKey: ["pb-logged-logs", month, hasScope ? visibleUserIds.join(",") : "all"],
+    enabled: canView && (!hasScope || visibleUserIds.length > 0),
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+      const end = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
+      let q = supabase.from("attendance_logs").select("user_id, date, tasks")
+        .gte("date", start).lt("date", end).order("date");
+      if (hasScope) q = q.in("user_id", visibleUserIds);
+      return (await q).data as LogRow[] ?? [];
+    },
+  });
+
   // Combined (previously merged approved task_activity — now dead).
   const combinedLogs = useMemo<LogRow[]>(() => (logs ?? []).slice(), [logs]);
+
 
 
 
@@ -200,6 +217,26 @@ export function ProjectBurnPage() {
   // Restrict logs to profiles in scope (dept-head only sees her team).
   const profileIdSet = useMemo(() => new Set((profiles ?? []).map((p) => p.id)), [profiles]);
   const scopedLogs = useMemo(() => combinedLogs.filter((r) => profileIdSet.size === 0 || profileIdSet.has(r.user_id)), [combinedLogs, profileIdSet]);
+
+  // Logged (unapproved-inclusive) hours per project code, scoped by the same
+  // dept/emp/project filters as the approved rollup so numbers stay comparable.
+  const loggedHoursByProject = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of loggedLogs ?? []) {
+      if (profileIdSet.size > 0 && !profileIdSet.has(row.user_id)) continue;
+      if (!passesDept(row.user_id)) continue;
+      if (empSel.size > 0 && !empSel.has(row.user_id)) continue;
+      for (const t of row.tasks ?? []) {
+        const code = t.project_code?.trim();
+        const h = Number(t.hours) || 0;
+        if (!code || h <= 0) continue;
+        if (projectFilter !== "all" && code !== projectFilter) continue;
+        map.set(code, (map.get(code) ?? 0) + h);
+      }
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedLogs, profileIdSet, deptSel, deptById, empSel, projectFilter]);
 
   // Daily rows: [date, project_code, user_id, hours, burn]
   type DailyRow = { date: string; code: string; name: string; user_id: string; hours: number; burn: number };
@@ -437,36 +474,55 @@ export function ProjectBurnPage() {
           <CardTitle>Burn by project / category</CardTitle>
           <CardDescription>
             Totals for {month} grouped by project across every department in view.
+            Logged = all punched hours (unfiltered). Approved = manager-approved days only, used for burn.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {projectRollup.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-8 text-center">No entries.</div>
-          ) : (
-            <div className="max-h-[480px] overflow-y-auto">
-              <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Project</TableHead>
-                  <TableHead className="text-right">Hours</TableHead>
-                  <TableHead className="text-right">Contributors</TableHead>
-                  {showCosts && <TableHead className="text-right">Burn</TableHead>}
-                </TableRow></TableHeader>
-                <TableBody>
-                  {projectRollup.map((r) => (
-                    <TableRow key={r.code}>
-                      <TableCell>
-                        <span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>
-                        {r.name}
-                      </TableCell>
-                      <TableCell className="text-right">{r.hours.toFixed(1)}</TableCell>
-                      <TableCell className="text-right">{r.contributors}</TableCell>
-                      {showCosts && <TableCell className="text-right">{inr(r.burn)}</TableCell>}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          {(() => {
+            // Merge approved rollup with logged-only projects so nothing punched-in disappears.
+            const merged = new Map<string, { code: string; name: string; approvedHours: number; loggedHours: number; contributors: number; burn: number }>();
+            for (const r of projectRollup) {
+              merged.set(r.code, { code: r.code, name: r.name, approvedHours: r.hours, loggedHours: loggedHoursByProject.get(r.code) ?? 0, contributors: r.contributors, burn: r.burn });
+            }
+            for (const [code, hrs] of loggedHoursByProject) {
+              if (merged.has(code)) continue;
+              merged.set(code, { code, name: code, approvedHours: 0, loggedHours: hrs, contributors: 0, burn: 0 });
+            }
+            const rows = Array.from(merged.values()).sort((a, b) => (showCosts ? b.burn - a.burn : b.approvedHours - a.approvedHours) || b.loggedHours - a.loggedHours);
+            if (rows.length === 0) return <div className="text-sm text-muted-foreground py-8 text-center">No entries.</div>;
+            return (
+              <div className="max-h-[480px] overflow-y-auto">
+                <Table>
+                  <TableHeader><TableRow>
+                    <TableHead>Project</TableHead>
+                    <TableHead className="text-right" title="All punched hours, unfiltered">Logged hrs</TableHead>
+                    <TableHead className="text-right" title="Manager-approved days only — used for burn">Approved hrs</TableHead>
+                    <TableHead className="text-right">Contributors</TableHead>
+                    {showCosts && <TableHead className="text-right">Burn</TableHead>}
+                  </TableRow></TableHeader>
+                  <TableBody>
+                    {rows.map((r) => {
+                      const pending = r.loggedHours > r.approvedHours + 0.0001;
+                      return (
+                        <TableRow key={r.code}>
+                          <TableCell>
+                            <span className="font-mono text-xs mr-2 text-muted-foreground">{r.code}</span>
+                            {r.name}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-muted-foreground">{r.loggedHours.toFixed(1)}</TableCell>
+                          <TableCell className={`text-right tabular-nums font-medium ${pending ? "text-amber-700" : ""}`} title={pending ? `${(r.loggedHours - r.approvedHours).toFixed(1)}h logged not yet approved` : undefined}>
+                            {r.approvedHours.toFixed(1)}
+                          </TableCell>
+                          <TableCell className="text-right">{r.contributors}</TableCell>
+                          {showCosts && <TableCell className="text-right">{inr(r.burn)}</TableCell>}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

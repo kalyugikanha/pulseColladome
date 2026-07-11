@@ -104,7 +104,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
                 )}
                 {isFinanceAdmin && (
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/finances") || pathname.startsWith("/project-burn")}>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/finances")}>
                       <Link to="/finances"><Wallet /><span>Finances</span></Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

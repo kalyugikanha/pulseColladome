@@ -711,6 +711,9 @@ function FinancesPage() {
         <TabsContent value="expenses" className="mt-4">
           <ExpensesPanel />
         </TabsContent>
+        <TabsContent value="project-burn" className="mt-4">
+          <ProjectBurnPage />
+        </TabsContent>
       </Tabs>
     </div>
   );

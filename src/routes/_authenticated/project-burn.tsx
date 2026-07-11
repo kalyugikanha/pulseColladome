@@ -349,27 +349,10 @@ export function ProjectBurnPage() {
     return EMP_COLORS[(idx < 0 ? 0 : idx) % EMP_COLORS.length];
   };
 
-  // Daily stacked series: per-day per-user hours + burn.
-  const dailyTrend = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const arr = Array.from({ length: daysInMonth }, (_, i) => {
-      const d = `${y}-${String(m).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`;
-      return { date: d, total: 0, perUser: new Map<string, { hours: number; burn: number }>() };
-    });
-    for (const r of filteredDaily) {
-      const idx = Number(r.date.slice(8, 10)) - 1;
-      if (!arr[idx]) continue;
-      const cell = arr[idx];
-      const cur = cell.perUser.get(r.user_id) ?? { hours: 0, burn: 0 };
-      cur.hours += r.hours; cur.burn += r.burn;
-      cell.perUser.set(r.user_id, cur);
-      cell.total += showCosts ? r.burn : r.hours;
-    }
-    return arr;
-  }, [filteredDaily, month, daysInMonth, showCosts]);
-  const trendMax = Math.max(1, ...dailyTrend.map((d) => d.total));
-  const distinctLoggedDates = useMemo(() => new Set(filteredDaily.map((r) => r.date)).size, [filteredDaily]);
-  const lowGranularity = distinctLoggedDates > 0 && distinctLoggedDates < 3;
+  const employeeSeriesMax = useMemo(
+    () => Math.max(1, ...employeeSeries.map((e) => (showCosts ? e.burn : e.hours))),
+    [employeeSeries, showCosts],
+  );
 
   // Burn by project rollup (respects month/dept/employee/project filters).
   const projectRollup = useMemo(() => {

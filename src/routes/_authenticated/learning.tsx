@@ -234,22 +234,42 @@ function LearningPage() {
       <LeaderboardCard />
 
 
-      <Dialog open={!!uploadFor} onOpenChange={(o) => { if (!o) { setUploadFor(null); setFile(null); } }}>
+      <Dialog open={!!uploadFor} onOpenChange={(o) => { if (!o) { setUploadFor(null); setFiles([]); setComment(""); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Submit proof — {uploadFor?.title}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>Screenshot (image or PDF)</Label>
-            <Input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Screenshots or PDFs (you can select multiple)</Label>
+              <Input
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])}
+              />
+              {files.length > 0 && (
+                <p className="text-xs text-muted-foreground">{files.length} file{files.length === 1 ? "" : "s"} selected</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <Label>What did you learn? <span className="text-muted-foreground font-normal">(shown to the reviewer)</span></Label>
+              <textarea
+                className="w-full min-h-[90px] rounded-md border bg-background p-2 text-sm"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="A couple of sentences on your key takeaways…"
+              />
+            </div>
             <p className="text-xs text-muted-foreground">A Learning Admin will review and approve or reject.</p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setUploadFor(null); setFile(null); }}>Cancel</Button>
-            <Button disabled={!file || busy} onClick={submitProof}>{busy ? "Uploading…" : "Submit"}</Button>
+            <Button variant="outline" onClick={() => { setUploadFor(null); setFiles([]); setComment(""); }}>Cancel</Button>
+            <Button disabled={files.length === 0 || busy} onClick={submitProof}>{busy ? "Uploading…" : "Submit"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

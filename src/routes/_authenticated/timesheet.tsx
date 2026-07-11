@@ -148,36 +148,26 @@ export function TimesheetPage() {
   const logByUser = useMemo(() => new Map((logs ?? []).map((r) => [r.user_id, r])), [logs]);
 
 
-  // Projects that actually appear in the day (for filter list) — from both sources.
+  // Projects that actually appear in the day (for filter list).
   const projectsInDay = useMemo(() => {
     const m = new Map<string, string>();
     for (const r of logs ?? []) for (const t of r.tasks ?? []) {
       const code = t.project_code?.trim();
       if (code && !m.has(code)) m.set(code, t.project_name || code);
     }
-    for (const a of activityRows ?? []) {
-      const code = a.task?.project?.code?.trim();
-      if (code && !m.has(code)) m.set(code, a.task?.project?.name || code);
-    }
     return Array.from(m.entries()).map(([code, name]) => ({ code, name })).sort((a, b) => a.code.localeCompare(b.code));
-  }, [logs, activityRows]);
+  }, [logs]);
 
-  // Tasks visible in the day (for Task filter). Merges activity-sourced task_ids
-  // with any log rows that carry a task_id (Stage 1 day-editor now writes it).
+  // Tasks visible in the day (for Task filter).
   const tasksInDay = useMemo(() => {
     const m = new Map<string, { title: string; code: string | null }>();
-    for (const a of activityRows ?? []) {
-      const id = a.task?.id || a.task_id;
-      if (!id || m.has(id)) continue;
-      m.set(id, { title: a.task?.title ?? "Task", code: a.task?.project?.code ?? null });
-    }
     for (const r of logs ?? []) for (const t of r.tasks ?? []) {
       const id = t.task_id;
       if (!id || m.has(id)) continue;
       m.set(id, { title: t.task_title ?? t.comments ?? "Task", code: t.project_code ?? null });
     }
     return Array.from(m.entries()).map(([id, v]) => ({ id, ...v })).sort((a, b) => a.title.localeCompare(b.title));
-  }, [logs, activityRows]);
+  }, [logs]);
 
 
   const allDepts = useMemo(() => {
@@ -186,7 +176,7 @@ export function TimesheetPage() {
     return Array.from(s).sort();
   }, [profiles]);
 
-  // Build rows: employees (filtered) with their tasks for the day (log + activity).
+  // Build rows: employees (filtered) with their tasks for the day.
   type EmpRow = { profile: Profile; log: LogRow | null; tasks: Task[]; approved: boolean; total: number; approvedTotal: number };
   const empRows = useMemo<EmpRow[]>(() => {
     const src = (profiles ?? []).filter((p) => {
@@ -199,42 +189,16 @@ export function TimesheetPage() {
     });
     const out: EmpRow[] = src.map((p) => {
       const log = logByUser.get(p.id) ?? null;
-      const logTasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t, source: "log" as const }));
-      const acts = activityByUser.get(p.id) ?? [];
-      const actTasks: Task[] = acts.map((a) => {
-        const proj = a.task?.project;
-        const code = proj?.code?.trim() || "—";
-        const name = proj?.name || a.task?.title || "Task";
-        const logged = Number(a.hours) || 0;
-        const approved = a.approval_status === "approved" || a.approval_status === "auto";
-        const approvedHrs = Number(a.approved_hours ?? logged) || 0;
-        const shownHrs = approved ? approvedHrs : logged;
-        const baseComment = a.note ?? a.task?.title ?? undefined;
-        const partial = approved && approvedHrs < logged;
-        return {
-          project_code: code,
-          project_name: name,
-          hours: shownHrs,
-          logged_hours: logged,
-          approved_hours: approved ? approvedHrs : undefined,
-          comments: partial ? `${baseComment ?? "Task hours"} · approved ${approvedHrs}/${logged}h` : baseComment,
-          source: "activity" as const,
-          approval_status: a.approval_status,
-          task_id: a.task?.id ?? a.task_id,
-          task_title: a.task?.title ?? "Task",
-        };
-      });
-      let tasks: Task[] = [...logTasks, ...actTasks];
+      let tasks: Task[] = (log?.tasks ?? []).map((t) => ({ ...t }));
       if (projSel.size > 0) tasks = tasks.filter((t) => t.project_code && projSel.has(t.project_code));
       if (taskSel.size > 0) tasks = tasks.filter((t) => t.task_id && taskSel.has(t.task_id));
       const total = tasks.reduce((s, t) => s + (Number(t.hours) || 0), 0);
       const dayApproved = !!log?.approved_at;
-      const approvedTotal = tasks.reduce((s, t) => {
-        if (t.source === "activity") return s + (t.approved_hours != null ? Number(t.approved_hours) : 0);
-        // log-sourced task: day-approval stamps everything
-        if (!dayApproved) return s;
-        return s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0));
-      }, 0);
+      // Day-level approval is the source of truth. When the day is approved,
+      // every row contributes its approved_hours (fallback: logged hours).
+      const approvedTotal = dayApproved
+        ? tasks.reduce((s, t) => s + (t.approved_hours != null ? Number(t.approved_hours) : (Number(t.hours) || 0)), 0)
+        : 0;
       return { profile: p, log, tasks, approved: dayApproved, total, approvedTotal };
     });
     return out
@@ -242,7 +206,8 @@ export function TimesheetPage() {
       .sort((a, b) =>
         (a.profile.full_name ?? a.profile.email ?? "").localeCompare(b.profile.full_name ?? b.profile.email ?? "")
       );
-  }, [profiles, logByUser, activityByUser, deptSel, empSel, projSel, taskSel, showEmpty]);
+  }, [profiles, logByUser, deptSel, empSel, projSel, taskSel, showEmpty]);
+
 
 
 

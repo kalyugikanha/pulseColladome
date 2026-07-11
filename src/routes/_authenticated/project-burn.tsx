@@ -120,26 +120,6 @@ export function ProjectBurnPage() {
   // Combined (previously merged approved task_activity — now dead).
   const combinedLogs = useMemo<LogRow[]>(() => (logs ?? []).slice(), [logs]);
 
-  // Logged (unapproved-inclusive) hours per project code, scoped by dept/emp
-  // filters so it stays comparable to the approved totals on the same row.
-  const loggedHoursByProject = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of loggedLogs ?? []) {
-      if (profileIdSet.size > 0 && !profileIdSet.has(row.user_id)) continue;
-      if (!passesDept(row.user_id)) continue;
-      if (empSel.size > 0 && !empSel.has(row.user_id)) continue;
-      for (const t of row.tasks ?? []) {
-        const code = t.project_code?.trim();
-        const h = Number(t.hours) || 0;
-        if (!code || h <= 0) continue;
-        if (projectFilter !== "all" && code !== projectFilter) continue;
-        map.set(code, (map.get(code) ?? 0) + h);
-      }
-    }
-    return map;
-    // profileIdSet / passesDept depend on profiles/deptSel/deptById/empSel/projectFilter
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedLogs, profileIdSet, deptSel, deptById, empSel, projectFilter]);
 
 
 

@@ -637,9 +637,8 @@ function FinancesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Hours by project — {month}</CardTitle>
-          <CardDescription>
-            Logged = all punched hours (unfiltered). Approved = manager-approved days only. Burn above uses Approved.
-          </CardDescription>
+          <CardDescription>Approved hours are the source of truth for the salary-share burn above.</CardDescription>
+          <p className="text-[11px] text-muted-foreground/80 mt-1"><span className="font-medium">Legend:</span> <b title="Every punched hour on this project, regardless of manager approval">Logged hrs</b> = raw punched hours (unfiltered). <b title="Only days a manager approved — the figure that feeds burn calculations">Approved hrs</b> = manager-approved days only; burn uses this.</p>
         </CardHeader>
         <CardContent>
           {(() => {

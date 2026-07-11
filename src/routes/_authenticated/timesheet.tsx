@@ -136,6 +136,31 @@ export function TimesheetPage() {
     },
   });
 
+  // Pending approvals report — every attendance_logs day within scope where
+  // approved_at IS NULL. Bounded to the last 60 days so the list stays
+  // scannable (older un-approved days are noise, not a work queue).
+  const pendingSinceIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 60);
+    return ymd(d);
+  }, []);
+  const { data: pendingRows } = useQuery({
+    queryKey: ["ts-pending", pendingSinceIso, hasScope || fallbackActorIds ? visibleUserIds.join(",") : "all"],
+    enabled: canView && ((!hasScope && !fallbackActorIds) || visibleUserIds.length > 0),
+    queryFn: async () => {
+      let q = supabase.from("attendance_logs")
+        .select("id, user_id, date, tasks, total_hours")
+        .is("approved_at", null)
+        .gte("date", pendingSinceIso)
+        .order("date", { ascending: false });
+      if (hasScope || fallbackActorIds) q = q.in("user_id", visibleUserIds);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; user_id: string; date: string; tasks: Task[] | null; total_hours: number | null }>;
+    },
+  });
+
+
   const { data: projectsAll } = useQuery({
     queryKey: ["ts-projects-all"],
     enabled: canView,
@@ -411,14 +436,24 @@ export function TimesheetPage() {
 
 
 
+      <PendingApprovalsCard
+        rows={pendingRows ?? []}
+        profiles={profiles ?? []}
+        onOpenDay={(uid, date) => {
+          const p = (profiles ?? []).find((x) => x.id === uid);
+          setEditor({ userId: uid, userName: p?.full_name ?? p?.email ?? "—", date });
+        }}
+      />
+
       <Card>
 
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
             <CardTitle>{dateLabel}</CardTitle>
             <CardDescription>
-              {empRows.length} employee{empRows.length === 1 ? "" : "s"} · {entryCount} entr{entryCount === 1 ? "y" : "ies"} · Logged {dayTotal.toFixed(1)} hrs · Approved {dayApprovedTotal.toFixed(1)} hrs{dayApprovedTotal < dayTotal ? ` · Gap ${(dayTotal - dayApprovedTotal).toFixed(1)} hrs` : ""}
+              {empRows.length} employee{empRows.length === 1 ? "" : "s"} · {entryCount} entr{entryCount === 1 ? "y" : "ies"} · <span title="All punched hours, unfiltered">Logged {dayTotal.toFixed(1)} hrs</span> · <span title="Manager-approved days only — feeds burn/finances">Approved {dayApprovedTotal.toFixed(1)} hrs</span>{dayApprovedTotal < dayTotal ? ` · Gap ${(dayTotal - dayApprovedTotal).toFixed(1)} hrs` : ""}
             </CardDescription>
+            <p className="text-[11px] text-muted-foreground/80 mt-1"><span className="font-medium">Legend:</span> <b>Logged</b> = raw punched hours. <b>Approved</b> = manager-approved days only; only these feed Project Burn and Finances.</p>
           </div>
           <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
             <Checkbox checked={showEmpty} onCheckedChange={(v) => setShowEmpty(!!v)} />
@@ -752,3 +787,75 @@ function InlineText({ value, disabled, onCommit, placeholder }: { value: string;
 
 
 
+
+function PendingApprovalsCard({
+  rows,
+  profiles,
+  onOpenDay,
+}: {
+  rows: Array<{ id: string; user_id: string; date: string; tasks: Task[] | null; total_hours: number | null }>;
+  profiles: Profile[];
+  onOpenDay: (userId: string, date: string) => void;
+}) {
+  const nameOf = (uid: string) => {
+    const p = profiles.find((x) => x.id === uid);
+    return p?.full_name ?? p?.email ?? "—";
+  };
+  const daysPending = (dateIso: string) => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const d = parseYmd(dateIso); d.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.round((today.getTime() - d.getTime()) / 86400000));
+  };
+  const sorted = [...rows].sort((a, b) => daysPending(b.date) - daysPending(a.date) || a.date.localeCompare(b.date));
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">Pending approvals
+          <Badge variant={sorted.length === 0 ? "outline" : "secondary"} className={sorted.length === 0 ? "" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"}>
+            {sorted.length}
+          </Badge>
+        </CardTitle>
+        <CardDescription>
+          Every un-approved day in the last 60 days within your scope. These hours don't count toward Project Burn or Finances until approved.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {sorted.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-6 text-center">Nothing pending — you're all caught up.</div>
+        ) : (
+          <div className="max-h-[320px] overflow-auto border rounded-md">
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                  <TableHead className="min-w-[220px]">Employee</TableHead>
+                  <TableHead className="w-[140px]">Date</TableHead>
+                  <TableHead className="w-[110px] text-right tabular-nums">Logged hrs</TableHead>
+                  <TableHead className="w-[110px] text-right tabular-nums">Days pending</TableHead>
+                  <TableHead className="w-[100px]" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sorted.map((r) => {
+                  const dp = daysPending(r.date);
+                  const hrs = Number(r.total_hours ?? 0) || (r.tasks ?? []).reduce((s, t) => s + (Number(t.hours) || 0), 0);
+                  const urgent = dp >= 7;
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{nameOf(r.user_id)}</TableCell>
+                      <TableCell className="text-sm">{format(parseYmd(r.date), "EEE, d MMM")}</TableCell>
+                      <TableCell className="text-right tabular-nums">{hrs.toFixed(1)}</TableCell>
+                      <TableCell className={`text-right tabular-nums ${urgent ? "text-amber-700 font-semibold" : ""}`}>{dp}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" onClick={() => onOpenDay(r.user_id, r.date)}>Review</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

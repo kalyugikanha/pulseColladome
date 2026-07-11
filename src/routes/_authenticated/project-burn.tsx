@@ -474,8 +474,8 @@ export function ProjectBurnPage() {
           <CardTitle>Burn by project / category</CardTitle>
           <CardDescription>
             Totals for {month} grouped by project across every department in view.
-            Logged = all punched hours (unfiltered). Approved = manager-approved days only, used for burn.
           </CardDescription>
+          <p className="text-[11px] text-muted-foreground/80 mt-1"><span className="font-medium">Legend:</span> <b title="Every punched hour on this project, regardless of manager approval">Logged hrs</b> = raw punched hours (unfiltered). <b title="Only days a manager approved — the figure that feeds burn calculations">Approved hrs</b> = manager-approved days only; burn uses this.</p>
         </CardHeader>
         <CardContent>
           {(() => {

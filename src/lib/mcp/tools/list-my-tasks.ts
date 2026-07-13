@@ -19,7 +19,7 @@ export default defineTool({
     let q = supabase
       .from("tasks")
       .select("id, title, status, priority, due_date, project_id")
-      .eq("assignee_id", ctx.getUserId())
+      .eq("assignee_id", ctx.getUserId()!)
       .order("updated_at", { ascending: false })
       .limit(50);
     if (status) q = q.eq("status", status);

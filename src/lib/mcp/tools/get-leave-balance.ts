@@ -16,7 +16,7 @@ export default defineTool({
     const { data, error } = await supabase
       .from("leave_balances")
       .select("leave_type, allocated, used")
-      .eq("user_id", ctx.getUserId());
+      .eq("user_id", ctx.getUserId()!);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return {
       content: [{ type: "text", text: JSON.stringify(data ?? []) }],

@@ -27,7 +27,7 @@ export default defineTool({
       _description: input.description ?? null,
       _due_date: input.due_date ?? null,
       _priority: input.priority ?? "medium",
-      _assignee_id: input.assignee_id ?? ctx.getUserId(),
+      _assignee_id: input.assignee_id ?? ctx.getUserId()!,
     });
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return {

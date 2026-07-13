@@ -19,7 +19,7 @@ export default defineTool({
     const { data, error } = await supabase
       .from("attendance_logs")
       .select("date, punch_in_time, punch_out_time, total_hours, tasks, approved_at")
-      .eq("user_id", ctx.getUserId())
+      .eq("user_id", ctx.getUserId()!)
       .eq("date", date)
       .maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };

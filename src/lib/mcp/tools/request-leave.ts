@@ -23,7 +23,7 @@ export default defineTool({
     const { data, error } = await supabase
       .from("leave_requests")
       .insert({
-        user_id: ctx.getUserId(),
+        user_id: ctx.getUserId()!,
         leave_type: input.leave_type,
         start_date: input.start_date,
         end_date: input.end_date,

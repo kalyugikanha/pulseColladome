@@ -16,7 +16,7 @@ export default defineTool({
     const { data, error } = await supabase
       .from("punch_sessions")
       .select("id, punch_in_time, project_code, project_name")
-      .eq("user_id", ctx.getUserId())
+      .eq("user_id", ctx.getUserId()!)
       .is("punch_out_time", null)
       .maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };

@@ -277,7 +277,7 @@ export function AttendanceTeamPanel() {
                         </TableCell>
                       </TableRow>
                     )}
-                    {overviewRows.map(({ p, a, open, leave, status }) => {
+                    {overviewRows.map(({ p, a, open, leave, isHalf, status }) => {
                       const punchInTime = open?.punch_in_time ?? a?.punch_in_time ?? null;
                       return (
                       <TableRow key={p.id}>

@@ -12,9 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInCalendarDays } from "date-fns";
+import { formatLeaveDays } from "@/lib/leave-format";
 
 export const Route = createFileRoute("/_authenticated/leave")({
   component: LeavePage,
@@ -34,6 +36,9 @@ export function LeavePage() {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<"casual"|"sick"|"earned"|"unpaid">("casual");
   const [start, setStart] = useState(""); const [end, setEnd] = useState(""); const [reason, setReason] = useState("");
+  const [halfDay, setHalfDay] = useState(false);
+  const sameDay = !!start && start === end;
+  const canHalfDay = sameDay;
 
   const { data } = useQuery({
     queryKey: ["leave", me?.id],
@@ -49,14 +54,17 @@ export function LeavePage() {
 
   async function submit() {
     if (!start || !end) return toast.error("Pick dates");
-    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
-    if (days <= 0) return toast.error("End must be after start");
-    const { error } = await supabase.from("leave_requests").insert({ user_id: me!.id, leave_type: type, start_date: start, end_date: end, days, reason });
+    const rangeDays = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (rangeDays <= 0) return toast.error("End must be after start");
+    const useHalf = canHalfDay && halfDay;
+    const days = useHalf ? 0.5 : rangeDays;
+    const { error } = await supabase.from("leave_requests").insert({ user_id: me!.id, leave_type: type, start_date: start, end_date: end, days, reason: useHalf ? `[Half-day] ${reason}`.trim() : reason });
     if (error) return toast.error(error.message);
     toast.success("Request submitted");
-    setOpen(false); setStart(""); setEnd(""); setReason("");
+    setOpen(false); setStart(""); setEnd(""); setReason(""); setHalfDay(false);
     qc.invalidateQueries();
   }
+
 
   const { data: manageable } = useQuery({
     queryKey: ["leave-manageable", me?.id, me?.isAdmin],
@@ -116,6 +124,12 @@ export function LeavePage() {
                   <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
                   <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
                 </div>
+                {canHalfDay && (
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox checked={halfDay} onCheckedChange={(v) => setHalfDay(v === true)} />
+                    <span>Half day (0.5d)</span>
+                  </label>
+                )}
                 <div className="space-y-1"><Label>Reason</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
               </div>
               <DialogFooter><Button onClick={submit} className="gradient-primary">Submit</Button></DialogFooter>
@@ -151,7 +165,7 @@ export function LeavePage() {
           {data?.requests.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3">
               <div>
-                <div className="text-sm font-medium capitalize">{r.leave_type} · {r.days} day{Number(r.days) === 1 ? "" : "s"}</div>
+                <div className="text-sm font-medium capitalize">{r.leave_type} · {formatLeaveDays(r.days)}{Number(r.days) === 0.5 ? " · Half day" : ""}</div>
                 <div className="text-xs text-muted-foreground">{format(new Date(r.start_date), "MMM d")} – {format(new Date(r.end_date), "MMM d, yyyy")}</div>
                 {r.reason && <div className="text-xs text-muted-foreground mt-1">{r.reason}</div>}
                 {r.admin_comment && <div className="text-xs mt-1"><span className="text-muted-foreground">Admin:</span> {r.admin_comment}</div>}
@@ -175,7 +189,10 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [comment, setComment] = useState("");
+  const [halfDay, setHalfDay] = useState(false);
   const [busy, setBusy] = useState(false);
+  const sameDay = !!start && start === end;
+  const canHalfDay = sameDay;
 
   const sortedPeople = useMemo(
     () => [...people].sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "")),
@@ -183,15 +200,17 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
   );
 
   function reset() {
-    setUserId(""); setType("casual"); setStart(""); setEnd(""); setComment("");
+    setUserId(""); setType("casual"); setStart(""); setEnd(""); setComment(""); setHalfDay(false);
   }
 
   async function submit() {
     if (!userId) return toast.error("Pick an employee");
     if (!start || !end) return toast.error("Pick dates");
-    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
-    if (days <= 0) return toast.error("End must be after start");
+    const rangeDays = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (rangeDays <= 0) return toast.error("End must be after start");
     if (!comment.trim()) return toast.error("Add a short note");
+    const useHalf = canHalfDay && halfDay;
+    const days = useHalf ? 0.5 : rangeDays;
     setBusy(true);
     const { error } = await supabase.from("leave_requests").insert({
       user_id: userId,
@@ -199,7 +218,7 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
       start_date: start,
       end_date: end,
       days,
-      reason: `Logged by ${me?.fullName ?? "manager"}: ${comment.trim()}`,
+      reason: `${useHalf ? "[Half-day] " : ""}Logged by ${me?.fullName ?? "manager"}: ${comment.trim()}`,
       status: "pending",
     });
     setBusy(false);
@@ -209,6 +228,7 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
     setOpen(false);
     onSaved();
   }
+
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
@@ -244,6 +264,12 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
             <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
           </div>
+          {canHalfDay && (
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={halfDay} onCheckedChange={(v) => setHalfDay(v === true)} />
+              <span>Half day (0.5d)</span>
+            </label>
+          )}
           <div className="space-y-1">
             <Label>Comment</Label>
             <Textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Reason / context (required)" />

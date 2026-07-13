@@ -46,7 +46,7 @@ export function AttendanceTeamPanel() {
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", today),
         supabase.from("punch_sessions").select("user_id, punch_in_time").eq("session_date", today).is("punch_out_time", null),
         supabase.from("leave_requests")
-          .select("user_id, leave_type, start_date, end_date, reason")
+          .select("user_id, leave_type, start_date, end_date, reason, days")
           .eq("status", "approved")
           .lte("start_date", today)
           .gte("end_date", today),
@@ -54,7 +54,7 @@ export function AttendanceTeamPanel() {
       const peopleList = people.data ?? [];
       const nameById = new Map(peopleList.map((p) => [p.id, p]));
       const scopedLeaves = ((todayLeaves.data ?? []) as Array<{
-        user_id: string; leave_type: string; start_date: string; end_date: string; reason: string | null;
+        user_id: string; leave_type: string; start_date: string; end_date: string; reason: string | null; days: number | null;
       }>).filter((l) => nameById.has(l.user_id));
       const isOrgWide = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin);
       const pendingReq = isOrgWide
@@ -93,7 +93,7 @@ export function AttendanceTeamPanel() {
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", overviewDateStr),
         supabase.from("punch_sessions").select("user_id, punch_in_time").eq("session_date", overviewDateStr).is("punch_out_time", null),
         supabase.from("leave_requests")
-          .select("user_id, leave_type, start_date, end_date")
+          .select("user_id, leave_type, start_date, end_date, days")
           .eq("status", "approved")
           .lte("start_date", overviewDateStr)
           .gte("end_date", overviewDateStr),
@@ -117,12 +117,13 @@ export function AttendanceTeamPanel() {
     const rows = (overview?.people ?? []).map((p) => {
       const a = attById.get(p.id);
       const open = openById.get(p.id);
-      const leave = leaveById.get(p.id);
-      const status: "leave" | "in" | "out" | "absent" = leave
+      const leave = leaveById.get(p.id) as { user_id: string; leave_type: string; start_date: string; end_date: string; days?: number | null } | undefined;
+      const isHalf = Number(leave?.days ?? 0) === 0.5;
+      const status: "leave" | "in" | "out" | "absent" = leave && !isHalf
         ? "leave"
         : open || (a?.punch_in_time && !a.punch_out_time) ? "in"
         : a?.punch_out_time ? "out" : "absent";
-      return { p, a, open, leave, status };
+      return { p, a, open, leave, isHalf, status };
     });
     const order = { leave: 0, absent: 1, in: 2, out: 3 } as const;
     rows.sort((x, y) => {
@@ -276,24 +277,31 @@ export function AttendanceTeamPanel() {
                         </TableCell>
                       </TableRow>
                     )}
-                    {overviewRows.map(({ p, a, open, leave, status }) => {
+                    {overviewRows.map(({ p, a, open, leave, isHalf, status }) => {
                       const punchInTime = open?.punch_in_time ?? a?.punch_in_time ?? null;
                       return (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.full_name ?? p.email}</TableCell>
                         <TableCell className="text-muted-foreground">{p.department ?? "—"}</TableCell>
                         <TableCell>
-                          {status === "leave" ? (
-                            <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 capitalize">
-                              On leave · {leave!.leave_type}
-                            </Badge>
-                          ) : status === "in" ? (
-                            <Badge className="gradient-primary">Punched in</Badge>
-                          ) : status === "out" ? (
-                            <Badge variant="secondary">Punched out</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-red-600 border-red-500/40">Not punched in</Badge>
-                          )}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {status === "leave" ? (
+                              <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 capitalize">
+                                On leave · {leave!.leave_type}
+                              </Badge>
+                            ) : status === "in" ? (
+                              <Badge className="gradient-primary">Punched in</Badge>
+                            ) : status === "out" ? (
+                              <Badge variant="secondary">Punched out</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-red-600 border-red-500/40">Not punched in</Badge>
+                            )}
+                            {isHalf && (
+                              <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-500/40" title={`Half-day ${leave?.leave_type ?? "leave"}`}>
+                                Half-day leave
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {punchInTime ? format(new Date(punchInTime), "HH:mm") : "—"}
@@ -345,7 +353,8 @@ export function AttendanceTeamPanel() {
                       const open = data?.todayOpenSessions.find((x) => x.user_id === p.id);
                       const punchInTime = open?.punch_in_time ?? a?.punch_in_time ?? null;
                       const leave = onLeaveById.get(p.id);
-                      const status = leave
+                      const isHalfLeave = Number((leave as { days?: number | null } | undefined)?.days ?? 0) === 0.5;
+                      const status = leave && !isHalfLeave
                         ? "leave"
                         : open || (a?.punch_in_time && !a.punch_out_time) ? "in" : a?.punch_out_time ? "out" : "absent";
                       return (
@@ -359,20 +368,21 @@ export function AttendanceTeamPanel() {
                             <div>
                               <div className="text-sm font-medium">{p.full_name ?? p.email}</div>
                               <div className="text-xs text-muted-foreground">
-                                {leave
+                                {leave && !isHalfLeave
                                   ? `On approved leave · ${format(new Date(leave.start_date), "d MMM")} – ${format(new Date(leave.end_date), "d MMM")}`
                                   : (
                                     <>
                                       {punchInTime ? `In at ${format(new Date(punchInTime), "HH:mm")}` : "Not punched in"}
                                       {a?.punch_out_time ? ` · Out ${format(new Date(a.punch_out_time), "HH:mm")}` : ""}
+                                      {isHalfLeave ? ` · Half-day ${leave!.leave_type} leave` : ""}
                                     </>
                                   )}
                                 {p.department ? ` · ${p.department}` : ""}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            {!leave && a?.total_hours && (
+                          <div className="flex items-center gap-2">
+                            {!(leave && !isHalfLeave) && a?.total_hours && (
                               <span className="text-xs font-mono text-muted-foreground">
                                 {Number(a.total_hours).toFixed(2)}h
                               </span>
@@ -388,6 +398,9 @@ export function AttendanceTeamPanel() {
                               >
                                 {status === "in" ? "Punched in" : status === "out" ? "Signed off" : "Absent"}
                               </Badge>
+                            )}
+                            {isHalfLeave && (
+                              <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-500/40">Half-day leave</Badge>
                             )}
                           </div>
                         </div>
@@ -427,7 +440,7 @@ export function AttendanceTeamPanel() {
                     <div className="text-sm font-medium">
                       {r.user?.full_name ?? r.user?.email ?? "Teammate"}
                       <span className="text-muted-foreground font-normal">
-                        {" "}· <span className="capitalize">{r.leave_type}</span> · {r.days} day{Number(r.days) === 1 ? "" : "s"}
+                        {" "}· <span className="capitalize">{r.leave_type}</span> · {Number(r.days) % 1 === 0 ? `${Number(r.days).toFixed(0)}d` : `${Number(r.days).toFixed(1)}d`}{Number(r.days) === 0.5 ? " · Half day" : ""}
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">

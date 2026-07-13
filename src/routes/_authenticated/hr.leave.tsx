@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { CalendarRange, Plus, Check, X, Pencil, Trash2 } from "lucide-react";
 import { format, differenceInCalendarDays, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
 import { logLeaveForEmployee, updateLeaveForEmployee, deleteLeaveForEmployee } from "@/lib/admin-users.functions";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatLeaveDays } from "@/lib/leave-format";
 
 export const Route = createFileRoute("/_authenticated/hr/leave")({
   beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "leaves" } }); },
@@ -226,7 +228,7 @@ function DayView({ empMap, onChanged }: { empMap: Map<string, Employee>; onChang
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{p?.full_name ?? p?.email ?? r.user_id.slice(0, 8)}</div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {p?.department ?? "—"} · {format(new Date(r.start_date), "d MMM")} – {format(new Date(r.end_date), "d MMM")} · {r.days}d
+                          {p?.department ?? "—"} · {format(new Date(r.start_date), "d MMM")} – {format(new Date(r.end_date), "d MMM")} · {formatLeaveDays(r.days)}{Number(r.days) === 0.5 ? " · Half day" : ""}
                         </div>
                         {r.reason && <div className="text-xs mt-1 text-muted-foreground line-clamp-2">{r.reason}</div>}
                       </div>
@@ -434,7 +436,7 @@ function RequestsTable({ rows, empMap, onChanged }: { rows: LeaveRow[]; empMap: 
                     <span className="text-muted-foreground font-normal"> · {p?.department ?? "—"}</span>
                   </div>
                   <div className="text-xs text-muted-foreground capitalize">
-                    {r.leave_type} · {format(new Date(r.start_date), "d MMM")} – {format(new Date(r.end_date), "d MMM yyyy")} · {r.days}d
+                    {r.leave_type} · {format(new Date(r.start_date), "d MMM")} – {format(new Date(r.end_date), "d MMM yyyy")} · {formatLeaveDays(r.days)}{Number(r.days) === 0.5 ? " · Half day" : ""}
                   </div>
                   {r.reason && <div className="text-xs mt-1">{r.reason}</div>}
                   {r.admin_comment && <div className="text-xs mt-1"><span className="text-muted-foreground">Admin:</span> {r.admin_comment}</div>}
@@ -475,17 +477,22 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [reason, setReason] = useState("");
+  const [halfDay, setHalfDay] = useState(false);
   const [busy, setBusy] = useState(false);
+  const sameDay = !!start && start === end;
+  const canHalfDay = sameDay;
 
   function reset() {
-    setUserId(""); setType("casual"); setStart(""); setEnd(""); setReason("");
+    setUserId(""); setType("casual"); setStart(""); setEnd(""); setReason(""); setHalfDay(false);
   }
 
   async function submit() {
     if (!userId) return toast.error("Pick an employee");
     if (!start || !end) return toast.error("Pick dates");
-    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
-    if (days <= 0) return toast.error("End must be after start");
+    const rangeDays = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (rangeDays <= 0) return toast.error("End must be after start");
+    const useHalf = canHalfDay && halfDay;
+    const days = useHalf ? 0.5 : rangeDays;
     setBusy(true);
     const payload = {
       user_id: userId,
@@ -493,7 +500,7 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
       start_date: start,
       end_date: end,
       days,
-      reason: reason.trim() || "Logged by HR",
+      reason: (useHalf ? "[Half-day] " : "") + (reason.trim() || "Logged by HR"),
     };
     try {
       await logLeaveFn({ data: payload });
@@ -505,6 +512,7 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
       setBusy(false);
     }
   }
+
 
 
   return (
@@ -541,6 +549,12 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
             <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
           </div>
+          {canHalfDay && (
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={halfDay} onCheckedChange={(v) => setHalfDay(v === true)} />
+              <span>Half day (0.5d)</span>
+            </label>
+          )}
           <div className="space-y-1"><Label>Reason / note</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional context" /></div>
           <p className="text-xs text-muted-foreground">Leave is auto-approved and deducted from the employee's balance. Past dates are allowed.</p>
 
@@ -563,7 +577,10 @@ function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee
   const [reason, setReason] = useState(row.reason ?? "");
   const [status, setStatus] = useState<LStatus>(row.status);
   const [adminComment, setAdminComment] = useState(row.admin_comment ?? "");
+  const [halfDay, setHalfDay] = useState(Number(row.days) === 0.5);
   const [busy, setBusy] = useState(false);
+  const sameDay = !!start && start === end;
+  const canHalfDay = sameDay;
 
   function resetToRow() {
     setType(row.leave_type);
@@ -572,12 +589,15 @@ function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee
     setReason(row.reason ?? "");
     setStatus(row.status);
     setAdminComment(row.admin_comment ?? "");
+    setHalfDay(Number(row.days) === 0.5);
   }
 
   async function submit() {
     if (!start || !end) return toast.error("Pick dates");
-    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
-    if (days <= 0) return toast.error("End must be on or after start");
+    const rangeDays = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (rangeDays <= 0) return toast.error("End must be on or after start");
+    const useHalf = canHalfDay && halfDay;
+    const days = useHalf ? 0.5 : rangeDays;
     setBusy(true);
     try {
       await updateFn({
@@ -601,6 +621,7 @@ function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee
       setBusy(false);
     }
   }
+
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) resetToRow(); }}>
@@ -640,6 +661,12 @@ function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee
             </Select>
           </div>
           <div className="space-y-1"><Label>Reason</Label><Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+          {canHalfDay && (
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={halfDay} onCheckedChange={(v) => setHalfDay(v === true)} />
+              <span>Half day (0.5d)</span>
+            </label>
+          )}
           <div className="space-y-1"><Label>Admin comment</Label><Textarea rows={2} value={adminComment} onChange={(e) => setAdminComment(e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">Balances re-sync automatically when status changes.</p>
         </div>

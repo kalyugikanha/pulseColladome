@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "sonner";
 import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board/board-kanban";
+import { RecurringBadge } from "@/components/tasks/recurring-badge";
 import { createTaskFull } from "@/lib/tasks-plus.functions";
 import { updateTaskFields } from "@/lib/tasks-workflow.functions";
 import { startWorkflow, listWorkflowTemplates } from "@/lib/workflows.functions";
@@ -235,7 +236,10 @@ function TasksListView({ queryKey, fetcher }: { queryKey: unknown[]; fetcher: ()
                       {c.due_date && ` · Due ${c.due_date}`}
                     </div>
                   </div>
-                  {c.priority && <Badge variant={c.priority === "high" ? "destructive" : "outline"} className="uppercase text-[10px]">{c.priority}</Badge>}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <RecurringBadge task={c} />
+                    {c.priority && <Badge variant={c.priority === "high" ? "destructive" : "outline"} className="uppercase text-[10px]">{c.priority}</Badge>}
+                  </div>
                 </div>
               ))}
             </div>

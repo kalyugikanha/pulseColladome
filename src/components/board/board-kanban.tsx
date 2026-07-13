@@ -19,6 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { toast } from "sonner";
 import { reorderKanbanCard, clearManualRank, sortColumnByDueDate } from "@/lib/tasks-workflow.functions";
+import { RecurringBadge } from "@/components/tasks/recurring-badge";
 
 type Status = "todo" | "in_progress" | "review" | "done";
 const COLUMNS: { key: Status; label: string }[] = [
@@ -47,6 +48,10 @@ export type BoardCard = {
   stage_snapshot: { name: string; requires_review: boolean } | null;
   workflow_template: { id: string; name: string; department: string | null } | null;
   workflow_total_stages: number;
+  is_recurring_template: boolean | null;
+  recurrence_freq: string | null;
+  recurrence_days: number[] | null;
+  recurrence_parent_id: string | null;
 };
 
 type SortKey = "manual" | "due_asc" | "due_desc" | "priority" | "created_desc";
@@ -402,6 +407,7 @@ function CardBody({ card }: { card: BoardCard }) {
       <div className="flex flex-wrap gap-1 mt-2 items-center">
         <Badge variant="outline" className="capitalize text-[10px]">{card.priority}</Badge>
         {card.due_date && <span className="text-[10px] text-muted-foreground">Due {format(new Date(card.due_date), "MMM d")}</span>}
+        <RecurringBadge task={card} />
         {card.workflow_template && card.stage_snapshot && (
           <Badge variant="secondary" className="text-[10px] gap-1">
             <Workflow className="h-3 w-3" />
@@ -456,6 +462,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
   let q = supabase.from("tasks").select(`
     id, title, status, priority, due_date, created_at, manual_rank, assignee_id, reviewer_id, project_id, created_by,
     workflow_instance_id, stage_index, stage_snapshot,
+    is_recurring_template, recurrence_freq, recurrence_days, recurrence_parent_id,
     assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
     project:projects(id, name)
   `).eq("is_recurring_template" as never, false as never)

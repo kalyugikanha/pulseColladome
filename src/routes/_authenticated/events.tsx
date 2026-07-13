@@ -68,7 +68,7 @@ function isThisWeek(dateStr: string) {
 
 function EventsPage() {
   const { data: me } = useCurrentUser();
-  const canManage = !!(me?.isAdmin || me?.isSuperAdmin);
+  const canManage = !!(me?.isAdmin || me?.isSuperAdmin || me?.isEventAdmin);
   const qc = useQueryClient();
   const [filter, setFilter] = useState<"all" | EventStatus>("all");
   const [dialogOpen, setDialogOpen] = useState(false);

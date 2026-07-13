@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-type Role = "admin" | "employee" | "project_manager" | "hr_admin" | "learning_admin";
+type Role = "admin" | "employee" | "project_manager" | "hr_admin" | "learning_admin" | "event_admin";
 type EmploymentType = "full_time" | "intern" | "contract" | "consultant";
 type LeaveType = "casual" | "sick" | "earned" | "unpaid";
 

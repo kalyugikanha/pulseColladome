@@ -165,7 +165,7 @@ export function LeavePage() {
           {data?.requests.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 p-3">
               <div>
-                <div className="text-sm font-medium capitalize">{r.leave_type} · {r.days} day{Number(r.days) === 1 ? "" : "s"}</div>
+                <div className="text-sm font-medium capitalize">{r.leave_type} · {formatLeaveDays(r.days)}{Number(r.days) === 0.5 ? " · Half day" : ""}</div>
                 <div className="text-xs text-muted-foreground">{format(new Date(r.start_date), "MMM d")} – {format(new Date(r.end_date), "MMM d, yyyy")}</div>
                 {r.reason && <div className="text-xs text-muted-foreground mt-1">{r.reason}</div>}
                 {r.admin_comment && <div className="text-xs mt-1"><span className="text-muted-foreground">Admin:</span> {r.admin_comment}</div>}

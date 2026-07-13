@@ -284,9 +284,14 @@ export function AttendanceTeamPanel() {
                         <TableCell className="text-muted-foreground">{p.department ?? "—"}</TableCell>
                         <TableCell>
                           {status === "leave" ? (
-                            <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 capitalize">
-                              On leave · {leave!.leave_type}
-                            </Badge>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 capitalize">
+                                On leave · {leave!.leave_type}
+                              </Badge>
+                              {Number((leave as { days?: number | null } | undefined)?.days ?? 0) === 0.5 && (
+                                <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-500/40">Half-day</Badge>
+                              )}
+                            </div>
                           ) : status === "in" ? (
                             <Badge className="gradient-primary">Punched in</Badge>
                           ) : status === "out" ? (

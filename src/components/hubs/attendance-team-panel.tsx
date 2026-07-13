@@ -347,7 +347,7 @@ export function AttendanceTeamPanel() {
                       </div>
                     )}
                     {sortedPeople.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No teammates in your scope.</p>
+                      <p className="text-sm text-muted-foreground">No teammates to show.</p>
                     )}
                     {sortedPeople.map((p) => {
                       const a = data?.todayAtt.find((x) => x.user_id === p.id);

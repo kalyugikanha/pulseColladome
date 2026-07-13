@@ -661,6 +661,12 @@ function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee
             </Select>
           </div>
           <div className="space-y-1"><Label>Reason</Label><Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+          {canHalfDay && (
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={halfDay} onCheckedChange={(v) => setHalfDay(v === true)} />
+              <span>Half day (0.5d)</span>
+            </label>
+          )}
           <div className="space-y-1"><Label>Admin comment</Label><Textarea rows={2} value={adminComment} onChange={(e) => setAdminComment(e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">Balances re-sync automatically when status changes.</p>
         </div>

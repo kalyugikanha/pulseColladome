@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Clock, Trash2, Check, ChevronsUpDown, Send, AlertTriangle, X, MessageSquare } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
+import { PunchGuidelinesBanner } from "@/components/punch/punch-guidelines";
 
 export const Route = createFileRoute("/_authenticated/punch")({
   component: PunchPage,

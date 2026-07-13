@@ -117,12 +117,13 @@ export function AttendanceTeamPanel() {
     const rows = (overview?.people ?? []).map((p) => {
       const a = attById.get(p.id);
       const open = openById.get(p.id);
-      const leave = leaveById.get(p.id);
-      const status: "leave" | "in" | "out" | "absent" = leave
+      const leave = leaveById.get(p.id) as { user_id: string; leave_type: string; start_date: string; end_date: string; days?: number | null } | undefined;
+      const isHalf = Number(leave?.days ?? 0) === 0.5;
+      const status: "leave" | "in" | "out" | "absent" = leave && !isHalf
         ? "leave"
         : open || (a?.punch_in_time && !a.punch_out_time) ? "in"
         : a?.punch_out_time ? "out" : "absent";
-      return { p, a, open, leave, status };
+      return { p, a, open, leave, isHalf, status };
     });
     const order = { leave: 0, absent: 1, in: 2, out: 3 } as const;
     rows.sort((x, y) => {

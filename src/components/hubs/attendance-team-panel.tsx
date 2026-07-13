@@ -30,19 +30,19 @@ export function AttendanceTeamPanel() {
   const [overviewSearch, setOverviewSearch] = useState("");
   const overviewDateStr = format(overviewDate, "yyyy-MM-dd");
 
-  const canView = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin || me.isReportingManager);
-  const { userScope } = useVisibilityScope(me);
+  const canView = !!me;
+  // Overview/Today are read-only and unscoped (company-wide) for every user.
+  // Leave approvals stay scoped to actual managers/admins via `approvalScope`.
+  const { userScope: approvalScope } = useVisibilityScope(me);
 
   const { data } = useQuery({
-    queryKey: ["attendance", me?.id, today, userScope?.join(",") ?? "all"],
+    queryKey: ["attendance", me?.id, today, approvalScope?.join(",") ?? "all"],
     enabled: canView,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
-      if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
       const [people, todayAtt, todayOpenSessions, todayLeaves] = await Promise.all([
-        peopleQ,
+        supabase.from("profiles").select("id, full_name, email, department"),
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", today),
         supabase.from("punch_sessions").select("user_id, punch_in_time").eq("session_date", today).is("punch_out_time", null),
         supabase.from("leave_requests")
@@ -57,11 +57,13 @@ export function AttendanceTeamPanel() {
         user_id: string; leave_type: string; start_date: string; end_date: string; reason: string | null; days: number | null;
       }>).filter((l) => nameById.has(l.user_id));
       const isOrgWide = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin);
-      const pendingReq = isOrgWide
+      const canApprove = isOrgWide || (approvalScope !== null && approvalScope.length > 0);
+      const approvalSet = approvalScope ? new Set(approvalScope) : null;
+      const pendingReq = canApprove
         ? await supabase.from("leave_requests").select("*").eq("status", "pending")
-        : await supabase.from("leave_requests").select("*").eq("status", "pending");
+        : { data: [] as Array<Record<string, unknown> & { user_id: string }> };
       const pendingWithUser = ((pendingReq.data ?? []) as Array<Record<string, unknown> & { user_id: string }>)
-        .filter((r) => nameById.has(r.user_id) || isOrgWide)
+        .filter((r) => isOrgWide || (approvalSet ? approvalSet.has(r.user_id) : false))
         .map((r) => ({
           ...r,
           user: nameById.get(r.user_id)
@@ -76,7 +78,7 @@ export function AttendanceTeamPanel() {
           reason?: string | null;
           user: { full_name: string | null; email: string | null } | null;
         }>;
-      return { people: peopleList, todayAtt: todayAtt.data ?? [], todayOpenSessions: todayOpenSessions.data ?? [], pending: pendingWithUser, onLeave: scopedLeaves };
+      return { people: peopleList, todayAtt: todayAtt.data ?? [], todayOpenSessions: todayOpenSessions.data ?? [], pending: pendingWithUser, onLeave: scopedLeaves, canApprove };
     },
   });
 

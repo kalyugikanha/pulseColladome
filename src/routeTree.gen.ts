@@ -36,6 +36,7 @@ import { Route as AuthenticatedLearningAdminRouteImport } from './routes/_authen
 import { Route as AuthenticatedLearningRouteImport } from './routes/_authenticated/learning'
 import { Route as AuthenticatedHrAdminRouteImport } from './routes/_authenticated/hr-admin'
 import { Route as AuthenticatedFinancesRouteImport } from './routes/_authenticated/finances'
+import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
 import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_authenticated/complete-onboarding'
@@ -189,6 +190,11 @@ const AuthenticatedFinancesRoute = AuthenticatedFinancesRouteImport.update({
   path: '/finances',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedEventsRoute = AuthenticatedEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDirectoryRoute = AuthenticatedDirectoryRouteImport.update({
   id: '/directory',
   path: '/directory',
@@ -271,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
+  '/events': typeof AuthenticatedEventsRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hr-admin': typeof AuthenticatedHrAdminRoute
   '/learning': typeof AuthenticatedLearningRoute
@@ -312,6 +319,7 @@ export interface FileRoutesByTo {
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
+  '/events': typeof AuthenticatedEventsRoute
   '/finances': typeof AuthenticatedFinancesRoute
   '/hr-admin': typeof AuthenticatedHrAdminRoute
   '/learning': typeof AuthenticatedLearningRoute
@@ -355,6 +363,7 @@ export interface FileRoutesById {
   '/_authenticated/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
+  '/_authenticated/events': typeof AuthenticatedEventsRoute
   '/_authenticated/finances': typeof AuthenticatedFinancesRoute
   '/_authenticated/hr-admin': typeof AuthenticatedHrAdminRoute
   '/_authenticated/learning': typeof AuthenticatedLearningRoute
@@ -398,6 +407,7 @@ export interface FileRouteTypes {
     | '/complete-onboarding'
     | '/dashboard'
     | '/directory'
+    | '/events'
     | '/finances'
     | '/hr-admin'
     | '/learning'
@@ -439,6 +449,7 @@ export interface FileRouteTypes {
     | '/complete-onboarding'
     | '/dashboard'
     | '/directory'
+    | '/events'
     | '/finances'
     | '/hr-admin'
     | '/learning'
@@ -481,6 +492,7 @@ export interface FileRouteTypes {
     | '/_authenticated/complete-onboarding'
     | '/_authenticated/dashboard'
     | '/_authenticated/directory'
+    | '/_authenticated/events'
     | '/_authenticated/finances'
     | '/_authenticated/hr-admin'
     | '/_authenticated/learning'
@@ -714,6 +726,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFinancesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/events': {
+      id: '/_authenticated/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof AuthenticatedEventsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/directory': {
       id: '/_authenticated/directory'
       path: '/directory'
@@ -815,6 +834,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCompleteOnboardingRoute: typeof AuthenticatedCompleteOnboardingRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
+  AuthenticatedEventsRoute: typeof AuthenticatedEventsRoute
   AuthenticatedFinancesRoute: typeof AuthenticatedFinancesRoute
   AuthenticatedHrAdminRoute: typeof AuthenticatedHrAdminRoute
   AuthenticatedLearningRoute: typeof AuthenticatedLearningRoute
@@ -847,6 +867,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCompleteOnboardingRoute: AuthenticatedCompleteOnboardingRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
+  AuthenticatedEventsRoute: AuthenticatedEventsRoute,
   AuthenticatedFinancesRoute: AuthenticatedFinancesRoute,
   AuthenticatedHrAdminRoute: AuthenticatedHrAdminRoute,
   AuthenticatedLearningRoute: AuthenticatedLearningRoute,

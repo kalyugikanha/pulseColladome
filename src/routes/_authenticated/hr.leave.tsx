@@ -228,7 +228,7 @@ function DayView({ empMap, onChanged }: { empMap: Map<string, Employee>; onChang
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{p?.full_name ?? p?.email ?? r.user_id.slice(0, 8)}</div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {p?.department ?? "—"} · {format(new Date(r.start_date), "d MMM")} – {format(new Date(r.end_date), "d MMM")} · {r.days}d
+                          {p?.department ?? "—"} · {format(new Date(r.start_date), "d MMM")} – {format(new Date(r.end_date), "d MMM")} · {formatLeaveDays(r.days)}{Number(r.days) === 0.5 ? " · Half day" : ""}
                         </div>
                         {r.reason && <div className="text-xs mt-1 text-muted-foreground line-clamp-2">{r.reason}</div>}
                       </div>

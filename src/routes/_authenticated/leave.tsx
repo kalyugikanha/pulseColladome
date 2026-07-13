@@ -264,6 +264,12 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
             <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
           </div>
+          {canHalfDay && (
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={halfDay} onCheckedChange={(v) => setHalfDay(v === true)} />
+              <span>Half day (0.5d)</span>
+            </label>
+          )}
           <div className="space-y-1">
             <Label>Comment</Label>
             <Textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Reason / context (required)" />

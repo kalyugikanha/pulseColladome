@@ -458,7 +458,7 @@ function CardPreview({ card }: { card: BoardCard }) {
 }
 
 /** Fetch tasks for a given assignee filter (uid or department). Includes workflow linking. */
-export async function fetchBoardCards(filter: { assigneeId?: string; department?: string }): Promise<BoardCard[]> {
+export async function fetchBoardCards(filter: { assigneeId?: string; department?: string; createdById?: string }): Promise<BoardCard[]> {
   // Materialize today's recurring occurrences (idempotent, safe to call every load).
   try { await supabase.rpc("generate_recurring_task_occurrences" as never); } catch { /* noop */ }
   let q = supabase.from("tasks").select(`
@@ -472,6 +472,9 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
     .order("due_date", { ascending: true, nullsFirst: false });
   if (filter.assigneeId) {
     q = q.or(`assignee_id.eq.${filter.assigneeId},and(reviewer_id.eq.${filter.assigneeId},status.eq.review)`);
+  }
+  if (filter.createdById) {
+    q = q.eq("created_by", filter.createdById);
   }
   const { data } = await q;
   let rows = ((data ?? []) as unknown as Array<Omit<BoardCard, "workflow_template" | "workflow_total_stages" | "creator"> & { assignee: BoardCard["assignee"] & { department?: string | null } }>);

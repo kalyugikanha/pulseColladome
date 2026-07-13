@@ -93,7 +93,7 @@ export function AttendanceTeamPanel() {
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", overviewDateStr),
         supabase.from("punch_sessions").select("user_id, punch_in_time").eq("session_date", overviewDateStr).is("punch_out_time", null),
         supabase.from("leave_requests")
-          .select("user_id, leave_type, start_date, end_date")
+          .select("user_id, leave_type, start_date, end_date, days")
           .eq("status", "approved")
           .lte("start_date", overviewDateStr)
           .gte("end_date", overviewDateStr),

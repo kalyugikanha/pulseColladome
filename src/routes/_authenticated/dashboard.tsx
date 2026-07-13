@@ -36,26 +36,27 @@ function StatCard({ icon: Icon, label, value, hint, tone = "default" }: { icon: 
 
 function Dashboard() {
   const { data: me } = useCurrentUser();
-  const qc = useQueryClient();
-  const punchInServer = useServerFn(punchInServerFn);
   const today = format(new Date(), "yyyy-MM-dd");
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
   const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
-  const [punchingIn, setPunchingIn] = useState(false);
-  const dashboardQueryKey = ["dashboard", me?.id, me?.realId, me?.isAdmin];
 
   const { data } = useQuery({
-    queryKey: dashboardQueryKey,
+    // Key is scoped to the currently-viewed user (me.id), so switching the
+    // "View as" picker rescopes the dashboard to that person and never
+    // shows another user's cached punch state.
+    queryKey: ["dashboard", me?.id, me?.isAdmin],
     enabled: !!me,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
+      // Attendance follows the viewed identity — otherwise a super admin
+      // impersonating a teammate would see their own punch state here while
+      // the Attendance page correctly shows the teammate's.
       const uid = me!.id;
-      const punchUid = me!.realId;
       const [todayLog, openSessions, weekLogs, myTasks, myLeave, balances] = await Promise.all([
-        supabase.from("attendance_logs").select("*").eq("user_id", punchUid).eq("date", today).maybeSingle(),
-        supabase.from("punch_sessions").select("id, punch_in_time").eq("user_id", punchUid).eq("session_date", today).is("punch_out_time", null).order("punch_in_time", { ascending: false }).limit(1),
-        supabase.from("attendance_logs").select("total_hours,date").eq("user_id", punchUid).gte("date", weekStart).lte("date", weekEnd),
+        supabase.from("attendance_logs").select("*").eq("user_id", uid).eq("date", today).maybeSingle(),
+        supabase.from("punch_sessions").select("id, punch_in_time").eq("user_id", uid).eq("session_date", today).is("punch_out_time", null).order("punch_in_time", { ascending: false }).limit(1),
+        supabase.from("attendance_logs").select("total_hours,date").eq("user_id", uid).gte("date", weekStart).lte("date", weekEnd),
         supabase.from("tasks").select("id,title,status,priority,due_date,project:projects(name)").eq("assignee_id", uid).neq("status", "done").order("due_date", { ascending: true }).limit(5),
         supabase.from("leave_requests").select("id,leave_type,start_date,end_date,status").eq("user_id", uid).order("created_at", { ascending: false }).limit(3),
         supabase.from("leave_balances").select("leave_type,allocated,used").eq("user_id", uid),
@@ -85,27 +86,6 @@ function Dashboard() {
   const activePunchInTime = data?.openSession?.punch_in_time ?? (data?.todayLog?.punch_in_time && !data?.todayLog?.punch_out_time ? data.todayLog.punch_in_time : null);
   const punchedIn = !!activePunchInTime;
 
-  async function punchInFromDashboard() {
-    if (!me || punchingIn || punchedIn) return;
-    setPunchingIn(true);
-    try {
-      const result = await punchInServer({ data: { sessionDate: today } }) as PunchInResult;
-      qc.setQueryData(dashboardQueryKey, (old: any) => old ? { ...old, openSession: result.session } : old);
-      toast.success(result.status === "already_open" ? "You are already punched in — refreshed." : "Punched in");
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["dashboard"] }),
-        qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
-        qc.invalidateQueries({ queryKey: ["punch-history"] }),
-        qc.invalidateQueries({ queryKey: ["attendance"] }),
-        qc.invalidateQueries({ queryKey: ["attendance-overview"] }),
-      ]);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not punch in.");
-    } finally {
-      setPunchingIn(false);
-    }
-  }
-
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -113,16 +93,12 @@ function Dashboard() {
           <h1 className="font-display text-3xl font-bold">Welcome back{me?.fullName ? `, ${me.fullName.split(" ")[0]}` : ""}.</h1>
           <p className="text-muted-foreground text-sm mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")}</p>
         </div>
-        {punchedIn ? (
-          <Button asChild size="lg" className="gradient-primary shadow-glow">
-            <Link to="/attendance" search={{ tab: "my" }}>Punch out</Link>
-          </Button>
-        ) : (
-          <Button size="lg" className="gradient-primary shadow-glow" onClick={punchInFromDashboard} disabled={!me || punchingIn}>
-            {punchingIn ? "Punching in…" : "Punch in"}
-          </Button>
-        )}
+        <QuickPunchControl variant="hero" />
       </header>
+
+      <PunchGuidelinesBanner />
+
+
 
       <GoogleCalendarConnectCard />
 

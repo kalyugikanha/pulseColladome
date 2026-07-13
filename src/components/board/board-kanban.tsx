@@ -462,6 +462,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
   let q = supabase.from("tasks").select(`
     id, title, status, priority, due_date, created_at, manual_rank, assignee_id, reviewer_id, project_id, created_by,
     workflow_instance_id, stage_index, stage_snapshot,
+    is_recurring_template, recurrence_freq, recurrence_days, recurrence_parent_id,
     assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email, department),
     project:projects(id, name)
   `).eq("is_recurring_template" as never, false as never)

@@ -21,6 +21,7 @@ import { EditTaskDialog } from "./edit-task-dialog";
 import { MarkDoneDialog } from "./mark-done-dialog";
 import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
+import { RecurringBadge } from "./recurring-badge";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer,
   addComment, resolveComment,

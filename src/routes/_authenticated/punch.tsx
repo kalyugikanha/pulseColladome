@@ -366,6 +366,9 @@ export function PunchPage() {
         <p className="text-muted-foreground text-sm mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")} — you can punch in and out as many times as you like.</p>
       </header>
 
+      <PunchGuidelinesBanner />
+
+
       {unlogged.balance > 0 && !unloggedDismissed && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
           <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />

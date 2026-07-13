@@ -20,6 +20,7 @@ import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { toast } from "sonner";
 import { reorderKanbanCard, clearManualRank, sortColumnByDueDate } from "@/lib/tasks-workflow.functions";
 import { RecurringBadge } from "@/components/tasks/recurring-badge";
+import { OverdueBadge, isOverdue } from "@/components/tasks/overdue-badge";
 
 type Status = "todo" | "in_progress" | "review" | "done";
 const COLUMNS: { key: Status; label: string }[] = [

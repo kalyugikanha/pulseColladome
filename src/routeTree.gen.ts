@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as GoogleCalendarConnectRouteImport } from './routes/google-calendar-connect'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -42,12 +43,16 @@ import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_a
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiAssistantTranscribeRouteImport } from './routes/api/assistant/transcribe'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as AuthenticatedHrOnboardingRouteImport } from './routes/_authenticated/hr.onboarding'
 import { Route as AuthenticatedHrLeaveRouteImport } from './routes/_authenticated/hr.leave'
 import { Route as AuthenticatedBoardDeptRouteImport } from './routes/_authenticated/board.$dept'
 import { Route as AuthenticatedAdminTaxonomyRouteImport } from './routes/_authenticated/admin.taxonomy'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google/callback'
 
 const TermsRoute = TermsRouteImport.update({
@@ -58,6 +63,11 @@ const TermsRoute = TermsRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GoogleCalendarConnectRoute = GoogleCalendarConnectRouteImport.update({
@@ -220,6 +230,18 @@ const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
   path: '/access',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAssistantTranscribeRoute = ApiAssistantTranscribeRouteImport.update({
   id: '/api/assistant/transcribe',
   path: '/api/assistant/transcribe',
@@ -252,6 +274,17 @@ const AuthenticatedAdminTaxonomyRoute =
     path: '/admin/taxonomy',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicGoogleCallbackRoute = ApiPublicGoogleCallbackRouteImport.update({
   id: '/api/public/google/callback',
   path: '/api/public/google/callback',
@@ -263,8 +296,11 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
+  '/mcp': typeof McpRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/access': typeof AuthenticatedAccessRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -291,6 +327,8 @@ export interface FileRoutesByFullPath {
   '/vendors': typeof AuthenticatedVendorsRoute
   '/workflows': typeof AuthenticatedWorkflowsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
@@ -304,8 +342,11 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
+  '/mcp': typeof McpRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/access': typeof AuthenticatedAccessRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -332,6 +373,8 @@ export interface FileRoutesByTo {
   '/vendors': typeof AuthenticatedVendorsRoute
   '/workflows': typeof AuthenticatedWorkflowsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
@@ -347,8 +390,11 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
+  '/mcp': typeof McpRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
@@ -375,6 +421,8 @@ export interface FileRoutesById {
   '/_authenticated/vendors': typeof AuthenticatedVendorsRoute
   '/_authenticated/workflows': typeof AuthenticatedWorkflowsRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/admin/taxonomy': typeof AuthenticatedAdminTaxonomyRoute
   '/_authenticated/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
@@ -390,8 +438,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/google-calendar-connect'
+    | '/mcp'
     | '/privacy'
     | '/terms'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/access'
     | '/attendance'
     | '/calendar'
@@ -418,6 +469,8 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/workflows'
     | '/auth/callback'
+    | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/admin/taxonomy'
     | '/board/$dept'
     | '/hr/leave'
@@ -431,8 +484,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/google-calendar-connect'
+    | '/mcp'
     | '/privacy'
     | '/terms'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/access'
     | '/attendance'
     | '/calendar'
@@ -459,6 +515,8 @@ export interface FileRouteTypes {
     | '/vendors'
     | '/workflows'
     | '/auth/callback'
+    | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/admin/taxonomy'
     | '/board/$dept'
     | '/hr/leave'
@@ -473,8 +531,11 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/google-calendar-connect'
+    | '/mcp'
     | '/privacy'
     | '/terms'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/_authenticated/access'
     | '/_authenticated/attendance'
     | '/_authenticated/calendar'
@@ -501,6 +562,8 @@ export interface FileRouteTypes {
     | '/_authenticated/vendors'
     | '/_authenticated/workflows'
     | '/auth/callback'
+    | '/.lovable/oauth/consent'
+    | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/admin/taxonomy'
     | '/_authenticated/board/$dept'
     | '/_authenticated/hr/leave'
@@ -516,8 +579,13 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   ChangePasswordRoute: typeof ChangePasswordRoute
   GoogleCalendarConnectRoute: typeof GoogleCalendarConnectRoute
+  McpRoute: typeof McpRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
+  Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiAssistantTranscribeRoute: typeof ApiAssistantTranscribeRoute
   ApiPublicGoogleCallbackRoute: typeof ApiPublicGoogleCallbackRoute
@@ -537,6 +605,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/google-calendar-connect': {
@@ -756,6 +831,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccessRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/assistant/transcribe': {
       id: '/api/assistant/transcribe'
       path: '/api/assistant/transcribe'
@@ -797,6 +886,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/taxonomy'
       preLoaderRoute: typeof AuthenticatedAdminTaxonomyRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/google/callback': {
       id: '/api/public/google/callback'
@@ -891,8 +994,14 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   ChangePasswordRoute: ChangePasswordRoute,
   GoogleCalendarConnectRoute: GoogleCalendarConnectRoute,
+  McpRoute: McpRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
+  Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiAssistantTranscribeRoute: ApiAssistantTranscribeRoute,
   ApiPublicGoogleCallbackRoute: ApiPublicGoogleCallbackRoute,

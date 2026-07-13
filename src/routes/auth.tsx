@@ -7,22 +7,43 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import logo from "@/assets/colladome-logo.png.asset.json";
 
+function sanitizeNext(next: string | undefined): string | null {
+  if (!next) return null;
+  // Only same-origin relative paths.
+  if (!next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
 export const Route = createFileRoute("/auth")({
-  beforeLoad: async () => {
+  validateSearch: (s: Record<string, unknown>): { next?: string } => {
+    return typeof s.next === "string" ? { next: s.next } : {};
+  },
+  beforeLoad: async ({ search }) => {
     const { data } = await supabase.auth.getUser();
-    if (data.user) throw redirect({ to: "/dashboard" });
+    if (data.user) {
+      const next = sanitizeNext(search.next);
+      throw redirect({ href: next ?? "/dashboard" });
+    }
   },
   component: AuthPage,
 });
 
 function AuthPage() {
   const router = useRouter();
+  const { next } = Route.useSearch();
+  const safeNext = sanitizeNext(next);
   const [loading, setLoading] = useState(false);
 
   async function handleGoogle() {
     setLoading(true);
+    if (safeNext) {
+      try { sessionStorage.setItem("pulse:auth:next", safeNext); } catch { /* ignore */ }
+    }
+    const callback = safeNext
+      ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`
+      : `${window.location.origin}/auth/callback`;
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth/callback`,
+      redirect_uri: callback,
       extraParams: { prompt: "select_account" },
     });
     if (result.error) {
@@ -36,7 +57,7 @@ function AuthPage() {
       return;
     }
     if (result.redirected) return;
-    router.navigate({ to: "/dashboard", replace: true });
+    router.navigate({ href: safeNext ?? "/dashboard", replace: true });
   }
 
   return (

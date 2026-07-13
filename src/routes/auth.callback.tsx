@@ -5,12 +5,22 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
+function sanitizeNext(next: string | undefined | null): string | null {
+  if (!next) return null;
+  if (!next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
 export const Route = createFileRoute("/auth/callback")({
+  validateSearch: (s: Record<string, unknown>): { next?: string } => {
+    return typeof s.next === "string" ? { next: s.next } : {};
+  },
   component: AuthCallback,
 });
 
 function AuthCallback() {
   const router = useRouter();
+  const { next } = Route.useSearch();
 
   useEffect(() => {
     let cancelled = false;
@@ -21,7 +31,11 @@ function AuthCallback() {
       const { data } = await supabase.auth.getSession();
       if (cancelled) return;
       if (data.session) {
-        router.navigate({ to: "/dashboard", replace: true });
+        let stored: string | null = null;
+        try { stored = sessionStorage.getItem("pulse:auth:next"); } catch { /* ignore */ }
+        try { sessionStorage.removeItem("pulse:auth:next"); } catch { /* ignore */ }
+        const target = sanitizeNext(next) ?? sanitizeNext(stored) ?? "/dashboard";
+        router.navigate({ href: target, replace: true });
         return;
       }
       attempts += 1;
@@ -37,7 +51,7 @@ function AuthCallback() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, next]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">

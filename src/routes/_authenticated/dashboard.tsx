@@ -1,17 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { punchIn as punchInServerFn, type PunchInResult } from "@/lib/punch.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, ListChecks, CalendarRange, FolderKanban, Users, TrendingUp, CheckCircle2, AlertCircle } from "lucide-react";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { GoogleCalendarConnectCard } from "@/components/google-calendar-connect";
-import { toast } from "sonner";
+import { QuickPunchControl } from "@/components/punch/quick-punch-control";
+import { PunchGuidelinesBanner } from "@/components/punch/punch-guidelines";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,

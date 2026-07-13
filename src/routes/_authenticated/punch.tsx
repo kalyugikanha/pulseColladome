@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Clock, Trash2, Check, ChevronsUpDown, Send, AlertTriangle, X, MessageSquare } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { toast } from "sonner";
+import { PunchGuidelinesBanner } from "@/components/punch/punch-guidelines";
 
 export const Route = createFileRoute("/_authenticated/punch")({
   component: PunchPage,
@@ -364,6 +365,9 @@ export function PunchPage() {
         <h1 className="font-display text-3xl font-bold">Attendance</h1>
         <p className="text-muted-foreground text-sm mt-1">{format(new Date(), "EEEE, MMMM d, yyyy")} — you can punch in and out as many times as you like.</p>
       </header>
+
+      <PunchGuidelinesBanner />
+
 
       {unlogged.balance > 0 && !unloggedDismissed && (
         <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">

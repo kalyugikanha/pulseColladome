@@ -83,13 +83,12 @@ export function AttendanceTeamPanel() {
   });
 
   const { data: overview } = useQuery({
-    queryKey: ["attendance-overview", overviewDateStr, userScope?.join(",") ?? "all"],
+    queryKey: ["attendance-overview", overviewDateStr],
     enabled: canView,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      let peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
-      if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
+      const peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
       const [people, att, openSessions, leaves] = await Promise.all([
         peopleQ,
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", overviewDateStr),

@@ -577,7 +577,10 @@ function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee
   const [reason, setReason] = useState(row.reason ?? "");
   const [status, setStatus] = useState<LStatus>(row.status);
   const [adminComment, setAdminComment] = useState(row.admin_comment ?? "");
+  const [halfDay, setHalfDay] = useState(Number(row.days) === 0.5);
   const [busy, setBusy] = useState(false);
+  const sameDay = !!start && start === end;
+  const canHalfDay = sameDay;
 
   function resetToRow() {
     setType(row.leave_type);
@@ -586,12 +589,15 @@ function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee
     setReason(row.reason ?? "");
     setStatus(row.status);
     setAdminComment(row.admin_comment ?? "");
+    setHalfDay(Number(row.days) === 0.5);
   }
 
   async function submit() {
     if (!start || !end) return toast.error("Pick dates");
-    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
-    if (days <= 0) return toast.error("End must be on or after start");
+    const rangeDays = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (rangeDays <= 0) return toast.error("End must be on or after start");
+    const useHalf = canHalfDay && halfDay;
+    const days = useHalf ? 0.5 : rangeDays;
     setBusy(true);
     try {
       await updateFn({
@@ -615,6 +621,7 @@ function EditLeaveDialog({ row, employee, onChanged }: { row: LeaveRow; employee
       setBusy(false);
     }
   }
+
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) resetToRow(); }}>

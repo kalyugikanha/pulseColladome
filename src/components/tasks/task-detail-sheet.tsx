@@ -265,8 +265,16 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     if (!task || deleteBusy) return;
     setDeleteBusy(true);
     try {
-      const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+      const { data, error } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("id", task.id)
+        .select("id");
       if (error) { toast.error(error.message); return; }
+      if (!data || data.length === 0) {
+        toast.error("Couldn't delete this task — you may not have permission.");
+        return;
+      }
       toast.success("Task deleted");
       setDeleteOpen(false);
       onClose();

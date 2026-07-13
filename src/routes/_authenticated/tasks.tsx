@@ -26,7 +26,7 @@ import { startWorkflow, listWorkflowTemplates } from "@/lib/workflows.functions"
 import { TaxonomyPage } from "./admin.taxonomy";
 
 type View = "list" | "kanban";
-type Scope = "mine" | "dept" | "all";
+type Scope = "mine" | "dept" | "all" | "assigned_by_me";
 
 const DEPTS = [
   { value: "Marketing", label: "Marketing" },
@@ -40,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/tasks")({
     const sc = s.scope;
     return {
       view: v === "list" || v === "kanban" ? v : undefined,
-      scope: sc === "mine" || sc === "dept" || sc === "all" ? sc : undefined,
+      scope: sc === "mine" || sc === "dept" || sc === "all" || sc === "assigned_by_me" ? sc : undefined,
       dept: typeof s.dept === "string" ? s.dept : undefined,
     };
   },
@@ -83,6 +83,7 @@ function TasksPage() {
   const fetcherArgs = useMemo(() => {
     if (effectiveScope === "mine") return { assigneeId: me.id };
     if (effectiveScope === "dept") return { department: dept };
+    if (effectiveScope === "assigned_by_me") return { createdById: me.id };
     if (effectiveScope === "all" && personFilter) return { assigneeId: personFilter };
     return {};
   }, [effectiveScope, me.id, dept, personFilter]);
@@ -98,6 +99,7 @@ function TasksPage() {
             {effectiveScope === "mine" && "Everything assigned to you."}
             {effectiveScope === "dept" && `All tasks in ${dept}.`}
             {effectiveScope === "all" && "Every task across the org."}
+            {effectiveScope === "assigned_by_me" && "Every task you've assigned, across the company."}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -106,6 +108,7 @@ function TasksPage() {
               <TabsTrigger value="mine">Mine</TabsTrigger>
               {canDept && <TabsTrigger value="dept">Department</TabsTrigger>}
               {canAll && <TabsTrigger value="all">All</TabsTrigger>}
+              <TabsTrigger value="assigned_by_me">Assigned by me</TabsTrigger>
             </TabsList>
           </Tabs>
           {effectiveScope === "dept" && (

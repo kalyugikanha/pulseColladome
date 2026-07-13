@@ -507,6 +507,51 @@ export type Database = {
           },
         ]
       }
+      events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          location: string | null
+          source: Database["public"]["Enums"]["event_source"]
+          source_file_path: string | null
+          source_text: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["event_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          source?: Database["public"]["Enums"]["event_source"]
+          source_file_path?: string | null
+          source_text?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["event_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          source?: Database["public"]["Enums"]["event_source"]
+          source_file_path?: string | null
+          source_text?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["event_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount_inr: number
@@ -2676,6 +2721,8 @@ export type Database = {
         | "review_glassdoor"
         | "review_ambitionbox"
         | "linkedin_employment"
+      event_source: "whatsapp" | "email" | "manual" | "other"
+      event_status: "upcoming" | "ongoing" | "completed" | "cancelled"
       leave_status: "pending" | "approved" | "rejected"
       leave_type: "casual" | "sick" | "earned" | "unpaid"
       onboarding_section:
@@ -2851,6 +2898,8 @@ export const Constants = {
         "review_ambitionbox",
         "linkedin_employment",
       ],
+      event_source: ["whatsapp", "email", "manual", "other"],
+      event_status: ["upcoming", "ongoing", "completed", "cancelled"],
       leave_status: ["pending", "approved", "rejected"],
       leave_type: ["casual", "sick", "earned", "unpaid"],
       onboarding_section: [

@@ -284,22 +284,24 @@ export function AttendanceTeamPanel() {
                         <TableCell className="font-medium">{p.full_name ?? p.email}</TableCell>
                         <TableCell className="text-muted-foreground">{p.department ?? "—"}</TableCell>
                         <TableCell>
-                          {status === "leave" ? (
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {status === "leave" ? (
                               <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 capitalize">
                                 On leave · {leave!.leave_type}
                               </Badge>
-                              {Number((leave as { days?: number | null } | undefined)?.days ?? 0) === 0.5 && (
-                                <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-500/40">Half-day</Badge>
-                              )}
-                            </div>
-                          ) : status === "in" ? (
-                            <Badge className="gradient-primary">Punched in</Badge>
-                          ) : status === "out" ? (
-                            <Badge variant="secondary">Punched out</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-red-600 border-red-500/40">Not punched in</Badge>
-                          )}
+                            ) : status === "in" ? (
+                              <Badge className="gradient-primary">Punched in</Badge>
+                            ) : status === "out" ? (
+                              <Badge variant="secondary">Punched out</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-red-600 border-red-500/40">Not punched in</Badge>
+                            )}
+                            {isHalf && (
+                              <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-500/40" title={`Half-day ${leave?.leave_type ?? "leave"}`}>
+                                Half-day leave
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {punchInTime ? format(new Date(punchInTime), "HH:mm") : "—"}

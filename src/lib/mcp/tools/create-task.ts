@@ -24,8 +24,8 @@ export default defineTool({
     const { data, error } = await supabase.rpc("create_task_full", {
       _project_id: input.project_id,
       _title: input.title,
-      _description: input.description ?? null,
-      _due_date: input.due_date ?? null,
+      _description: input.description,
+      _due_date: input.due_date,
       _priority: input.priority ?? "medium",
       _assignee_id: input.assignee_id ?? ctx.getUserId()!,
     });

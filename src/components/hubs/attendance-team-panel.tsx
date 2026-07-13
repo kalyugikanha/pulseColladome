@@ -440,7 +440,7 @@ export function AttendanceTeamPanel() {
                     <div className="text-sm font-medium">
                       {r.user?.full_name ?? r.user?.email ?? "Teammate"}
                       <span className="text-muted-foreground font-normal">
-                        {" "}· <span className="capitalize">{r.leave_type}</span> · {r.days} day{Number(r.days) === 1 ? "" : "s"}
+                        {" "}· <span className="capitalize">{r.leave_type}</span> · {Number(r.days) % 1 === 0 ? `${Number(r.days).toFixed(0)}d` : `${Number(r.days).toFixed(1)}d`}{Number(r.days) === 0.5 ? " · Half day" : ""}
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">

@@ -47,6 +47,10 @@ export type BoardCard = {
   stage_snapshot: { name: string; requires_review: boolean } | null;
   workflow_template: { id: string; name: string; department: string | null } | null;
   workflow_total_stages: number;
+  is_recurring_template: boolean | null;
+  recurrence_freq: string | null;
+  recurrence_days: number[] | null;
+  recurrence_parent_id: string | null;
 };
 
 type SortKey = "manual" | "due_asc" | "due_desc" | "priority" | "created_desc";

@@ -477,17 +477,22 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [reason, setReason] = useState("");
+  const [halfDay, setHalfDay] = useState(false);
   const [busy, setBusy] = useState(false);
+  const sameDay = !!start && start === end;
+  const canHalfDay = sameDay;
 
   function reset() {
-    setUserId(""); setType("casual"); setStart(""); setEnd(""); setReason("");
+    setUserId(""); setType("casual"); setStart(""); setEnd(""); setReason(""); setHalfDay(false);
   }
 
   async function submit() {
     if (!userId) return toast.error("Pick an employee");
     if (!start || !end) return toast.error("Pick dates");
-    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
-    if (days <= 0) return toast.error("End must be after start");
+    const rangeDays = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (rangeDays <= 0) return toast.error("End must be after start");
+    const useHalf = canHalfDay && halfDay;
+    const days = useHalf ? 0.5 : rangeDays;
     setBusy(true);
     const payload = {
       user_id: userId,
@@ -495,7 +500,7 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
       start_date: start,
       end_date: end,
       days,
-      reason: reason.trim() || "Logged by HR",
+      reason: (useHalf ? "[Half-day] " : "") + (reason.trim() || "Logged by HR"),
     };
     try {
       await logLeaveFn({ data: payload });
@@ -507,6 +512,7 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
       setBusy(false);
     }
   }
+
 
 
   return (

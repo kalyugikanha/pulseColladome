@@ -353,7 +353,8 @@ export function AttendanceTeamPanel() {
                       const open = data?.todayOpenSessions.find((x) => x.user_id === p.id);
                       const punchInTime = open?.punch_in_time ?? a?.punch_in_time ?? null;
                       const leave = onLeaveById.get(p.id);
-                      const status = leave
+                      const isHalfLeave = Number((leave as { days?: number | null } | undefined)?.days ?? 0) === 0.5;
+                      const status = leave && !isHalfLeave
                         ? "leave"
                         : open || (a?.punch_in_time && !a.punch_out_time) ? "in" : a?.punch_out_time ? "out" : "absent";
                       return (
@@ -367,20 +368,21 @@ export function AttendanceTeamPanel() {
                             <div>
                               <div className="text-sm font-medium">{p.full_name ?? p.email}</div>
                               <div className="text-xs text-muted-foreground">
-                                {leave
+                                {leave && !isHalfLeave
                                   ? `On approved leave · ${format(new Date(leave.start_date), "d MMM")} – ${format(new Date(leave.end_date), "d MMM")}`
                                   : (
                                     <>
                                       {punchInTime ? `In at ${format(new Date(punchInTime), "HH:mm")}` : "Not punched in"}
                                       {a?.punch_out_time ? ` · Out ${format(new Date(a.punch_out_time), "HH:mm")}` : ""}
+                                      {isHalfLeave ? ` · Half-day ${leave!.leave_type} leave` : ""}
                                     </>
                                   )}
                                 {p.department ? ` · ${p.department}` : ""}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            {!leave && a?.total_hours && (
+                          <div className="flex items-center gap-2">
+                            {!(leave && !isHalfLeave) && a?.total_hours && (
                               <span className="text-xs font-mono text-muted-foreground">
                                 {Number(a.total_hours).toFixed(2)}h
                               </span>
@@ -396,6 +398,9 @@ export function AttendanceTeamPanel() {
                               >
                                 {status === "in" ? "Punched in" : status === "out" ? "Signed off" : "Absent"}
                               </Badge>
+                            )}
+                            {isHalfLeave && (
+                              <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-500/40">Half-day leave</Badge>
                             )}
                           </div>
                         </div>

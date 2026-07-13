@@ -549,6 +549,12 @@ function LogLeaveDialog({ employees, onSaved }: { employees: Employee[]; onSaved
             <div className="space-y-1"><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
             <div className="space-y-1"><Label>End</Label><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
           </div>
+          {canHalfDay && (
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={halfDay} onCheckedChange={(v) => setHalfDay(v === true)} />
+              <span>Half day (0.5d)</span>
+            </label>
+          )}
           <div className="space-y-1"><Label>Reason / note</Label><Textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional context" /></div>
           <p className="text-xs text-muted-foreground">Leave is auto-approved and deducted from the employee's balance. Past dates are allowed.</p>
 

@@ -441,7 +441,7 @@ function SortableCardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: stri
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
         onDoubleClick={() => onOpen(card.id)}
-        className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-30 border-dashed" : ""}`}
+        className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isOverdue(card) ? "border-l-4 border-l-destructive" : ""} ${isDragging ? "opacity-30 border-dashed" : ""}`}
       >
         <CardBody card={card} />
       </Card>

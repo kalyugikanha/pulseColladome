@@ -93,7 +93,12 @@ export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: st
           </Select>
         </div>
       )}
+      <div className="flex items-center gap-1.5">
+        <QuickPunchControl variant="compact" />
+        <PunchGuidelinesTooltip />
+      </div>
       <NotificationsBell userId={realUserId} />
+
       <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
         <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
         Live

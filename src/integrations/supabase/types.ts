@@ -2614,6 +2614,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      is_non_working_day: { Args: { _d: string }; Returns: boolean }
       list_all_profiles_for_super_admin: {
         Args: never
         Returns: {

@@ -407,6 +407,7 @@ function CardBody({ card }: { card: BoardCard }) {
       <div className="flex flex-wrap gap-1 mt-2 items-center">
         <Badge variant="outline" className="capitalize text-[10px]">{card.priority}</Badge>
         {card.due_date && <span className="text-[10px] text-muted-foreground">Due {format(new Date(card.due_date), "MMM d")}</span>}
+        <RecurringBadge task={card} />
         {card.workflow_template && card.stage_snapshot && (
           <Badge variant="secondary" className="text-[10px] gap-1">
             <Workflow className="h-3 w-3" />

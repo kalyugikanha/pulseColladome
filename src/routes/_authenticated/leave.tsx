@@ -36,6 +36,9 @@ export function LeavePage() {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<"casual"|"sick"|"earned"|"unpaid">("casual");
   const [start, setStart] = useState(""); const [end, setEnd] = useState(""); const [reason, setReason] = useState("");
+  const [halfDay, setHalfDay] = useState(false);
+  const sameDay = !!start && start === end;
+  const canHalfDay = sameDay;
 
   const { data } = useQuery({
     queryKey: ["leave", me?.id],
@@ -51,14 +54,17 @@ export function LeavePage() {
 
   async function submit() {
     if (!start || !end) return toast.error("Pick dates");
-    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
-    if (days <= 0) return toast.error("End must be after start");
-    const { error } = await supabase.from("leave_requests").insert({ user_id: me!.id, leave_type: type, start_date: start, end_date: end, days, reason });
+    const rangeDays = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (rangeDays <= 0) return toast.error("End must be after start");
+    const useHalf = canHalfDay && halfDay;
+    const days = useHalf ? 0.5 : rangeDays;
+    const { error } = await supabase.from("leave_requests").insert({ user_id: me!.id, leave_type: type, start_date: start, end_date: end, days, reason: useHalf ? `[Half-day] ${reason}`.trim() : reason });
     if (error) return toast.error(error.message);
     toast.success("Request submitted");
-    setOpen(false); setStart(""); setEnd(""); setReason("");
+    setOpen(false); setStart(""); setEnd(""); setReason(""); setHalfDay(false);
     qc.invalidateQueries();
   }
+
 
   const { data: manageable } = useQuery({
     queryKey: ["leave-manageable", me?.id, me?.isAdmin],

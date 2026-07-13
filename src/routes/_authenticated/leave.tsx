@@ -189,7 +189,10 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [comment, setComment] = useState("");
+  const [halfDay, setHalfDay] = useState(false);
   const [busy, setBusy] = useState(false);
+  const sameDay = !!start && start === end;
+  const canHalfDay = sameDay;
 
   const sortedPeople = useMemo(
     () => [...people].sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? "")),
@@ -197,15 +200,17 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
   );
 
   function reset() {
-    setUserId(""); setType("casual"); setStart(""); setEnd(""); setComment("");
+    setUserId(""); setType("casual"); setStart(""); setEnd(""); setComment(""); setHalfDay(false);
   }
 
   async function submit() {
     if (!userId) return toast.error("Pick an employee");
     if (!start || !end) return toast.error("Pick dates");
-    const days = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
-    if (days <= 0) return toast.error("End must be after start");
+    const rangeDays = differenceInCalendarDays(new Date(end), new Date(start)) + 1;
+    if (rangeDays <= 0) return toast.error("End must be after start");
     if (!comment.trim()) return toast.error("Add a short note");
+    const useHalf = canHalfDay && halfDay;
+    const days = useHalf ? 0.5 : rangeDays;
     setBusy(true);
     const { error } = await supabase.from("leave_requests").insert({
       user_id: userId,
@@ -213,7 +218,7 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
       start_date: start,
       end_date: end,
       days,
-      reason: `Logged by ${me?.fullName ?? "manager"}: ${comment.trim()}`,
+      reason: `${useHalf ? "[Half-day] " : ""}Logged by ${me?.fullName ?? "manager"}: ${comment.trim()}`,
       status: "pending",
     });
     setBusy(false);
@@ -223,6 +228,7 @@ function LogForTeammateDialog({ people, onSaved }: { people: ManageablePerson[];
     setOpen(false);
     onSaved();
   }
+
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>

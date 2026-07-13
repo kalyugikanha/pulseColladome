@@ -451,7 +451,7 @@ function SortableCardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: stri
 
 function CardPreview({ card }: { card: BoardCard }) {
   return (
-    <Card className="p-3 select-none bg-background">
+    <Card className={`p-3 select-none bg-background ${isOverdue(card) ? "border-l-4 border-l-destructive" : ""}`}>
       <CardBody card={card} />
     </Card>
   );

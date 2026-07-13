@@ -26,7 +26,7 @@ import { startWorkflow, listWorkflowTemplates } from "@/lib/workflows.functions"
 import { TaxonomyPage } from "./admin.taxonomy";
 
 type View = "list" | "kanban";
-type Scope = "mine" | "dept" | "all";
+type Scope = "mine" | "dept" | "all" | "assigned_by_me";
 
 const DEPTS = [
   { value: "Marketing", label: "Marketing" },
@@ -40,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/tasks")({
     const sc = s.scope;
     return {
       view: v === "list" || v === "kanban" ? v : undefined,
-      scope: sc === "mine" || sc === "dept" || sc === "all" ? sc : undefined,
+      scope: sc === "mine" || sc === "dept" || sc === "all" || sc === "assigned_by_me" ? sc : undefined,
       dept: typeof s.dept === "string" ? s.dept : undefined,
     };
   },

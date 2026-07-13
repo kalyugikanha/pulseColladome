@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { CalendarRange, Plus, Check, X, Pencil, Trash2 } from "lucide-react";
 import { format, differenceInCalendarDays, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from "date-fns";
 import { logLeaveForEmployee, updateLeaveForEmployee, deleteLeaveForEmployee } from "@/lib/admin-users.functions";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatLeaveDays } from "@/lib/leave-format";
 
 export const Route = createFileRoute("/_authenticated/hr/leave")({
   beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "leaves" } }); },

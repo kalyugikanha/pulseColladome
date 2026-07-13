@@ -54,7 +54,7 @@ export function AttendanceTeamPanel() {
       const peopleList = people.data ?? [];
       const nameById = new Map(peopleList.map((p) => [p.id, p]));
       const scopedLeaves = ((todayLeaves.data ?? []) as Array<{
-        user_id: string; leave_type: string; start_date: string; end_date: string; reason: string | null;
+        user_id: string; leave_type: string; start_date: string; end_date: string; reason: string | null; days: number | null;
       }>).filter((l) => nameById.has(l.user_id));
       const isOrgWide = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin);
       const pendingReq = isOrgWide

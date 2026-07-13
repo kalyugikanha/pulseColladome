@@ -24,7 +24,7 @@ function AttendanceHub() {
 
   if (!me) return <div className="text-muted-foreground">Loading…</div>;
 
-  const canManageTeam = me.isAdmin || me.isSuperAdmin || me.isHrAdmin || me.isDepartmentHead || me.isReportingManager;
+  const canManageTeam = true;
   const canSeeTeamTimesheet = me.canManageProjects || me.isDepartmentHead || me.isReportingManager || me.isAdmin || me.isSuperAdmin;
 
   const tab: Tab = search.tab ?? "my";

@@ -30,19 +30,19 @@ export function AttendanceTeamPanel() {
   const [overviewSearch, setOverviewSearch] = useState("");
   const overviewDateStr = format(overviewDate, "yyyy-MM-dd");
 
-  const canView = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin || me.isReportingManager);
-  const { userScope } = useVisibilityScope(me);
+  const canView = !!me;
+  // Overview/Today are read-only and unscoped (company-wide) for every user.
+  // Leave approvals stay scoped to actual managers/admins via `approvalScope`.
+  const { userScope: approvalScope } = useVisibilityScope(me);
 
   const { data } = useQuery({
-    queryKey: ["attendance", me?.id, today, userScope?.join(",") ?? "all"],
+    queryKey: ["attendance", me?.id, today, approvalScope?.join(",") ?? "all"],
     enabled: canView,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      let peopleQ = supabase.from("profiles").select("id, full_name, email, department");
-      if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
       const [people, todayAtt, todayOpenSessions, todayLeaves] = await Promise.all([
-        peopleQ,
+        supabase.from("profiles").select("id, full_name, email, department"),
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", today),
         supabase.from("punch_sessions").select("user_id, punch_in_time").eq("session_date", today).is("punch_out_time", null),
         supabase.from("leave_requests")
@@ -57,11 +57,13 @@ export function AttendanceTeamPanel() {
         user_id: string; leave_type: string; start_date: string; end_date: string; reason: string | null; days: number | null;
       }>).filter((l) => nameById.has(l.user_id));
       const isOrgWide = !!me && (me.isAdmin || me.isSuperAdmin || me.isHrAdmin);
-      const pendingReq = isOrgWide
+      const canApprove = isOrgWide || (approvalScope !== null && approvalScope.length > 0);
+      const approvalSet = approvalScope ? new Set(approvalScope) : null;
+      const pendingReq = canApprove
         ? await supabase.from("leave_requests").select("*").eq("status", "pending")
-        : await supabase.from("leave_requests").select("*").eq("status", "pending");
+        : { data: [] as Array<Record<string, unknown> & { user_id: string }> };
       const pendingWithUser = ((pendingReq.data ?? []) as Array<Record<string, unknown> & { user_id: string }>)
-        .filter((r) => nameById.has(r.user_id) || isOrgWide)
+        .filter((r) => isOrgWide || (approvalSet ? approvalSet.has(r.user_id) : false))
         .map((r) => ({
           ...r,
           user: nameById.get(r.user_id)
@@ -76,18 +78,17 @@ export function AttendanceTeamPanel() {
           reason?: string | null;
           user: { full_name: string | null; email: string | null } | null;
         }>;
-      return { people: peopleList, todayAtt: todayAtt.data ?? [], todayOpenSessions: todayOpenSessions.data ?? [], pending: pendingWithUser, onLeave: scopedLeaves };
+      return { people: peopleList, todayAtt: todayAtt.data ?? [], todayOpenSessions: todayOpenSessions.data ?? [], pending: pendingWithUser, onLeave: scopedLeaves, canApprove };
     },
   });
 
   const { data: overview } = useQuery({
-    queryKey: ["attendance-overview", overviewDateStr, userScope?.join(",") ?? "all"],
+    queryKey: ["attendance-overview", overviewDateStr],
     enabled: canView,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      let peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
-      if (userScope && userScope.length) peopleQ = peopleQ.in("id", userScope);
+      const peopleQ = supabase.from("profiles").select("id, full_name, email, department, is_active").eq("is_active", true);
       const [people, att, openSessions, leaves] = await Promise.all([
         peopleQ,
         supabase.from("attendance_logs").select("user_id, punch_in_time, punch_out_time, total_hours").eq("date", overviewDateStr),
@@ -202,12 +203,14 @@ export function AttendanceTeamPanel() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="today">Today</TabsTrigger>
-          <TabsTrigger value="leave">
-            Leave approvals
-            {data?.pending.length ? (
-              <Badge className="ml-2" variant="secondary">{data.pending.length}</Badge>
-            ) : null}
-          </TabsTrigger>
+          {data?.canApprove && (
+            <TabsTrigger value="leave">
+              Leave approvals
+              {data?.pending.length ? (
+                <Badge className="ml-2" variant="secondary">{data.pending.length}</Badge>
+              ) : null}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
@@ -243,7 +246,7 @@ export function AttendanceTeamPanel() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                <SummaryCard icon={<Users className="h-4 w-4" />} label="Total employees" value={counts.total} caption="in your scope" />
+                <SummaryCard icon={<Users className="h-4 w-4" />} label="Total employees" value={counts.total} caption="company-wide" />
                 <SummaryCard icon={<Plane className="h-4 w-4" />} label="On leave" value={counts.onLeave} caption={`of ${counts.total}`} tone="amber" />
                 <SummaryCard icon={<LogIn className="h-4 w-4" />} label="Punched in" value={counts.punchedIn} caption={`of ${counts.total}`} tone="green" />
                 <SummaryCard icon={<LogOut className="h-4 w-4" />} label="Punched out" value={counts.punchedOut} caption={`of ${counts.total}`} tone="green" />
@@ -346,7 +349,7 @@ export function AttendanceTeamPanel() {
                       </div>
                     )}
                     {sortedPeople.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No teammates in your scope.</p>
+                      <p className="text-sm text-muted-foreground">No teammates to show.</p>
                     )}
                     {sortedPeople.map((p) => {
                       const a = data?.todayAtt.find((x) => x.user_id === p.id);

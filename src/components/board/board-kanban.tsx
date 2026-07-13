@@ -20,6 +20,7 @@ import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { toast } from "sonner";
 import { reorderKanbanCard, clearManualRank, sortColumnByDueDate } from "@/lib/tasks-workflow.functions";
 import { RecurringBadge } from "@/components/tasks/recurring-badge";
+import { OverdueBadge, isOverdue } from "@/components/tasks/overdue-badge";
 
 type Status = "todo" | "in_progress" | "review" | "done";
 const COLUMNS: { key: Status; label: string }[] = [
@@ -406,6 +407,7 @@ function CardBody({ card }: { card: BoardCard }) {
       <div className="text-sm font-medium">{card.title}</div>
       <div className="flex flex-wrap gap-1 mt-2 items-center">
         <Badge variant="outline" className="capitalize text-[10px]">{card.priority}</Badge>
+        <OverdueBadge task={card} />
         {card.due_date && <span className="text-[10px] text-muted-foreground">Due {format(new Date(card.due_date), "MMM d")}</span>}
         <RecurringBadge task={card} />
         {card.workflow_template && card.stage_snapshot && (
@@ -439,7 +441,7 @@ function SortableCardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: stri
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <Card
         onDoubleClick={() => onOpen(card.id)}
-        className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isDragging ? "opacity-30 border-dashed" : ""}`}
+        className={`p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/50 ${isOverdue(card) ? "border-l-4 border-l-destructive" : ""} ${isDragging ? "opacity-30 border-dashed" : ""}`}
       >
         <CardBody card={card} />
       </Card>
@@ -449,7 +451,7 @@ function SortableCardItem({ card, onOpen }: { card: BoardCard; onOpen: (id: stri
 
 function CardPreview({ card }: { card: BoardCard }) {
   return (
-    <Card className="p-3 select-none bg-background">
+    <Card className={`p-3 select-none bg-background ${isOverdue(card) ? "border-l-4 border-l-destructive" : ""}`}>
       <CardBody card={card} />
     </Card>
   );

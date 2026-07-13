@@ -329,6 +329,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                 <Badge variant="secondary" className="capitalize">{String(task.review_state).replace("_"," ")}</Badge>
               )}
               <RecurringBadge task={task as never} className="text-[11px]" />
+              <OverdueBadge task={task as never} className="text-[11px]" />
               <div className="flex-1" />
               <Button size="sm" variant="ghost" onClick={async () => {
                 await watchFn({ data: { taskId: taskId!, watching: !isWatching } });

@@ -203,12 +203,14 @@ export function AttendanceTeamPanel() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="today">Today</TabsTrigger>
-          <TabsTrigger value="leave">
-            Leave approvals
-            {data?.pending.length ? (
-              <Badge className="ml-2" variant="secondary">{data.pending.length}</Badge>
-            ) : null}
-          </TabsTrigger>
+          {data?.canApprove && (
+            <TabsTrigger value="leave">
+              Leave approvals
+              {data?.pending.length ? (
+                <Badge className="ml-2" variant="secondary">{data.pending.length}</Badge>
+              ) : null}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="mt-4 space-y-4">

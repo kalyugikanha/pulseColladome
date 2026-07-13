@@ -228,7 +228,7 @@ function TasksListView({ queryKey, fetcher }: { queryKey: unknown[]; fetcher: ()
             <div className="divide-y">
               {items.length === 0 && <div className="px-4 py-3 text-xs text-muted-foreground">Nothing here.</div>}
               {items.map((c) => (
-                <div key={c.id} className="px-4 py-2 flex items-center justify-between gap-2 hover:bg-muted/40">
+                <div key={c.id} className={`px-4 py-2 flex items-center justify-between gap-2 hover:bg-muted/40 ${isOverdue(c) ? "border-l-4 border-l-destructive" : ""}`}>
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">{c.title}</div>
                     <div className="text-[11px] text-muted-foreground truncate">
@@ -238,6 +238,7 @@ function TasksListView({ queryKey, fetcher }: { queryKey: unknown[]; fetcher: ()
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <OverdueBadge task={c} />
                     <RecurringBadge task={c} />
                     {c.priority && <Badge variant={c.priority === "high" ? "destructive" : "outline"} className="uppercase text-[10px]">{c.priority}</Badge>}
                   </div>

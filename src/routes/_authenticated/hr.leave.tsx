@@ -436,7 +436,7 @@ function RequestsTable({ rows, empMap, onChanged }: { rows: LeaveRow[]; empMap: 
                     <span className="text-muted-foreground font-normal"> · {p?.department ?? "—"}</span>
                   </div>
                   <div className="text-xs text-muted-foreground capitalize">
-                    {r.leave_type} · {format(new Date(r.start_date), "d MMM")} – {format(new Date(r.end_date), "d MMM yyyy")} · {r.days}d
+                    {r.leave_type} · {format(new Date(r.start_date), "d MMM")} – {format(new Date(r.end_date), "d MMM yyyy")} · {formatLeaveDays(r.days)}{Number(r.days) === 0.5 ? " · Half day" : ""}
                   </div>
                   {r.reason && <div className="text-xs mt-1">{r.reason}</div>}
                   {r.admin_comment && <div className="text-xs mt-1"><span className="text-muted-foreground">Admin:</span> {r.admin_comment}</div>}

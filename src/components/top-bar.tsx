@@ -8,6 +8,10 @@ import { useHolidays, nextHoliday } from "@/hooks/use-holidays";
 import { CalendarClock, Eye } from "lucide-react";
 import { differenceInCalendarDays, format } from "date-fns";
 import { NotificationsBell } from "@/components/notifications-bell";
+import { QuickPunchControl } from "@/components/punch/quick-punch-control";
+import { PunchGuidelinesTooltip } from "@/components/punch/punch-guidelines";
+
+
 
 type Row = { id: string; label: string; sub?: string; pending?: boolean };
 

@@ -91,7 +91,7 @@ export const resolveStandupFlag = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { error } = await supabase
       .from("standup_flags" as never)
-      .update({ resolved_at: new Date().toISOString() })
+      .update({ resolved_at: new Date().toISOString() } as never)
       .eq("id", data.id)
       .eq("flagged_by", userId);
     if (error) throw new Error(error.message);
@@ -106,7 +106,7 @@ export const clearMyStandupFlagForTask = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { error } = await supabase
       .from("standup_flags" as never)
-      .update({ resolved_at: new Date().toISOString() })
+      .update({ resolved_at: new Date().toISOString() } as never)
       .eq("task_id", data.taskId)
       .eq("flagged_by", userId)
       .is("resolved_at", null);

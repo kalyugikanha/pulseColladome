@@ -140,9 +140,9 @@ export function NotificationsBell({ userId }: { userId: string }) {
                     <div className="flex items-start gap-2">
                       <div className="mt-0.5"><Flag className="h-3.5 w-3.5 text-primary" /></div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium">Flagged for today's stand-up</div>
+                        <div className="text-xs font-medium">Flagged for stand-up{f.flagger?.full_name ? ` by ${f.flagger.full_name}` : ""}</div>
                         <div className="text-xs whitespace-pre-wrap break-words text-muted-foreground">
-                          {f.task?.title ?? "Task"}
+                          {f.task?.title ?? f.title ?? "Agenda item"}
                           {f.note ? ` — "${f.note}"` : ""}
                         </div>
                         <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">

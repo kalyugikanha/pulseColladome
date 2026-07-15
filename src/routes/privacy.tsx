@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { SiteFooter } from "@/components/site-footer";
 
 export const Route = createFileRoute("/privacy")({
   component: PrivacyPage,
@@ -109,6 +110,7 @@ function PrivacyPage() {
           </div>
         </section>
       </div>
+      <SiteFooter />
     </main>
   );
 }

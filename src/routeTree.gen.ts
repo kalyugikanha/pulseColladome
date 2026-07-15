@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as GoogleCalendarConnectRouteImport } from './routes/google-calendar-connect'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -64,6 +65,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const GoogleCalendarConnectRoute = GoogleCalendarConnectRouteImport.update({
   id: '/google-calendar-connect',
   path: '/google-calendar-connect',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
@@ -268,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
+  '/contact': typeof ContactRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
@@ -310,6 +317,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
+  '/contact': typeof ContactRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
@@ -354,6 +362,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
+  '/contact': typeof ContactRoute
   '/google-calendar-connect': typeof GoogleCalendarConnectRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
@@ -398,6 +407,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
+    | '/contact'
     | '/google-calendar-connect'
     | '/privacy'
     | '/terms'
@@ -440,6 +450,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/change-password'
+    | '/contact'
     | '/google-calendar-connect'
     | '/privacy'
     | '/terms'
@@ -483,6 +494,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/change-password'
+    | '/contact'
     | '/google-calendar-connect'
     | '/privacy'
     | '/terms'
@@ -527,6 +539,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
   ChangePasswordRoute: typeof ChangePasswordRoute
+  ContactRoute: typeof ContactRoute
   GoogleCalendarConnectRoute: typeof GoogleCalendarConnectRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
@@ -556,6 +569,13 @@ declare module '@tanstack/react-router' {
       path: '/google-calendar-connect'
       fullPath: '/google-calendar-connect'
       preLoaderRoute: typeof GoogleCalendarConnectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/change-password': {
@@ -911,6 +931,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
   ChangePasswordRoute: ChangePasswordRoute,
+  ContactRoute: ContactRoute,
   GoogleCalendarConnectRoute: GoogleCalendarConnectRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
@@ -921,13 +942,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

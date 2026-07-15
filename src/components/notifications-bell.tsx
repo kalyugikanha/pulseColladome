@@ -11,7 +11,7 @@ import { Bell, CheckCheck, ClipboardList, MessageSquare, AtSign, GitPullRequest,
 import { formatDistanceToNow } from "date-fns";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
-import { isBeforeStandupCutoff, STANDUP_MEET_URL } from "@/lib/standup-cutoff";
+import { STANDUP_MEET_URL } from "@/lib/standup-cutoff";
 import { useViewAs } from "@/hooks/use-view-as";
 
 

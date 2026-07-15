@@ -83,7 +83,7 @@ export function StandupTray() {
                   <div className="text-xs italic text-muted-foreground border-l-2 pl-2">"{f.note}"</div>
                 )}
                 <div className="text-[10px] text-muted-foreground">
-                  flagged {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+                  flagged {format(new Date(f.created_at), "MMM d, h:mm a")} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
                 </div>
               </div>
             ))

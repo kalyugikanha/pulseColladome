@@ -52,7 +52,8 @@ export function useCurrentUser() {
   const { viewAsUserId } = useViewAs();
   return useQuery<CurrentUser | null>({
     queryKey: ["current-user", viewAsUserId],
-    staleTime: 60_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;

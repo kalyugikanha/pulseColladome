@@ -1417,6 +1417,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "standup_flags_flagger_profile_fkey"
+            columns: ["flagged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "standup_flags_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false

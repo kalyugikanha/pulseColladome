@@ -4,30 +4,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Flag, Video } from "lucide-react";
 import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
-
-const MEET_URL = "https://meet.google.com/kea-rfwh-ceo";
-
-function isBeforeCutoff(createdAt: string): boolean {
-  const now = new Date();
-  const cutoff = new Date(now);
-  cutoff.setHours(11, 0, 0, 0);
-  if (now >= cutoff) return false;
-  const created = new Date(createdAt);
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-  return created >= startOfDay && created < cutoff;
-}
+import { isBeforeStandupCutoff, STANDUP_MEET_URL } from "@/lib/standup-cutoff";
+import { useViewAs } from "@/hooks/use-view-as";
 
 export function StandupAssigneeBanner() {
   const listFn = useServerFn(listStandupFlagsForMeAsAssignee);
+  const { viewAsUserId } = useViewAs();
   const { data } = useQuery({
-    queryKey: ["standup-flags", "assignee-me"],
-    queryFn: () => listFn({}),
+    queryKey: ["standup-flags", "assignee", viewAsUserId ?? "self"],
+    queryFn: () => listFn({ data: { asUserId: viewAsUserId ?? null } }),
     refetchOnWindowFocus: true,
     staleTime: 60_000,
   });
 
-  const items = (data ?? []).filter((f) => isBeforeCutoff(f.created_at));
+  const items = (data ?? []).filter((f) => isBeforeStandupCutoff(f.created_at));
   if (items.length === 0) return null;
 
   return (
@@ -53,7 +43,7 @@ export function StandupAssigneeBanner() {
             </ul>
           </div>
           <Button asChild size="sm" className="gradient-primary gap-1 shrink-0">
-            <a href={MEET_URL} target="_blank" rel="noopener noreferrer">
+            <a href={STANDUP_MEET_URL} target="_blank" rel="noopener noreferrer">
               <Video className="h-3.5 w-3.5" /> Join stand-up
             </a>
           </Button>

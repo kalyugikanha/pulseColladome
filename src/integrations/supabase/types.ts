@@ -1377,6 +1377,41 @@ export type Database = {
           },
         ]
       }
+      standup_flags: {
+        Row: {
+          created_at: string
+          flagged_by: string
+          id: string
+          note: string | null
+          resolved_at: string | null
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          flagged_by: string
+          id?: string
+          note?: string | null
+          resolved_at?: string | null
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          flagged_by?: string
+          id?: string
+          note?: string | null
+          resolved_at?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "standup_flags_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       super_admins: {
         Row: {
           created_at: string

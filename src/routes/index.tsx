@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { SiteFooter } from "@/components/site-footer";
 
 const QUOTES: { text: string; author: string }[] = [
   { text: "The best way to predict the future is to build it.", author: "Alan Kay" },
@@ -77,7 +78,7 @@ function LandingPage() {
           }}
         />
         <nav className="relative z-10 flex items-center justify-between mb-16">
-          <div className="font-semibold tracking-tight text-lg">Colladome<span className="text-primary">.</span>Pulse</div>
+          <div className="font-semibold tracking-tight text-lg">Colladome <span className="text-primary">Pulse</span></div>
           <div className="flex gap-3">
             <Link to={pulsePath}>
               <Button variant="ghost" size="sm">{isSignedIn ? "Dashboard" : "Sign in"}</Button>
@@ -114,6 +115,27 @@ function LandingPage() {
 
         <div className="relative z-10 mt-24 text-xs uppercase tracking-[0.3em] text-muted-foreground">
           Scroll ↓
+        </div>
+      </section>
+
+      {/* What Pulse is */}
+      <section className="relative px-6 md:px-16 py-24 border-t border-border/60">
+        <div className="max-w-5xl mx-auto grid gap-10 md:grid-cols-[1fr_2fr] items-start">
+          <p className="uppercase tracking-[0.25em] text-xs text-primary font-semibold">
+            What is Colladome Pulse?
+          </p>
+          <div className="space-y-6">
+            <p
+              className="text-2xl md:text-3xl leading-snug"
+              style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}
+            >
+              An internal employee portal for <em className="text-primary">Colladome IT Network Solutions</em>.
+            </p>
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-2xl">
+              Employees can securely sign in to manage tasks, collaborate with teams,
+              access company resources, and use AI-powered productivity tools.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -172,10 +194,9 @@ function LandingPage() {
             <Button size="lg" className="text-base px-10 py-6">{isSignedIn ? "Open dashboard" : "Enter Pulse"}</Button>
           </Link>
         </div>
-        <p className="mt-16 text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          © {new Date().getFullYear()} Colladome
-        </p>
       </section>
+
+      <SiteFooter />
     </main>
   );
 }

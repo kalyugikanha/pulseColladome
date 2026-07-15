@@ -191,17 +191,17 @@ function LandingPage() {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Colladome Pulse — Build the future with AI" },
+      { title: "Colladome Pulse | Internal Employee Portal" },
       {
         name: "description",
         content:
-          "A founder's note from Colladome: in a world rewritten by AI, we adapt first and build the future. Enter Pulse — our internal operating system.",
+          "Colladome Pulse is the internal employee portal for Colladome IT Network Solutions. Employees sign in to manage tasks, attendance, leave, and team collaboration.",
       },
-      { property: "og:title", content: "Colladome Pulse — Build the future with AI" },
+      { property: "og:title", content: "Colladome Pulse | Internal Employee Portal" },
       {
         property: "og:description",
         content:
-          "In a world rewritten by AI, we don't watch — we hold the pen. A daily dose of vision from Colladome.",
+          "The internal employee portal for Colladome IT Network Solutions. Sign in to manage tasks, attendance, leave, and team collaboration.",
       },
     ],
   }),

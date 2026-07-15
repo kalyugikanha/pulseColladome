@@ -36,6 +36,7 @@ function StandupAgendaPage() {
   const qc = useQueryClient();
   const { viewAsUserId } = useViewAs();
   const listFn = useServerFn(listMyStandupFlags);
+  const listForMeFn = useServerFn(listStandupFlagsForMeAsAssignee);
   const createFn = useServerFn(createStandupNote);
   const resolveFn = useServerFn(resolveStandupFlag);
 
@@ -48,6 +49,18 @@ function StandupAgendaPage() {
   const { data: history } = useQuery({
     queryKey: ["standup-flags", "mine", "history", viewAsUserId ?? "self"],
     queryFn: () => listFn({ data: { asUserId: viewAsUserId ?? null, resolved: true } }),
+    staleTime: 60_000,
+  });
+
+  const { data: forMeActive } = useQuery({
+    queryKey: ["standup-flags", "for-me", "active", viewAsUserId ?? "self"],
+    queryFn: () => listForMeFn({ data: { asUserId: viewAsUserId ?? null, resolved: false } }),
+    refetchOnWindowFocus: true,
+  });
+
+  const { data: forMeHistory } = useQuery({
+    queryKey: ["standup-flags", "for-me", "history", viewAsUserId ?? "self"],
+    queryFn: () => listForMeFn({ data: { asUserId: viewAsUserId ?? null, resolved: true } }),
     staleTime: 60_000,
   });
 

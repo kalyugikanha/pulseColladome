@@ -276,3 +276,28 @@ function AgendaRow({ f, onDiscussed }: { f: StandupFlag; onDiscussed: () => void
     </div>
   );
 }
+
+type ForMeFlag = Awaited<ReturnType<typeof listStandupFlagsForMeAsAssignee>>[number];
+
+function ForMeRow({ f, muted }: { f: ForMeFlag; muted?: boolean }) {
+  const isFreeform = !f.task_id;
+  const flaggerName = f.flagger?.full_name ?? f.flagger?.email ?? "A teammate";
+  return (
+    <div className={`border rounded-md p-3 ${muted ? "opacity-70" : ""}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-medium">{f.task?.title ?? f.title ?? "Agenda item"}</span>
+        {isFreeform && <Badge variant="outline" className="text-[10px]">Free-form</Badge>}
+      </div>
+      <div className="text-xs text-muted-foreground mt-0.5">
+        flagged by <span className="font-medium">{flaggerName}</span>
+      </div>
+      {f.note && (
+        <div className="text-xs italic text-muted-foreground border-l-2 pl-2 mt-1.5">"{f.note}"</div>
+      )}
+      <div className="text-[10px] text-muted-foreground mt-1.5">
+        {format(new Date(f.created_at), "MMM d, h:mm a")} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+        {f.resolved_at && ` · discussed ${formatDistanceToNow(new Date(f.resolved_at), { addSuffix: true })}`}
+      </div>
+    </div>
+  );
+}

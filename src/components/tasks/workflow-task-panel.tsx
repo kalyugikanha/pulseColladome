@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { CheckCircle2, Circle, Workflow, Star } from "lucide-react";
 import { closeTask, reviewTask, listTaskReviewComments, type WorkflowStageInput } from "@/lib/workflows.functions";
+import { StandupFlagButton } from "@/components/tasks/standup-flag-button";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
 import { format } from "date-fns";

@@ -10,6 +10,7 @@ import { format, startOfWeek, endOfWeek } from "date-fns";
 import { GoogleCalendarConnectCard } from "@/components/google-calendar-connect";
 import { QuickPunchControl } from "@/components/punch/quick-punch-control";
 import { PunchGuidelinesBanner } from "@/components/punch/punch-guidelines";
+import { StandupAssigneeBanner } from "@/components/standup-assignee-banner";
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({

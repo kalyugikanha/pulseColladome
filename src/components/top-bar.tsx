@@ -98,6 +98,7 @@ export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: st
         <QuickPunchControl variant="compact" />
         <PunchGuidelinesTooltip />
       </div>
+      <StandupTray />
       <NotificationsBell userId={realUserId} />
 
       <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">

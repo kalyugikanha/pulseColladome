@@ -7,18 +7,21 @@ import { ClipboardList, Check } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
 import { listMyStandupFlags, resolveStandupFlag } from "@/lib/standup-flags.functions";
+import { useViewAs } from "@/hooks/use-view-as";
 
 export function StandupTray() {
   const qc = useQueryClient();
   const listFn = useServerFn(listMyStandupFlags);
   const resolveFn = useServerFn(resolveStandupFlag);
+  const { viewAsUserId } = useViewAs();
 
   const { data: items } = useQuery({
-    queryKey: ["standup-flags", "mine"],
-    queryFn: () => listFn({}),
+    queryKey: ["standup-flags", "mine", viewAsUserId ?? "self"],
+    queryFn: () => listFn({ data: { asUserId: viewAsUserId ?? null } }),
     refetchOnWindowFocus: true,
     staleTime: 30_000,
   });
+
 
   const count = items?.length ?? 0;
 

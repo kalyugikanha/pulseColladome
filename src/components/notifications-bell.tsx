@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bell, CheckCheck, ClipboardList, MessageSquare, AtSign, GitPullRequest, ClipboardCheck } from "lucide-react";
+import { Bell, CheckCheck, ClipboardList, MessageSquare, AtSign, GitPullRequest, ClipboardCheck, Flag } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
+import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
+import { isBeforeStandupCutoff, STANDUP_MEET_URL } from "@/lib/standup-cutoff";
+import { useViewAs } from "@/hooks/use-view-as";
+
 
 type Notif = {
   id: string;
@@ -30,6 +35,7 @@ function iconFor(kind: string) {
 export function NotificationsBell({ userId }: { userId: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { viewAsUserId } = useViewAs();
   const [open, setOpen] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
@@ -48,6 +54,16 @@ export function NotificationsBell({ userId }: { userId: string }) {
     },
   });
 
+  // Stand-up flags where the (viewed) user is the assignee, active before today's 11am cutoff.
+  const listStandupFn = useServerFn(listStandupFlagsForMeAsAssignee);
+  const { data: standupFlags } = useQuery({
+    queryKey: ["standup-flags", "assignee", viewAsUserId ?? "self"],
+    queryFn: () => listStandupFn({ data: { asUserId: viewAsUserId ?? null } }),
+    refetchOnWindowFocus: true,
+    staleTime: 60_000,
+  });
+  const standupItems = (standupFlags ?? []).filter((f) => isBeforeStandupCutoff(f.created_at));
+
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -62,6 +78,8 @@ export function NotificationsBell({ userId }: { userId: string }) {
   }, [userId, qc]);
 
   const unread = (notifications ?? []).filter((n) => !n.read_at);
+  const totalCount = unread.length + standupItems.length;
+
 
   async function markRead(n: Notif) {
     if (!n.read_at) {
@@ -91,9 +109,9 @@ export function NotificationsBell({ userId }: { userId: string }) {
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="relative h-8 w-8">
             <Bell className="h-4 w-4" />
-            {unread.length > 0 && (
+            {totalCount > 0 && (
               <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] leading-none flex items-center justify-center rounded-full">
-                {unread.length > 9 ? "9+" : unread.length}
+                {totalCount > 9 ? "9+" : totalCount}
               </Badge>
             )}
           </Button>
@@ -106,10 +124,35 @@ export function NotificationsBell({ userId }: { userId: string }) {
             </Button>
           </div>
           <ScrollArea className="max-h-96">
-            {(notifications ?? []).length === 0 ? (
+            {standupItems.length === 0 && (notifications ?? []).length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">You're all caught up.</div>
             ) : (
               <div className="divide-y divide-border">
+                {standupItems.map((f) => (
+                  <a
+                    key={`standup:${f.id}`}
+                    href={STANDUP_MEET_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setOpen(false)}
+                    className="block w-full text-left px-3 py-2.5 hover:bg-muted/60 transition-colors bg-primary/5"
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="mt-0.5"><Flag className="h-3.5 w-3.5 text-primary" /></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium">Flagged for today's stand-up</div>
+                        <div className="text-xs whitespace-pre-wrap break-words text-muted-foreground">
+                          {f.task?.title ?? "Task"}
+                          {f.note ? ` — "${f.note}"` : ""}
+                        </div>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
+                          Tap to join stand-up · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+                        </div>
+                      </div>
+                      <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />
+                    </div>
+                  </a>
+                ))}
                 {(notifications ?? []).map((n) => (
                   <button
                     key={n.id}
@@ -130,6 +173,7 @@ export function NotificationsBell({ userId }: { userId: string }) {
                 ))}
               </div>
             )}
+
           </ScrollArea>
         </PopoverContent>
       </Popover>

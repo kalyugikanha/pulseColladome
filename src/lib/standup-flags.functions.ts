@@ -52,38 +52,67 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
     return { id: (inserted as unknown as { id: string }).id };
   });
 
+/**
+ * Resolve the effective user id for a read-only server function.
+ * - Default: the authenticated caller.
+ * - If the caller passes `asUserId` AND is a super admin (verified server-side
+ *   against `super_admins`, never trusting a client flag), the query is
+ *   scoped to that user. Any other case falls back to the real caller id.
+ * Writes MUST NOT use this — always use `context.userId` for mutations.
+ */
+async function resolveViewedUserId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  callerId: string,
+  asUserId: string | null | undefined,
+): Promise<string> {
+  if (!asUserId || asUserId === callerId) return callerId;
+  const { data } = await supabase
+    .from("super_admins")
+    .select("user_id")
+    .eq("user_id", callerId)
+    .maybeSingle();
+  return data ? asUserId : callerId;
+}
+
+
 /** List the current user's active (unresolved) stand-up flags. */
 export const listMyStandupFlags = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<StandupFlag[]> => {
+  .inputValidator((d: { asUserId?: string | null } | undefined) => d ?? {})
+  .handler(async ({ data, context }): Promise<StandupFlag[]> => {
     const { supabase, userId } = context;
-    const { data, error } = await supabase
+    const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
+    const { data: rows, error } = await supabase
       .from("standup_flags" as never)
       .select("id, task_id, note, created_at, resolved_at, task:tasks(id, title, status, assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email))")
-      .eq("flagged_by", userId)
+      .eq("flagged_by", viewedId)
       .is("resolved_at", null)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return (data ?? []) as unknown as StandupFlag[];
+    return (rows ?? []) as unknown as StandupFlag[];
   });
 
 /** List active stand-up flags where the current user is the task assignee (for dashboard banner). */
 export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d: { asUserId?: string | null } | undefined) => d ?? {})
+  .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data, error } = await supabase
+    const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
+    const { data: rows, error } = await supabase
       .from("standup_flags" as never)
       .select("id, task_id, note, created_at, task:tasks!inner(id, title, assignee_id)")
       .is("resolved_at", null)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as unknown as Array<{
+    const list = (rows ?? []) as unknown as Array<{
       id: string; task_id: string; note: string | null; created_at: string;
       task: { id: string; title: string; assignee_id: string | null } | null;
     }>;
-    return rows.filter((r) => r.task?.assignee_id === userId);
+    return list.filter((r) => r.task?.assignee_id === viewedId);
   });
+
 
 /** Get the active flag for a given task (for the current user), or null. */
 export const getMyStandupFlagForTask = createServerFn({ method: "GET" })

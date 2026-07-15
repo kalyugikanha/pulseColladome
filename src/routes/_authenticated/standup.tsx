@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { ClipboardList, Check, Flag, Video, Plus, History } from "lucide-react";
+import { ClipboardList, Check, Flag, Video, Plus, History, Inbox } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import {
   listMyStandupFlags,
+  listStandupFlagsForMeAsAssignee,
   createStandupNote,
   resolveStandupFlag,
   type StandupFlag,
@@ -35,6 +36,7 @@ function StandupAgendaPage() {
   const qc = useQueryClient();
   const { viewAsUserId } = useViewAs();
   const listFn = useServerFn(listMyStandupFlags);
+  const listForMeFn = useServerFn(listStandupFlagsForMeAsAssignee);
   const createFn = useServerFn(createStandupNote);
   const resolveFn = useServerFn(resolveStandupFlag);
 
@@ -47,6 +49,18 @@ function StandupAgendaPage() {
   const { data: history } = useQuery({
     queryKey: ["standup-flags", "mine", "history", viewAsUserId ?? "self"],
     queryFn: () => listFn({ data: { asUserId: viewAsUserId ?? null, resolved: true } }),
+    staleTime: 60_000,
+  });
+
+  const { data: forMeActive } = useQuery({
+    queryKey: ["standup-flags", "for-me", "active", viewAsUserId ?? "self"],
+    queryFn: () => listForMeFn({ data: { asUserId: viewAsUserId ?? null, resolved: false } }),
+    refetchOnWindowFocus: true,
+  });
+
+  const { data: forMeHistory } = useQuery({
+    queryKey: ["standup-flags", "for-me", "history", viewAsUserId ?? "self"],
+    queryFn: () => listForMeFn({ data: { asUserId: viewAsUserId ?? null, resolved: true } }),
     staleTime: 60_000,
   });
 
@@ -101,7 +115,7 @@ function StandupAgendaPage() {
             Stand-up agenda
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Items you've flagged to discuss. Only you see this list. Mark items discussed after stand-up.
+            Track what you've flagged for others and what others have flagged for you. Mark items discussed after stand-up.
           </p>
         </div>
         <Button asChild className="gradient-primary gap-1.5">
@@ -150,10 +164,40 @@ function StandupAgendaPage() {
         </CardContent>
       </Card>
 
+      <Card className="border-primary/30">
+        <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Inbox className="h-4 w-4 text-primary" /> Flagged for you
+          </CardTitle>
+          {(forMeActive?.length ?? 0) > 0 && (
+            <Badge className="text-xs">{forMeActive!.length} pending</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(forMeActive?.length ?? 0) === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Nothing flagged for you. When a teammate flags a task assigned to you (or tags you on a note), it'll appear here until they mark it discussed.
+            </div>
+          ) : (
+            (forMeActive ?? []).map((f) => <ForMeRow key={f.id} f={f} />)
+          )}
+          {(forMeHistory?.length ?? 0) > 0 && (
+            <details className="pt-2">
+              <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                Show recently discussed ({Math.min(forMeHistory!.length, 20)})
+              </summary>
+              <div className="space-y-2 mt-2">
+                {forMeHistory!.slice(0, 20).map((f) => <ForMeRow key={f.id} f={f} muted />)}
+              </div>
+            </details>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base flex items-center gap-2">
-            <Flag className="h-4 w-4 text-primary" /> Active agenda
+            <Flag className="h-4 w-4 text-primary" /> Flagged by you
           </CardTitle>
           {activeCount > 0 && (
             <Badge variant="secondary" className="text-xs">
@@ -229,6 +273,31 @@ function AgendaRow({ f, onDiscussed }: { f: StandupFlag; onDiscussed: () => void
       <Button size="sm" variant="outline" className="gap-1 shrink-0" onClick={onDiscussed}>
         <Check className="h-3.5 w-3.5" /> Mark discussed
       </Button>
+    </div>
+  );
+}
+
+type ForMeFlag = Awaited<ReturnType<typeof listStandupFlagsForMeAsAssignee>>[number];
+
+function ForMeRow({ f, muted }: { f: ForMeFlag; muted?: boolean }) {
+  const isFreeform = !f.task_id;
+  const flaggerName = f.flagger?.full_name ?? f.flagger?.email ?? "A teammate";
+  return (
+    <div className={`border rounded-md p-3 ${muted ? "opacity-70" : ""}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-medium">{f.task?.title ?? f.title ?? "Agenda item"}</span>
+        {isFreeform && <Badge variant="outline" className="text-[10px]">Free-form</Badge>}
+      </div>
+      <div className="text-xs text-muted-foreground mt-0.5">
+        flagged by <span className="font-medium">{flaggerName}</span>
+      </div>
+      {f.note && (
+        <div className="text-xs italic text-muted-foreground border-l-2 pl-2 mt-1.5">"{f.note}"</div>
+      )}
+      <div className="text-[10px] text-muted-foreground mt-1.5">
+        {format(new Date(f.created_at), "MMM d, h:mm a")} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+        {f.resolved_at && ` · discussed ${formatDistanceToNow(new Date(f.resolved_at), { addSuffix: true })}`}
+      </div>
     </div>
   );
 }

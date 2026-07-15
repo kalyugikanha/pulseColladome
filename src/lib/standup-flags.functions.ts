@@ -110,26 +110,26 @@ export const listMyStandupFlags = createServerFn({ method: "GET" })
     return (rows ?? []) as unknown as StandupFlag[];
   });
 
-/** List active stand-up flags where the current user is the task assignee or tagged assignee. */
+/** List stand-up flags where the current user is the task assignee or tagged assignee. */
 export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { asUserId?: string | null } | undefined) => d ?? {})
+  .inputValidator((d: { asUserId?: string | null; resolved?: boolean } | undefined) => d ?? {})
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
-    const { data: rows, error } = await supabase
+    let q = supabase
       .from("standup_flags" as never)
-      .select(`id, task_id, title, note, assignee_tag, created_at, flagger:profiles!standup_flags_flagger_profile_fkey(id, full_name, email), task:tasks(id, title, assignee_id)`)
-      .is("resolved_at", null)
-      .order("created_at", { ascending: true });
+      .select(`id, task_id, title, note, assignee_tag, created_at, resolved_at, flagged_by, flagger:profiles!standup_flags_flagger_profile_fkey(id, full_name, email), task:tasks(id, title, status, assignee_id, assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email))`);
+    q = data.resolved ? q.not("resolved_at", "is", null) : q.is("resolved_at", null);
+    const { data: rows, error } = await q.order("created_at", { ascending: !data.resolved });
     if (error) throw new Error(error.message);
     const list = (rows ?? []) as unknown as Array<{
       id: string; task_id: string | null; title: string | null; note: string | null;
-      assignee_tag: string | null; created_at: string;
+      assignee_tag: string | null; created_at: string; resolved_at: string | null; flagged_by: string;
       flagger: { id: string; full_name: string | null; email: string | null } | null;
-      task: { id: string; title: string; assignee_id: string | null } | null;
+      task: { id: string; title: string; status: string; assignee_id: string | null; assignee: { id: string; full_name: string | null; email: string | null } | null } | null;
     }>;
-    return list.filter((r) => r.assignee_tag === viewedId || r.task?.assignee_id === viewedId);
+    return list.filter((r) => r.flagged_by !== viewedId && (r.assignee_tag === viewedId || r.task?.assignee_id === viewedId));
   });
 
 /** Get the active flag for a given task (for the current user), or null. */

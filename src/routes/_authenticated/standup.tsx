@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import {
   listMyStandupFlags,
+  listStandupFlagsForMeAsAssignee,
   createStandupNote,
   resolveStandupFlag,
   type StandupFlag,

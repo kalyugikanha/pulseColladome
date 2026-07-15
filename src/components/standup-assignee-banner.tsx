@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Flag, Video } from "lucide-react";
 import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
-import { isBeforeStandupCutoff, STANDUP_MEET_URL } from "@/lib/standup-cutoff";
+import { STANDUP_MEET_URL } from "@/lib/standup-cutoff";
 import { useViewAs } from "@/hooks/use-view-as";
 
 export function StandupAssigneeBanner() {

@@ -164,10 +164,40 @@ function StandupAgendaPage() {
         </CardContent>
       </Card>
 
+      <Card className="border-primary/30">
+        <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Inbox className="h-4 w-4 text-primary" /> Flagged for you
+          </CardTitle>
+          {(forMeActive?.length ?? 0) > 0 && (
+            <Badge className="text-xs">{forMeActive!.length} pending</Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(forMeActive?.length ?? 0) === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Nothing flagged for you. When a teammate flags a task assigned to you (or tags you on a note), it'll appear here until they mark it discussed.
+            </div>
+          ) : (
+            (forMeActive ?? []).map((f) => <ForMeRow key={f.id} f={f} />)
+          )}
+          {(forMeHistory?.length ?? 0) > 0 && (
+            <details className="pt-2">
+              <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                Show recently discussed ({Math.min(forMeHistory!.length, 20)})
+              </summary>
+              <div className="space-y-2 mt-2">
+                {forMeHistory!.slice(0, 20).map((f) => <ForMeRow key={f.id} f={f} muted />)}
+              </div>
+            </details>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="pb-3 flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base flex items-center gap-2">
-            <Flag className="h-4 w-4 text-primary" /> Active agenda
+            <Flag className="h-4 w-4 text-primary" /> Flagged by you
           </CardTitle>
           {activeCount > 0 && (
             <Badge variant="secondary" className="text-xs">

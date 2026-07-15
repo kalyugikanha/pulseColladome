@@ -17,7 +17,7 @@ export function StandupAssigneeBanner() {
     staleTime: 60_000,
   });
 
-  const items = (data ?? []).filter((f) => isBeforeStandupCutoff(f.created_at));
+  const items = data ?? [];
   if (items.length === 0) return null;
 
   return (

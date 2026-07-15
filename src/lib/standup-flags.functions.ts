@@ -119,7 +119,7 @@ export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
     const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
     const { data: rows, error } = await supabase
       .from("standup_flags" as never)
-      .select(`id, task_id, title, note, assignee_tag, created_at, flagger:profiles!standup_flags_flagged_by_fkey(id, full_name, email), task:tasks(id, title, assignee_id)`)
+      .select(`id, task_id, title, note, assignee_tag, created_at, flagger:profiles!standup_flags_flagger_profile_fkey(id, full_name, email), task:tasks(id, title, assignee_id)`)
       .is("resolved_at", null)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);

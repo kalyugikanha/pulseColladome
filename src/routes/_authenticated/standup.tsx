@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { ClipboardList, Check, Flag, Video, Plus, History } from "lucide-react";
+import { ClipboardList, Check, Flag, Video, Plus, History, Inbox } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

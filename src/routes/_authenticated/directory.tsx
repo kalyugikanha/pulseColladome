@@ -238,8 +238,12 @@ export function DirectoryPage() {
 
     toast.success("Updated");
     setEditing(null);
-    qc.invalidateQueries({ queryKey: ["directory-profiles"] });
-    qc.invalidateQueries({ queryKey: ["salary-export-banks"] });
+    // Broad invalidation — a reporting_manager_id change affects every
+    // team-scoped view (current user's direct reports, reports-tree,
+    // team timesheet, attendance team, leave, tasks, performance, etc.).
+    // Clearing the cache guarantees the acting admin sees the new tree
+    // immediately without waiting for staleTime.
+    qc.invalidateQueries();
   }
 
   async function toggleActive(p: Profile, active: boolean) {

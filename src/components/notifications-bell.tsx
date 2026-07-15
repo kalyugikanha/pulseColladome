@@ -109,9 +109,9 @@ export function NotificationsBell({ userId }: { userId: string }) {
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="relative h-8 w-8">
             <Bell className="h-4 w-4" />
-            {unread.length > 0 && (
+            {totalCount > 0 && (
               <Badge className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] leading-none flex items-center justify-center rounded-full">
-                {unread.length > 9 ? "9+" : unread.length}
+                {totalCount > 9 ? "9+" : totalCount}
               </Badge>
             )}
           </Button>
@@ -124,10 +124,35 @@ export function NotificationsBell({ userId }: { userId: string }) {
             </Button>
           </div>
           <ScrollArea className="max-h-96">
-            {(notifications ?? []).length === 0 ? (
+            {standupItems.length === 0 && (notifications ?? []).length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">You're all caught up.</div>
             ) : (
               <div className="divide-y divide-border">
+                {standupItems.map((f) => (
+                  <a
+                    key={`standup:${f.id}`}
+                    href={STANDUP_MEET_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setOpen(false)}
+                    className="block w-full text-left px-3 py-2.5 hover:bg-muted/60 transition-colors bg-primary/5"
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="mt-0.5"><Flag className="h-3.5 w-3.5 text-primary" /></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium">Flagged for today's stand-up</div>
+                        <div className="text-xs whitespace-pre-wrap break-words text-muted-foreground">
+                          {f.task?.title ?? "Task"}
+                          {f.note ? ` — "${f.note}"` : ""}
+                        </div>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
+                          Tap to join stand-up · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+                        </div>
+                      </div>
+                      <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />
+                    </div>
+                  </a>
+                ))}
                 {(notifications ?? []).map((n) => (
                   <button
                     key={n.id}
@@ -148,6 +173,7 @@ export function NotificationsBell({ userId }: { userId: string }) {
                 ))}
               </div>
             )}
+
           </ScrollArea>
         </PopoverContent>
       </Popover>

@@ -61,7 +61,8 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
  * Writes MUST NOT use this — always use `context.userId` for mutations.
  */
 async function resolveViewedUserId(
-  supabase: import("@supabase/supabase-js").SupabaseClient,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   callerId: string,
   asUserId: string | null | undefined,
 ): Promise<string> {
@@ -73,6 +74,7 @@ async function resolveViewedUserId(
     .maybeSingle();
   return data ? asUserId : callerId;
 }
+
 
 /** List the current user's active (unresolved) stand-up flags. */
 export const listMyStandupFlags = createServerFn({ method: "GET" })

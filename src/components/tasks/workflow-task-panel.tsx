@@ -145,6 +145,7 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
           </>
         )}
         <Button size="sm" variant="ghost" onClick={() => setReviewOpen("comment")}>Add review comment</Button>
+        <StandupFlagButton taskId={task.id} />
       </div>
 
       {(comments?.length ?? 0) > 0 && (

@@ -98,6 +98,7 @@ function Dashboard() {
       </header>
 
       <PunchGuidelinesBanner />
+      <StandupAssigneeBanner />
 
 
 

@@ -442,6 +442,12 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
               </div>
             )}
 
+            {!task.workflow_instance_id && (
+              <div className="mb-4">
+                <StandupFlagButton taskId={task.id} />
+              </div>
+            )}
+
             <div className="space-y-3">
               <div className="text-sm font-semibold">Activity</div>
 

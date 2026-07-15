@@ -45,7 +45,7 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
 
     const { data: inserted, error } = await supabase
       .from("standup_flags" as never)
-      .insert({ task_id: data.taskId, flagged_by: userId, note })
+      .insert({ task_id: data.taskId, flagged_by: userId, note } as never)
       .select("id")
       .single();
     if (error) throw new Error(error.message);

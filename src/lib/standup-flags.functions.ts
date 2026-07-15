@@ -37,7 +37,7 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
     if (existingId) {
       const { error } = await supabase
         .from("standup_flags" as never)
-        .update({ note })
+        .update({ note } as never)
         .eq("id", existingId);
       if (error) throw new Error(error.message);
       return { id: existingId };

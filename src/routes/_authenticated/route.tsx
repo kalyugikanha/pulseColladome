@@ -44,6 +44,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
   const workspaceItems: NavItem[] = [
     { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
     { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
+    { title: "Stand-up", url: "/standup", icon: ClipboardList },
     { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
     { title: "Events", url: "/events", icon: PartyPopper },
     { title: "Projects", url: "/projects", icon: FolderKanban, match: "/projects" },

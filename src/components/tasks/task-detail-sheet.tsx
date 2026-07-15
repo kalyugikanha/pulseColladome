@@ -21,6 +21,7 @@ import { EditTaskDialog } from "./edit-task-dialog";
 import { MarkDoneDialog } from "./mark-done-dialog";
 import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
+import { StandupFlagButton } from "./standup-flag-button";
 import { RecurringBadge } from "./recurring-badge";
 import { OverdueBadge } from "./overdue-badge";
 import {
@@ -439,6 +440,12 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
             {task.workflow_instance_id && (
               <div className="mb-4">
                 <WorkflowTaskPanel taskId={task.id} onChanged={refresh} onOpenTask={(id) => onClose(id)} />
+              </div>
+            )}
+
+            {!task.workflow_instance_id && (
+              <div className="mb-4">
+                <StandupFlagButton taskId={task.id} />
               </div>
             )}
 

@@ -10,6 +10,7 @@ import { differenceInCalendarDays, format } from "date-fns";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { QuickPunchControl } from "@/components/punch/quick-punch-control";
 import { PunchGuidelinesTooltip } from "@/components/punch/punch-guidelines";
+import { StandupTray } from "@/components/standup-tray";
 
 
 
@@ -97,6 +98,7 @@ export function TopBar({ realUserId, isSuperAdmin, viewingAs }: { realUserId: st
         <QuickPunchControl variant="compact" />
         <PunchGuidelinesTooltip />
       </div>
+      <StandupTray />
       <NotificationsBell userId={realUserId} />
 
       <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">

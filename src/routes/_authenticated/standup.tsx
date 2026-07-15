@@ -115,7 +115,7 @@ function StandupAgendaPage() {
             Stand-up agenda
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Items you've flagged to discuss. Only you see this list. Mark items discussed after stand-up.
+            Track what you've flagged for others and what others have flagged for you. Mark items discussed after stand-up.
           </p>
         </div>
         <Button asChild className="gradient-primary gap-1.5">

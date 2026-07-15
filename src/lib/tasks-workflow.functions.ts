@@ -38,6 +38,28 @@ export const getTaskDetail = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const actingUserId = context.actingUserId;
+
+    // If this task is part of a workflow instance, we surface comments and
+    // attachments across every task in that instance so review history from
+    // prior stages doesn't disappear when the workflow advances (each stage
+    // spawns a new task row with a fresh task_id).
+    const { data: taskCore } = await supabase
+      .from("tasks")
+      .select("id, workflow_instance_id")
+      .eq("id", data.taskId)
+      .maybeSingle();
+    const instanceId = (taskCore as { workflow_instance_id: string | null } | null)?.workflow_instance_id ?? null;
+
+    let commentTaskIds: string[] = [data.taskId];
+    if (instanceId) {
+      const { data: sib } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("workflow_instance_id", instanceId);
+      const ids = ((sib as Array<{ id: string }> | null) ?? []).map((r) => r.id);
+      if (ids.length > 0) commentTaskIds = ids;
+    }
+
     const [task, subtasks, activity, comments, attachments, watchers, deps, myRating] = await Promise.all([
       supabase.from("tasks").select(`
         *,
@@ -47,8 +69,8 @@ export const getTaskDetail = createServerFn({ method: "POST" })
       `).eq("id", data.taskId).maybeSingle(),
       supabase.from("task_subtasks").select("*").eq("task_id", data.taskId).order("position"),
       supabase.from("task_activity").select("*, actor:profiles!task_activity_actor_id_fkey(id, full_name)").eq("task_id", data.taskId).order("created_at", { ascending: false }),
-      supabase.from("task_comments").select("*, author:profiles!task_comments_author_id_fkey(id, full_name, email)").eq("task_id", data.taskId).order("created_at"),
-      supabase.from("task_comment_attachments").select("*, comment:task_comments!inner(task_id)").eq("comment.task_id", data.taskId),
+      supabase.from("task_comments").select("*, author:profiles!task_comments_author_id_fkey(id, full_name, email)").in("task_id", commentTaskIds).order("created_at"),
+      supabase.from("task_comment_attachments").select("*, comment:task_comments!inner(task_id)").in("comment.task_id", commentTaskIds),
       supabase.from("task_watchers").select("*, user:profiles!task_watchers_user_id_fkey(id, full_name, email)").eq("task_id", data.taskId),
       supabase.from("task_dependencies").select("*, dep:tasks!task_dependencies_depends_on_task_id_fkey(id, title, status)").eq("task_id", data.taskId),
       supabase.from("task_ratings").select("rating").eq("task_id", data.taskId).eq("rater_id", actingUserId).order("created_at", { ascending: false }).limit(1).maybeSingle(),

@@ -68,8 +68,8 @@ function LandingPage() {
 
   return (
     <main className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* Hero */}
-      <section className="relative min-h-screen flex flex-col justify-center px-6 md:px-16 py-24">
+      {/* Hero: H1 + subtitle */}
+      <section className="relative px-6 md:px-16 pt-16 pb-20 md:pt-24 md:pb-28">
         <div
           className="pointer-events-none absolute inset-0 opacity-60"
           style={{
@@ -86,40 +86,27 @@ function LandingPage() {
           </div>
         </nav>
 
-        <div className="relative z-10 max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-1000">
-          <p className="uppercase tracking-[0.25em] text-xs md:text-sm text-primary font-semibold mb-6">
-            A note from the founder
-          </p>
+        <div className="relative z-10 max-w-5xl">
           <h1
             className="text-5xl md:text-7xl lg:text-8xl leading-[1.05] tracking-tight font-normal"
             style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}
           >
-            The world is being <em className="text-primary">rewritten</em> by AI.
-            <br />
-            We're not watching — we're the ones <em className="text-primary">holding the pen</em>.
+            Colladome <span className="text-primary">Pulse</span>
           </h1>
-          <p className="mt-10 max-w-2xl text-lg md:text-xl text-muted-foreground leading-relaxed">
-            Everything is changing. The tools, the rules, the pace. At Colladome, we don't wait for the future to arrive —
-            we adapt first, build in the open, and advocate for the shift. This is where that work lives.
+          <p className="mt-6 text-xl md:text-2xl text-muted-foreground">
+            Internal Employee Portal for Colladome IT Network Solutions
           </p>
 
-          <div className="mt-12 flex flex-wrap gap-4">
+          <div className="mt-10 flex flex-wrap gap-4">
             <Link to={pulsePath}>
               <Button size="lg" className="text-base px-8 py-6">{pulseLabel}</Button>
             </Link>
-            <a href="#manifesto">
-              <Button size="lg" variant="outline" className="text-base px-8 py-6">Read the vision</Button>
-            </a>
           </div>
-        </div>
-
-        <div className="relative z-10 mt-24 text-xs uppercase tracking-[0.3em] text-muted-foreground">
-          Scroll ↓
         </div>
       </section>
 
       {/* What Pulse is */}
-      <section className="relative px-6 md:px-16 py-24 border-t border-border/60">
+      <section className="relative px-6 md:px-16 py-20 border-t border-border/60">
         <div className="max-w-5xl mx-auto grid gap-10 md:grid-cols-[1fr_2fr] items-start">
           <p className="uppercase tracking-[0.25em] text-xs text-primary font-semibold">
             What is Colladome Pulse?
@@ -187,7 +174,7 @@ function LandingPage() {
           className="text-4xl md:text-6xl leading-tight tracking-tight max-w-3xl mx-auto"
           style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}
         >
-          Build the future <em className="text-primary">with us</em>.
+          Sign in to Colladome Pulse.
         </h2>
         <div className="mt-10">
           <Link to={pulsePath}>
@@ -204,17 +191,17 @@ function LandingPage() {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Colladome Pulse — Build the future with AI" },
+      { title: "Colladome Pulse | Internal Employee Portal" },
       {
         name: "description",
         content:
-          "A founder's note from Colladome: in a world rewritten by AI, we adapt first and build the future. Enter Pulse — our internal operating system.",
+          "Colladome Pulse is the internal employee portal for Colladome IT Network Solutions. Employees sign in to manage tasks, attendance, leave, and team collaboration.",
       },
-      { property: "og:title", content: "Colladome Pulse — Build the future with AI" },
+      { property: "og:title", content: "Colladome Pulse | Internal Employee Portal" },
       {
         property: "og:description",
         content:
-          "In a world rewritten by AI, we don't watch — we hold the pen. A daily dose of vision from Colladome.",
+          "The internal employee portal for Colladome IT Network Solutions. Sign in to manage tasks, attendance, leave, and team collaboration.",
       },
     ],
   }),

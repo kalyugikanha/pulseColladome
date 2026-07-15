@@ -55,11 +55,18 @@ export function useVisibilityScope(
   const base = getVisibilityScope(me, opts);
   const seeds = me?.directReportIds ?? [];
   const enabled = !!me && !base.isUnscoped && seeds.length > 0;
+  // Include the sorted seeds in the query key so the tree refetches when
+  // the viewer's direct reports change (e.g. someone's reporting_manager_id
+  // was updated). Without this, react-query would return the previously
+  // cached subtree keyed only by user id, and views scoped to this subtree
+  // would keep showing ex-reports as team members.
+  const seedsKey = [...seeds].sort().join(",");
 
   const { data: tree } = useQuery<string[]>({
-    queryKey: ["reports-tree", me?.id],
+    queryKey: ["reports-tree", me?.id, seedsKey],
     enabled,
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const seen = new Set<string>(seeds);
       let frontier = seeds.slice();

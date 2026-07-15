@@ -89,7 +89,14 @@ export function useCurrentUser() {
       const realIsLearning = !!roles?.some((r) => r.role === "learning_admin");
       const realIsEvent = !!roles?.some((r) => r.role === "event_admin");
 
-      // View-as override: only super admins can impersonate view. Data queries keep the real id.
+      // View-as override: only super admins can impersonate. When active,
+      // `me.id` becomes the viewed user's id so client-side reads (Dashboard,
+      // Tasks "Mine" scope, stand-up assignee lookups, etc.) reflect their
+      // data — RLS still gates access (super_admins pass; anyone else falls
+      // back). Writes/mutations MUST continue to use `realId` (or route
+      // through `impersonationMiddleware` server-side) so actions are always
+      // attributed to the real signed-in user.
+
       let viewingAs = false;
       let vName = profile?.full_name ?? null;
       let vEmail = email;

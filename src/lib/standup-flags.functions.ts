@@ -59,12 +59,30 @@ export const listMyStandupFlags = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data, error } = await supabase
       .from("standup_flags" as never)
-      .select("id, task_id, note, created_at, resolved_at, task:tasks(id, title, status, assignee:profiles!tasks_assignee_id_fkey(id, full_name, email))")
+      .select("id, task_id, note, created_at, resolved_at, task:tasks(id, title, status, assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email))")
       .eq("flagged_by", userId)
       .is("resolved_at", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     return (data ?? []) as unknown as StandupFlag[];
+  });
+
+/** List active stand-up flags where the current user is the task assignee (for dashboard banner). */
+export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data, error } = await supabase
+      .from("standup_flags" as never)
+      .select("id, task_id, note, created_at, task:tasks!inner(id, title, assignee_id)")
+      .is("resolved_at", null)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as unknown as Array<{
+      id: string; task_id: string; note: string | null; created_at: string;
+      task: { id: string; title: string; assignee_id: string | null } | null;
+    }>;
+    return rows.filter((r) => r.task?.assignee_id === userId);
   });
 
 /** Get the active flag for a given task (for the current user), or null. */

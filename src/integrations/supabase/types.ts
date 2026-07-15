@@ -1379,30 +1379,43 @@ export type Database = {
       }
       standup_flags: {
         Row: {
+          assignee_tag: string | null
           created_at: string
           flagged_by: string
           id: string
           note: string | null
           resolved_at: string | null
-          task_id: string
+          task_id: string | null
+          title: string | null
         }
         Insert: {
+          assignee_tag?: string | null
           created_at?: string
           flagged_by: string
           id?: string
           note?: string | null
           resolved_at?: string | null
-          task_id: string
+          task_id?: string | null
+          title?: string | null
         }
         Update: {
+          assignee_tag?: string | null
           created_at?: string
           flagged_by?: string
           id?: string
           note?: string | null
           resolved_at?: string | null
-          task_id?: string
+          task_id?: string | null
+          title?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "standup_flags_assignee_tag_fkey"
+            columns: ["assignee_tag"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "standup_flags_task_id_fkey"
             columns: ["task_id"]

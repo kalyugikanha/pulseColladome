@@ -45,9 +45,14 @@ export function StandupTray() {
       </PopoverTrigger>
       <PopoverContent className="w-96 p-0" align="end">
         <div className="p-3 border-b">
-          <div className="font-medium text-sm">Stand-up agenda</div>
+          <div className="flex items-center justify-between">
+            <div className="font-medium text-sm">Stand-up agenda</div>
+            {count > 0 && (
+              <span className="text-xs text-muted-foreground">{count} to discuss today</span>
+            )}
+          </div>
           <div className="text-xs text-muted-foreground">
-            Tasks you've flagged to discuss. Only visible to you.
+            Tasks you've flagged to discuss. Oldest first. Only visible to you.
           </div>
         </div>
         <div className="max-h-96 overflow-y-auto">

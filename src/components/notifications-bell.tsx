@@ -11,7 +11,7 @@ import { Bell, CheckCheck, ClipboardList, MessageSquare, AtSign, GitPullRequest,
 import { formatDistanceToNow } from "date-fns";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
-import { isBeforeStandupCutoff, STANDUP_MEET_URL } from "@/lib/standup-cutoff";
+import { STANDUP_MEET_URL } from "@/lib/standup-cutoff";
 import { useViewAs } from "@/hooks/use-view-as";
 
 
@@ -62,7 +62,7 @@ export function NotificationsBell({ userId }: { userId: string }) {
     refetchOnWindowFocus: true,
     staleTime: 60_000,
   });
-  const standupItems = (standupFlags ?? []).filter((f) => isBeforeStandupCutoff(f.created_at));
+  const standupItems = standupFlags ?? [];
 
   useEffect(() => {
     if (!userId) return;
@@ -140,9 +140,9 @@ export function NotificationsBell({ userId }: { userId: string }) {
                     <div className="flex items-start gap-2">
                       <div className="mt-0.5"><Flag className="h-3.5 w-3.5 text-primary" /></div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium">Flagged for today's stand-up</div>
+                        <div className="text-xs font-medium">Flagged for stand-up{f.flagger?.full_name ? ` by ${f.flagger.full_name}` : ""}</div>
                         <div className="text-xs whitespace-pre-wrap break-words text-muted-foreground">
-                          {f.task?.title ?? "Task"}
+                          {f.task?.title ?? f.title ?? "Agenda item"}
                           {f.note ? ` — "${f.note}"` : ""}
                         </div>
                         <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">

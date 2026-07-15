@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Flag, Video } from "lucide-react";
 import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
-import { isBeforeStandupCutoff, STANDUP_MEET_URL } from "@/lib/standup-cutoff";
+import { STANDUP_MEET_URL } from "@/lib/standup-cutoff";
 import { useViewAs } from "@/hooks/use-view-as";
 
 export function StandupAssigneeBanner() {
@@ -17,7 +17,7 @@ export function StandupAssigneeBanner() {
     staleTime: 60_000,
   });
 
-  const items = (data ?? []).filter((f) => isBeforeStandupCutoff(f.created_at));
+  const items = data ?? [];
   if (items.length === 0) return null;
 
   return (
@@ -30,13 +30,16 @@ export function StandupAssigneeBanner() {
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm">
               {items.length === 1
-                ? "This task is flagged to discuss in today's stand-up"
-                : `${items.length} tasks are flagged to discuss in today's stand-up`}
+                ? "You have 1 item flagged for stand-up"
+                : `You have ${items.length} items flagged for stand-up`}
             </div>
             <ul className="mt-1.5 space-y-1">
               {items.map((f) => (
                 <li key={f.id} className="text-sm">
-                  <span className="font-medium">{f.task?.title ?? "Task"}</span>
+                  <span className="font-medium">{f.task?.title ?? f.title ?? "Agenda item"}</span>
+                  {f.flagger?.full_name && (
+                    <span className="text-muted-foreground"> · by {f.flagger.full_name}</span>
+                  )}
                   {f.note && <span className="text-muted-foreground italic"> — "{f.note}"</span>}
                 </li>
               ))}

@@ -3,8 +3,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type StandupFlag = {
   id: string;
-  task_id: string;
+  task_id: string | null;
+  title: string | null;
   note: string | null;
+  assignee_tag: string | null;
   created_at: string;
   resolved_at: string | null;
   task: {
@@ -13,7 +15,12 @@ export type StandupFlag = {
     status: string;
     assignee: { id: string; full_name: string | null; email: string | null } | null;
   } | null;
+  tagged: { id: string; full_name: string | null; email: string | null } | null;
 };
+
+const TASK_SELECT = "task:tasks(id, title, status, assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email))";
+const TAGGED_SELECT = "tagged:profiles!standup_flags_assignee_tag_fkey(id, full_name, email)";
+const FULL_SELECT = `id, task_id, title, note, assignee_tag, created_at, resolved_at, ${TASK_SELECT}, ${TAGGED_SELECT}`;
 
 /** Flag a task for stand-up discussion (or update the note on an existing active flag). */
 export const flagTaskForStandup = createServerFn({ method: "POST" })
@@ -24,7 +31,6 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
     if (!data.taskId) throw new Error("taskId required");
     const note = (data.note ?? "").trim() || null;
 
-    // If there's an existing unresolved flag by this user for this task, update its note.
     const { data: existing } = await supabase
       .from("standup_flags" as never)
       .select("id")
@@ -52,14 +58,26 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
     return { id: (inserted as unknown as { id: string }).id };
   });
 
-/**
- * Resolve the effective user id for a read-only server function.
- * - Default: the authenticated caller.
- * - If the caller passes `asUserId` AND is a super admin (verified server-side
- *   against `super_admins`, never trusting a client flag), the query is
- *   scoped to that user. Any other case falls back to the real caller id.
- * Writes MUST NOT use this — always use `context.userId` for mutations.
- */
+/** Create a free-form agenda note (no task). Optionally tag an assignee. */
+export const createStandupNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { title: string; note?: string | null; assigneeTag?: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const title = (data.title ?? "").trim();
+    if (!title) throw new Error("Title required");
+    const note = (data.note ?? "").trim() || null;
+    const assignee_tag = data.assigneeTag || null;
+
+    const { data: inserted, error } = await supabase
+      .from("standup_flags" as never)
+      .insert({ flagged_by: userId, title, note, assignee_tag } as never)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { id: (inserted as unknown as { id: string }).id };
+  });
+
 async function resolveViewedUserId(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
@@ -75,25 +93,24 @@ async function resolveViewedUserId(
   return data ? asUserId : callerId;
 }
 
-
-/** List the current user's active (unresolved) stand-up flags. */
+/** List the current user's stand-up flags (as the flagger). */
 export const listMyStandupFlags = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { asUserId?: string | null } | undefined) => d ?? {})
+  .inputValidator((d: { asUserId?: string | null; resolved?: boolean } | undefined) => d ?? {})
   .handler(async ({ data, context }): Promise<StandupFlag[]> => {
     const { supabase, userId } = context;
     const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
-    const { data: rows, error } = await supabase
+    let q = supabase
       .from("standup_flags" as never)
-      .select("id, task_id, note, created_at, resolved_at, task:tasks(id, title, status, assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email))")
-      .eq("flagged_by", viewedId)
-      .is("resolved_at", null)
-      .order("created_at", { ascending: true });
+      .select(FULL_SELECT)
+      .eq("flagged_by", viewedId);
+    q = data.resolved ? q.not("resolved_at", "is", null) : q.is("resolved_at", null);
+    const { data: rows, error } = await q.order("created_at", { ascending: !data.resolved });
     if (error) throw new Error(error.message);
     return (rows ?? []) as unknown as StandupFlag[];
   });
 
-/** List active stand-up flags where the current user is the task assignee (for dashboard banner). */
+/** List active stand-up flags where the current user is the task assignee or tagged assignee. */
 export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { asUserId?: string | null } | undefined) => d ?? {})
@@ -102,17 +119,18 @@ export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
     const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
     const { data: rows, error } = await supabase
       .from("standup_flags" as never)
-      .select("id, task_id, note, created_at, task:tasks!inner(id, title, assignee_id)")
+      .select(`id, task_id, title, note, assignee_tag, created_at, flagger:profiles!standup_flags_flagger_profile_fkey(id, full_name, email), task:tasks(id, title, assignee_id)`)
       .is("resolved_at", null)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const list = (rows ?? []) as unknown as Array<{
-      id: string; task_id: string; note: string | null; created_at: string;
+      id: string; task_id: string | null; title: string | null; note: string | null;
+      assignee_tag: string | null; created_at: string;
+      flagger: { id: string; full_name: string | null; email: string | null } | null;
       task: { id: string; title: string; assignee_id: string | null } | null;
     }>;
-    return list.filter((r) => r.task?.assignee_id === viewedId);
+    return list.filter((r) => r.assignee_tag === viewedId || r.task?.assignee_id === viewedId);
   });
-
 
 /** Get the active flag for a given task (for the current user), or null. */
 export const getMyStandupFlagForTask = createServerFn({ method: "GET" })

@@ -8,6 +8,8 @@ import {
   type PunchInResult,
   type PunchSessionResult,
 } from "@/lib/punch.functions";
+import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
+import { STANDUP_MEET_URL } from "@/lib/standup-cutoff";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -57,6 +59,8 @@ export function QuickPunchControl({
     },
   });
 
+  const listStandupFn = useServerFn(listStandupFlagsForMeAsAssignee);
+
   async function handlePunchIn() {
     if (!me || punchingIn || openSession) return;
     setPunchingIn(true);
@@ -65,6 +69,25 @@ export function QuickPunchControl({
       toast.success(
         result.status === "already_open" ? "You are already punched in — refreshed." : "Punched in",
       );
+
+      // Stand-up awareness — surface active flags at punch-in time.
+      try {
+        const flags = await listStandupFn({ data: {} });
+        if (flags && flags.length > 0) {
+          const flaggers = Array.from(new Set(
+            flags.map((f) => f.flagger?.full_name).filter(Boolean) as string[],
+          ));
+          const withWho = flaggers.length === 0 ? "" :
+            flaggers.length === 1 ? ` with ${flaggers[0]}` :
+            flaggers.length === 2 ? ` with ${flaggers[0]} and ${flaggers[1]}` :
+            ` with ${flaggers[0]}, ${flaggers[1]} +${flaggers.length - 2} more`;
+          toast(`You have ${flags.length} item${flags.length === 1 ? "" : "s"} to discuss${withWho} at today's stand-up`, {
+            duration: 10000,
+            action: { label: "Join Meet", onClick: () => window.open(STANDUP_MEET_URL, "_blank", "noopener,noreferrer") },
+          });
+        }
+      } catch { /* non-fatal */ }
+
       await Promise.all([
         refetch(),
         qc.invalidateQueries({ queryKey: ["quick-punch-session"] }),

@@ -23,6 +23,7 @@ import { Route as AuthenticatedVendorsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedTimesheetRouteImport } from './routes/_authenticated/timesheet'
 import { Route as AuthenticatedTeamRouteImport } from './routes/_authenticated/team'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
+import { Route as AuthenticatedStandupRouteImport } from './routes/_authenticated/standup'
 import { Route as AuthenticatedResourcesRouteImport } from './routes/_authenticated/resources'
 import { Route as AuthenticatedPunchRouteImport } from './routes/_authenticated/punch'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
@@ -119,6 +120,11 @@ const AuthenticatedTeamRoute = AuthenticatedTeamRouteImport.update({
 const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedStandupRoute = AuthenticatedStandupRouteImport.update({
+  id: '/standup',
+  path: '/standup',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedResourcesRoute = AuthenticatedResourcesRouteImport.update({
@@ -299,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
+  '/standup': typeof AuthenticatedStandupRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
@@ -342,6 +349,7 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthenticatedProjectsRoute
   '/punch': typeof AuthenticatedPunchRoute
   '/resources': typeof AuthenticatedResourcesRoute
+  '/standup': typeof AuthenticatedStandupRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/team': typeof AuthenticatedTeamRoute
   '/timesheet': typeof AuthenticatedTimesheetRoute
@@ -387,6 +395,7 @@ export interface FileRoutesById {
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/punch': typeof AuthenticatedPunchRoute
   '/_authenticated/resources': typeof AuthenticatedResourcesRoute
+  '/_authenticated/standup': typeof AuthenticatedStandupRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/team': typeof AuthenticatedTeamRoute
   '/_authenticated/timesheet': typeof AuthenticatedTimesheetRoute
@@ -432,6 +441,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/punch'
     | '/resources'
+    | '/standup'
     | '/tasks'
     | '/team'
     | '/timesheet'
@@ -475,6 +485,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/punch'
     | '/resources'
+    | '/standup'
     | '/tasks'
     | '/team'
     | '/timesheet'
@@ -519,6 +530,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projects'
     | '/_authenticated/punch'
     | '/_authenticated/resources'
+    | '/_authenticated/standup'
     | '/_authenticated/tasks'
     | '/_authenticated/team'
     | '/_authenticated/timesheet'
@@ -646,6 +658,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof AuthenticatedTasksRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/standup': {
+      id: '/_authenticated/standup'
+      path: '/standup'
+      fullPath: '/standup'
+      preLoaderRoute: typeof AuthenticatedStandupRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/resources': {
@@ -869,6 +888,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedPunchRoute: typeof AuthenticatedPunchRoute
   AuthenticatedResourcesRoute: typeof AuthenticatedResourcesRoute
+  AuthenticatedStandupRoute: typeof AuthenticatedStandupRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedTeamRoute: typeof AuthenticatedTeamRoute
   AuthenticatedTimesheetRoute: typeof AuthenticatedTimesheetRoute
@@ -902,6 +922,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedPunchRoute: AuthenticatedPunchRoute,
   AuthenticatedResourcesRoute: AuthenticatedResourcesRoute,
+  AuthenticatedStandupRoute: AuthenticatedStandupRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedTeamRoute: AuthenticatedTeamRoute,
   AuthenticatedTimesheetRoute: AuthenticatedTimesheetRoute,
@@ -942,13 +963,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -62,7 +62,7 @@ export function NotificationsBell({ userId }: { userId: string }) {
     refetchOnWindowFocus: true,
     staleTime: 60_000,
   });
-  const standupItems = (standupFlags ?? []).filter((f) => isBeforeStandupCutoff(f.created_at));
+  const standupItems = standupFlags ?? [];
 
   useEffect(() => {
     if (!userId) return;

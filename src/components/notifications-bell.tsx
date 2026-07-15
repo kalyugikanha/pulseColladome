@@ -35,6 +35,7 @@ function iconFor(kind: string) {
 export function NotificationsBell({ userId }: { userId: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { viewAsUserId } = useViewAs();
   const [open, setOpen] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
@@ -53,6 +54,16 @@ export function NotificationsBell({ userId }: { userId: string }) {
     },
   });
 
+  // Stand-up flags where the (viewed) user is the assignee, active before today's 11am cutoff.
+  const listStandupFn = useServerFn(listStandupFlagsForMeAsAssignee);
+  const { data: standupFlags } = useQuery({
+    queryKey: ["standup-flags", "assignee", viewAsUserId ?? "self"],
+    queryFn: () => listStandupFn({ data: { asUserId: viewAsUserId ?? null } }),
+    refetchOnWindowFocus: true,
+    staleTime: 60_000,
+  });
+  const standupItems = (standupFlags ?? []).filter((f) => isBeforeStandupCutoff(f.created_at));
+
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -67,6 +78,8 @@ export function NotificationsBell({ userId }: { userId: string }) {
   }, [userId, qc]);
 
   const unread = (notifications ?? []).filter((n) => !n.read_at);
+  const totalCount = unread.length + standupItems.length;
+
 
   async function markRead(n: Notif) {
     if (!n.read_at) {

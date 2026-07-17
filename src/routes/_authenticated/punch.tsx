@@ -220,7 +220,7 @@ export function PunchPage() {
     queryFn: async () => (await supabase.from("attendance_logs").select("date,total_hours,punch_in_time,punch_out_time").eq("user_id", punchUserId!).order("date", { ascending: false }).limit(14)).data ?? [],
   });
 
-  const openSession = sessions?.find((s) => !s.punch_out_time) ?? null;
+  const openSession = openSessionAnyDay ?? sessions?.find((s) => !s.punch_out_time) ?? null;
   const closedSessions = (sessions ?? []).filter((s) => s.punch_out_time);
   const totalToday = closedSessions.reduce((s, r) => s + Number(r.hours ?? 0), 0);
 

@@ -59,9 +59,6 @@ export function QuickPunchControl({
       return ((data ?? [])[0] ?? null) as PunchSessionResult | null;
     },
   });
-      return ((data ?? [])[0] ?? null) as PunchSessionResult | null;
-    },
-  });
 
   const listStandupFn = useServerFn(listStandupFlagsForMeAsAssignee);
 

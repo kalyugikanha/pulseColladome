@@ -95,6 +95,26 @@ export function PunchPage() {
     },
   });
 
+  // Separate, date-agnostic query so a session left open from a previous day
+  // still surfaces "Punch out" / opens the punch-out dialog correctly today.
+  const { data: openSessionAnyDay, refetch: refetchOpenSession } = useQuery({
+    queryKey: ["punch-open-session", punchUserId],
+    enabled: !!punchUserId,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from("punch_sessions")
+        .select("*")
+        .eq("user_id", punchUserId!)
+        .is("punch_out_time", null)
+        .order("punch_in_time", { ascending: false })
+        .limit(1);
+      return ((data ?? [])[0] ?? null) as Session | null;
+    },
+  });
+
   const { data: projects } = useQuery({
     queryKey: ["projects-for-log"],
     enabled: !!me,

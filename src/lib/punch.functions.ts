@@ -177,11 +177,12 @@ export const punchIn = createServerFn({ method: "POST" })
     const { db, targetUserId, onBehalfOf } = await resolvePunchIdentity(context);
     const supabase = db as any;
 
+    // Date-agnostic: any still-open session (today or a prior day) counts as "already open".
+    // A session accrues real elapsed hours until the user explicitly punches out.
     const { data: existingToday, error: existingError } = await supabase
       .from("punch_sessions")
       .select("*")
       .eq("user_id", targetUserId)
-      .eq("session_date", data.sessionDate)
       .is("punch_out_time", null)
       .order("punch_in_time", { ascending: false })
       .limit(1)

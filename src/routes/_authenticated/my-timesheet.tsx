@@ -276,13 +276,9 @@ export function MyTimesheetPage() {
                             : <Badge variant="outline">Pending</Badge>}
                       </TableCell>
                       <TableCell>
-                        {r.taskId ? (
-                          <span className="text-xs text-muted-foreground">via task</span>
-                        ) : (
-                          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditor({ date: r.date })}>
-                            <Pencil className="h-3 w-3 mr-1" /> {r.approved ? "View" : "Edit"}
-                          </Button>
-                        )}
+                        <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditor({ date: r.date })}>
+                          <Pencil className="h-3 w-3 mr-1" /> {r.approved ? "View" : "Edit"}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );

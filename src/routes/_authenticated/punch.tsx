@@ -255,7 +255,7 @@ export function PunchPage() {
         });
       }
       toast.success(result.status === "already_open" ? "You are already punched in — refreshed." : "Punched in");
-      await refetchSessions();
+      await Promise.all([refetchSessions(), refetchOpenSession()]);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["punch-sessions-today"] }),
         qc.invalidateQueries({ queryKey: ["punch-history"] }),

@@ -335,7 +335,7 @@ export function PunchPage() {
       qc.setQueryData<Session[]>(["punch-sessions-today", punchUserId], (old = []) => old.map((row) => row.id === result.session.id ? result.session as Session : row));
       setUnlogged({ balance: Number(result.unloggedBalance ?? 0), since: result.unloggedSince ?? null });
       setUnloggedDismissed(false);
-      await refetchSessions();
+      await Promise.all([refetchSessions(), refetchOpenSession()]);
       if (opts.skip) {
         toast.success("Punched out — you can log hours later.");
       } else {

@@ -46,15 +46,19 @@ export function QuickPunchControl({
     refetchOnWindowFocus: true,
     staleTime: 15_000,
     queryFn: async () => {
+      // Date-agnostic: catch sessions left open from an earlier day so the UI
+      // shows "Punch out" instead of offering a duplicate "Punch in".
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
         .from("punch_sessions")
         .select("*")
         .eq("user_id", userId!)
-        .eq("session_date", today)
         .is("punch_out_time", null)
         .order("punch_in_time", { ascending: false })
         .limit(1);
+      return ((data ?? [])[0] ?? null) as PunchSessionResult | null;
+    },
+  });
       return ((data ?? [])[0] ?? null) as PunchSessionResult | null;
     },
   });

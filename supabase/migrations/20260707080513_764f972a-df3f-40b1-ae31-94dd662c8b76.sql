@@ -1,0 +1,2 @@
+ALTER TABLE public.punch_sessions ADD COLUMN IF NOT EXISTS primary_task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS punch_sessions_primary_task_id_idx ON public.punch_sessions(primary_task_id);

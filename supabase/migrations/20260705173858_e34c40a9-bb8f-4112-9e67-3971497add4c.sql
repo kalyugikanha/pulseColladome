@@ -1,0 +1,1 @@
+ALTER TABLE public.punch_sessions ADD COLUMN IF NOT EXISTS allocations jsonb NOT NULL DEFAULT '[]'::jsonb;

@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.generate_recurring_task_occurrences() TO authenticated;

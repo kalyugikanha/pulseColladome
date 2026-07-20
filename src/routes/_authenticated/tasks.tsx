@@ -291,22 +291,12 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     queryKey: ["projects-list-lite"],
     queryFn: async () => (await supabase.from("projects").select("id, code, name").order("code")).data as Array<{ id: string; code: string | null; name: string | null }> ?? [],
   });
-  const [assigneeFilter, setAssigneeFilter] = useState("");
   const { data: people } = useQuery({
     queryKey: ["assignable-users"],
     queryFn: async () => {
       const { data } = await supabase.rpc("list_assignable_users");
       return (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null; department: string | null }>;
     },
-  });
-  const filteredPeople = (people ?? []).filter((p) => {
-    if (!assigneeFilter.trim()) return true;
-    const q = assigneeFilter.toLowerCase();
-    return (
-      (p.full_name ?? "").toLowerCase().includes(q) ||
-      (p.email ?? "").toLowerCase().includes(q) ||
-      (p.department ?? "").toLowerCase().includes(q)
-    );
   });
   const { data: templates } = useQuery({
     queryKey: ["workflow-templates"], enabled: open,

@@ -284,8 +284,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly">("none");
   const [repeatDays, setRepeatDays] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => { if (open) { setAssignee(defaultAssigneeId ?? ""); } }, [open, defaultAssigneeId]);
+  useEffect(() => { if (open) { setAssignees(defaultAssigneeId ? [defaultAssigneeId] : []); } }, [open, defaultAssigneeId]);
 
   const { data: projects } = useQuery({
     queryKey: ["projects-list-lite"],

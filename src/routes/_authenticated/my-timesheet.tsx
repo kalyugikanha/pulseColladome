@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_authenticated/my-timesheet")({
 });
 
 type Task = { project_code?: string; project_name?: string; hours?: number; approved_hours?: number; comments?: string; approval_note?: string; task_id?: string; task_title?: string };
-type LogRow = { id: string; date: string; tasks: Task[] | null; approved_at: string | null };
+type LogRow = { id: string; date: string; tasks: Task[] | null; approved_at: string | null; total_hours: number | null };
 
 type ViewMode = "month" | "range" | "day";
 

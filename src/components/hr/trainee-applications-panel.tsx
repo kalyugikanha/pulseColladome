@@ -61,7 +61,10 @@ export function HrTraineeApplicationsPage() {
     setBusyId(app.id);
     try {
       await approveFn({ data: { id: app.id } });
-      toast.success(`Approved — ${app.email} can now sign in as a trainee.`);
+      toast.success(
+        `Approved — ${app.email} can now sign in with the temporary password Test@123 (they'll be asked to set their own on first login).`,
+        { duration: 10000 },
+      );
       qc.invalidateQueries({ queryKey: ["trainee-applications"] });
       qc.invalidateQueries({ queryKey: ["role-grants"] });
     } catch (e) {
@@ -106,8 +109,9 @@ export function HrTraineeApplicationsPage() {
         </h2>
         <p className="text-sm text-muted-foreground">
           Applications submitted through the public <code className="px-1 rounded bg-muted">/apply</code> page.
-          Approving grants the applicant the <strong>trainee</strong> role — they can then sign in with Google
-          using the email they submitted.
+          Approving provisions a login for the applicant with the temporary password{" "}
+          <code className="px-1 rounded bg-muted">Test@123</code> and grants the{" "}
+          <strong>trainee</strong> role — please relay the password to them.
         </p>
       </div>
 

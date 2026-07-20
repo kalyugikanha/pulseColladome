@@ -76,7 +76,7 @@ export const approveTraineeApplication = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: app, error: fetchErr } = await supabaseAdmin
       .from("trainee_applications")
-      .select("id, email, status")
+      .select("id, email, full_name, status")
       .eq("id", data.id)
       .maybeSingle();
     if (fetchErr) throw new Error(fetchErr.message);
@@ -84,10 +84,30 @@ export const approveTraineeApplication = createServerFn({ method: "POST" })
     if (app.status !== "pending") throw new Error("Application has already been reviewed");
 
     const email = app.email.toLowerCase();
+    const full_name = (app.full_name ?? email.split("@")[0]).trim();
+
     const { error: grantErr } = await supabaseAdmin
       .from("role_grants")
-      .upsert({ email, role: "trainee", is_super_admin: false }, { onConflict: "email" });
+      .upsert(
+        { email, role: "trainee", is_super_admin: false },
+        { onConflict: "email" },
+      );
     if (grantErr) throw new Error(grantErr.message);
+
+    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: "Test@123",
+      email_confirm: true,
+      user_metadata: { full_name },
+    });
+    // Ignore "already exists" so approvals remain idempotent.
+    if (createErr && !/already (registered|exists)|duplicate/i.test(createErr.message)) {
+      throw new Error(createErr.message);
+    }
+    const newId = created?.user?.id;
+    if (newId) {
+      await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", newId);
+    }
 
     const { error: updErr } = await supabaseAdmin
       .from("trainee_applications")
@@ -99,7 +119,7 @@ export const approveTraineeApplication = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
     if (updErr) throw new Error(updErr.message);
-    return { ok: true, email };
+    return { ok: true, email, temporary_password: "Test@123" as const };
   });
 
 export const rejectTraineeApplication = createServerFn({ method: "POST" })

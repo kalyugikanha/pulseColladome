@@ -173,6 +173,21 @@ export function EditTaskDialog({
               </Select>
             </div>
           </div>
+          <div className="space-y-1">
+            <Label>Also assign to others</Label>
+            <AssigneeMultiSelect
+              people={roster}
+              value={extraAssignees}
+              onChange={setExtraAssignees}
+              placeholder="Copy this task to more teammates"
+              excludeIds={assignee ? [assignee] : []}
+            />
+            {extraAssignees.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Saving will create {extraAssignees.length} additional {extraAssignees.length === 1 ? "task" : "tasks"} with the same details.
+              </p>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
             <div className="space-y-1"><Label>Scheduled post date</Label><Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} /></div>

@@ -323,6 +323,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   async function submit() {
     if (!title.trim()) return toast.error("Title required");
     if (!projectId) return toast.error("Project required");
+    if (assignees.length === 0) return toast.error("Pick at least one assignee");
     if (repeat === "weekly" && repeatDays.size === 0) return toast.error("Pick at least one weekday");
     const estNum = estimate.trim() === "" ? null : Number(estimate);
     if (estNum !== null && (!Number.isFinite(estNum) || estNum < 0)) {
@@ -332,28 +333,49 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     setBusy(true);
     try {
       if (wfMode && wfTemplateId) {
-        await startWfFn({ data: {
-          templateId: wfTemplateId, projectId, title: title.trim(),
-          description: desc.trim() || null, dueDate: due || null,
-          assigneeId: assignee || null, priority: pri,
-        }});
+        let ok = 0;
+        const fails: string[] = [];
+        for (const aid of assignees) {
+          try {
+            await startWfFn({ data: {
+              templateId: wfTemplateId, projectId, title: title.trim(),
+              description: desc.trim() || null, dueDate: due || null,
+              assigneeId: aid, priority: pri,
+            }});
+            ok++;
+          } catch (e) {
+            const name = (people ?? []).find((p) => p.id === aid)?.full_name ?? aid;
+            fails.push(`${name}: ${(e as Error).message}`);
+          }
+        }
+        toast.success(`Created ${ok} ${ok === 1 ? "task" : "tasks"}`);
+        if (fails.length) toast.error(`Failed for: ${fails.join("; ")}`);
       } else {
-        const created = await createFn({ data: {
+        const res = await createBulkFn({ data: {
           projectId, title: title.trim(), description: desc.trim(),
           dueDate: due || null, priority: pri,
-          assigneeId: assignee || defaultAssigneeId!, assetLinks: cleanLinks,
+          assigneeIds: assignees, assetLinks: cleanLinks,
           domainId: null, departmentId: null, taskTypeIds: [],
           estimatedHours: estNum,
           recurrence: repeat === "none"
             ? null
             : { freq: repeat, days: repeat === "weekly" ? Array.from(repeatDays).sort() : [] },
         }});
-        const newId = (created as unknown as { id?: string } | null)?.id;
-        if (newId && repeat === "none" && postDate) {
-          await updateFn({ data: { taskId: newId, patch: { scheduled_post_date: postDate } } });
+        if (repeat === "none" && postDate) {
+          for (const tid of res.taskIds) {
+            await updateFn({ data: { taskId: tid, patch: { scheduled_post_date: postDate } } });
+          }
+        }
+        const n = res.createdCount;
+        toast.success(`Created ${n} ${n === 1 ? "task" : "tasks"}${repeat !== "none" ? " (recurring)" : ""}`);
+        if (res.failures.length > 0) {
+          const names = res.failures.map((f) => {
+            const name = (people ?? []).find((p) => p.id === f.assigneeId)?.full_name ?? f.assigneeId;
+            return `${name}: ${f.message}`;
+          });
+          toast.error(`Failed for: ${names.join("; ")}`);
         }
       }
-      toast.success(repeat === "none" ? "Task created" : "Recurring task saved");
       setTitle(""); setDesc(""); setDue(""); setPostDate(""); setEstimate(""); setLinks([]);
       setProjectId(""); setWfTemplateId(""); setWfMode(false);
       setRepeat("none"); setRepeatDays(new Set());

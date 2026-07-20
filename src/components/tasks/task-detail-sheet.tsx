@@ -753,16 +753,46 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
         />
         <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete this task?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently remove the task and its comments, checklist, activity, and stage history. This cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={doDelete} disabled={deleteBusy}>{deleteBusy ? "Deleting…" : "Delete"}</AlertDialogAction>
-            </AlertDialogFooter>
+            {isRecurringTask(task as never) ? (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete recurring task?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This task is part of a recurring series. Choose whether to delete just this occurrence or the entire series.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => doDelete("single")}
+                    disabled={deleteBusy}
+                  >
+                    {deleteBusy ? "Deleting…" : "Delete just this occurrence"}
+                  </AlertDialogAction>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => doDelete("series")}
+                    disabled={deleteBusy}
+                  >
+                    {deleteBusy ? "Deleting…" : "Delete this entire series"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove the task and its comments, checklist, activity, and stage history. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => doDelete("single")} disabled={deleteBusy}>{deleteBusy ? "Deleting…" : "Delete"}</AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )}
           </AlertDialogContent>
         </AlertDialog>
         <MarkDoneDialog

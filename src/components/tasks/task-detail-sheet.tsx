@@ -262,21 +262,24 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     (myDept ?? "").toLowerCase() === "marketing"
   );
 
-  async function doDelete() {
+  async function doDelete(mode: "single" | "series" = "single") {
     if (!task || deleteBusy) return;
     setDeleteBusy(true);
     try {
+      const ids: string[] = [task.id];
+      const parentId = (task as { recurrence_parent_id?: string | null }).recurrence_parent_id ?? null;
+      if (mode === "series" && parentId) ids.push(parentId);
       const { data, error } = await supabase
         .from("tasks")
         .delete()
-        .eq("id", task.id)
+        .in("id", ids)
         .select("id");
       if (error) { toast.error(error.message); return; }
       if (!data || data.length === 0) {
         toast.error("Couldn't delete this task — you may not have permission.");
         return;
       }
-      toast.success("Task deleted");
+      toast.success(mode === "series" ? "Recurring series deleted" : "Task deleted");
       setDeleteOpen(false);
       onClose();
       await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });

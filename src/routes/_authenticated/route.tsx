@@ -194,10 +194,21 @@ function AuthenticatedLayout() {
       } else if (pathname === "/onboarding-pending" && needsInput) {
         router.navigate({ to: "/complete-onboarding", replace: true });
       }
+      return;
     }
-
-
-
+    // Trainee guard: only Dashboard, Tasks, Learning are reachable.
+    if (user.isTrainee) {
+      const allowed = (p: string) =>
+        p === "/dashboard" ||
+        p === "/tasks" || p.startsWith("/tasks/") ||
+        p === "/learning" || p.startsWith("/learning/") ||
+        p === "/complete-onboarding" ||
+        p === "/change-password" ||
+        p === "/onboarding-pending";
+      if (!allowed(pathname)) {
+        router.navigate({ to: "/dashboard", replace: true });
+      }
+    }
   }, [user, pathname, router]);
 
   if (isLoading || !user) {

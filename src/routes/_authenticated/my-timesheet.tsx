@@ -255,6 +255,28 @@ export function MyTimesheetPage() {
               <TableBody>
                 {filteredRows.map((r, i) => {
                   const reduced = r.approvedHours != null && r.approvedHours < r.hours;
+                  if (r.unallocated) {
+                    return (
+                      <TableRow key={`unalloc-${r.date}-${i}`} className="bg-amber-50/60 dark:bg-amber-950/20">
+                        <TableCell className="text-xs">{format(new Date(r.date + "T00:00:00"), "d MMM")}</TableCell>
+                        <TableCell colSpan={2}>
+                          <div className="text-sm font-medium text-amber-900 dark:text-amber-200">Unallocated — hours not yet logged to a task</div>
+                          <div className="text-xs text-muted-foreground">You punched in this day but skipped the task allocation.</div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-amber-900 dark:text-amber-200">{r.hours.toFixed(1)}</TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
+                        <TableCell />
+                        <TableCell>
+                          <Badge variant="outline" className="text-amber-700 border-amber-500/60">Needs logging</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditor({ date: r.date })}>
+                            <Pencil className="h-3 w-3 mr-1" /> Log
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
                   return (
                     <TableRow key={`${r.date}-${r.code}-${i}`}>
                       <TableCell className="text-xs">{format(new Date(r.date + "T00:00:00"), "d MMM")}</TableCell>

@@ -152,7 +152,7 @@ export function MyTimesheetPage() {
 
   const distinctProjects = useMemo(() => {
     const map = new Map<string, string>();
-    for (const r of rows) map.set(r.code, r.name);
+    for (const r of rows) if (!r.unallocated) map.set(r.code, r.name);
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [rows]);
 

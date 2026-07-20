@@ -47,6 +47,7 @@ export function EditTaskDialog({
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [estimate, setEstimate] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [extraAssignees, setExtraAssignees] = useState<string[]>([]);
 
   const { data: projects } = useQuery({
     queryKey: ["projects-active"], enabled: open,

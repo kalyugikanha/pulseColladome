@@ -100,7 +100,11 @@ export const listMyStandupFlags = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<StandupFlag[]> => {
     const { supabase, userId } = context;
     const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
-    let q = supabase
+    const client =
+      viewedId !== userId
+        ? (await import("@/integrations/supabase/client.server")).supabaseAdmin
+        : supabase;
+    let q = client
       .from("standup_flags" as never)
       .select(FULL_SELECT)
       .eq("flagged_by", viewedId);
@@ -117,7 +121,11 @@ export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
-    let q = supabase
+    const client =
+      viewedId !== userId
+        ? (await import("@/integrations/supabase/client.server")).supabaseAdmin
+        : supabase;
+    let q = client
       .from("standup_flags" as never)
       .select(`id, task_id, title, note, assignee_tag, created_at, resolved_at, flagged_by, flagger:profiles!standup_flags_flagger_profile_fkey(id, full_name, email), task:tasks(id, title, status, assignee_id, assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email))`);
     q = data.resolved ? q.not("resolved_at", "is", null) : q.is("resolved_at", null);

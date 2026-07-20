@@ -56,7 +56,7 @@ export function MyTimesheetPage() {
     enabled: !!me?.id,
     queryFn: async () => {
       const { data, error } = await supabase.from("attendance_logs")
-        .select("id, date, tasks, approved_at")
+        .select("id, date, tasks, approved_at, total_hours")
         .eq("user_id", me!.id)
         .gte("date", startIso).lt("date", endIso)
         .order("date");

@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { updateTaskFields } from "@/lib/tasks-workflow.functions";
+import { createTasksBulk } from "@/lib/tasks-plus.functions";
+import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
 import { useViewAs } from "@/hooks/use-view-as";
 
 type EditableTask = {

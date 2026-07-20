@@ -22,7 +22,7 @@ import { MarkDoneDialog } from "./mark-done-dialog";
 import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
 import { StandupFlagButton } from "./standup-flag-button";
-import { RecurringBadge } from "./recurring-badge";
+import { RecurringBadge, isRecurringTask } from "./recurring-badge";
 import { OverdueBadge } from "./overdue-badge";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer,
@@ -262,21 +262,24 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     (myDept ?? "").toLowerCase() === "marketing"
   );
 
-  async function doDelete() {
+  async function doDelete(mode: "single" | "series" = "single") {
     if (!task || deleteBusy) return;
     setDeleteBusy(true);
     try {
+      const ids: string[] = [task.id];
+      const parentId = (task as { recurrence_parent_id?: string | null }).recurrence_parent_id ?? null;
+      if (mode === "series" && parentId) ids.push(parentId);
       const { data, error } = await supabase
         .from("tasks")
         .delete()
-        .eq("id", task.id)
+        .in("id", ids)
         .select("id");
       if (error) { toast.error(error.message); return; }
       if (!data || data.length === 0) {
         toast.error("Couldn't delete this task — you may not have permission.");
         return;
       }
-      toast.success("Task deleted");
+      toast.success(mode === "series" ? "Recurring series deleted" : "Task deleted");
       setDeleteOpen(false);
       onClose();
       await qc.invalidateQueries({ queryKey: ["mkt-kanban"] });
@@ -750,16 +753,46 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
         />
         <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete this task?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently remove the task and its comments, checklist, activity, and stage history. This cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={doDelete} disabled={deleteBusy}>{deleteBusy ? "Deleting…" : "Delete"}</AlertDialogAction>
-            </AlertDialogFooter>
+            {isRecurringTask(task as never) ? (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete recurring task?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This task is part of a recurring series. Choose whether to delete just this occurrence or the entire series.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => doDelete("single")}
+                    disabled={deleteBusy}
+                  >
+                    {deleteBusy ? "Deleting…" : "Delete just this occurrence"}
+                  </AlertDialogAction>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => doDelete("series")}
+                    disabled={deleteBusy}
+                  >
+                    {deleteBusy ? "Deleting…" : "Delete this entire series"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            ) : (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently remove the task and its comments, checklist, activity, and stage history. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => doDelete("single")} disabled={deleteBusy}>{deleteBusy ? "Deleting…" : "Delete"}</AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )}
           </AlertDialogContent>
         </AlertDialog>
         <MarkDoneDialog

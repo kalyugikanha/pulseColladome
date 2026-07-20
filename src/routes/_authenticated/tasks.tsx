@@ -20,7 +20,8 @@ import { toast } from "sonner";
 import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board/board-kanban";
 import { RecurringBadge } from "@/components/tasks/recurring-badge";
 import { OverdueBadge, isOverdue } from "@/components/tasks/overdue-badge";
-import { createTaskFull } from "@/lib/tasks-plus.functions";
+import { createTaskFull, createTasksBulk } from "@/lib/tasks-plus.functions";
+import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
 import { updateTaskFields } from "@/lib/tasks-workflow.functions";
 import { startWorkflow, listWorkflowTemplates } from "@/lib/workflows.functions";
 import { TaxonomyPage } from "./admin.taxonomy";
@@ -265,6 +266,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   onCreated?: () => void;
 }) {
   const createFn = useServerFn(createTaskFull);
+  const createBulkFn = useServerFn(createTasksBulk);
   const updateFn = useServerFn(updateTaskFields);
   const startWfFn = useServerFn(startWorkflow);
   const listWf = useServerFn(listWorkflowTemplates);
@@ -277,35 +279,24 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [pri, setPri] = useState<"low" | "medium" | "high">("medium");
   const [projectId, setProjectId] = useState("");
-  const [assignee, setAssignee] = useState<string>(defaultAssigneeId ?? "");
+  const [assignees, setAssignees] = useState<string[]>(defaultAssigneeId ? [defaultAssigneeId] : []);
   const [wfMode, setWfMode] = useState(false);
   const [wfTemplateId, setWfTemplateId] = useState<string>("");
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly">("none");
   const [repeatDays, setRepeatDays] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => { if (open) { setAssignee(defaultAssigneeId ?? ""); } }, [open, defaultAssigneeId]);
+  useEffect(() => { if (open) { setAssignees(defaultAssigneeId ? [defaultAssigneeId] : []); } }, [open, defaultAssigneeId]);
 
   const { data: projects } = useQuery({
     queryKey: ["projects-list-lite"],
     queryFn: async () => (await supabase.from("projects").select("id, code, name").order("code")).data as Array<{ id: string; code: string | null; name: string | null }> ?? [],
   });
-  const [assigneeFilter, setAssigneeFilter] = useState("");
   const { data: people } = useQuery({
     queryKey: ["assignable-users"],
     queryFn: async () => {
       const { data } = await supabase.rpc("list_assignable_users");
       return (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null; department: string | null }>;
     },
-  });
-  const filteredPeople = (people ?? []).filter((p) => {
-    if (!assigneeFilter.trim()) return true;
-    const q = assigneeFilter.toLowerCase();
-    return (
-      (p.full_name ?? "").toLowerCase().includes(q) ||
-      (p.email ?? "").toLowerCase().includes(q) ||
-      (p.department ?? "").toLowerCase().includes(q)
-    );
   });
   const { data: templates } = useQuery({
     queryKey: ["workflow-templates"], enabled: open,
@@ -323,6 +314,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   async function submit() {
     if (!title.trim()) return toast.error("Title required");
     if (!projectId) return toast.error("Project required");
+    if (assignees.length === 0) return toast.error("Pick at least one assignee");
     if (repeat === "weekly" && repeatDays.size === 0) return toast.error("Pick at least one weekday");
     const estNum = estimate.trim() === "" ? null : Number(estimate);
     if (estNum !== null && (!Number.isFinite(estNum) || estNum < 0)) {
@@ -332,28 +324,49 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     setBusy(true);
     try {
       if (wfMode && wfTemplateId) {
-        await startWfFn({ data: {
-          templateId: wfTemplateId, projectId, title: title.trim(),
-          description: desc.trim() || null, dueDate: due || null,
-          assigneeId: assignee || null, priority: pri,
-        }});
+        let ok = 0;
+        const fails: string[] = [];
+        for (const aid of assignees) {
+          try {
+            await startWfFn({ data: {
+              templateId: wfTemplateId, projectId, title: title.trim(),
+              description: desc.trim() || null, dueDate: due || null,
+              assigneeId: aid, priority: pri,
+            }});
+            ok++;
+          } catch (e) {
+            const name = (people ?? []).find((p) => p.id === aid)?.full_name ?? aid;
+            fails.push(`${name}: ${(e as Error).message}`);
+          }
+        }
+        toast.success(`Created ${ok} ${ok === 1 ? "task" : "tasks"}`);
+        if (fails.length) toast.error(`Failed for: ${fails.join("; ")}`);
       } else {
-        const created = await createFn({ data: {
+        const res = await createBulkFn({ data: {
           projectId, title: title.trim(), description: desc.trim(),
           dueDate: due || null, priority: pri,
-          assigneeId: assignee || defaultAssigneeId!, assetLinks: cleanLinks,
+          assigneeIds: assignees, assetLinks: cleanLinks,
           domainId: null, departmentId: null, taskTypeIds: [],
           estimatedHours: estNum,
           recurrence: repeat === "none"
             ? null
             : { freq: repeat, days: repeat === "weekly" ? Array.from(repeatDays).sort() : [] },
         }});
-        const newId = (created as unknown as { id?: string } | null)?.id;
-        if (newId && repeat === "none" && postDate) {
-          await updateFn({ data: { taskId: newId, patch: { scheduled_post_date: postDate } } });
+        if (repeat === "none" && postDate) {
+          for (const tid of res.taskIds) {
+            await updateFn({ data: { taskId: tid, patch: { scheduled_post_date: postDate } } });
+          }
+        }
+        const n = res.createdCount;
+        toast.success(`Created ${n} ${n === 1 ? "task" : "tasks"}${repeat !== "none" ? " (recurring)" : ""}`);
+        if (res.failures.length > 0) {
+          const names = res.failures.map((f) => {
+            const name = (people ?? []).find((p) => p.id === f.assigneeId)?.full_name ?? f.assigneeId;
+            return `${name}: ${f.message}`;
+          });
+          toast.error(`Failed for: ${names.join("; ")}`);
         }
       }
-      toast.success(repeat === "none" ? "Task created" : "Recurring task saved");
       setTitle(""); setDesc(""); setDue(""); setPostDate(""); setEstimate(""); setLinks([]);
       setProjectId(""); setWfTemplateId(""); setWfMode(false);
       setRepeat("none"); setRepeatDays(new Set());
@@ -430,28 +443,13 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs">Assignee</Label>
-              <Select value={assignee} onValueChange={setAssignee}>
-                <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <div className="p-1 sticky top-0 bg-popover z-10">
-                    <Input
-                      placeholder="Search name, email, department…"
-                      value={assigneeFilter}
-                      onChange={(e) => setAssigneeFilter(e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  {filteredPeople.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {(p.full_name ?? p.email)}{p.department ? ` · ${p.department}` : ""}
-                    </SelectItem>
-                  ))}
-                  {filteredPeople.length === 0 && (
-                    <div className="px-2 py-3 text-xs text-muted-foreground">No matches</div>
-                  )}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs">Assignees</Label>
+              <AssigneeMultiSelect
+                people={people ?? []}
+                value={assignees}
+                onChange={setAssignees}
+                placeholder="Pick teammates"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Estimated hours</Label>

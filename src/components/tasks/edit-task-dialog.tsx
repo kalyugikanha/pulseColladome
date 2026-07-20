@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { updateTaskFields } from "@/lib/tasks-workflow.functions";
+import { createTasksBulk } from "@/lib/tasks-plus.functions";
+import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
 import { useViewAs } from "@/hooks/use-view-as";
 
 type EditableTask = {
@@ -45,6 +47,7 @@ export function EditTaskDialog({
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [estimate, setEstimate] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [extraAssignees, setExtraAssignees] = useState<string[]>([]);
 
   const { data: projects } = useQuery({
     queryKey: ["projects-active"], enabled: open,
@@ -63,9 +66,11 @@ export function EditTaskDialog({
     
     setLinks(Array.isArray(task.asset_links) ? task.asset_links : []);
     setEstimate(task.estimated_hours == null ? "" : String(task.estimated_hours));
+    setExtraAssignees([]);
   }, [open, task?.id]);
 
   const updateFn = useServerFn(updateTaskFields);
+  const createBulkFn = useServerFn(createTasksBulk);
   const { viewAsUserId } = useViewAs();
 
   async function submit() {
@@ -93,7 +98,35 @@ export function EditTaskDialog({
           estimated_hours: estNum,
         },
       }});
-      toast.success("Task updated");
+      let extraMsg = "";
+      if (extraAssignees.length > 0) {
+        const cleanLinks = links.filter((l) => l.url.trim());
+        const res = await createBulkFn({ data: {
+          projectId,
+          title: title.trim(),
+          description: desc.trim() || null,
+          dueDate: deadline || null,
+          priority,
+          assigneeIds: extraAssignees,
+          assetLinks: cleanLinks,
+          domainId: null,
+          departmentId: null,
+          taskTypeIds: [],
+          estimatedHours: estNum,
+          recurrence: null,
+        }});
+        if (res.createdCount > 0) {
+          extraMsg = ` — and copied to ${res.createdCount} more ${res.createdCount === 1 ? "person" : "people"}.`;
+        }
+        if (res.failures.length > 0) {
+          const names = res.failures.map((f) => {
+            const p = roster.find((r) => r.id === f.assigneeId);
+            return `${p?.full_name ?? p?.email ?? f.assigneeId}: ${f.message}`;
+          });
+          toast.error(`Copy failed for: ${names.join("; ")}`);
+        }
+      }
+      toast.success(`Task updated${extraMsg}`);
       onSaved();
       onClose();
     } catch (e) {
@@ -139,6 +172,21 @@ export function EditTaskDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Also assign to others</Label>
+            <AssigneeMultiSelect
+              people={roster}
+              value={extraAssignees}
+              onChange={setExtraAssignees}
+              placeholder="Copy this task to more teammates"
+              excludeIds={assignee ? [assignee] : []}
+            />
+            {extraAssignees.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Saving will create {extraAssignees.length} additional {extraAssignees.length === 1 ? "task" : "tasks"} with the same details.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>

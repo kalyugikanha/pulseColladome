@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/access")({
   beforeLoad: () => { throw redirect({ to: "/hr-admin", search: { tab: "access" } }); },
 });
 
-type GrantRole = "admin" | "employee" | "project_manager" | "learning_admin" | "event_admin";
+type GrantRole = "admin" | "employee" | "project_manager" | "learning_admin" | "event_admin" | "trainee";
 
 export function AccessPage() {
   const { data: me } = useCurrentUser();
@@ -218,6 +218,7 @@ export function AccessPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="trainee">Trainee</SelectItem>
                   <SelectItem value="project_manager">Project Manager</SelectItem>
                   <SelectItem value="learning_admin">Learning Admin</SelectItem>
                   <SelectItem value="event_admin">Event Admin</SelectItem>
@@ -256,6 +257,7 @@ export function AccessPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="trainee">Trainee</SelectItem>
                   <SelectItem value="project_manager">Project Manager</SelectItem>
                   <SelectItem value="learning_admin">Learning Admin</SelectItem>
                   <SelectItem value="event_admin">Event Admin</SelectItem>

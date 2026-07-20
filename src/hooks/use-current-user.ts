@@ -15,6 +15,7 @@ export type CurrentUser = {
   isHrAdmin: boolean;
   isLearningAdmin: boolean;
   isEventAdmin: boolean;
+  isTrainee: boolean;
   canManageProjects: boolean;
   /**
    * True only for org-wide people visibility: admin, super admin, HR admin,
@@ -88,6 +89,7 @@ export function useCurrentUser() {
       const realIsHrAdmin = !!roles?.some((r) => r.role === "hr_admin");
       const realIsLearning = !!roles?.some((r) => r.role === "learning_admin");
       const realIsEvent = !!roles?.some((r) => r.role === "event_admin");
+      const realIsTrainee = !!roles?.some((r) => r.role === "trainee");
 
       // View-as override: only super admins can impersonate. When active,
       // `me.id` becomes the viewed user's id so client-side reads (Dashboard,
@@ -106,6 +108,7 @@ export function useCurrentUser() {
       let vIsHr = realIsHrAdmin;
       let vIsLearning = realIsLearning;
       let vIsEvent = realIsEvent;
+      let vIsTrainee = realIsTrainee;
       let vCanManageProjects = realAdmin || realIsHrAdmin || realHeadOf.length > 0 || !!roles?.some((r) => r.role === "project_manager");
       let vHeadOf = realHeadOf;
       let vReportIds = realReportIds;
@@ -129,6 +132,7 @@ export function useCurrentUser() {
           vIsHr = !!otherRoles?.some((r) => r.role === "hr_admin");
           vIsLearning = !!otherRoles?.some((r) => r.role === "learning_admin");
           vIsEvent = !!otherRoles?.some((r) => r.role === "event_admin");
+          vIsTrainee = !!otherRoles?.some((r) => r.role === "trainee");
           vHeadOf = (otherHeadRows ?? []).map((r) => r.department).filter((d): d is string => !!d);
           vCanManageProjects = vIsAdmin || vIsHr || vHeadOf.length > 0 || !!otherRoles?.some((r) => r.role === "project_manager");
           vReportIds = ((otherReports ?? []) as Array<{ id: string }>).map((r) => r.id);
@@ -147,6 +151,7 @@ export function useCurrentUser() {
         isHrAdmin: vIsHr,
         isLearningAdmin: vIsLearning || vIsSuper || vIsAdmin,
         isEventAdmin: vIsEvent || vIsSuper || vIsAdmin,
+        isTrainee: vIsTrainee,
         canManageProjects: vCanManageProjects,
         isPeopleUnscoped: vIsAdmin || vIsSuper || vIsHr || vIsFinance,
         isDepartmentHead: vHeadOf.length > 0,

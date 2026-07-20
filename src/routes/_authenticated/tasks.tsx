@@ -66,15 +66,16 @@ function TasksPage() {
 
   if (!me) return <div className="text-muted-foreground">Loading…</div>;
 
-  const canDept = me.isReportingManager || me.isDepartmentHead || me.isAdmin || me.isSuperAdmin;
-  const canAll = me.isAdmin || me.isSuperAdmin;
-  const canManageTaxonomy = me.isSuperAdmin || me.isDepartmentHead || me.isReportingManager;
+  const isTrainee = me.isTrainee;
+  const canDept = !isTrainee && (me.isReportingManager || me.isDepartmentHead || me.isAdmin || me.isSuperAdmin);
+  const canAll = !isTrainee && (me.isAdmin || me.isSuperAdmin);
+  const canManageTaxonomy = !isTrainee && (me.isSuperAdmin || me.isDepartmentHead || me.isReportingManager);
 
   const view: View = search.view ?? "kanban";
-  const scope: Scope = search.scope ?? "mine";
+  const scope: Scope = isTrainee ? "mine" : (search.scope ?? "mine");
   const dept = search.dept ?? DEPTS[0].value;
 
-  const effectiveScope: Scope = scope === "all" && !canAll ? (canDept ? "dept" : "mine") : scope === "dept" && !canDept ? "mine" : scope;
+  const effectiveScope: Scope = isTrainee ? "mine" : (scope === "all" && !canAll ? (canDept ? "dept" : "mine") : scope === "dept" && !canDept ? "mine" : scope);
 
   const setSearch = (patch: Partial<{ view: View; scope: Scope; dept: string }>) => {
     navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, ...patch }), replace: true });
@@ -103,14 +104,16 @@ function TasksPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Tabs value={effectiveScope} onValueChange={(v) => setSearch({ scope: v as Scope })}>
-            <TabsList>
-              <TabsTrigger value="mine">Mine</TabsTrigger>
-              {canDept && <TabsTrigger value="dept">Department</TabsTrigger>}
-              {canAll && <TabsTrigger value="all">All</TabsTrigger>}
-              <TabsTrigger value="assigned_by_me">Assigned by me</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {!isTrainee && (
+            <Tabs value={effectiveScope} onValueChange={(v) => setSearch({ scope: v as Scope })}>
+              <TabsList>
+                <TabsTrigger value="mine">Mine</TabsTrigger>
+                {canDept && <TabsTrigger value="dept">Department</TabsTrigger>}
+                {canAll && <TabsTrigger value="all">All</TabsTrigger>}
+                <TabsTrigger value="assigned_by_me">Assigned by me</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
           {effectiveScope === "dept" && (
             <Select value={dept} onValueChange={(v) => setSearch({ dept: v })}>
               <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>

@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 type NavItem = { title: string; url: string; icon: typeof LayoutDashboard; match?: string };
 
-function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearningAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; isLearningAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; userId: string; fullName: string | null; email: string | null }) {
+function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearningAdmin, canManageProjects, isDepartmentHead, isReportingManager, headOfDepartments, isTrainee, userId, fullName, email }: { isAdmin: boolean; isSuperAdmin: boolean; isFinanceAdmin: boolean; isHrAdmin: boolean; isLearningAdmin: boolean; canManageProjects: boolean; isDepartmentHead: boolean; isReportingManager: boolean; headOfDepartments: string[]; isTrainee: boolean; userId: string; fullName: string | null; email: string | null }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const qc = useQueryClient();
@@ -41,20 +41,26 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
 
   const initials = (fullName ?? email ?? "?").split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
-  const workspaceItems: NavItem[] = [
-    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-    { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
-    { title: "Stand-up", url: "/standup", icon: ClipboardList },
-    { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
-    { title: "Events", url: "/events", icon: PartyPopper },
-    { title: "Projects", url: "/projects", icon: FolderKanban, match: "/projects" },
-    { title: "Team", url: "/team", icon: Users, match: "/team|/leave|/calendar|/directory" },
-    { title: "Performance", url: "/performance", icon: Star },
-    { title: "Learning", url: "/learning", icon: BookOpen, match: "/learning" },
-    { title: "Resource Hub", url: "/resources", icon: Layers },
-  ];
+  const workspaceItems: NavItem[] = isTrainee
+    ? [
+        { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+        { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
+        { title: "Learning", url: "/learning", icon: BookOpen, match: "/learning" },
+      ]
+    : [
+        { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+        { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
+        { title: "Stand-up", url: "/standup", icon: ClipboardList },
+        { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
+        { title: "Events", url: "/events", icon: PartyPopper },
+        { title: "Projects", url: "/projects", icon: FolderKanban, match: "/projects" },
+        { title: "Team", url: "/team", icon: Users, match: "/team|/leave|/calendar|/directory" },
+        { title: "Performance", url: "/performance", icon: Star },
+        { title: "Learning", url: "/learning", icon: BookOpen, match: "/learning" },
+        { title: "Resource Hub", url: "/resources", icon: Layers },
+      ];
 
-  const showAdminGroup = isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin || isReportingManager || isLearningAdmin;
+  const showAdminGroup = !isTrainee && (isAdmin || isSuperAdmin || isHrAdmin || isFinanceAdmin || isReportingManager || isLearningAdmin);
   const isActive = (item: NavItem) => {
     if (item.match) return item.match.split("|").some((p) => pathname === p || pathname.startsWith(p + "/"));
     return pathname === item.url || pathname.startsWith(item.url + "/");
@@ -188,10 +194,21 @@ function AuthenticatedLayout() {
       } else if (pathname === "/onboarding-pending" && needsInput) {
         router.navigate({ to: "/complete-onboarding", replace: true });
       }
+      return;
     }
-
-
-
+    // Trainee guard: only Dashboard, Tasks, Learning are reachable.
+    if (user.isTrainee) {
+      const allowed = (p: string) =>
+        p === "/dashboard" ||
+        p === "/tasks" || p.startsWith("/tasks/") ||
+        p === "/learning" || p.startsWith("/learning/") ||
+        p === "/complete-onboarding" ||
+        p === "/change-password" ||
+        p === "/onboarding-pending";
+      if (!allowed(pathname)) {
+        router.navigate({ to: "/dashboard", replace: true });
+      }
+    }
   }, [user, pathname, router]);
 
   if (isLoading || !user) {
@@ -201,7 +218,7 @@ function AuthenticatedLayout() {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} isLearningAdmin={user.isLearningAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} isReportingManager={user.isReportingManager} headOfDepartments={user.headOfDepartments} userId={user.realId} fullName={user.fullName} email={user.email} />
+        <AppSidebar isAdmin={user.isAdmin} isSuperAdmin={user.isSuperAdmin} isFinanceAdmin={user.isFinanceAdmin} isHrAdmin={user.isHrAdmin} isLearningAdmin={user.isLearningAdmin} canManageProjects={user.canManageProjects} isDepartmentHead={user.isDepartmentHead} isReportingManager={user.isReportingManager} headOfDepartments={user.headOfDepartments} isTrainee={user.isTrainee} userId={user.realId} fullName={user.fullName} email={user.email} />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b border-border bg-surface/60 backdrop-blur px-4 sticky top-0 z-10">
             <SidebarTrigger />

@@ -149,7 +149,8 @@ export const createTaskFull = createServerFn({ method: "POST" })
   .middleware([impersonationMiddleware])
   .inputValidator((d: TaskInput) => d)
   .handler(async ({ data, context }) => {
-    return await createOneTaskForAssignee(data, context as never);
+    const t = await createOneTaskForAssignee(data, context as never);
+    return { id: t.id };
   });
 
 export const createTasksBulk = createServerFn({ method: "POST" })

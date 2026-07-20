@@ -45,7 +45,13 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
     ? [
         { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
         { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
+        { title: "Stand-up", url: "/standup", icon: ClipboardList },
+        { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
+        { title: "Events", url: "/events", icon: PartyPopper },
+        { title: "Team", url: "/team", icon: Users, match: "/team|/leave|/calendar|/directory" },
+        { title: "Performance", url: "/performance", icon: Star },
         { title: "Learning", url: "/learning", icon: BookOpen, match: "/learning" },
+        { title: "Resource Hub", url: "/resources", icon: Layers },
       ]
     : [
         { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -196,16 +202,29 @@ function AuthenticatedLayout() {
       }
       return;
     }
-    // Trainee guard: only Dashboard, Tasks, Learning are reachable.
+    // Trainee guard: restrict to trainee-allowed routes.
     if (user.isTrainee) {
-      const allowed = (p: string) =>
-        p === "/dashboard" ||
-        p === "/tasks" || p.startsWith("/tasks/") ||
-        p === "/learning" || p.startsWith("/learning/") ||
-        p === "/complete-onboarding" ||
-        p === "/change-password" ||
-        p === "/onboarding-pending";
-      if (!allowed(pathname)) {
+      const allowedPrefixes = [
+        "/dashboard",
+        "/tasks",
+        "/standup",
+        "/attendance",
+        "/punch",
+        "/timesheet",
+        "/my-timesheet",
+        "/events",
+        "/team",
+        "/leave",
+        "/calendar",
+        "/performance",
+        "/learning",
+        "/resources",
+        "/complete-onboarding",
+        "/change-password",
+        "/onboarding-pending",
+      ];
+      const allowed = allowedPrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
+      if (!allowed) {
         router.navigate({ to: "/dashboard", replace: true });
       }
     }

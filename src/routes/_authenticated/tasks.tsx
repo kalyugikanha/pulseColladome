@@ -452,28 +452,13 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs">Assignee</Label>
-              <Select value={assignee} onValueChange={setAssignee}>
-                <SelectTrigger><SelectValue placeholder="Pick teammate" /></SelectTrigger>
-                <SelectContent className="max-h-72">
-                  <div className="p-1 sticky top-0 bg-popover z-10">
-                    <Input
-                      placeholder="Search name, email, department…"
-                      value={assigneeFilter}
-                      onChange={(e) => setAssigneeFilter(e.target.value)}
-                      className="h-8"
-                    />
-                  </div>
-                  {filteredPeople.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {(p.full_name ?? p.email)}{p.department ? ` · ${p.department}` : ""}
-                    </SelectItem>
-                  ))}
-                  {filteredPeople.length === 0 && (
-                    <div className="px-2 py-3 text-xs text-muted-foreground">No matches</div>
-                  )}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs">Assignees</Label>
+              <AssigneeMultiSelect
+                people={people ?? []}
+                value={assignees}
+                onChange={setAssignees}
+                placeholder="Pick teammates"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Estimated hours</Label>

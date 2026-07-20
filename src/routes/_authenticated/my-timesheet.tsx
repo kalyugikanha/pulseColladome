@@ -88,13 +88,17 @@ export function MyTimesheetPage() {
 
 
   // Flatten to (date, project, hours, comments)
-  type Row = { date: string; taskTitle?: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approvalNote?: string; approved: boolean; pending?: boolean; taskId?: string };
+  type Row = { date: string; taskTitle?: string; code: string; name: string; hours: number; approvedHours: number | null; comments?: string; approvalNote?: string; approved: boolean; pending?: boolean; taskId?: string; unallocated?: boolean };
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
+    // Track allocated hours per date across BOTH attendance_logs.tasks and task_activity,
+    // so we can compute the true unallocated remainder against total_hours.
+    const allocatedByDate = new Map<string, number>();
     for (const l of logs ?? []) {
       for (const t of l.tasks ?? []) {
         const code = t.project_code?.trim(); const h = Number(t.hours) || 0;
         if (!code || h <= 0) continue;
+        allocatedByDate.set(l.date, (allocatedByDate.get(l.date) ?? 0) + h);
         const isApproved = !!l.approved_at;
         const ah = t.approved_hours != null ? Number(t.approved_hours) : null;
         out.push({
@@ -108,6 +112,7 @@ export function MyTimesheetPage() {
       const h = Number(a.hours) || 0;
       if (h <= 0) continue;
       const date = a.completion_date ?? a.created_at.slice(0, 10);
+      allocatedByDate.set(date, (allocatedByDate.get(date) ?? 0) + h);
       const proj = a.task?.project;
       const code = proj?.code?.trim() || "—";
       const name = proj?.name || a.task?.title || "Task";
@@ -121,6 +126,24 @@ export function MyTimesheetPage() {
         pending: !approved,
         taskId: a.task_id,
       });
+    }
+
+    // Unallocated: punched-in hours (attendance_logs.total_hours) with no matching task allocation.
+    for (const l of logs ?? []) {
+      const total = Number(l.total_hours) || 0;
+      const allocated = allocatedByDate.get(l.date) ?? 0;
+      const gap = total - allocated;
+      if (gap > 0.05) {
+        out.push({
+          date: l.date,
+          code: "—",
+          name: "Unallocated — hours not yet logged to a task",
+          hours: gap,
+          approvedHours: null,
+          approved: false,
+          unallocated: true,
+        });
+      }
     }
 
     return out.sort((a, b) => b.date.localeCompare(a.date));

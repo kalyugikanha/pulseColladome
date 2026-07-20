@@ -22,7 +22,7 @@ import { MarkDoneDialog } from "./mark-done-dialog";
 import { duplicateTask } from "@/lib/tasks-plus.functions";
 import { WorkflowTaskPanel } from "./workflow-task-panel";
 import { StandupFlagButton } from "./standup-flag-button";
-import { RecurringBadge } from "./recurring-badge";
+import { RecurringBadge, isRecurringTask } from "./recurring-badge";
 import { OverdueBadge } from "./overdue-badge";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer,

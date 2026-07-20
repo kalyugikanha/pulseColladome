@@ -265,6 +265,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   onCreated?: () => void;
 }) {
   const createFn = useServerFn(createTaskFull);
+  const createBulkFn = useServerFn(createTasksBulk);
   const updateFn = useServerFn(updateTaskFields);
   const startWfFn = useServerFn(startWorkflow);
   const listWf = useServerFn(listWorkflowTemplates);

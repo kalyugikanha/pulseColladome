@@ -278,7 +278,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
   const [pri, setPri] = useState<"low" | "medium" | "high">("medium");
   const [projectId, setProjectId] = useState("");
-  const [assignee, setAssignee] = useState<string>(defaultAssigneeId ?? "");
+  const [assignees, setAssignees] = useState<string[]>(defaultAssigneeId ? [defaultAssigneeId] : []);
   const [wfMode, setWfMode] = useState(false);
   const [wfTemplateId, setWfTemplateId] = useState<string>("");
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly">("none");

@@ -21,6 +21,7 @@ import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board
 import { RecurringBadge } from "@/components/tasks/recurring-badge";
 import { OverdueBadge, isOverdue } from "@/components/tasks/overdue-badge";
 import { createTaskFull, createTasksBulk } from "@/lib/tasks-plus.functions";
+import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
 import { updateTaskFields } from "@/lib/tasks-workflow.functions";
 import { startWorkflow, listWorkflowTemplates } from "@/lib/workflows.functions";
 import { TaxonomyPage } from "./admin.taxonomy";

@@ -6,17 +6,23 @@ import {
   GraduationCap,
   Wallet,
   CalendarDays,
-  Workflow,
   Timer,
   Eye,
   LineChart,
   TrendingUp,
+  Sparkles,
+  ArrowRight,
+  Mail,
+  Phone,
+  Linkedin,
+  Instagram,
+  Facebook,
+  Youtube,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SiteFooter } from "@/components/site-footer";
 import colladomeLogo from "@/assets/colladome-logo.png.asset.json";
 
 const FEATURES = [
@@ -230,6 +236,190 @@ const GALLERY = [
   { title: "Workflow Templates", sub: "Standardize processes. Save time. Stay consistent.", node: <WorkflowMockup /> },
 ];
 
+// ---------- Hero product visual (floating browser mockup) ----------
+
+function HeroProductVisual() {
+  return (
+    <div className="relative mx-auto max-w-5xl">
+      {/* Glow behind the frame */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 blur-3xl opacity-70"
+        style={{
+          background:
+            "radial-gradient(60% 60% at 50% 40%, color-mix(in oklab, var(--primary-glow) 45%, transparent), transparent 70%)",
+        }}
+      />
+      <div className="relative rounded-2xl border border-border/70 bg-card shadow-[0_40px_120px_-30px_rgba(0,0,0,0.35),0_20px_60px_-20px_color-mix(in_oklab,var(--primary)_25%,transparent)] overflow-hidden">
+        {/* Browser chrome */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border/60 bg-surface-2/60">
+          <span className="h-3 w-3 rounded-full bg-destructive/70" />
+          <span className="h-3 w-3 rounded-full bg-primary/70" />
+          <span className="h-3 w-3 rounded-full bg-success/70" />
+          <div className="ml-4 flex-1 max-w-md">
+            <div className="rounded-md border border-border/60 bg-background px-3 py-1 text-[11px] text-muted-foreground">
+              pulse.colladome.com / dashboard
+            </div>
+          </div>
+        </div>
+        {/* Dashboard content */}
+        <div className="p-5 md:p-7 space-y-5 bg-background">
+          {/* Stat row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { k: "Punched in today", v: "16 / 20" },
+              { k: "Open tasks", v: "42" },
+              { k: "Salary burn (Jul)", v: "₹12.4L" },
+              { k: "Courses in progress", v: "9" },
+            ].map((s) => (
+              <div key={s.k} className="rounded-lg border border-border/60 bg-surface p-3">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{s.k}</div>
+                <div className="mt-1 text-xl font-semibold">{s.v}</div>
+              </div>
+            ))}
+          </div>
+          {/* Two-panel row */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-border/60 bg-surface p-3">
+              <div className="text-xs font-semibold mb-3">Today's board</div>
+              <TasksMockup />
+            </div>
+            <div className="rounded-lg border border-border/60 bg-surface p-3">
+              <div className="text-xs font-semibold mb-3">Team attendance</div>
+              <AttendanceMockup />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Sticky nav ----------
+
+function StickyNav({ pulsePath, isSignedIn }: { pulsePath: string; isSignedIn: boolean }) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return (
+    <nav
+      className={`sticky top-0 z-40 transition-all ${
+        scrolled
+          ? "backdrop-blur-md bg-background/75 border-b border-border/60"
+          : "bg-transparent border-b border-transparent"
+      }`}
+    >
+      <div className="max-w-6xl mx-auto flex items-center justify-between px-6 md:px-10 py-4">
+        <Link to="/" className="font-semibold tracking-tight text-lg">
+          Colladome <span className="text-primary">Pulse</span>
+        </Link>
+        <div className="flex items-center gap-3">
+          <Link to={pulsePath}>
+            <Button variant={scrolled ? "default" : "ghost"} size="sm">
+              {isSignedIn ? "Dashboard" : "Sign in"}
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+// ---------- Rich footer ----------
+
+function LandingFooter() {
+  const socials = [
+    { icon: Linkedin, href: "https://www.linkedin.com/company/colladome/", label: "LinkedIn" },
+    { icon: Instagram, href: "https://www.instagram.com/colladome/", label: "Instagram" },
+    { icon: Facebook, href: "https://www.facebook.com/socialcolladome", label: "Facebook" },
+    { icon: Youtube, href: "https://www.youtube.com/@Colladome", label: "YouTube" },
+  ];
+  return (
+    <footer className="border-t border-border/60 bg-surface-2/40">
+      <div className="max-w-6xl mx-auto px-6 md:px-16 py-14 grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
+        <div className="space-y-4">
+          <a href="https://colladome.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 group">
+            <img src={colladomeLogo.url} alt="Colladome IT Network Solutions" className="h-9 w-auto opacity-90 group-hover:opacity-100 transition" />
+          </a>
+          <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+            Colladome Pulse is built and maintained by{" "}
+            <a href="https://colladome.com" target="_blank" rel="noreferrer" className="text-foreground hover:text-primary underline underline-offset-4">
+              Colladome IT Network Solutions
+            </a>
+            . Custom software · AI · Cloud & Enterprise.
+          </p>
+          <div className="flex items-center gap-3 pt-2">
+            {socials.map(({ icon: Icon, href, label }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={label}
+                className="flex h-9 w-9 items-center justify-center rounded-md border border-border/60 text-muted-foreground hover:text-primary hover:border-primary/60 transition"
+              >
+                <Icon className="h-4 w-4" />
+              </a>
+            ))}
+            <a
+              href="https://x.com/SocialColladome"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="X"
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-border/60 text-muted-foreground hover:text-primary hover:border-primary/60 transition font-semibold text-sm"
+            >
+              𝕏
+            </a>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold">Get in touch</div>
+          <ul className="space-y-2 text-sm">
+            <li className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" />
+              <a href="mailto:hello@colladome.com" className="hover:text-primary">hello@colladome.com</a>
+            </li>
+            <li className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-primary" />
+              <a href="tel:+917727895151" className="hover:text-primary">+91 77278 95151</a>
+            </li>
+            <li>
+              <a
+                href="https://colladome.com/contact-us/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline underline-offset-4"
+              >
+                Get in touch <ArrowRight className="h-3.5 w-3.5" />
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div className="space-y-3">
+          <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-semibold">Product</div>
+          <ul className="space-y-2 text-sm">
+            <li><Link to="/apply" className="hover:text-primary">Apply for training</Link></li>
+            <li><Link to="/privacy" className="hover:text-primary">Privacy Policy</Link></li>
+            <li><Link to="/terms" className="hover:text-primary">Terms of Service</Link></li>
+            <li><Link to="/contact" className="hover:text-primary">Support</Link></li>
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-border/60">
+        <div className="max-w-6xl mx-auto px-6 md:px-16 py-5 text-xs text-muted-foreground">
+          © 2026 Colladome IT Network Solutions. All rights reserved.
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 // ---------- Page ----------
 
 function LandingPage() {
@@ -242,32 +432,49 @@ function LandingPage() {
   const pulsePath = isSignedIn ? "/dashboard" : "/auth";
   const pulseLabel = isSignedIn ? "Go to dashboard" : "Enter Pulse →";
 
+  const serifStyle = { fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' } as const;
+
   return (
     <main className="min-h-screen bg-background text-foreground overflow-x-hidden">
-      {/* Hero */}
-      <section className="relative px-6 md:px-16 pt-10 pb-20 md:pt-14 md:pb-28">
+      <StickyNav pulsePath={pulsePath} isSignedIn={isSignedIn} />
+
+      {/* ================= HERO ================= */}
+      <section className="relative px-6 md:px-16 pt-16 pb-28 md:pt-24 md:pb-36">
+        {/* Layered radial glows */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-60"
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(1200px 600px at 20% 10%, color-mix(in oklab, var(--primary-glow) 35%, transparent), transparent 60%), radial-gradient(900px 500px at 90% 90%, color-mix(in oklab, var(--primary) 25%, transparent), transparent 60%)",
+              "radial-gradient(1200px 700px at 50% -10%, color-mix(in oklab, var(--primary-glow) 55%, transparent), transparent 65%), radial-gradient(900px 600px at 15% 30%, color-mix(in oklab, var(--primary) 30%, transparent), transparent 60%), radial-gradient(900px 600px at 85% 20%, color-mix(in oklab, var(--primary-glow) 30%, transparent), transparent 60%)",
           }}
         />
-        <nav className="relative z-10 flex items-center justify-between mb-16">
-          <div className="font-semibold tracking-tight text-lg">
-            Colladome <span className="text-primary">Pulse</span>
-          </div>
-          <div className="flex gap-3">
-            <Link to={pulsePath}>
-              <Button variant="ghost" size="sm">{isSignedIn ? "Dashboard" : "Sign in"}</Button>
-            </Link>
-          </div>
-        </nav>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-1/3 h-px opacity-40"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, color-mix(in oklab, var(--primary) 50%, transparent), transparent)",
+          }}
+        />
 
-        <div className="relative z-10 max-w-5xl">
+        <div className="relative z-10 max-w-5xl mx-auto text-center">
+          {/* Built by pill */}
+          <div className="flex justify-center mb-8">
+            <a
+              href="https://colladome.com"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 backdrop-blur px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-foreground/80 hover:border-primary/60 hover:text-foreground transition"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              Built by Colladome
+            </a>
+          </div>
+
           <h1
-            className="text-5xl md:text-7xl lg:text-8xl leading-[1.05] tracking-tight font-normal"
-            style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}
+            className="text-5xl md:text-7xl lg:text-[5.5rem] leading-[1.05] tracking-tight font-normal"
+            style={serifStyle}
           >
             One Platform.
             <br />
@@ -275,20 +482,21 @@ function LandingPage() {
             <br />
             <span className="text-primary">Total Clarity.</span>
           </h1>
-          <figure className="mt-8 max-w-2xl border-l-2 border-primary/60 pl-4">
+
+          <figure className="mt-10 max-w-2xl mx-auto">
             <blockquote
               className="text-lg md:text-xl text-foreground/80 leading-relaxed"
-              style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif', fontStyle: "italic" }}
+              style={{ ...serifStyle, fontStyle: "italic" }}
             >
               "Pulse brings everything our team needs into one place — so we can focus on growing
               the business, not chasing updates."
             </blockquote>
-            <figcaption className="mt-3 text-xs uppercase tracking-[0.25em] text-muted-foreground">
+            <figcaption className="mt-4 text-xs uppercase tracking-[0.25em] text-muted-foreground">
               — Colladome Leadership
             </figcaption>
           </figure>
 
-          <div className="mt-10 flex flex-wrap gap-3 items-center">
+          <div className="mt-12 flex flex-wrap gap-3 items-center justify-center">
             <Link to={pulsePath}>
               <Button size="lg" className="text-base px-8 py-6">{pulseLabel}</Button>
             </Link>
@@ -297,28 +505,24 @@ function LandingPage() {
                 {isSignedIn ? "Open dashboard" : "Sign in"}
               </Button>
             </Link>
-            {!isSignedIn && (
-              <Link to="/apply" className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 ml-1">
-                Applying for our training program? →
-              </Link>
-            )}
           </div>
+        </div>
 
+        {/* Floating product visual */}
+        <div className="relative z-10 mt-16 md:mt-20 px-2 md:px-4">
+          <HeroProductVisual />
         </div>
       </section>
 
-      {/* What is Pulse + feature grid */}
-      <section className="relative px-6 md:px-16 py-20 border-t border-border/60 bg-surface-2/40">
+      {/* ================= WHAT IS PULSE ================= */}
+      <section className="relative px-6 md:px-16 py-24 md:py-32 border-t border-border/60 bg-surface-2/40">
         <div className="max-w-6xl mx-auto">
           <div className="grid gap-10 md:grid-cols-[1fr_2fr] items-start">
             <p className="uppercase tracking-[0.25em] text-xs text-primary font-semibold">
               What is Colladome Pulse?
             </p>
             <div className="space-y-5 max-w-2xl">
-              <p
-                className="text-2xl md:text-3xl leading-snug"
-                style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}
-              >
+              <p className="text-2xl md:text-3xl leading-snug" style={serifStyle}>
                 A unified operating system for how your company actually runs.
               </p>
               <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
@@ -329,9 +533,12 @@ function LandingPage() {
             </div>
           </div>
 
-          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map(({ icon: Icon, title, desc }) => (
-              <Card key={title} className="border-border/60">
+              <Card
+                key={title}
+                className="border-border/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_-20px_color-mix(in_oklab,var(--primary)_35%,transparent)] hover:border-primary/40"
+              >
                 <CardHeader className="flex flex-row items-center gap-3 pb-2">
                   <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
                     <Icon className="h-5 w-5" />
@@ -345,17 +552,14 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Gallery */}
-      <section className="relative px-6 md:px-16 py-24 border-t border-border/60">
+      {/* ================= GALLERY ================= */}
+      <section className="relative px-6 md:px-16 py-24 md:py-32 border-t border-border/60">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-12 max-w-3xl">
+          <div className="mb-14 max-w-3xl">
             <p className="uppercase tracking-[0.25em] text-xs text-primary font-semibold mb-4">
               A quick tour
             </p>
-            <h2
-              className="text-4xl md:text-5xl leading-tight tracking-tight"
-              style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}
-            >
+            <h2 className="text-4xl md:text-5xl leading-tight tracking-tight" style={serifStyle}>
               All your work. <span className="text-primary">One place.</span>
             </h2>
             <p className="mt-4 text-muted-foreground">
@@ -365,7 +569,10 @@ function LandingPage() {
 
           <div className="grid gap-5 md:grid-cols-2">
             {GALLERY.map((g) => (
-              <Card key={g.title} className="border-border/60 overflow-hidden">
+              <Card
+                key={g.title}
+                className="border-border/60 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_25px_60px_-25px_rgba(0,0,0,0.25)] hover:border-primary/40"
+              >
                 <CardHeader className="pb-3">
                   <div className="text-base font-semibold">{g.title}</div>
                   <div className="text-sm text-muted-foreground">{g.sub}</div>
@@ -377,24 +584,57 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Closing banner */}
-      <section className="relative px-6 md:px-16 py-20 bg-sidebar text-sidebar-foreground">
-        <div className="max-w-5xl mx-auto text-center space-y-4">
-          <h2
-            className="text-4xl md:text-6xl leading-tight tracking-tight"
-            style={{ fontFamily: '"Instrument Serif", ui-serif, Georgia, serif' }}
+      {/* ================= JOIN COLLADOME ================= */}
+      <section className="relative px-6 md:px-16 py-24 border-t border-border/60">
+        <div className="max-w-5xl mx-auto">
+          <div
+            className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-background to-background px-8 py-14 md:px-16 md:py-20"
           >
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-24 -right-24 h-80 w-80 rounded-full blur-3xl opacity-60"
+              style={{ background: "radial-gradient(circle, color-mix(in oklab, var(--primary-glow) 60%, transparent), transparent 70%)" }}
+            />
+            <div className="relative grid gap-8 md:grid-cols-[2fr_1fr] items-center">
+              <div>
+                <p className="uppercase tracking-[0.25em] text-xs text-primary font-semibold mb-4">
+                  Careers & training
+                </p>
+                <h2 className="text-4xl md:text-5xl leading-tight tracking-tight" style={serifStyle}>
+                  Want to join <span className="text-primary">Colladome?</span>
+                </h2>
+                <p className="mt-4 text-base md:text-lg text-muted-foreground max-w-xl">
+                  We're always looking for people who want to build with us. Apply and our team
+                  will be in touch.
+                </p>
+              </div>
+              <div className="flex md:justify-end">
+                <Link to="/apply">
+                  <Button size="lg" className="text-base px-8 py-6">
+                    Apply now <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================= CLOSING BANNER ================= */}
+      <section className="relative px-6 md:px-16 py-24 md:py-28 bg-sidebar text-sidebar-foreground">
+        <div className="max-w-5xl mx-auto text-center space-y-4">
+          <h2 className="text-4xl md:text-6xl leading-tight tracking-tight" style={serifStyle}>
             Built to reduce operational chaos.
           </h2>
           <p className="text-lg md:text-xl text-sidebar-foreground/80 max-w-3xl mx-auto">
             So we can focus on what truly matters — growing the business.
           </p>
 
-          <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+          <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
             {CLOSER_ITEMS.map(({ icon: Icon, label }) => (
               <div
                 key={label}
-                className="flex flex-col items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 px-4 py-5"
+                className="flex flex-col items-center gap-2 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 px-4 py-5 transition-all duration-300 hover:-translate-y-1 hover:bg-sidebar-accent/60"
               >
                 <Icon className="h-5 w-5 text-sidebar-primary" />
                 <div className="text-sm font-medium">{label}</div>
@@ -402,7 +642,7 @@ function LandingPage() {
             ))}
           </div>
 
-          <div className="pt-10">
+          <div className="pt-12">
             <Link to={pulsePath}>
               <Button size="lg" className="text-base px-10 py-6">{pulseLabel}</Button>
             </Link>
@@ -410,34 +650,7 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Powered-by strip */}
-      <section className="px-6 md:px-16 py-10 border-t border-border/60">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-            Powered by
-          </div>
-          <a
-            href="https://colladome.com"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-3 group"
-          >
-            <img
-              src={colladomeLogo.url}
-              alt="Colladome IT Network Solutions"
-              className="h-8 w-auto opacity-80 group-hover:opacity-100 transition"
-            />
-            <span className="text-sm text-muted-foreground group-hover:text-foreground transition">
-              Colladome IT Network Solutions
-            </span>
-          </a>
-          <div className="text-xs text-muted-foreground">
-            Custom software · AI · Cloud & Enterprise
-          </div>
-        </div>
-      </section>
-
-      <SiteFooter />
+      <LandingFooter />
     </main>
   );
 }

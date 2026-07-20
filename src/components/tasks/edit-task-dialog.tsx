@@ -98,7 +98,35 @@ export function EditTaskDialog({
           estimated_hours: estNum,
         },
       }});
-      toast.success("Task updated");
+      let extraMsg = "";
+      if (extraAssignees.length > 0) {
+        const cleanLinks = links.filter((l) => l.url.trim());
+        const res = await createBulkFn({ data: {
+          projectId,
+          title: title.trim(),
+          description: desc.trim() || null,
+          dueDate: deadline || null,
+          priority,
+          assigneeIds: extraAssignees,
+          assetLinks: cleanLinks,
+          domainId: null,
+          departmentId: null,
+          taskTypeIds: [],
+          estimatedHours: estNum,
+          recurrence: null,
+        }});
+        if (res.createdCount > 0) {
+          extraMsg = ` — and copied to ${res.createdCount} more ${res.createdCount === 1 ? "person" : "people"}.`;
+        }
+        if (res.failures.length > 0) {
+          const names = res.failures.map((f) => {
+            const p = roster.find((r) => r.id === f.assigneeId);
+            return `${p?.full_name ?? p?.email ?? f.assigneeId}: ${f.message}`;
+          });
+          toast.error(`Copy failed for: ${names.join("; ")}`);
+        }
+      }
+      toast.success(`Task updated${extraMsg}`);
       onSaved();
       onClose();
     } catch (e) {

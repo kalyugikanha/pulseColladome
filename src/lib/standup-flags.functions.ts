@@ -100,7 +100,11 @@ export const listMyStandupFlags = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<StandupFlag[]> => {
     const { supabase, userId } = context;
     const viewedId = await resolveViewedUserId(supabase, userId, data.asUserId);
-    let q = supabase
+    const client =
+      viewedId !== userId
+        ? (await import("@/integrations/supabase/client.server")).supabaseAdmin
+        : supabase;
+    let q = client
       .from("standup_flags" as never)
       .select(FULL_SELECT)
       .eq("flagged_by", viewedId);

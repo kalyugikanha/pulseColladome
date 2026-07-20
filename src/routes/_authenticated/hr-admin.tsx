@@ -7,6 +7,7 @@ import { HrLeavePage } from "./hr.leave";
 import { HrOnboardingPage } from "./hr.onboarding";
 import { OnboardingPage } from "./onboarding";
 import { AccessPage } from "./access";
+import { HrTraineeApplicationsPage } from "@/components/hr/trainee-applications-panel";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "leaves").default("leaves"),
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/hr-admin")({
   component: HrAdminPage,
 });
 
-const VALID = ["leaves", "approvals", "onboarding", "access"] as const;
+const VALID = ["leaves", "approvals", "onboarding", "trainees", "access"] as const;
 
 function HrAdminPage() {
   const { data: me } = useCurrentUser();
@@ -30,6 +31,7 @@ function HrAdminPage() {
   if (me && !me.isSuperAdmin && !me.isHrAdmin) throw redirect({ to: "/dashboard" });
 
   const canAccess = !!me?.isSuperAdmin;
+  const canTrainees = !!(me?.isSuperAdmin || me?.isHrAdmin);
   const active = (VALID as readonly string[]).includes(tab) ? tab : "leaves";
   const effective = active === "access" && !canAccess ? "leaves" : active;
 
@@ -47,13 +49,16 @@ function HrAdminPage() {
           <TabsTrigger value="leaves">Leaves</TabsTrigger>
           <TabsTrigger value="approvals">Onboarding Approvals</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+          {canTrainees && <TabsTrigger value="trainees">Trainee Applications</TabsTrigger>}
           {canAccess && <TabsTrigger value="access">Access &amp; Roles</TabsTrigger>}
         </TabsList>
         <TabsContent value="leaves" className="mt-4"><HrLeavePage /></TabsContent>
         <TabsContent value="approvals" className="mt-4"><HrOnboardingPage /></TabsContent>
         <TabsContent value="onboarding" className="mt-4"><OnboardingPage /></TabsContent>
+        {canTrainees && <TabsContent value="trainees" className="mt-4"><HrTraineeApplicationsPage /></TabsContent>}
         {canAccess && <TabsContent value="access" className="mt-4"><AccessPage /></TabsContent>}
       </Tabs>
+
     </div>
   );
 }

@@ -288,7 +288,7 @@ function LandingPage() {
             </figcaption>
           </figure>
 
-          <div className="mt-10 flex flex-wrap gap-3">
+          <div className="mt-10 flex flex-wrap gap-3 items-center">
             <Link to={pulsePath}>
               <Button size="lg" className="text-base px-8 py-6">{pulseLabel}</Button>
             </Link>
@@ -297,7 +297,13 @@ function LandingPage() {
                 {isSignedIn ? "Open dashboard" : "Sign in"}
               </Button>
             </Link>
+            {!isSignedIn && (
+              <Link to="/apply" className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 ml-1">
+                Applying for our training program? →
+              </Link>
+            )}
           </div>
+
         </div>
       </section>
 

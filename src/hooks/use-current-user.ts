@@ -15,6 +15,7 @@ export type CurrentUser = {
   isHrAdmin: boolean;
   isLearningAdmin: boolean;
   isEventAdmin: boolean;
+  isTrainee: boolean;
   canManageProjects: boolean;
   /**
    * True only for org-wide people visibility: admin, super admin, HR admin,

@@ -58,6 +58,8 @@ type TaskInput = {
   recurrence?: RecurrenceInput | null;
 };
 
+type BulkTaskInput = Omit<TaskInput, "assigneeId"> & { assigneeIds: string[] };
+
 function taskCreateError(error: { message?: string; code?: string; details?: string } | Error): Error {
   const message = error.message ?? "Task could not be created";
   const code = "code" in error ? error.code : undefined;
@@ -74,66 +76,101 @@ function taskCreateError(error: { message?: string; code?: string; details?: str
   return new Error(message || "Task could not be created.");
 }
 
+// Creates one task for a single assignee. Shared by createTaskFull and
+// createTasksBulk. Same behavior as the previous inline handler:
+// RPC create, impersonation re-attribution, default reviewer, recurrence.
+async function createOneTaskForAssignee(
+  data: TaskInput,
+  context: {
+    supabase: {
+      rpc: (name: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+      from: (table: string) => {
+        update: (patch: Record<string, unknown>) => {
+          eq: (col: string, val: unknown) => Promise<{ error: unknown }> & {
+            is: (col: string, val: null) => Promise<{ error: unknown }>;
+          };
+        };
+      };
+    };
+    userId: string;
+    actingUserId: string;
+    isImpersonating: boolean;
+  },
+): Promise<{ id: string } & Record<string, unknown>> {
+  const title = data.title.trim();
+  if (!title) throw new Error("Task title is required.");
+  if (!data.projectId) throw new Error("Please select a project.");
+  const { supabase } = context;
+  const rec = data.recurrence;
+  const isRecurring = !!rec && rec.freq !== "none";
+  if (isRecurring && rec!.freq === "weekly" && (!rec!.days || rec!.days.length === 0)) {
+    throw new Error("Pick at least one weekday for weekly recurrence.");
+  }
+  const { data: task, error } = await supabase.rpc("create_task_full", {
+    _project_id: data.projectId,
+    _title: title,
+    _description: data.description?.trim() || undefined,
+    _due_date: isRecurring ? undefined : (data.dueDate || undefined),
+    _priority: data.priority,
+    _assignee_id: data.assigneeId,
+    _asset_links: data.assetLinks,
+    _department_id: data.departmentId ?? undefined,
+    _task_type_ids: data.taskTypeIds,
+    _estimated_hours: data.estimatedHours ?? undefined,
+  });
+  if (error) throw taskCreateError(error as { message?: string; code?: string; details?: string });
+  const taskId = (task as unknown as { id: string }).id;
+
+  if (context.isImpersonating && context.actingUserId !== context.userId) {
+    await (supabase.from("tasks").update({ created_by: context.actingUserId }) as unknown as { eq: (c: string, v: unknown) => Promise<unknown> }).eq("id", taskId);
+  }
+
+  const creatorId = context.actingUserId;
+  if (creatorId && data.assigneeId && creatorId !== data.assigneeId) {
+    await (supabase.from("tasks").update({ reviewer_id: creatorId }) as unknown as { eq: (c: string, v: unknown) => { is: (c: string, v: null) => Promise<unknown> } })
+      .eq("id", taskId).is("reviewer_id", null);
+  }
+
+  if (isRecurring) {
+    const { error: upErr } = await (supabase.from("tasks").update({
+      is_recurring_template: true,
+      recurrence_freq: rec!.freq,
+      recurrence_days: rec!.freq === "weekly" ? (rec!.days ?? []) : null,
+      due_date: null,
+    }) as unknown as { eq: (c: string, v: unknown) => Promise<{ error: unknown }> }).eq("id", taskId);
+    if (upErr) throw upErr;
+    const { error: genErr } = await supabase.rpc("generate_recurring_task_occurrences");
+    if (genErr) throw genErr;
+  }
+  return task as { id: string } & Record<string, unknown>;
+}
+
 export const createTaskFull = createServerFn({ method: "POST" })
   .middleware([impersonationMiddleware])
   .inputValidator((d: TaskInput) => d)
   .handler(async ({ data, context }) => {
-    const title = data.title.trim();
-    if (!title) throw new Error("Task title is required.");
-    if (!data.projectId) throw new Error("Please select a project.");
-    const { supabase } = context;
-    const rec = data.recurrence;
-    const isRecurring = !!rec && rec.freq !== "none";
-    if (isRecurring && rec!.freq === "weekly" && (!rec!.days || rec!.days.length === 0)) {
-      throw new Error("Pick at least one weekday for weekly recurrence.");
-    }
-    const { data: task, error } = await supabase.rpc("create_task_full", {
-      _project_id: data.projectId,
-      _title: title,
-      _description: data.description?.trim() || undefined,
-      _due_date: isRecurring ? undefined : (data.dueDate || undefined),
-      _priority: data.priority,
-      _assignee_id: data.assigneeId,
-      _asset_links: data.assetLinks,
-      _department_id: data.departmentId ?? undefined,
-      _task_type_ids: data.taskTypeIds,
-      _estimated_hours: data.estimatedHours ?? undefined,
-    });
-    if (error) throw taskCreateError(error);
-    const taskId = (task as unknown as { id: string }).id;
-
-    // Impersonation attribution: the RPC stamps auth.uid() as created_by.
-    // When impersonating, re-attribute the row to the acting user.
-    if (context.isImpersonating && context.actingUserId !== context.userId) {
-      await supabase.from("tasks").update({ created_by: context.actingUserId } as never).eq("id", taskId);
-    }
-
-    // Default reviewer to the person who assigned/created the task, unless
-    // they are also the assignee. Only sets when reviewer_id is still null.
-    const creatorId = context.actingUserId;
-    if (creatorId && data.assigneeId && creatorId !== data.assigneeId) {
-      await supabase.from("tasks").update({ reviewer_id: creatorId } as never)
-        .eq("id", taskId).is("reviewer_id", null);
-    }
-
-
-
-    if (isRecurring) {
-      const { error: upErr } = await supabase
-        .from("tasks")
-        .update({
-          is_recurring_template: true,
-          recurrence_freq: rec!.freq,
-          recurrence_days: rec!.freq === "weekly" ? (rec!.days ?? []) : null,
-          due_date: null,
-        } as never)
-        .eq("id", taskId);
-      if (upErr) throw upErr;
-      const { error: genErr } = await supabase.rpc("generate_recurring_task_occurrences" as never);
-      if (genErr) throw genErr;
-    }
-    return task;
+    return await createOneTaskForAssignee(data, context as never);
   });
+
+export const createTasksBulk = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: BulkTaskInput) => d)
+  .handler(async ({ data, context }) => {
+    const ids = Array.from(new Set((data.assigneeIds ?? []).filter((s) => typeof s === "string" && s.length > 0)));
+    if (ids.length === 0) throw new Error("Pick at least one assignee.");
+    const taskIds: string[] = [];
+    const failures: { assigneeId: string; message: string }[] = [];
+    for (const assigneeId of ids) {
+      try {
+        const t = await createOneTaskForAssignee({ ...data, assigneeId }, context as never);
+        if (t?.id) taskIds.push(t.id);
+      } catch (e) {
+        failures.push({ assigneeId, message: (e as Error).message || "Failed" });
+      }
+    }
+    return { createdCount: taskIds.length, taskIds, failures };
+  });
+
 
 /** Materialize today's occurrences for every recurring template (idempotent). */
 export const generateRecurringOccurrences = createServerFn({ method: "POST" })

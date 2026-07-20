@@ -271,6 +271,39 @@ export type Database = {
           },
         ]
       }
+      bde_sequences: {
+        Row: {
+          client_name: string | null
+          created_at: string | null
+          full_sequence: string
+          generated_by: string
+          generated_by_email: string | null
+          id: string
+          linkedin_post: string | null
+          metadata: Json | null
+        }
+        Insert: {
+          client_name?: string | null
+          created_at?: string | null
+          full_sequence: string
+          generated_by?: string
+          generated_by_email?: string | null
+          id?: string
+          linkedin_post?: string | null
+          metadata?: Json | null
+        }
+        Update: {
+          client_name?: string | null
+          created_at?: string | null
+          full_sequence?: string
+          generated_by?: string
+          generated_by_email?: string | null
+          id?: string
+          linkedin_post?: string | null
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       course_submissions: {
         Row: {
           course_id: string

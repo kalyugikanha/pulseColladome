@@ -66,9 +66,11 @@ export function EditTaskDialog({
     
     setLinks(Array.isArray(task.asset_links) ? task.asset_links : []);
     setEstimate(task.estimated_hours == null ? "" : String(task.estimated_hours));
+    setExtraAssignees([]);
   }, [open, task?.id]);
 
   const updateFn = useServerFn(updateTaskFields);
+  const createBulkFn = useServerFn(createTasksBulk);
   const { viewAsUserId } = useViewAs();
 
   async function submit() {

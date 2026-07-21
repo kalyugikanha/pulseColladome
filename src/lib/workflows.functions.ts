@@ -346,7 +346,7 @@ export const reviewTask = createServerFn({ method: "POST" })
     }
 
 
-    await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
+    await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId, data.nextDueOffsetDays ?? null);
     return { ok: true };
   });
 

@@ -29,7 +29,7 @@ export function AccessPage() {
   const [provisioning, setProvisioning] = useState(false);
   const [provisionResult, setProvisionResult] = useState<{ created: { email: string; temporary_password: string }[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ synced: string[]; alreadyOk: string[]; errors: { email: string; message: string }[] } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ synced: { email: string; temporary_password: string }[]; alreadyOk: string[]; errors: { email: string; message: string }[] } | null>(null);
 
   // Grant-only form (existing)
   const [email, setEmail] = useState("");

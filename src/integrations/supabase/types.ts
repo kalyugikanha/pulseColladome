@@ -304,6 +304,52 @@ export type Database = {
         }
         Relationships: []
       }
+      course_assignment_tasks: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_assignment_tasks_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_assignment_tasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_assignment_tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_submissions: {
         Row: {
           course_id: string
@@ -2825,6 +2871,7 @@ export type Database = {
         Args: { _session_date: string; _user_id: string }
         Returns: undefined
       }
+      sync_learning_tasks: { Args: { _course_id?: string }; Returns: undefined }
       user_onboarding_gate: { Args: { _uid: string }; Returns: boolean }
     }
     Enums: {

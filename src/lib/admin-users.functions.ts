@@ -1,5 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { randomBytes } from "crypto";
+
+// Generate a strong, unique temporary password for a newly provisioned account.
+// Always paired with profiles.must_change_password = true so the user is forced
+// to replace it on first sign-in.
+function generateTempPassword(): string {
+  // 18 URL-safe chars + guaranteed symbol/digit/upper to satisfy common policies.
+  const base = randomBytes(15).toString("base64url").replace(/[^A-Za-z0-9]/g, "");
+  return `A${base.slice(0, 16)}9!`;
+}
 
 type Role = "admin" | "employee" | "project_manager" | "hr_admin" | "learning_admin" | "event_admin" | "trainee";
 type EmploymentType = "full_time" | "intern" | "contract" | "consultant";
@@ -155,9 +165,10 @@ export const createTeamUser = createServerFn({ method: "POST" })
     }, { onConflict: "email" });
     if (grantErr) throw new Error(grantErr.message);
 
+    const tempPassword = generateTempPassword();
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: "Test@123",
+      password: tempPassword,
       email_confirm: true,
       user_metadata: { full_name },
     });
@@ -175,7 +186,7 @@ export const createTeamUser = createServerFn({ method: "POST" })
       await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", newId);
     }
 
-    return { ok: true, email, temporary_password: "Test@123" as const, user_id: newId ?? null };
+    return { ok: true, email, temporary_password: tempPassword, user_id: newId ?? null };
   });
 
 export const updateEmployeeProfile = createServerFn({ method: "POST" })
@@ -228,7 +239,7 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
 
     const existing = new Set((profiles ?? []).map((p) => (p.email ?? "").toLowerCase()).filter(Boolean));
 
-    const created: string[] = [];
+    const created: { email: string; temporary_password: string }[] = [];
     const skipped: string[] = [];
     const errors: { email: string; message: string }[] = [];
 
@@ -239,9 +250,10 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
       const email = (g.email ?? "").trim();
       if (!email) continue;
       if (existing.has(email.toLowerCase())) { skipped.push(email); continue; }
-      const { error } = await supabaseAdmin.auth.admin.createUser({
+      const tempPassword = generateTempPassword();
+      const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
         email,
-        password: "Test@123",
+        password: tempPassword,
         email_confirm: true,
         user_metadata: { full_name: nameFromEmail(email) },
       });
@@ -252,7 +264,11 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
           errors.push({ email, message: error.message });
         }
       } else {
-        created.push(email);
+        const newId = newUser?.user?.id;
+        if (newId) {
+          await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", newId);
+        }
+        created.push({ email, temporary_password: tempPassword });
       }
     }
 
@@ -300,7 +316,7 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const created: string[] = [];
+    const created: { email: string; temporary_password: string }[] = [];
     const updated: string[] = [];
     const errors: { email: string; message: string }[] = [];
 
@@ -353,9 +369,10 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
 
           updated.push(em);
         } else {
-          const { error: cErr } = await supabaseAdmin.auth.admin.createUser({
+          const tempPassword = generateTempPassword();
+          const { data: createdUser, error: cErr } = await supabaseAdmin.auth.admin.createUser({
             email: em,
-            password: "Test@123",
+            password: tempPassword,
             email_confirm: true,
             user_metadata: { full_name: entry.full_name },
           });
@@ -366,7 +383,11 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
               throw new Error(cErr.message);
             }
           } else {
-            created.push(em);
+            const newId = createdUser?.user?.id;
+            if (newId) {
+              await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", newId);
+            }
+            created.push({ email: em, temporary_password: tempPassword });
           }
         }
       } catch (e: unknown) {
@@ -401,7 +422,7 @@ export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
       page += 1;
     }
 
-    const synced: string[] = [];
+    const synced: { email: string; temporary_password: string }[] = [];
     const alreadyOk: string[] = [];
     const errors: { email: string; message: string }[] = [];
 
@@ -427,9 +448,10 @@ export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
         authId = (existingId as string | null) ?? null;
         alreadyOk.push(em);
       } else {
+        const tempPassword = generateTempPassword();
         const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
           email: em,
-          password: "Test@123",
+          password: tempPassword,
           email_confirm: true,
           user_metadata: { full_name: p.full_name ?? em.split("@")[0] },
         });
@@ -442,7 +464,10 @@ export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
           const { data: lookedUp } = await supabaseAdmin.rpc("find_auth_user_id_by_email", { _email: em });
           authId = (lookedUp as string | null) ?? null;
         }
-        if (authId) synced.push(em);
+        if (authId) {
+          await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", authId);
+          synced.push({ email: em, temporary_password: tempPassword });
+        }
       }
 
       // Re-link profile row to the auth user id (handles placeholder profiles like Anjali).
@@ -509,9 +534,10 @@ export const logLeaveForEmployee = createServerFn({ method: "POST" })
         }
         return String(e);
       };
+      const tempPassword = generateTempPassword();
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email: selectedProfile.email,
-        password: "Test@123",
+        password: tempPassword,
         email_confirm: true,
         user_metadata: { full_name: selectedProfile.full_name ?? selectedProfile.email.split("@")[0] },
       });
@@ -526,6 +552,7 @@ export const logLeaveForEmployee = createServerFn({ method: "POST" })
       if (!authUserId) {
         throw new Error(`Could not resolve backend account for ${selectedProfile.email} after provisioning.`);
       }
+      await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", authUserId);
     }
 
     await ensureProfileForAuthUser(supabaseAdmin, authUserId, selectedProfile, context.userId);

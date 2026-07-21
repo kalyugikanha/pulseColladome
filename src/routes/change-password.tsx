@@ -29,7 +29,6 @@ function ChangePasswordPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (pw.length < 8) return toast.error("Use at least 8 characters.");
-    if (pw === "Test@123") return toast.error("Please choose a new password, not the default.");
     if (pw !== confirm) return toast.error("Passwords don't match.");
     setLoading(true);
     try {

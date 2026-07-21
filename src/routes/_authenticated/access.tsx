@@ -27,9 +27,9 @@ export function AccessPage() {
   const bulkProvisionFn = useServerFn(bulkProvisionTeam);
   const syncMissingFn = useServerFn(syncMissingAuthAccounts);
   const [provisioning, setProvisioning] = useState(false);
-  const [provisionResult, setProvisionResult] = useState<{ created: string[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
+  const [provisionResult, setProvisionResult] = useState<{ created: { email: string; temporary_password: string }[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ synced: string[]; alreadyOk: string[]; errors: { email: string; message: string }[] } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ synced: { email: string; temporary_password: string }[]; alreadyOk: string[]; errors: { email: string; message: string }[] } | null>(null);
 
   // Grant-only form (existing)
   const [email, setEmail] = useState("");
@@ -110,7 +110,7 @@ export function AccessPage() {
     setCreating(true);
     try {
       const salary = cSalary.trim() ? Number(cSalary) : null;
-      await createUserFn({ data: {
+      const res = await createUserFn({ data: {
         email: em,
         full_name: cFullName.trim() || undefined,
         role: cRole,
@@ -118,7 +118,7 @@ export function AccessPage() {
         default_monthly_salary: salary,
         department: cDept.trim() || null,
       } });
-      toast.success(`Account created for ${em}. Temporary password: Test@123 — they'll be asked to reset it on first sign-in.`);
+      toast.success(`Account created for ${em}. Temporary password: ${res.temporary_password} — share it privately; they'll be asked to reset it on first sign-in.`, { duration: 20000 });
       setCFullName(""); setCEmail(""); setCRole("employee"); setCIsSuper(false); setCSalary(""); setCDept("");
       qc.invalidateQueries({ queryKey: ["role-grants"] });
       qc.invalidateQueries({ queryKey: ["access-departments"] });
@@ -169,7 +169,7 @@ export function AccessPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-display flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Provision team from list</CardTitle>
-          <CardDescription>Creates accounts for the full Colladome roster (temp password <code className="px-1 rounded bg-muted">Test@123</code>) and syncs roles, monthly salaries, and departments. Safe to re-run — existing users are updated, not duplicated.</CardDescription>
+          <CardDescription>Creates accounts for the full Colladome roster (each gets a unique one-time password shown below) and syncs roles, monthly salaries, and departments. Safe to re-run — existing users are updated, not duplicated.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
@@ -183,7 +183,7 @@ export function AccessPage() {
                 <Badge variant="outline">Already OK: {syncResult.alreadyOk.length}</Badge>
                 <Badge variant={syncResult.errors.length ? "destructive" : "outline"}>Errors: {syncResult.errors.length}</Badge>
               </div>
-              {syncResult.synced.length > 0 && <details open><summary className="cursor-pointer text-muted-foreground">Synced ({syncResult.synced.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.synced.map((e) => <li key={e}>{e}</li>)}</ul></details>}
+              {syncResult.synced.length > 0 && <details open><summary className="cursor-pointer text-muted-foreground">Synced ({syncResult.synced.length}) — share each temp password privately</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.synced.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span> — temp password: <code className="px-1 rounded bg-muted">{e.temporary_password}</code></li>)}</ul></details>}
               {syncResult.errors.length > 0 && <details open><summary className="cursor-pointer text-destructive">Errors</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.errors.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span>: {e.message}</li>)}</ul></details>}
             </div>
           )}
@@ -194,7 +194,7 @@ export function AccessPage() {
                 <Badge variant="outline">Updated: {provisionResult.updated.length}</Badge>
                 <Badge variant={provisionResult.errors.length ? "destructive" : "outline"}>Errors: {provisionResult.errors.length}</Badge>
               </div>
-              {provisionResult.created.length > 0 && <details><summary className="cursor-pointer text-muted-foreground">Created ({provisionResult.created.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.created.map((e) => <li key={e}>{e}</li>)}</ul></details>}
+              {provisionResult.created.length > 0 && <details open><summary className="cursor-pointer text-muted-foreground">Created ({provisionResult.created.length}) — share each temp password privately</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.created.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span> — temp password: <code className="px-1 rounded bg-muted">{e.temporary_password}</code></li>)}</ul></details>}
               {provisionResult.updated.length > 0 && <details><summary className="cursor-pointer text-muted-foreground">Updated ({provisionResult.updated.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.updated.map((e) => <li key={e}>{e}</li>)}</ul></details>}
               {provisionResult.errors.length > 0 && <details open><summary className="cursor-pointer text-destructive">Errors</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.errors.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span>: {e.message}</li>)}</ul></details>}
             </div>
@@ -207,7 +207,7 @@ export function AccessPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-display flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" /> Create account</CardTitle>
-          <CardDescription>Provision a new team member with the temporary password <code className="px-1 rounded bg-muted">Test@123</code>. They will be forced to set a new password before using the app.</CardDescription>
+          <CardDescription>Provision a new team member. A unique one-time password is generated and shown once in the success toast — share it privately. They will be forced to set a new password before using the app.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-6">

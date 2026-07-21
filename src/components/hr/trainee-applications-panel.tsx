@@ -60,11 +60,15 @@ export function HrTraineeApplicationsPage() {
   async function approve(app: TraineeApplication) {
     setBusyId(app.id);
     try {
-      await approveFn({ data: { id: app.id } });
-      toast.success(
-        `Approved — ${app.email} can now sign in with the temporary password Test@123 (they'll be asked to set their own on first login).`,
-        { duration: 10000 },
-      );
+      const res = await approveFn({ data: { id: app.id } });
+      if (res?.temporary_password) {
+        toast.success(
+          `Approved — ${app.email} temp password: ${res.temporary_password} (share privately; they'll be asked to reset on first login).`,
+          { duration: 20000 },
+        );
+      } else {
+        toast.success(`Approved — ${app.email} already had a login; no new password issued.`, { duration: 10000 });
+      }
       qc.invalidateQueries({ queryKey: ["trainee-applications"] });
       qc.invalidateQueries({ queryKey: ["role-grants"] });
     } catch (e) {
@@ -109,9 +113,8 @@ export function HrTraineeApplicationsPage() {
         </h2>
         <p className="text-sm text-muted-foreground">
           Applications submitted through the public <code className="px-1 rounded bg-muted">/apply</code> page.
-          Approving provisions a login for the applicant with the temporary password{" "}
-          <code className="px-1 rounded bg-muted">Test@123</code> and grants the{" "}
-          <strong>trainee</strong> role — please relay the password to them.
+          Approving provisions a login for the applicant with a unique one-time password shown in the success toast
+          and grants the <strong>trainee</strong> role — please relay it to them privately.
         </p>
       </div>
 

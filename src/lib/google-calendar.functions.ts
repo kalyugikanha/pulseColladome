@@ -327,7 +327,7 @@ export const syncMyGoogleCalendar = createServerFn({ method: "POST" })
 export const listTeamCalendarEvents = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { startISO: string; endISO: string }) => input)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [{ data: events, error: eventsError }, { data: bookings, error: bookingsError }, { data: profiles, error: profilesError }, { data: tokens, error: tokensError }] = await Promise.all([
       supabaseAdmin
@@ -355,9 +355,47 @@ export const listTeamCalendarEvents = createServerFn({ method: "POST" })
     if (bookingsError) throw new Error(bookingsError.message);
     if (profilesError) throw new Error(profilesError.message);
     if (tokensError) throw new Error(tokensError.message);
+
+    // Redact private meeting details for events the caller does not own.
+    // Everyone sees a "Busy" block with times/attendee count, but titles,
+    // descriptions, locations, meeting links, and organizer/attendee lists
+    // stay visible only to the owner of the event row.
+    type CalendarEvent = NonNullable<typeof events>[number];
+    const redactEvent = (ev: CalendarEvent): CalendarEvent => {
+      if (ev.user_id === context.userId) return ev;
+      return {
+        ...ev,
+        summary: "Busy",
+        description_snippet: null,
+        location: null,
+        meeting_link: null,
+        html_link: null,
+        organizer_email: null,
+      } as CalendarEvent;
+    };
+    const redactedEvents = (events ?? []).map(redactEvent);
+
+    // Bookings the caller neither created nor is invited to are redacted too.
+    const callerEmail = ((profiles ?? []).find((p) => p.id === context.userId)?.email ?? "").toLowerCase();
+    type Booking = NonNullable<typeof bookings>[number];
+    const redactBooking = (b: Booking): Booking => {
+      const invited = Array.isArray(b.attendee_emails)
+        ? (b.attendee_emails as unknown[]).some((e) => String(e ?? "").toLowerCase() === callerEmail)
+        : false;
+      if (b.created_by === context.userId || invited) return b;
+      return {
+        ...b,
+        title: "Busy",
+        description: null,
+        location: null,
+        meeting_link: null,
+      } as Booking;
+    };
+    const redactedBookings = (bookings ?? []).map(redactBooking);
+
     return {
-      events: events ?? [],
-      bookings: bookings ?? [],
+      events: redactedEvents,
+      bookings: redactedBookings,
       profiles: profiles ?? [],
       statuses: tokens ?? [],
     };

@@ -399,6 +399,22 @@ async function spawnNextStage(
     d.setUTCHours(0, 0, 0, 0);
     d.setUTCDate(d.getUTCDate() + Math.max(0, Math.floor(effectiveOffset)));
     dueDate = d.toISOString().slice(0, 10);
+  } else if (task.due_date) {
+    // Carry the current task's deadline forward when nothing is configured.
+    dueDate = task.due_date;
+  }
+
+  // Terminal-stage guard: if the next stage is the workflow's last stage
+  // (no branches, no next_stage_position, no later stage in the template),
+  // a deadline must be present — otherwise deadlines silently vanish at the end.
+  const isTerminal =
+    (nextStage.branch_options?.length ?? 0) === 0 &&
+    nextStage.next_stage_position == null &&
+    !stages.some((s) => s.position > nextStage.position);
+  if (isTerminal && !dueDate) {
+    throw new Error(
+      `This moves the task to its final stage (${nextStage.name}) — set a deadline first.`,
+    );
   }
 
   const { data: newTask, error } = await supabase.rpc("create_task_full", {

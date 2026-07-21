@@ -1,5 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { randomBytes } from "crypto";
+
+// Generate a strong, unique temporary password for a newly provisioned account.
+// Always paired with profiles.must_change_password = true so the user is forced
+// to replace it on first sign-in.
+function generateTempPassword(): string {
+  // 18 URL-safe chars + guaranteed symbol/digit/upper to satisfy common policies.
+  const base = randomBytes(15).toString("base64url").replace(/[^A-Za-z0-9]/g, "");
+  return `A${base.slice(0, 16)}9!`;
+}
 
 type Role = "admin" | "employee" | "project_manager" | "hr_admin" | "learning_admin" | "event_admin" | "trainee";
 type EmploymentType = "full_time" | "intern" | "contract" | "consultant";

@@ -440,6 +440,23 @@ function ReviewTab() {
               {preview.sub.learner_comment}
             </div>
           )}
+          {preview && (() => {
+            const hist = historyFor(preview.sub.course_id, preview.sub.user_id);
+            return hist.length > 1 ? (
+              <div className="text-xs rounded border bg-muted/30 p-2 max-h-40 overflow-auto">
+                <div className="font-medium mb-1">Prior history ({hist.length} entries)</div>
+                <div className="space-y-1">
+                  {hist.map((h) => (
+                    <div key={h.id} className="flex flex-wrap gap-x-2">
+                      <span className="font-mono">{format(parseISO(h.submitted_at), "d MMM, HH:mm")}</span>
+                      <Badge variant="outline" className="h-4 text-[10px] px-1">{h.status}</Badge>
+                      {h.learner_comment && <span className="italic truncate">"{h.learner_comment}"</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
           {preview && (
             <div className="space-y-3 max-h-[70vh] overflow-auto">
               {preview.urls.map(({ path, url }, i) => (
@@ -452,6 +469,7 @@ function ReviewTab() {
               ))}
             </div>
           )}
+
           {preview && (
             <DialogFooter>
               <Button variant="outline" onClick={() => setPreview(null)}>Close</Button>

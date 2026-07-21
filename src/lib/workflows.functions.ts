@@ -201,6 +201,7 @@ export const closeTask = createServerFn({ method: "POST" })
     taskId: string;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
+    nextDueOffsetDays?: number | null;
     requiredFieldValues?: Record<string, unknown>;
     rating?: number | null;
   }) => d)

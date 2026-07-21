@@ -207,7 +207,7 @@ export function AccessPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-display flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" /> Create account</CardTitle>
-          <CardDescription>Provision a new team member with the temporary password <code className="px-1 rounded bg-muted">Test@123</code>. They will be forced to set a new password before using the app.</CardDescription>
+          <CardDescription>Provision a new team member. A unique one-time password is generated and shown once in the success toast — share it privately. They will be forced to set a new password before using the app.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-6">

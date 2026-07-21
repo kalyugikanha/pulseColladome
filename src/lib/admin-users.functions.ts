@@ -422,7 +422,7 @@ export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
       page += 1;
     }
 
-    const synced: string[] = [];
+    const synced: { email: string; temporary_password: string }[] = [];
     const alreadyOk: string[] = [];
     const errors: { email: string; message: string }[] = [];
 

@@ -69,7 +69,11 @@ async function saveSequence(
       .select("id")
       .single();
 
-    if (error || !data?.id) return null;
+    if (error) {
+      console.error("[saveSequence] Supabase Error:", error);
+      return null;
+    }
+    if (!data?.id) return null;
     return data.id as string;
   } catch {
     return null;
@@ -112,6 +116,7 @@ export const chatFn = createServerFn({ method: "POST" })
       token: (input as any)?.token ?? "",
       userName: (input as any)?.userName ?? "Team Member",
       userEmail: (input as any)?.userEmail ?? "",
+      originUrl: (input as any)?.originUrl ?? "http://localhost:8080",
     };
   })
   .handler(async ({ data }) => {
@@ -164,7 +169,9 @@ Be helpful, concise, and friendly. Match user's language (English, Hindi, Hingli
       // Save to Supabase for shareable link
       sequenceId = await saveSequence(ctx, replyText, generatedBy, generatedByEmail, clientName, userMessage);
       if (sequenceId) {
-        shareUrl = `http://localhost:8080/outreach/${sequenceId}`;
+        // Strip trailing slash if present
+        const baseUrl = data.originUrl.endsWith('/') ? data.originUrl.slice(0, -1) : data.originUrl;
+        shareUrl = `${baseUrl}/outreach/${sequenceId}`;
       }
 
       // Append metadata footer to chat response (short version)

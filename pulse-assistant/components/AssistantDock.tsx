@@ -86,6 +86,7 @@ export function AssistantDock() {
           token: session?.access_token ?? "",
           userName: me?.fullName ?? "Team Member",
           userEmail: me?.email ?? "",
+          originUrl: window.location.origin,
         }
       });
       setMsgs((m) => [...m, {

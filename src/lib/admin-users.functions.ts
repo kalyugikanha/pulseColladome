@@ -239,7 +239,7 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
 
     const existing = new Set((profiles ?? []).map((p) => (p.email ?? "").toLowerCase()).filter(Boolean));
 
-    const created: string[] = [];
+    const created: { email: string; temporary_password: string }[] = [];
     const skipped: string[] = [];
     const errors: { email: string; message: string }[] = [];
 
@@ -250,9 +250,10 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
       const email = (g.email ?? "").trim();
       if (!email) continue;
       if (existing.has(email.toLowerCase())) { skipped.push(email); continue; }
-      const { error } = await supabaseAdmin.auth.admin.createUser({
+      const tempPassword = generateTempPassword();
+      const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
         email,
-        password: "Test@123",
+        password: tempPassword,
         email_confirm: true,
         user_metadata: { full_name: nameFromEmail(email) },
       });
@@ -263,7 +264,11 @@ export const provisionPendingUsers = createServerFn({ method: "POST" })
           errors.push({ email, message: error.message });
         }
       } else {
-        created.push(email);
+        const newId = newUser?.user?.id;
+        if (newId) {
+          await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", newId);
+        }
+        created.push({ email, temporary_password: tempPassword });
       }
     }
 

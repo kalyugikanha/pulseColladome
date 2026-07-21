@@ -376,7 +376,7 @@ function ReviewTab() {
     }).eq("id", sub.id);
     if (error) return toast.error(error.message);
     toast.success("Approved");
-    qc.invalidateQueries({ queryKey: ["review-queue"] });
+    qc.invalidateQueries({ queryKey: ["review-queue-all"] });
     qc.invalidateQueries({ queryKey: ["leaderboard"] });
     setPreview(null);
   }
@@ -390,7 +390,7 @@ function ReviewTab() {
     }).eq("id", rejecting.id);
     if (error) return toast.error(error.message);
     toast.success("Rejected");
-    qc.invalidateQueries({ queryKey: ["review-queue"] });
+    qc.invalidateQueries({ queryKey: ["review-queue-all"] });
     setRejecting(null); setNote(""); setPreview(null);
   }
 

@@ -201,6 +201,7 @@ export const closeTask = createServerFn({ method: "POST" })
     taskId: string;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
+    nextDueOffsetDays?: number | null;
     requiredFieldValues?: Record<string, unknown>;
     rating?: number | null;
   }) => d)
@@ -272,7 +273,7 @@ export const closeTask = createServerFn({ method: "POST" })
       if (!reviewer || reviewer === actingUserId) {
         await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
         // No rating on self-close.
-        await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
+        await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId, data.nextDueOffsetDays ?? null);
         return { ok: true, status: "done" };
       }
       await supabase.from("tasks").update({ status: "review" } as never).eq("id", task.id);
@@ -286,7 +287,7 @@ export const closeTask = createServerFn({ method: "POST" })
     // Done + optional next stage
     await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
     // No rating on self-close.
-    await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
+    await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId, data.nextDueOffsetDays ?? null);
     return { ok: true, status: "done" };
   });
 
@@ -300,6 +301,7 @@ export const reviewTask = createServerFn({ method: "POST" })
     body?: string | null;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
+    nextDueOffsetDays?: number | null;
     rating?: number | null;
   }) => d)
   .handler(async ({ data, context }) => {
@@ -344,7 +346,7 @@ export const reviewTask = createServerFn({ method: "POST" })
     }
 
 
-    await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
+    await spawnNextStage(supabase, task, task.stage_snapshot, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId, data.nextDueOffsetDays ?? null);
     return { ok: true };
   });
 
@@ -359,6 +361,7 @@ async function spawnNextStage(
   branchKey: string | null,
   nextAssigneeId: string | null,
   actorId: string,
+  dueOffsetDays: number | null,
 ) {
   if (!stage || !task.workflow_instance_id) return;
   const { data: inst } = await supabase.from("workflow_instances" as never)
@@ -389,9 +392,19 @@ async function spawnNextStage(
   const projectId = nextStage.project_id ?? task.project_id ?? instance.project_id;
   if (!projectId) return;
 
+  const effectiveOffset = dueOffsetDays ?? nextStage.default_due_offset_days ?? null;
+  let dueDate: string | undefined = undefined;
+  if (effectiveOffset != null && Number.isFinite(effectiveOffset)) {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() + Math.max(0, Math.floor(effectiveOffset)));
+    dueDate = d.toISOString().slice(0, 10);
+  }
+
   const { data: newTask, error } = await supabase.rpc("create_task_full", {
     _project_id: projectId,
     _title: task.title,
+    _due_date: dueDate,
     _priority: "medium",
     _assignee_id: assignee,
     _asset_links: task.asset_links ?? [],

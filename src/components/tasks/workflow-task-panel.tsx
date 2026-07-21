@@ -33,6 +33,7 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
   const [task, setTask] = useState<TaskInfo | null>(null);
   const [instance, setInstance] = useState<{ id: string; started_by: string; template_id: string; template_name: string; total_stages: number } | null>(null);
   const [siblings, setSiblings] = useState<Array<{ id: string; title: string; status: string; stage_index: number | null; stage_snapshot: { name?: string } | null }>>([]);
+  const [templateStages, setTemplateStages] = useState<WorkflowStageInput[]>([]);
   const [closeOpen, setCloseOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState<"approve" | "request_changes" | "comment" | null>(null);
   const closeFn = useServerFn(closeTask);
@@ -56,8 +57,10 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
         const i = inst as unknown as { id: string; started_by: string; template_id: string; template: { name: string } | null } | null;
         if (i) {
           const { data: sc } = await supabase.from("workflow_template_stages" as never)
-            .select("position").eq("template_id", i.template_id);
-          setInstance({ ...i, template_name: i.template?.name ?? "Workflow", total_stages: (sc as unknown as unknown[])?.length ?? 0 });
+            .select("*").eq("template_id", i.template_id).order("position");
+          const allStages = (sc as unknown as WorkflowStageInput[]) ?? [];
+          setTemplateStages(allStages);
+          setInstance({ ...i, template_name: i.template?.name ?? "Workflow", total_stages: allStages.length });
         }
         const { data: sibs } = await supabase.from("tasks")
           .select("id, title, status, stage_index, stage_snapshot")
@@ -120,9 +123,27 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
             size="sm"
             className="gradient-primary"
             onClick={async () => {
+              // For a non-branching stage, if the next fixed stage has an offset,
+              // we still want to open the dialog so the user can confirm/adjust.
+              let nextStageHasOffset = false;
+              if ((stage.branch_options ?? []).length === 0) {
+                let nextPos = stage.next_stage_position ?? null;
+                if (nextPos == null) {
+                  const later = templateStages.find((s) => s.position > (task.stage_index ?? stage.position));
+                  nextPos = later?.position ?? null;
+                }
+                if (nextPos != null) {
+                  const ns = templateStages.find((s) => s.position === nextPos);
+                  nextStageHasOffset = ns?.default_due_offset_days != null;
+                }
+              } else {
+                // Branching — offsets get chosen after branch pick, so always dialog.
+                nextStageHasOffset = true;
+              }
               const needsDialog =
                 (stage.required_fields ?? []).length > 0 ||
-                (stage.branch_options ?? []).length > 0;
+                (stage.branch_options ?? []).length > 0 ||
+                nextStageHasOffset;
               if (needsDialog) {
                 setCloseOpen(true);
                 return;
@@ -164,13 +185,13 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
 
       {closeOpen && (
         <CloseStageDialog
-          task={task} stage={stage} onClose={() => setCloseOpen(false)}
+          task={task} stage={stage} templateStages={templateStages} onClose={() => setCloseOpen(false)}
           onDone={async () => { setCloseOpen(false); await refetchComments(); await onChanged?.(); }}
         />
       )}
       {reviewOpen && (
         <ReviewDialog
-          action={reviewOpen} task={task} stage={stage} onClose={() => setReviewOpen(null)}
+          action={reviewOpen} task={task} stage={stage} templateStages={templateStages} onClose={() => setReviewOpen(null)}
           onDone={async () => { setReviewOpen(null); await refetchComments(); await onChanged?.(); }}
         />
       )}
@@ -179,31 +200,61 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
   );
 }
 
-function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; onClose: () => void; onDone: () => void | Promise<void> }) {
+function resolveNextStage(
+  stage: WorkflowStageInput,
+  templateStages: WorkflowStageInput[],
+  currentPos: number,
+  branchKey: string | null,
+): WorkflowStageInput | null {
+  let nextPos: number | null = null;
+  if ((stage.branch_options ?? []).length > 0) {
+    if (!branchKey) return null;
+    nextPos = stage.branch_target_map[branchKey] ?? null;
+  } else if (stage.next_stage_position != null) {
+    nextPos = stage.next_stage_position;
+  } else {
+    const later = templateStages.find((s) => s.position > currentPos);
+    nextPos = later?.position ?? null;
+  }
+  if (nextPos == null) return null;
+  return templateStages.find((s) => s.position === nextPos) ?? null;
+}
+
+function CloseStageDialog({ task, stage, templateStages, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; templateStages: WorkflowStageInput[]; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
+  const [dueOffset, setDueOffset] = useState<string>("");
+  const [offsetTouched, setOffsetTouched] = useState(false);
 
   useEffect(() => {
-    // Use the SECURITY DEFINER RPC so the full active roster is visible —
-    // a direct profiles.select() is limited by RLS to self + direct reports
-    // + HR/admin, which hides most teammates from regular employees.
     supabase.rpc("list_assignable_users").then(({ data }) => setPeople((data ?? []) as typeof people));
   }, []);
 
   const hasBranches = stage.branch_options.length > 0;
   const missingRequired = (stage.required_fields ?? []).some((f) => f.required && !values[f.key]);
 
+  const currentPos = task.stage_index ?? stage.position;
+  const nextStage = resolveNextStage(stage, templateStages, currentPos, hasBranches ? (branchKey || null) : null);
+
+  // Sync default offset from resolved next stage when branch changes.
+  useEffect(() => {
+    if (offsetTouched) return;
+    setDueOffset(nextStage?.default_due_offset_days != null ? String(nextStage.default_due_offset_days) : "");
+  }, [nextStage?.position, nextStage?.default_due_offset_days, offsetTouched]);
+
   async function submit() {
     setBusy(true);
     try {
+      const parsedOffset = dueOffset === "" ? null : Math.max(0, Number(dueOffset));
       await close({ data: {
         taskId: task.id,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
+        nextDueOffsetDays: parsedOffset,
         requiredFieldValues: values,
         rating: null,
       }});
@@ -228,7 +279,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
             <>
               <div className="space-y-1">
                 <Label className="text-xs">Which branch is next? *</Label>
-                <Select value={branchKey} onValueChange={setBranchKey}>
+                <Select value={branchKey} onValueChange={(v) => { setBranchKey(v); setOffsetTouched(false); }}>
                   <SelectTrigger><SelectValue placeholder="Pick branch" /></SelectTrigger>
                   <SelectContent>
                     {stage.branch_options.map((b) => <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>)}
@@ -246,6 +297,20 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
               </div>
             </>
           )}
+          {nextStage && (
+            <div className="space-y-1">
+              <Label className="text-xs">
+                Next stage deadline (days from today){nextStage.name ? ` — ${nextStage.name}` : ""}
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                value={dueOffset}
+                onChange={(e) => { setOffsetTouched(true); setDueOffset(e.target.value); }}
+                placeholder="No auto due date"
+              />
+            </div>
+          )}
           {stage.requires_review && <p className="text-xs text-muted-foreground">This stage requires review — task moves to Review after you close it.</p>}
         </div>
         <DialogFooter>
@@ -260,8 +325,9 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
 }
 
 
-function ReviewDialog({ action, task, stage, onClose, onDone }: {
+function ReviewDialog({ action, task, stage, templateStages, onClose, onDone }: {
   action: "approve" | "request_changes" | "comment"; task: TaskInfo; stage: WorkflowStageInput;
+  templateStages: WorkflowStageInput[];
   onClose: () => void; onDone: () => void | Promise<void>;
 }) {
   const review = useServerFn(reviewTask);
@@ -273,24 +339,36 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
   const [rating, setRating] = useState<number>(0);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
   const [busy, setBusy] = useState(false);
+  const [dueOffset, setDueOffset] = useState<string>("");
+  const [offsetTouched, setOffsetTouched] = useState(false);
 
   useEffect(() => {
-    // See CloseStageDialog above — RPC bypasses RLS so the roster is complete.
     supabase.rpc("list_assignable_users").then(({ data }) => setPeople((data ?? []) as typeof people));
   }, []);
 
   const hasBranches = stage.branch_options.length > 0 && action === "approve";
   const actingUserId = viewAsUserId ?? me?.id ?? null;
   const canRate = action === "approve" && !!task.assignee_id && !!actingUserId;
+  const currentPos = task.stage_index ?? stage.position;
+  const nextStage = action === "approve"
+    ? resolveNextStage(stage, templateStages, currentPos, hasBranches ? (branchKey || null) : null)
+    : null;
+
+  useEffect(() => {
+    if (offsetTouched) return;
+    setDueOffset(nextStage?.default_due_offset_days != null ? String(nextStage.default_due_offset_days) : "");
+  }, [nextStage?.position, nextStage?.default_due_offset_days, offsetTouched]);
 
   async function submit() {
     setBusy(true);
     try {
+      const parsedOffset = dueOffset === "" ? null : Math.max(0, Number(dueOffset));
       await review({ data: {
         taskId: task.id, action,
         body: body.trim() || null,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
+        nextDueOffsetDays: action === "approve" ? parsedOffset : null,
         rating: canRate && rating > 0 ? rating : null,
       }});
       toast.success(action === "approve" ? "Approved" : action === "request_changes" ? "Sent back" : "Comment added");
@@ -332,7 +410,7 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
             <>
               <div className="space-y-1">
                 <Label className="text-xs">Next branch *</Label>
-                <Select value={branchKey} onValueChange={setBranchKey}>
+                <Select value={branchKey} onValueChange={(v) => { setBranchKey(v); setOffsetTouched(false); }}>
                   <SelectTrigger><SelectValue placeholder="Pick branch" /></SelectTrigger>
                   <SelectContent>
                     {stage.branch_options.map((b) => <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>)}
@@ -349,6 +427,20 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
                 </Select>
               </div>
             </>
+          )}
+          {action === "approve" && nextStage && (
+            <div className="space-y-1">
+              <Label className="text-xs">
+                Next stage deadline (days from today){nextStage.name ? ` — ${nextStage.name}` : ""}
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                value={dueOffset}
+                onChange={(e) => { setOffsetTouched(true); setDueOffset(e.target.value); }}
+                placeholder="No auto due date"
+              />
+            </div>
           )}
         </div>
         <DialogFooter>

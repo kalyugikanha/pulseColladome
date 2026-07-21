@@ -281,6 +281,20 @@ function StageEditor({ stage, index, totalStages, allStages, people, projects, o
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Deadline extension (days after this stage closes)</Label>
+              <Input
+                type="number"
+                min={0}
+                className="h-8"
+                placeholder="No auto due date"
+                value={stage.default_due_offset_days ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onChange({ default_due_offset_days: v === "" ? null : Math.max(0, Number(v)) });
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-1">

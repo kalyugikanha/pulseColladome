@@ -94,9 +94,11 @@ export const approveTraineeApplication = createServerFn({ method: "POST" })
       );
     if (grantErr) throw new Error(grantErr.message);
 
+    const { randomBytes } = await import("crypto");
+    const tempPassword = `A${randomBytes(15).toString("base64url").replace(/[^A-Za-z0-9]/g, "").slice(0, 16)}9!`;
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: "Test@123",
+      password: tempPassword,
       email_confirm: true,
       user_metadata: { full_name },
     });
@@ -119,7 +121,9 @@ export const approveTraineeApplication = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
     if (updErr) throw new Error(updErr.message);
-    return { ok: true, email, temporary_password: "Test@123" as const };
+    // temporary_password is only returned when we actually created a new auth account;
+    // for idempotent re-approvals we don't know or reset the existing password.
+    return { ok: true, email, temporary_password: newId ? tempPassword : null };
   });
 
 export const rejectTraineeApplication = createServerFn({ method: "POST" })

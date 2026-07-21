@@ -123,9 +123,27 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
             size="sm"
             className="gradient-primary"
             onClick={async () => {
+              // For a non-branching stage, if the next fixed stage has an offset,
+              // we still want to open the dialog so the user can confirm/adjust.
+              let nextStageHasOffset = false;
+              if ((stage.branch_options ?? []).length === 0) {
+                let nextPos = stage.next_stage_position ?? null;
+                if (nextPos == null) {
+                  const later = templateStages.find((s) => s.position > (task.stage_index ?? stage.position));
+                  nextPos = later?.position ?? null;
+                }
+                if (nextPos != null) {
+                  const ns = templateStages.find((s) => s.position === nextPos);
+                  nextStageHasOffset = ns?.default_due_offset_days != null;
+                }
+              } else {
+                // Branching — offsets get chosen after branch pick, so always dialog.
+                nextStageHasOffset = true;
+              }
               const needsDialog =
                 (stage.required_fields ?? []).length > 0 ||
-                (stage.branch_options ?? []).length > 0;
+                (stage.branch_options ?? []).length > 0 ||
+                nextStageHasOffset;
               if (needsDialog) {
                 setCloseOpen(true);
                 return;
@@ -167,13 +185,13 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
 
       {closeOpen && (
         <CloseStageDialog
-          task={task} stage={stage} onClose={() => setCloseOpen(false)}
+          task={task} stage={stage} templateStages={templateStages} onClose={() => setCloseOpen(false)}
           onDone={async () => { setCloseOpen(false); await refetchComments(); await onChanged?.(); }}
         />
       )}
       {reviewOpen && (
         <ReviewDialog
-          action={reviewOpen} task={task} stage={stage} onClose={() => setReviewOpen(null)}
+          action={reviewOpen} task={task} stage={stage} templateStages={templateStages} onClose={() => setReviewOpen(null)}
           onDone={async () => { setReviewOpen(null); await refetchComments(); await onChanged?.(); }}
         />
       )}

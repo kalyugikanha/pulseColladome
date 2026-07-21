@@ -110,7 +110,7 @@ export function AccessPage() {
     setCreating(true);
     try {
       const salary = cSalary.trim() ? Number(cSalary) : null;
-      await createUserFn({ data: {
+      const res = await createUserFn({ data: {
         email: em,
         full_name: cFullName.trim() || undefined,
         role: cRole,
@@ -118,7 +118,7 @@ export function AccessPage() {
         default_monthly_salary: salary,
         department: cDept.trim() || null,
       } });
-      toast.success(`Account created for ${em}. Temporary password: Test@123 — they'll be asked to reset it on first sign-in.`);
+      toast.success(`Account created for ${em}. Temporary password: ${res.temporary_password} — share it privately; they'll be asked to reset it on first sign-in.`, { duration: 20000 });
       setCFullName(""); setCEmail(""); setCRole("employee"); setCIsSuper(false); setCSalary(""); setCDept("");
       qc.invalidateQueries({ queryKey: ["role-grants"] });
       qc.invalidateQueries({ queryKey: ["access-departments"] });

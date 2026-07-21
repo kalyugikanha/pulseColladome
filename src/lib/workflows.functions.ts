@@ -273,7 +273,7 @@ export const closeTask = createServerFn({ method: "POST" })
       if (!reviewer || reviewer === actingUserId) {
         await supabase.from("tasks").update({ status: "done", completion_percent: 100 } as never).eq("id", task.id);
         // No rating on self-close.
-        await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId);
+        await spawnNextStage(supabase, task, stage, data.branchKey ?? null, data.nextAssigneeId ?? null, actingUserId, data.nextDueOffsetDays ?? null);
         return { ok: true, status: "done" };
       }
       await supabase.from("tasks").update({ status: "review" } as never).eq("id", task.id);

@@ -356,6 +356,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
               {task.review_state && task.review_state !== "none" && (
                 <Badge variant="secondary" className="capitalize">{String(task.review_state).replace("_"," ")}</Badge>
               )}
+              <TaskTypeBadges types={taskTypes} />
               <RecurringBadge task={task as never} className="text-[11px]" />
               <OverdueBadge task={task as never} className="text-[11px]" />
               <div className="flex-1" />

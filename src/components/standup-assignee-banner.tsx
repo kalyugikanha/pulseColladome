@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Flag, Video } from "lucide-react";
+import { Flag, ClipboardList } from "lucide-react";
 import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
-import { STANDUP_MEET_URL } from "@/lib/standup-cutoff";
 import { useViewAs } from "@/hooks/use-view-as";
 
 export function StandupAssigneeBanner() {
@@ -46,9 +46,9 @@ export function StandupAssigneeBanner() {
             </ul>
           </div>
           <Button asChild size="sm" className="gradient-primary gap-1 shrink-0">
-            <a href={STANDUP_MEET_URL} target="_blank" rel="noopener noreferrer">
-              <Video className="h-3.5 w-3.5" /> Join stand-up
-            </a>
+            <Link to="/standup">
+              <ClipboardList className="h-3.5 w-3.5" /> Open agenda
+            </Link>
           </Button>
         </div>
       </CardContent>

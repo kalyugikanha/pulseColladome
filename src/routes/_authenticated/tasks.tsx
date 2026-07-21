@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board/board-kanban";
 import { RecurringBadge } from "@/components/tasks/recurring-badge";
 import { OverdueBadge, isOverdue } from "@/components/tasks/overdue-badge";
+import { TaskTypeBadges } from "@/components/tasks/task-type-badges";
 import { createTaskFull, createTasksBulk } from "@/lib/tasks-plus.functions";
 import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
 import { updateTaskFields } from "@/lib/tasks-workflow.functions";
@@ -244,7 +245,8 @@ function TasksListView({ queryKey, fetcher }: { queryKey: unknown[]; fetcher: ()
                       {c.due_date && ` · Due ${c.due_date}`}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                    <TaskTypeBadges types={c.taskTypes} size="xs" />
                     <OverdueBadge task={c} />
                     <RecurringBadge task={c} />
                     {c.priority && <Badge variant={c.priority === "high" ? "destructive" : "outline"} className="uppercase text-[10px]">{c.priority}</Badge>}

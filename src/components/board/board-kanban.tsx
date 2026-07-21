@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { reorderKanbanCard, clearManualRank, sortColumnByDueDate } from "@/lib/tasks-workflow.functions";
 import { RecurringBadge } from "@/components/tasks/recurring-badge";
 import { OverdueBadge, isOverdue } from "@/components/tasks/overdue-badge";
+import { TaskTypeBadges, type TaskTypeLite } from "@/components/tasks/task-type-badges";
 
 type Status = "todo" | "in_progress" | "review" | "done";
 const COLUMNS: { key: Status; label: string }[] = [
@@ -53,6 +54,7 @@ export type BoardCard = {
   recurrence_freq: string | null;
   recurrence_days: number[] | null;
   recurrence_parent_id: string | null;
+  taskTypes: TaskTypeLite[];
 };
 
 type SortKey = "manual" | "due_asc" | "due_desc" | "priority" | "created_desc";
@@ -407,6 +409,7 @@ function CardBody({ card }: { card: BoardCard }) {
       <div className="text-sm font-medium">{card.title}</div>
       <div className="flex flex-wrap gap-1 mt-2 items-center">
         <Badge variant="outline" className="capitalize text-[10px]">{card.priority}</Badge>
+        <TaskTypeBadges types={card.taskTypes} size="xs" />
         <OverdueBadge task={card} />
         {card.due_date && <span className="text-[10px] text-muted-foreground">Due {format(new Date(card.due_date), "MMM d")}</span>}
         <RecurringBadge task={card} />
@@ -512,6 +515,22 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
     }
   }
 
+  // Load task type tags for every task in one round trip so the "Learning"
+  // pill (and any other task-type badge) shows on cards.
+  const taskIds = rows.map((r) => r.id);
+  const typesByTask = new Map<string, TaskTypeLite[]>();
+  if (taskIds.length) {
+    const { data: tt } = await supabase.from("task_task_types")
+      .select("task_id, task_type:taxonomy_task_types(id, name)")
+      .in("task_id", taskIds);
+    for (const row of ((tt ?? []) as unknown as Array<{ task_id: string; task_type: { id: string; name: string } | null }>)) {
+      if (!row.task_type) continue;
+      const list = typesByTask.get(row.task_id) ?? [];
+      list.push({ id: row.task_type.id, name: row.task_type.name });
+      typesByTask.set(row.task_id, list);
+    }
+  }
+
   if (filter.department) {
     const key = filter.department.toLowerCase();
     rows = rows.filter((r) => {
@@ -531,6 +550,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
         ? { id: wf.templateId, name: wf.templateName, department: wf.templateDepartment }
         : null,
       workflow_total_stages: wf?.totalStages ?? 0,
+      taskTypes: typesByTask.get(r.id) ?? [],
     };
   });
 }

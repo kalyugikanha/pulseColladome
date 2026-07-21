@@ -24,6 +24,7 @@ import { WorkflowTaskPanel } from "./workflow-task-panel";
 import { StandupFlagButton } from "./standup-flag-button";
 import { RecurringBadge, isRecurringTask } from "./recurring-badge";
 import { OverdueBadge } from "./overdue-badge";
+import { TaskTypeBadges, type TaskTypeLite } from "./task-type-badges";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer,
   addComment, resolveComment,
@@ -98,6 +99,21 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     queryFn: () => listAttachmentsFn({ data: { taskId: taskId! } }) as Promise<Attachment[]>,
   });
   const [uploadBusy, setUploadBusy] = useState(false);
+
+  // Fetch task types (Learning, etc.) attached to this task so the header can
+  // render pills — getTaskDetail doesn't return them.
+  const { data: taskTypes } = useQuery({
+    queryKey: ["task-types", taskId ?? null],
+    enabled: !!taskId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("task_task_types")
+        .select("task_type:taxonomy_task_types(id, name)")
+        .eq("task_id", taskId!);
+      const rows = (data ?? []) as unknown as Array<{ task_type: { id: string; name: string } | null }>;
+      return rows.map((r) => r.task_type).filter(Boolean) as TaskTypeLite[];
+    },
+  });
 
   const [commentBody, setCommentBody] = useState("");
   const [reviewNote, setReviewNote] = useState("");
@@ -340,6 +356,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
               {task.review_state && task.review_state !== "none" && (
                 <Badge variant="secondary" className="capitalize">{String(task.review_state).replace("_"," ")}</Badge>
               )}
+              <TaskTypeBadges types={taskTypes} />
               <RecurringBadge task={task as never} className="text-[11px]" />
               <OverdueBadge task={task as never} className="text-[11px]" />
               <div className="flex-1" />

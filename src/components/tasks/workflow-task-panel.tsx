@@ -200,31 +200,61 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
   );
 }
 
-function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; onClose: () => void; onDone: () => void | Promise<void> }) {
+function resolveNextStage(
+  stage: WorkflowStageInput,
+  templateStages: WorkflowStageInput[],
+  currentPos: number,
+  branchKey: string | null,
+): WorkflowStageInput | null {
+  let nextPos: number | null = null;
+  if ((stage.branch_options ?? []).length > 0) {
+    if (!branchKey) return null;
+    nextPos = stage.branch_target_map[branchKey] ?? null;
+  } else if (stage.next_stage_position != null) {
+    nextPos = stage.next_stage_position;
+  } else {
+    const later = templateStages.find((s) => s.position > currentPos);
+    nextPos = later?.position ?? null;
+  }
+  if (nextPos == null) return null;
+  return templateStages.find((s) => s.position === nextPos) ?? null;
+}
+
+function CloseStageDialog({ task, stage, templateStages, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; templateStages: WorkflowStageInput[]; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
   const [branchKey, setBranchKey] = useState<string>("");
   const [nextAssignee, setNextAssignee] = useState<string>("");
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
+  const [dueOffset, setDueOffset] = useState<string>("");
+  const [offsetTouched, setOffsetTouched] = useState(false);
 
   useEffect(() => {
-    // Use the SECURITY DEFINER RPC so the full active roster is visible —
-    // a direct profiles.select() is limited by RLS to self + direct reports
-    // + HR/admin, which hides most teammates from regular employees.
     supabase.rpc("list_assignable_users").then(({ data }) => setPeople((data ?? []) as typeof people));
   }, []);
 
   const hasBranches = stage.branch_options.length > 0;
   const missingRequired = (stage.required_fields ?? []).some((f) => f.required && !values[f.key]);
 
+  const currentPos = task.stage_index ?? stage.position;
+  const nextStage = resolveNextStage(stage, templateStages, currentPos, hasBranches ? (branchKey || null) : null);
+
+  // Sync default offset from resolved next stage when branch changes.
+  useEffect(() => {
+    if (offsetTouched) return;
+    setDueOffset(nextStage?.default_due_offset_days != null ? String(nextStage.default_due_offset_days) : "");
+  }, [nextStage?.position, nextStage?.default_due_offset_days, offsetTouched]);
+
   async function submit() {
     setBusy(true);
     try {
+      const parsedOffset = dueOffset === "" ? null : Math.max(0, Number(dueOffset));
       await close({ data: {
         taskId: task.id,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
+        nextDueOffsetDays: parsedOffset,
         requiredFieldValues: values,
         rating: null,
       }});
@@ -249,7 +279,7 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
             <>
               <div className="space-y-1">
                 <Label className="text-xs">Which branch is next? *</Label>
-                <Select value={branchKey} onValueChange={setBranchKey}>
+                <Select value={branchKey} onValueChange={(v) => { setBranchKey(v); setOffsetTouched(false); }}>
                   <SelectTrigger><SelectValue placeholder="Pick branch" /></SelectTrigger>
                   <SelectContent>
                     {stage.branch_options.map((b) => <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>)}
@@ -266,6 +296,20 @@ function CloseStageDialog({ task, stage, onClose, onDone }: { task: TaskInfo; st
                 </Select>
               </div>
             </>
+          )}
+          {nextStage && (
+            <div className="space-y-1">
+              <Label className="text-xs">
+                Next stage deadline (days from today){nextStage.name ? ` — ${nextStage.name}` : ""}
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                value={dueOffset}
+                onChange={(e) => { setOffsetTouched(true); setDueOffset(e.target.value); }}
+                placeholder="No auto due date"
+              />
+            </div>
           )}
           {stage.requires_review && <p className="text-xs text-muted-foreground">This stage requires review — task moves to Review after you close it.</p>}
         </div>

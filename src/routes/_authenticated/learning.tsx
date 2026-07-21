@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -11,11 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { BookOpen, ExternalLink, Upload, CheckCircle2, Clock3, AlertTriangle, Ban, RotateCcw, Trophy } from "lucide-react";
+import { BookOpen, ExternalLink, Upload, CheckCircle2, Clock3, AlertTriangle, Ban, RotateCcw, Trophy, ChevronDown, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/learning")({ component: LearningPage });
 
 const GRACE_DAYS = 7;
+
 
 type Course = {
   id: string;
@@ -77,7 +78,6 @@ function LearningPage() {
     queryKey: ["my-courses", me?.id, myDept],
     enabled: !!me,
     queryFn: async () => {
-      // Fetch course_ids targeted at me individually or via my dept
       const [{ data: byUser }, { data: byDept }] = await Promise.all([
         supabase.from("course_targets").select("course_id").eq("user_id", me!.id),
         myDept
@@ -95,16 +95,35 @@ function LearningPage() {
     queryKey: ["my-submissions", me?.id],
     enabled: !!me,
     queryFn: async () => {
-      const { data } = await supabase.from("course_submissions").select("*").eq("user_id", me!.id);
+      const { data } = await supabase.from("course_submissions").select("*").eq("user_id", me!.id).order("submitted_at", { ascending: false });
       return (data ?? []) as Submission[];
     },
   });
 
+  // Latest submission per course (submissions are sorted DESC by submitted_at above).
   const subByCourse = useMemo(() => {
     const m = new Map<string, Submission>();
-    for (const s of submissions) m.set(s.course_id, s);
+    for (const s of submissions) if (!m.has(s.course_id)) m.set(s.course_id, s);
     return m;
   }, [submissions]);
+
+  const historyByCourse = useMemo(() => {
+    const m = new Map<string, Submission[]>();
+    for (const s of submissions) {
+      const arr = m.get(s.course_id) ?? [];
+      arr.push(s);
+      m.set(s.course_id, arr);
+    }
+    return m;
+  }, [submissions]);
+
+  // Safety-net: pick up department-membership edge cases.
+  useEffect(() => {
+    if (!me) return;
+    supabase.rpc("sync_learning_tasks", {}).then(() => {
+      qc.invalidateQueries({ queryKey: ["my-tasks"] });
+    });
+  }, [me?.id, qc]);
 
   const grouped = useMemo(() => {
     const rows = assigned.map((c) => ({ course: c, sub: subByCourse.get(c.id), status: statusFor(c, subByCourse.get(c.id)) }));
@@ -116,11 +135,20 @@ function LearningPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  function openUpload(course: Course, existing: Submission | undefined) {
+  function toggleHistory(id: string) {
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  function openUpload(course: Course) {
     setUploadFor(course);
     setFiles([]);
-    setComment(existing?.learner_comment ?? "");
+    setComment("");
   }
 
   async function submitProof() {
@@ -134,35 +162,19 @@ function LearningPage() {
         if (up.error) throw up.error;
         paths.push(path);
       }
-      const existing = subByCourse.get(uploadFor.id);
-      if (existing) {
-        const { error } = await supabase
-          .from("course_submissions")
-          .update({
-            screenshot_path: paths[0],
-            screenshot_paths: paths,
-            learner_comment: comment.trim() || null,
-            status: "submitted",
-            rejection_note: null,
-            submitted_at: new Date().toISOString(),
-            reviewed_at: null,
-            reviewed_by: null,
-          })
-          .eq("id", existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("course_submissions")
-          .insert({
-            course_id: uploadFor.id,
-            user_id: me.id,
-            screenshot_path: paths[0],
-            screenshot_paths: paths,
-            learner_comment: comment.trim() || null,
-          });
-        if (error) throw error;
-      }
-      toast.success("Submitted for review");
+      // Always insert — every submission is its own timestamped log entry.
+      const { error } = await supabase
+        .from("course_submissions")
+        .insert({
+          course_id: uploadFor.id,
+          user_id: me.id,
+          screenshot_path: paths[0],
+          screenshot_paths: paths,
+          learner_comment: comment.trim() || null,
+          status: "submitted",
+        });
+      if (error) throw error;
+      toast.success("Update logged");
       setUploadFor(null);
       setFiles([]);
       setComment("");
@@ -173,6 +185,7 @@ function LearningPage() {
       setBusy(false);
     }
   }
+
 
   return (
     <div className="space-y-6">
@@ -195,38 +208,57 @@ function LearningPage() {
           {grouped.length === 0 && <p className="text-sm text-muted-foreground">No courses assigned yet.</p>}
           <div className="space-y-2">
             {grouped.map(({ course, sub, status }) => {
-              const canSubmit = status === "due" || status === "awaiting";
+              const history = historyByCourse.get(course.id) ?? [];
+              const isOpen = expanded.has(course.id);
               return (
-                <div key={course.id} className="border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{course.title}</span>
-                      <StatusBadge status={status} />
-                    </div>
-                    {course.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>}
-                    <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                      <span>Due {format(parseISO(course.due_date), "d MMM yyyy")}</span>
-                      {course.resource_url && (
-                        <a href={course.resource_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline text-primary">
-                          <ExternalLink className="h-3 w-3" /> Open resource
-                        </a>
+                <div key={course.id} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium truncate">{course.title}</span>
+                        <StatusBadge status={status} />
+                      </div>
+                      {course.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>}
+                      <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        <span>Due {format(parseISO(course.due_date), "d MMM yyyy")}</span>
+                        {course.resource_url && (
+                          <a href={course.resource_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline text-primary">
+                            <ExternalLink className="h-3 w-3" /> Open resource
+                          </a>
+                        )}
+                      </div>
+                      {sub?.status === "rejected" && sub.rejection_note && (
+                        <div className="text-xs text-red-600 mt-1">Rejected: {sub.rejection_note}</div>
                       )}
                     </div>
-                    {sub?.status === "rejected" && sub.rejection_note && (
-                      <div className="text-xs text-red-600 mt-1">Rejected: {sub.rejection_note}</div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {canSubmit && (
-                      <Button size="sm" variant="outline" onClick={() => openUpload(course, sub)}>
+                    <div className="flex items-center gap-2">
+                      {history.length > 0 && (
+                        <Button size="sm" variant="ghost" onClick={() => toggleHistory(course.id)}>
+                          {isOpen ? <ChevronDown className="h-3.5 w-3.5 mr-1" /> : <ChevronRight className="h-3.5 w-3.5 mr-1" />}
+                          History ({history.length})
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => openUpload(course)}>
                         <Upload className="h-3.5 w-3.5 mr-1" />
-                        {sub ? "Resubmit" : "Submit proof"}
+                        {sub ? "Add update" : "Submit proof"}
                       </Button>
-                    )}
+                    </div>
                   </div>
+                  {isOpen && history.length > 0 && (
+                    <div className="pl-2 border-l-2 space-y-1">
+                      {history.map((h) => (
+                        <div key={h.id} className="text-xs text-muted-foreground flex flex-wrap gap-x-2">
+                          <span className="font-mono">{format(parseISO(h.submitted_at), "d MMM, HH:mm")}</span>
+                          <Badge variant="outline" className="h-4 text-[10px] px-1">{h.status}</Badge>
+                          {h.learner_comment && <span className="italic truncate">"{h.learner_comment}"</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
+
           </div>
         </CardContent>
       </Card>

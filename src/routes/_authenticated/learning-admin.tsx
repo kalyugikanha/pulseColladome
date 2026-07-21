@@ -245,9 +245,12 @@ function CourseEditor({ course, existingTargets, onClose, onSaved }: { course: C
         const { error } = await supabase.from("course_targets").insert(inserts);
         if (error) throw error;
       }
+      // Sync learning tasks: create for new targets + refresh due dates.
+      await supabase.rpc("sync_learning_tasks", { _course_id: courseId! });
       toast.success(course ? "Updated" : "Created");
       onSaved();
       onClose();
+
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -316,10 +319,23 @@ function CourseEditor({ course, existingTargets, onClose, onSaved }: { course: C
 // ---------- Review queue ----------
 function ReviewTab() {
   const qc = useQueryClient();
-  const { data: subs = [] } = useQuery({
-    queryKey: ["review-queue"],
-    queryFn: async () => (await supabase.from("course_submissions").select("*").eq("status", "submitted").order("submitted_at", { ascending: true })).data as Submission[] ?? [],
+  const { data: allSubs = [] } = useQuery({
+    queryKey: ["review-queue-all"],
+    queryFn: async () => (await supabase.from("course_submissions").select("*").order("submitted_at", { ascending: false })).data as Submission[] ?? [],
   });
+  // Latest submission per (course_id,user_id). Show it only when latest is 'submitted'.
+  const subs = useMemo(() => {
+    const latest = new Map<string, Submission>();
+    for (const s of allSubs) {
+      const key = `${s.course_id}::${s.user_id}`;
+      if (!latest.has(key)) latest.set(key, s);
+    }
+    return Array.from(latest.values())
+      .filter((s) => s.status === "submitted")
+      .sort((a, b) => a.submitted_at.localeCompare(b.submitted_at));
+  }, [allSubs]);
+  const historyFor = (courseId: string, userId: string) =>
+    allSubs.filter((s) => s.course_id === courseId && s.user_id === userId);
   const { data: courses = [] } = useQuery({
     queryKey: ["admin-courses"],
     queryFn: async () => (await supabase.from("courses").select("id,title,description,resource_url,due_date")).data as Course[] ?? [],
@@ -332,6 +348,7 @@ function ReviewTab() {
   const [preview, setPreview] = useState<{ sub: Submission; urls: { path: string; url: string }[] } | null>(null);
   const [rejecting, setRejecting] = useState<Submission | null>(null);
   const [note, setNote] = useState("");
+
 
   function proofPaths(sub: Submission): string[] {
     const arr = sub.screenshot_paths ?? [];
@@ -359,7 +376,7 @@ function ReviewTab() {
     }).eq("id", sub.id);
     if (error) return toast.error(error.message);
     toast.success("Approved");
-    qc.invalidateQueries({ queryKey: ["review-queue"] });
+    qc.invalidateQueries({ queryKey: ["review-queue-all"] });
     qc.invalidateQueries({ queryKey: ["leaderboard"] });
     setPreview(null);
   }
@@ -373,7 +390,7 @@ function ReviewTab() {
     }).eq("id", rejecting.id);
     if (error) return toast.error(error.message);
     toast.success("Rejected");
-    qc.invalidateQueries({ queryKey: ["review-queue"] });
+    qc.invalidateQueries({ queryKey: ["review-queue-all"] });
     setRejecting(null); setNote(""); setPreview(null);
   }
 
@@ -423,6 +440,23 @@ function ReviewTab() {
               {preview.sub.learner_comment}
             </div>
           )}
+          {preview && (() => {
+            const hist = historyFor(preview.sub.course_id, preview.sub.user_id);
+            return hist.length > 1 ? (
+              <div className="text-xs rounded border bg-muted/30 p-2 max-h-40 overflow-auto">
+                <div className="font-medium mb-1">Prior history ({hist.length} entries)</div>
+                <div className="space-y-1">
+                  {hist.map((h) => (
+                    <div key={h.id} className="flex flex-wrap gap-x-2">
+                      <span className="font-mono">{format(parseISO(h.submitted_at), "d MMM, HH:mm")}</span>
+                      <Badge variant="outline" className="h-4 text-[10px] px-1">{h.status}</Badge>
+                      {h.learner_comment && <span className="italic truncate">"{h.learner_comment}"</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
           {preview && (
             <div className="space-y-3 max-h-[70vh] overflow-auto">
               {preview.urls.map(({ path, url }, i) => (
@@ -435,6 +469,7 @@ function ReviewTab() {
               ))}
             </div>
           )}
+
           {preview && (
             <DialogFooter>
               <Button variant="outline" onClick={() => setPreview(null)}>Close</Button>

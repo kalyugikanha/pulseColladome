@@ -78,7 +78,6 @@ function LearningPage() {
     queryKey: ["my-courses", me?.id, myDept],
     enabled: !!me,
     queryFn: async () => {
-      // Fetch course_ids targeted at me individually or via my dept
       const [{ data: byUser }, { data: byDept }] = await Promise.all([
         supabase.from("course_targets").select("course_id").eq("user_id", me!.id),
         myDept
@@ -96,16 +95,35 @@ function LearningPage() {
     queryKey: ["my-submissions", me?.id],
     enabled: !!me,
     queryFn: async () => {
-      const { data } = await supabase.from("course_submissions").select("*").eq("user_id", me!.id);
+      const { data } = await supabase.from("course_submissions").select("*").eq("user_id", me!.id).order("submitted_at", { ascending: false });
       return (data ?? []) as Submission[];
     },
   });
 
+  // Latest submission per course (submissions are sorted DESC by submitted_at above).
   const subByCourse = useMemo(() => {
     const m = new Map<string, Submission>();
-    for (const s of submissions) m.set(s.course_id, s);
+    for (const s of submissions) if (!m.has(s.course_id)) m.set(s.course_id, s);
     return m;
   }, [submissions]);
+
+  const historyByCourse = useMemo(() => {
+    const m = new Map<string, Submission[]>();
+    for (const s of submissions) {
+      const arr = m.get(s.course_id) ?? [];
+      arr.push(s);
+      m.set(s.course_id, arr);
+    }
+    return m;
+  }, [submissions]);
+
+  // Safety-net: pick up department-membership edge cases.
+  useEffect(() => {
+    if (!me) return;
+    supabase.rpc("sync_learning_tasks", { _course_id: null }).then(() => {
+      qc.invalidateQueries({ queryKey: ["my-tasks"] });
+    });
+  }, [me?.id, qc]);
 
   const grouped = useMemo(() => {
     const rows = assigned.map((c) => ({ course: c, sub: subByCourse.get(c.id), status: statusFor(c, subByCourse.get(c.id)) }));
@@ -117,11 +135,20 @@ function LearningPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  function openUpload(course: Course, existing: Submission | undefined) {
+  function toggleHistory(id: string) {
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  function openUpload(course: Course) {
     setUploadFor(course);
     setFiles([]);
-    setComment(existing?.learner_comment ?? "");
+    setComment("");
   }
 
   async function submitProof() {
@@ -135,35 +162,19 @@ function LearningPage() {
         if (up.error) throw up.error;
         paths.push(path);
       }
-      const existing = subByCourse.get(uploadFor.id);
-      if (existing) {
-        const { error } = await supabase
-          .from("course_submissions")
-          .update({
-            screenshot_path: paths[0],
-            screenshot_paths: paths,
-            learner_comment: comment.trim() || null,
-            status: "submitted",
-            rejection_note: null,
-            submitted_at: new Date().toISOString(),
-            reviewed_at: null,
-            reviewed_by: null,
-          })
-          .eq("id", existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("course_submissions")
-          .insert({
-            course_id: uploadFor.id,
-            user_id: me.id,
-            screenshot_path: paths[0],
-            screenshot_paths: paths,
-            learner_comment: comment.trim() || null,
-          });
-        if (error) throw error;
-      }
-      toast.success("Submitted for review");
+      // Always insert — every submission is its own timestamped log entry.
+      const { error } = await supabase
+        .from("course_submissions")
+        .insert({
+          course_id: uploadFor.id,
+          user_id: me.id,
+          screenshot_path: paths[0],
+          screenshot_paths: paths,
+          learner_comment: comment.trim() || null,
+          status: "submitted",
+        });
+      if (error) throw error;
+      toast.success("Update logged");
       setUploadFor(null);
       setFiles([]);
       setComment("");
@@ -174,6 +185,7 @@ function LearningPage() {
       setBusy(false);
     }
   }
+
 
   return (
     <div className="space-y-6">

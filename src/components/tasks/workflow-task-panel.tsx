@@ -33,6 +33,7 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
   const [task, setTask] = useState<TaskInfo | null>(null);
   const [instance, setInstance] = useState<{ id: string; started_by: string; template_id: string; template_name: string; total_stages: number } | null>(null);
   const [siblings, setSiblings] = useState<Array<{ id: string; title: string; status: string; stage_index: number | null; stage_snapshot: { name?: string } | null }>>([]);
+  const [templateStages, setTemplateStages] = useState<WorkflowStageInput[]>([]);
   const [closeOpen, setCloseOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState<"approve" | "request_changes" | "comment" | null>(null);
   const closeFn = useServerFn(closeTask);
@@ -56,8 +57,10 @@ export function WorkflowTaskPanel({ taskId, onChanged, onOpenTask }: { taskId: s
         const i = inst as unknown as { id: string; started_by: string; template_id: string; template: { name: string } | null } | null;
         if (i) {
           const { data: sc } = await supabase.from("workflow_template_stages" as never)
-            .select("position").eq("template_id", i.template_id);
-          setInstance({ ...i, template_name: i.template?.name ?? "Workflow", total_stages: (sc as unknown as unknown[])?.length ?? 0 });
+            .select("*").eq("template_id", i.template_id).order("position");
+          const allStages = (sc as unknown as WorkflowStageInput[]) ?? [];
+          setTemplateStages(allStages);
+          setInstance({ ...i, template_name: i.template?.name ?? "Workflow", total_stages: allStages.length });
         }
         const { data: sibs } = await supabase.from("tasks")
           .select("id, title, status, stage_index, stage_snapshot")

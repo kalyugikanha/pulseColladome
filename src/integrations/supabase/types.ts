@@ -1030,7 +1030,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          debit_account_number?: string
+          debit_account_number: string
           id?: string
           pay_date_offset_days?: number
           updated_at?: string

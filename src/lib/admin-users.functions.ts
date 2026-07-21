@@ -534,9 +534,10 @@ export const logLeaveForEmployee = createServerFn({ method: "POST" })
         }
         return String(e);
       };
+      const tempPassword = generateTempPassword();
       const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email: selectedProfile.email,
-        password: "Test@123",
+        password: tempPassword,
         email_confirm: true,
         user_metadata: { full_name: selectedProfile.full_name ?? selectedProfile.email.split("@")[0] },
       });
@@ -551,6 +552,7 @@ export const logLeaveForEmployee = createServerFn({ method: "POST" })
       if (!authUserId) {
         throw new Error(`Could not resolve backend account for ${selectedProfile.email} after provisioning.`);
       }
+      await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", authUserId);
     }
 
     await ensureProfileForAuthUser(supabaseAdmin, authUserId, selectedProfile, context.userId);

@@ -11,7 +11,6 @@ import { Bell, CheckCheck, ClipboardList, MessageSquare, AtSign, GitPullRequest,
 import { formatDistanceToNow } from "date-fns";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { listStandupFlagsForMeAsAssignee } from "@/lib/standup-flags.functions";
-import { STANDUP_MEET_URL } from "@/lib/standup-cutoff";
 import { useViewAs } from "@/hooks/use-view-as";
 
 
@@ -129,12 +128,10 @@ export function NotificationsBell({ userId }: { userId: string }) {
             ) : (
               <div className="divide-y divide-border">
                 {standupItems.map((f) => (
-                  <a
+                  <button
                     key={`standup:${f.id}`}
-                    href={STANDUP_MEET_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setOpen(false)}
+                    type="button"
+                    onClick={() => { setOpen(false); navigate({ to: "/standup" }); }}
                     className="block w-full text-left px-3 py-2.5 hover:bg-muted/60 transition-colors bg-primary/5"
                   >
                     <div className="flex items-start gap-2">
@@ -146,12 +143,12 @@ export function NotificationsBell({ userId }: { userId: string }) {
                           {f.note ? ` — "${f.note}"` : ""}
                         </div>
                         <div className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">
-                          Tap to join stand-up · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
+                          Open stand-up agenda · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
                         </div>
                       </div>
                       <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />
                     </div>
-                  </a>
+                  </button>
                 ))}
                 {(notifications ?? []).map((n) => (
                   <button

@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { ClipboardList, Check, Flag, Video, Plus, History, Inbox } from "lucide-react";
+import { ClipboardList, Check, Flag, Video, Plus, History, Inbox, Users, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,11 @@ import {
   resolveStandupFlag,
   type StandupFlag,
 } from "@/lib/standup-flags.functions";
-import { STANDUP_MEET_URL } from "@/lib/standup-cutoff";
+import {
+  getMyStandupSettings,
+  saveMyStandupSettings,
+  listStandupSettings,
+} from "@/lib/standup-settings.functions";
 import { useViewAs } from "@/hooks/use-view-as";
 
 export const Route = createFileRoute("/_authenticated/standup")({
@@ -32,6 +36,16 @@ export const Route = createFileRoute("/_authenticated/standup")({
   }),
 });
 
+function formatTime(t: string | null | undefined): string {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return format(d, "h:mm a");
+}
+
+type TeamSetting = Awaited<ReturnType<typeof listStandupSettings>>[number];
+
 function StandupAgendaPage() {
   const qc = useQueryClient();
   const { viewAsUserId } = useViewAs();
@@ -39,6 +53,9 @@ function StandupAgendaPage() {
   const listForMeFn = useServerFn(listStandupFlagsForMeAsAssignee);
   const createFn = useServerFn(createStandupNote);
   const resolveFn = useServerFn(resolveStandupFlag);
+  const getMineFn = useServerFn(getMyStandupSettings);
+  const saveMineFn = useServerFn(saveMyStandupSettings);
+  const listSettingsFn = useServerFn(listStandupSettings);
 
   const { data: active } = useQuery({
     queryKey: ["standup-flags", "mine", "active", viewAsUserId ?? "self"],
@@ -72,6 +89,43 @@ function StandupAgendaPage() {
       return (data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>;
     },
   });
+
+  const { data: mySettings, refetch: refetchMine } = useQuery({
+    queryKey: ["standup-settings", "mine"],
+    queryFn: () => getMineFn(),
+  });
+
+  const { data: teamSettings } = useQuery({
+    queryKey: ["standup-settings", "all"],
+    queryFn: () => listSettingsFn({ data: { userIds: null } }),
+    staleTime: 60_000,
+  });
+
+  // Build lookup of user_id -> settings for inline row hints.
+  const relevantIds = useMemo(() => {
+    const ids = new Set<string>();
+    (active ?? []).forEach((f) => {
+      const uid = f.task?.assignee?.id ?? f.tagged?.id ?? null;
+      if (uid) ids.add(uid);
+    });
+    (forMeActive ?? []).forEach((f) => {
+      if (f.flagger?.id) ids.add(f.flagger.id);
+    });
+    return Array.from(ids);
+  }, [active, forMeActive]);
+
+  const { data: relevantSettings } = useQuery({
+    queryKey: ["standup-settings", "relevant", relevantIds.sort().join(",")],
+    enabled: relevantIds.length > 0,
+    queryFn: () => listSettingsFn({ data: { userIds: relevantIds } }),
+  });
+
+  const settingsByUser = useMemo(() => {
+    const map = new Map<string, TeamSetting>();
+    (relevantSettings ?? []).forEach((s) => map.set(s.user_id, s));
+    (teamSettings ?? []).forEach((s) => { if (!map.has(s.user_id)) map.set(s.user_id, s); });
+    return map;
+  }, [relevantSettings, teamSettings]);
 
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
@@ -118,12 +172,16 @@ function StandupAgendaPage() {
             Track what you've flagged for others and what others have flagged for you. Mark items discussed after stand-up.
           </p>
         </div>
-        <Button asChild className="gradient-primary gap-1.5">
-          <a href={STANDUP_MEET_URL} target="_blank" rel="noopener noreferrer">
-            <Video className="h-4 w-4" /> Join stand-up
-          </a>
-        </Button>
       </div>
+
+      <MyStandupCard
+        initial={mySettings ?? null}
+        onSave={async (payload) => {
+          await saveMineFn({ data: payload });
+          await refetchMine();
+          qc.invalidateQueries({ queryKey: ["standup-settings"] });
+        }}
+      />
 
       <Card>
         <CardHeader className="pb-3">
@@ -179,7 +237,9 @@ function StandupAgendaPage() {
               Nothing flagged for you. When a teammate flags a task assigned to you (or tags you on a note), it'll appear here until they mark it discussed.
             </div>
           ) : (
-            (forMeActive ?? []).map((f) => <ForMeRow key={f.id} f={f} />)
+            (forMeActive ?? []).map((f) => (
+              <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} />
+            ))
           )}
           {(forMeHistory?.length ?? 0) > 0 && (
             <details className="pt-2">
@@ -187,7 +247,9 @@ function StandupAgendaPage() {
                 Show recently discussed ({Math.min(forMeHistory!.length, 20)})
               </summary>
               <div className="space-y-2 mt-2">
-                {forMeHistory!.slice(0, 20).map((f) => <ForMeRow key={f.id} f={f} muted />)}
+                {forMeHistory!.slice(0, 20).map((f) => (
+                  <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} muted />
+                ))}
               </div>
             </details>
           )}
@@ -211,12 +273,18 @@ function StandupAgendaPage() {
               Nothing on your agenda. Flag a task or add a free-form note above.
             </div>
           ) : (
-            (active ?? []).map((f) => (
-              <AgendaRow key={f.id} f={f} onDiscussed={() => markDiscussed(f.id)} />
-            ))
+            (active ?? []).map((f) => {
+              const uid = f.task?.assignee?.id ?? f.tagged?.id ?? null;
+              const s = uid ? settingsByUser.get(uid) ?? null : null;
+              return (
+                <AgendaRow key={f.id} f={f} settings={s} onDiscussed={() => markDiscussed(f.id)} />
+              );
+            })
           )}
         </CardContent>
       </Card>
+
+      <TeamScheduleCard settings={teamSettings ?? []} />
 
       <Card>
         <CardHeader className="pb-3">
@@ -245,11 +313,180 @@ function StandupAgendaPage() {
   );
 }
 
-function AgendaRow({ f, onDiscussed }: { f: StandupFlag; onDiscussed: () => void }) {
+function MyStandupCard({
+  initial,
+  onSave,
+}: {
+  initial: { meeting_link: string | null; start_time: string; end_time: string | null } | null;
+  onSave: (p: { meetingLink: string | null; startTime: string; endTime: string | null }) => Promise<void>;
+}) {
+  const [link, setLink] = useState("");
+  const [start, setStart] = useState("11:00");
+  const [end, setEnd] = useState("12:00");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLink(initial?.meeting_link ?? "");
+    setStart((initial?.start_time ?? "11:00:00").slice(0, 5));
+    setEnd((initial?.end_time ?? "12:00:00").slice(0, 5));
+  }, [initial]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave({
+        meetingLink: link.trim() || null,
+        startTime: start,
+        endTime: end || null,
+      });
+      toast.success("Stand-up settings saved");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Card className="border-primary/30">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Video className="h-4 w-4 text-primary" /> My stand-up
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Your meeting link and time window are visible to teammates so they know when to join your stand-up. Start time must be 11:00 AM or later.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium">Meeting link</label>
+            <Input
+              className="mt-1"
+              placeholder="https://meet.google.com/..."
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium">Start time (≥ 11:00 AM)</label>
+            <Input
+              className="mt-1"
+              type="time"
+              min="11:00"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium">End time</label>
+            <Input
+              className="mt-1"
+              type="time"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          {initial?.meeting_link && (
+            <Button asChild variant="outline" size="sm" className="gap-1">
+              <a href={initial.meeting_link} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-3.5 w-3.5" /> Open my link
+              </a>
+            </Button>
+          )}
+          <Button size="sm" className="gradient-primary" onClick={save} disabled={saving || !start}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TeamScheduleCard({ settings }: { settings: TeamSetting[] }) {
+  const usable = settings.filter((s) => s.meeting_link || s.start_time);
+  if (usable.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2 text-muted-foreground">
+          <Users className="h-4 w-4" /> Team stand-up schedule
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <details>
+          <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+            Show all ({usable.length})
+          </summary>
+          <div className="mt-2 divide-y">
+            {usable.map((s) => (
+              <div key={s.user_id} className="py-2 flex items-center justify-between gap-3 text-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium truncate">
+                    {s.profile?.full_name ?? s.profile?.email ?? "—"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatTime(s.start_time)}{s.end_time ? ` – ${formatTime(s.end_time)}` : ""}
+                    {s.profile?.department ? ` · ${s.profile.department}` : ""}
+                  </div>
+                </div>
+                {s.meeting_link ? (
+                  <Button asChild size="sm" variant="outline" className="gap-1 shrink-0">
+                    <a href={s.meeting_link} target="_blank" rel="noopener noreferrer">
+                      <Video className="h-3.5 w-3.5" /> Join
+                    </a>
+                  </Button>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground shrink-0">no link set</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StandupLink({ settings, label }: { settings: TeamSetting | null; label: string }) {
+  if (!settings) {
+    return (
+      <div className="text-[10px] text-muted-foreground mt-1">
+        {label} hasn't set a stand-up time yet.
+      </div>
+    );
+  }
+  const window = `${formatTime(settings.start_time)}${settings.end_time ? `–${formatTime(settings.end_time)}` : ""}`;
+  return (
+    <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+      <span>{label}'s stand-up · {window}</span>
+      {settings.meeting_link ? (
+        <a
+          href={settings.meeting_link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-primary hover:underline"
+        >
+          <Video className="h-3 w-3" /> Join
+        </a>
+      ) : (
+        <span className="italic">no link set</span>
+      )}
+    </div>
+  );
+}
+
+function AgendaRow({
+  f,
+  settings,
+  onDiscussed,
+}: {
+  f: StandupFlag;
+  settings: TeamSetting | null;
+  onDiscussed: () => void;
+}) {
   const isFreeform = !f.task_id;
-  const assigneeName =
-    f.task?.assignee?.full_name ?? f.task?.assignee?.email ??
-    f.tagged?.full_name ?? f.tagged?.email ?? null;
+  const assignee = f.task?.assignee ?? f.tagged ?? null;
+  const assigneeName = assignee?.full_name ?? assignee?.email ?? null;
 
   return (
     <div className="border rounded-md p-3 flex items-start justify-between gap-3">
@@ -269,6 +506,7 @@ function AgendaRow({ f, onDiscussed }: { f: StandupFlag; onDiscussed: () => void
         <div className="text-[10px] text-muted-foreground mt-1.5">
           flagged {format(new Date(f.created_at), "MMM d, h:mm a")} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
         </div>
+        {assignee && <StandupLink settings={settings} label={assigneeName ?? "Assignee"} />}
       </div>
       <Button size="sm" variant="outline" className="gap-1 shrink-0" onClick={onDiscussed}>
         <Check className="h-3.5 w-3.5" /> Mark discussed
@@ -279,7 +517,7 @@ function AgendaRow({ f, onDiscussed }: { f: StandupFlag; onDiscussed: () => void
 
 type ForMeFlag = Awaited<ReturnType<typeof listStandupFlagsForMeAsAssignee>>[number];
 
-function ForMeRow({ f, muted }: { f: ForMeFlag; muted?: boolean }) {
+function ForMeRow({ f, settings, muted }: { f: ForMeFlag; settings: TeamSetting | null; muted?: boolean }) {
   const isFreeform = !f.task_id;
   const flaggerName = f.flagger?.full_name ?? f.flagger?.email ?? "A teammate";
   return (
@@ -298,6 +536,7 @@ function ForMeRow({ f, muted }: { f: ForMeFlag; muted?: boolean }) {
         {format(new Date(f.created_at), "MMM d, h:mm a")} · {formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}
         {f.resolved_at && ` · discussed ${formatDistanceToNow(new Date(f.resolved_at), { addSuffix: true })}`}
       </div>
+      <StandupLink settings={settings} label={flaggerName} />
     </div>
   );
 }

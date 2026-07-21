@@ -84,7 +84,7 @@ export function QuickPunchControl({
             ` with ${flaggers[0]}, ${flaggers[1]} +${flaggers.length - 2} more`;
           toast(`You have ${flags.length} item${flags.length === 1 ? "" : "s"} to discuss${withWho} at today's stand-up`, {
             duration: 10000,
-            action: { label: "Join Meet", onClick: () => window.open(STANDUP_MEET_URL, "_blank", "noopener,noreferrer") },
+            action: { label: "Open agenda", onClick: () => { window.location.href = "/standup"; } },
           });
         }
       } catch { /* non-fatal */ }

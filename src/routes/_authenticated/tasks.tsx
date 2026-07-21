@@ -245,7 +245,8 @@ function TasksListView({ queryKey, fetcher }: { queryKey: unknown[]; fetcher: ()
                       {c.due_date && ` · Due ${c.due_date}`}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                    <TaskTypeBadges types={c.taskTypes} size="xs" />
                     <OverdueBadge task={c} />
                     <RecurringBadge task={c} />
                     {c.priority && <Badge variant={c.priority === "high" ? "destructive" : "outline"} className="uppercase text-[10px]">{c.priority}</Badge>}

@@ -515,6 +515,22 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
     }
   }
 
+  // Load task type tags for every task in one round trip so the "Learning"
+  // pill (and any other task-type badge) shows on cards.
+  const taskIds = rows.map((r) => r.id);
+  const typesByTask = new Map<string, TaskTypeLite[]>();
+  if (taskIds.length) {
+    const { data: tt } = await supabase.from("task_task_types")
+      .select("task_id, task_type:taxonomy_task_types(id, name)")
+      .in("task_id", taskIds);
+    for (const row of ((tt ?? []) as unknown as Array<{ task_id: string; task_type: { id: string; name: string } | null }>)) {
+      if (!row.task_type) continue;
+      const list = typesByTask.get(row.task_id) ?? [];
+      list.push({ id: row.task_type.id, name: row.task_type.name });
+      typesByTask.set(row.task_id, list);
+    }
+  }
+
   if (filter.department) {
     const key = filter.department.toLowerCase();
     rows = rows.filter((r) => {
@@ -534,6 +550,7 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
         ? { id: wf.templateId, name: wf.templateName, department: wf.templateDepartment }
         : null,
       workflow_total_stages: wf?.totalStages ?? 0,
+      taskTypes: typesByTask.get(r.id) ?? [],
     };
   });
 }

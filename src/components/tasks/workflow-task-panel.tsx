@@ -220,6 +220,14 @@ function resolveNextStage(
   return templateStages.find((s) => s.position === nextPos) ?? null;
 }
 
+function isTerminalStage(next: WorkflowStageInput, templateStages: WorkflowStageInput[]): boolean {
+  return (
+    (next.branch_options?.length ?? 0) === 0 &&
+    next.next_stage_position == null &&
+    !templateStages.some((s) => s.position > next.position)
+  );
+}
+
 function CloseStageDialog({ task, stage, templateStages, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; templateStages: WorkflowStageInput[]; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
   const [branchKey, setBranchKey] = useState<string>("");
@@ -297,26 +305,42 @@ function CloseStageDialog({ task, stage, templateStages, onClose, onDone }: { ta
               </div>
             </>
           )}
-          {nextStage && (
-            <div className="space-y-1">
-              <Label className="text-xs">
-                Next stage deadline (days from today){nextStage.name ? ` — ${nextStage.name}` : ""}
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                value={dueOffset}
-                onChange={(e) => { setOffsetTouched(true); setDueOffset(e.target.value); }}
-                placeholder="No auto due date"
-              />
-            </div>
-          )}
+          {nextStage && (() => {
+            const terminal = isTerminalStage(nextStage, templateStages);
+            const deadlineMissing = terminal && dueOffset === "";
+            return (
+              <div className="space-y-1">
+                <Label className="text-xs">
+                  Next stage deadline (days from today){nextStage.name ? ` — ${nextStage.name}` : ""}
+                  {terminal && <span className="text-destructive"> *</span>}
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={dueOffset}
+                  onChange={(e) => { setOffsetTouched(true); setDueOffset(e.target.value); }}
+                  placeholder={terminal ? "Required — final stage" : "Carry current deadline forward"}
+                  className={deadlineMissing ? "border-destructive" : ""}
+                />
+                {terminal && (
+                  <p className="text-xs text-destructive">
+                    This is the workflow's final stage — a deadline is required.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
           {stage.requires_review && <p className="text-xs text-muted-foreground">This stage requires review — task moves to Review after you close it.</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="gradient-primary" onClick={submit}
-            disabled={busy || (hasBranches && !branchKey) || missingRequired}
+            disabled={
+              busy ||
+              (hasBranches && !branchKey) ||
+              missingRequired ||
+              (!!nextStage && isTerminalStage(nextStage, templateStages) && dueOffset === "")
+            }
           >Close stage</Button>
         </DialogFooter>
       </DialogContent>
@@ -428,24 +452,43 @@ function ReviewDialog({ action, task, stage, templateStages, onClose, onDone }: 
               </div>
             </>
           )}
-          {action === "approve" && nextStage && (
-            <div className="space-y-1">
-              <Label className="text-xs">
-                Next stage deadline (days from today){nextStage.name ? ` — ${nextStage.name}` : ""}
-              </Label>
-              <Input
-                type="number"
-                min={0}
-                value={dueOffset}
-                onChange={(e) => { setOffsetTouched(true); setDueOffset(e.target.value); }}
-                placeholder="No auto due date"
-              />
-            </div>
-          )}
+          {action === "approve" && nextStage && (() => {
+            const terminal = isTerminalStage(nextStage, templateStages);
+            const deadlineMissing = terminal && dueOffset === "";
+            return (
+              <div className="space-y-1">
+                <Label className="text-xs">
+                  Next stage deadline (days from today){nextStage.name ? ` — ${nextStage.name}` : ""}
+                  {terminal && <span className="text-destructive"> *</span>}
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={dueOffset}
+                  onChange={(e) => { setOffsetTouched(true); setDueOffset(e.target.value); }}
+                  placeholder={terminal ? "Required — final stage" : "Carry current deadline forward"}
+                  className={deadlineMissing ? "border-destructive" : ""}
+                />
+                {terminal && (
+                  <p className="text-xs text-destructive">
+                    This is the workflow's final stage — a deadline is required.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="gradient-primary" onClick={submit} disabled={busy || (hasBranches && !branchKey)}>
+          <Button
+            className="gradient-primary"
+            onClick={submit}
+            disabled={
+              busy ||
+              (hasBranches && !branchKey) ||
+              (action === "approve" && !!nextStage && isTerminalStage(nextStage, templateStages) && dueOffset === "")
+            }
+          >
             {action === "approve" ? "Approve" : action === "request_changes" ? "Send back" : "Post"}
           </Button>
         </DialogFooter>

@@ -301,6 +301,7 @@ export const reviewTask = createServerFn({ method: "POST" })
     body?: string | null;
     branchKey?: string | null;
     nextAssigneeId?: string | null;
+    nextDueOffsetDays?: number | null;
     rating?: number | null;
   }) => d)
   .handler(async ({ data, context }) => {

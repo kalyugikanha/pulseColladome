@@ -361,6 +361,7 @@ async function spawnNextStage(
   branchKey: string | null,
   nextAssigneeId: string | null,
   actorId: string,
+  dueOffsetDays: number | null,
 ) {
   if (!stage || !task.workflow_instance_id) return;
   const { data: inst } = await supabase.from("workflow_instances" as never)
@@ -391,9 +392,19 @@ async function spawnNextStage(
   const projectId = nextStage.project_id ?? task.project_id ?? instance.project_id;
   if (!projectId) return;
 
+  const effectiveOffset = dueOffsetDays ?? nextStage.default_due_offset_days ?? null;
+  let dueDate: string | undefined = undefined;
+  if (effectiveOffset != null && Number.isFinite(effectiveOffset)) {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() + Math.max(0, Math.floor(effectiveOffset)));
+    dueDate = d.toISOString().slice(0, 10);
+  }
+
   const { data: newTask, error } = await supabase.rpc("create_task_full", {
     _project_id: projectId,
     _title: task.title,
+    _due_date: dueDate,
     _priority: "medium",
     _assignee_id: assignee,
     _asset_links: task.asset_links ?? [],

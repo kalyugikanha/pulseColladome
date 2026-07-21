@@ -325,8 +325,9 @@ function CloseStageDialog({ task, stage, templateStages, onClose, onDone }: { ta
 }
 
 
-function ReviewDialog({ action, task, stage, onClose, onDone }: {
+function ReviewDialog({ action, task, stage, templateStages, onClose, onDone }: {
   action: "approve" | "request_changes" | "comment"; task: TaskInfo; stage: WorkflowStageInput;
+  templateStages: WorkflowStageInput[];
   onClose: () => void; onDone: () => void | Promise<void>;
 }) {
   const review = useServerFn(reviewTask);
@@ -338,24 +339,36 @@ function ReviewDialog({ action, task, stage, onClose, onDone }: {
   const [rating, setRating] = useState<number>(0);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
   const [busy, setBusy] = useState(false);
+  const [dueOffset, setDueOffset] = useState<string>("");
+  const [offsetTouched, setOffsetTouched] = useState(false);
 
   useEffect(() => {
-    // See CloseStageDialog above — RPC bypasses RLS so the roster is complete.
     supabase.rpc("list_assignable_users").then(({ data }) => setPeople((data ?? []) as typeof people));
   }, []);
 
   const hasBranches = stage.branch_options.length > 0 && action === "approve";
   const actingUserId = viewAsUserId ?? me?.id ?? null;
   const canRate = action === "approve" && !!task.assignee_id && !!actingUserId;
+  const currentPos = task.stage_index ?? stage.position;
+  const nextStage = action === "approve"
+    ? resolveNextStage(stage, templateStages, currentPos, hasBranches ? (branchKey || null) : null)
+    : null;
+
+  useEffect(() => {
+    if (offsetTouched) return;
+    setDueOffset(nextStage?.default_due_offset_days != null ? String(nextStage.default_due_offset_days) : "");
+  }, [nextStage?.position, nextStage?.default_due_offset_days, offsetTouched]);
 
   async function submit() {
     setBusy(true);
     try {
+      const parsedOffset = dueOffset === "" ? null : Math.max(0, Number(dueOffset));
       await review({ data: {
         taskId: task.id, action,
         body: body.trim() || null,
         branchKey: hasBranches ? (branchKey || null) : null,
         nextAssigneeId: hasBranches ? (nextAssignee || null) : null,
+        nextDueOffsetDays: action === "approve" ? parsedOffset : null,
         rating: canRate && rating > 0 ? rating : null,
       }});
       toast.success(action === "approve" ? "Approved" : action === "request_changes" ? "Sent back" : "Comment added");

@@ -208,38 +208,57 @@ function LearningPage() {
           {grouped.length === 0 && <p className="text-sm text-muted-foreground">No courses assigned yet.</p>}
           <div className="space-y-2">
             {grouped.map(({ course, sub, status }) => {
-              const canSubmit = status === "due" || status === "awaiting";
+              const history = historyByCourse.get(course.id) ?? [];
+              const isOpen = expanded.has(course.id);
               return (
-                <div key={course.id} className="border rounded-lg p-3 flex flex-col sm:flex-row sm:items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{course.title}</span>
-                      <StatusBadge status={status} />
-                    </div>
-                    {course.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>}
-                    <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                      <span>Due {format(parseISO(course.due_date), "d MMM yyyy")}</span>
-                      {course.resource_url && (
-                        <a href={course.resource_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline text-primary">
-                          <ExternalLink className="h-3 w-3" /> Open resource
-                        </a>
+                <div key={course.id} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium truncate">{course.title}</span>
+                        <StatusBadge status={status} />
+                      </div>
+                      {course.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>}
+                      <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                        <span>Due {format(parseISO(course.due_date), "d MMM yyyy")}</span>
+                        {course.resource_url && (
+                          <a href={course.resource_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline text-primary">
+                            <ExternalLink className="h-3 w-3" /> Open resource
+                          </a>
+                        )}
+                      </div>
+                      {sub?.status === "rejected" && sub.rejection_note && (
+                        <div className="text-xs text-red-600 mt-1">Rejected: {sub.rejection_note}</div>
                       )}
                     </div>
-                    {sub?.status === "rejected" && sub.rejection_note && (
-                      <div className="text-xs text-red-600 mt-1">Rejected: {sub.rejection_note}</div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {canSubmit && (
-                      <Button size="sm" variant="outline" onClick={() => openUpload(course, sub)}>
+                    <div className="flex items-center gap-2">
+                      {history.length > 0 && (
+                        <Button size="sm" variant="ghost" onClick={() => toggleHistory(course.id)}>
+                          {isOpen ? <ChevronDown className="h-3.5 w-3.5 mr-1" /> : <ChevronRight className="h-3.5 w-3.5 mr-1" />}
+                          History ({history.length})
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => openUpload(course)}>
                         <Upload className="h-3.5 w-3.5 mr-1" />
-                        {sub ? "Resubmit" : "Submit proof"}
+                        {sub ? "Add update" : "Submit proof"}
                       </Button>
-                    )}
+                    </div>
                   </div>
+                  {isOpen && history.length > 0 && (
+                    <div className="pl-2 border-l-2 space-y-1">
+                      {history.map((h) => (
+                        <div key={h.id} className="text-xs text-muted-foreground flex flex-wrap gap-x-2">
+                          <span className="font-mono">{format(parseISO(h.submitted_at), "d MMM, HH:mm")}</span>
+                          <Badge variant="outline" className="h-4 text-[10px] px-1">{h.status}</Badge>
+                          {h.learner_comment && <span className="italic truncate">"{h.learner_comment}"</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
+
           </div>
         </CardContent>
       </Card>

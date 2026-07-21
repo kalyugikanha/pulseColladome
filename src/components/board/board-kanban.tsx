@@ -409,6 +409,7 @@ function CardBody({ card }: { card: BoardCard }) {
       <div className="text-sm font-medium">{card.title}</div>
       <div className="flex flex-wrap gap-1 mt-2 items-center">
         <Badge variant="outline" className="capitalize text-[10px]">{card.priority}</Badge>
+        <TaskTypeBadges types={card.taskTypes} size="xs" />
         <OverdueBadge task={card} />
         {card.due_date && <span className="text-[10px] text-muted-foreground">Due {format(new Date(card.due_date), "MMM d")}</span>}
         <RecurringBadge task={card} />

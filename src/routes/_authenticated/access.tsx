@@ -183,7 +183,7 @@ export function AccessPage() {
                 <Badge variant="outline">Already OK: {syncResult.alreadyOk.length}</Badge>
                 <Badge variant={syncResult.errors.length ? "destructive" : "outline"}>Errors: {syncResult.errors.length}</Badge>
               </div>
-              {syncResult.synced.length > 0 && <details open><summary className="cursor-pointer text-muted-foreground">Synced ({syncResult.synced.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.synced.map((e) => <li key={e}>{e}</li>)}</ul></details>}
+              {syncResult.synced.length > 0 && <details open><summary className="cursor-pointer text-muted-foreground">Synced ({syncResult.synced.length}) — share each temp password privately</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.synced.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span> — temp password: <code className="px-1 rounded bg-muted">{e.temporary_password}</code></li>)}</ul></details>}
               {syncResult.errors.length > 0 && <details open><summary className="cursor-pointer text-destructive">Errors</summary><ul className="mt-1 pl-4 list-disc text-xs">{syncResult.errors.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span>: {e.message}</li>)}</ul></details>}
             </div>
           )}

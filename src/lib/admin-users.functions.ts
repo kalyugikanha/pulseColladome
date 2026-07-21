@@ -369,9 +369,10 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
 
           updated.push(em);
         } else {
-          const { error: cErr } = await supabaseAdmin.auth.admin.createUser({
+          const tempPassword = generateTempPassword();
+          const { data: createdUser, error: cErr } = await supabaseAdmin.auth.admin.createUser({
             email: em,
-            password: "Test@123",
+            password: tempPassword,
             email_confirm: true,
             user_metadata: { full_name: entry.full_name },
           });
@@ -382,7 +383,11 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
               throw new Error(cErr.message);
             }
           } else {
-            created.push(em);
+            const newId = createdUser?.user?.id;
+            if (newId) {
+              await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", newId);
+            }
+            created.push({ email: em, temporary_password: tempPassword });
           }
         }
       } catch (e: unknown) {

@@ -120,7 +120,7 @@ function LearningPage() {
   // Safety-net: pick up department-membership edge cases.
   useEffect(() => {
     if (!me) return;
-    supabase.rpc("sync_learning_tasks", { _course_id: null }).then(() => {
+    supabase.rpc("sync_learning_tasks", { _course_id: undefined as unknown as string }).then(() => {
       qc.invalidateQueries({ queryKey: ["my-tasks"] });
     });
   }, [me?.id, qc]);

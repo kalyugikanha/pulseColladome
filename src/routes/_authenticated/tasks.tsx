@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { BoardKanban, fetchBoardCards, type BoardCard } from "@/components/board/board-kanban";
 import { RecurringBadge } from "@/components/tasks/recurring-badge";
 import { OverdueBadge, isOverdue } from "@/components/tasks/overdue-badge";
+import { TaskTypeBadges } from "@/components/tasks/task-type-badges";
 import { createTaskFull, createTasksBulk } from "@/lib/tasks-plus.functions";
 import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
 import { updateTaskFields } from "@/lib/tasks-workflow.functions";

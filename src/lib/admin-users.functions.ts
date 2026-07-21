@@ -165,9 +165,10 @@ export const createTeamUser = createServerFn({ method: "POST" })
     }, { onConflict: "email" });
     if (grantErr) throw new Error(grantErr.message);
 
+    const tempPassword = generateTempPassword();
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: "Test@123",
+      password: tempPassword,
       email_confirm: true,
       user_metadata: { full_name },
     });
@@ -185,7 +186,7 @@ export const createTeamUser = createServerFn({ method: "POST" })
       await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", newId);
     }
 
-    return { ok: true, email, temporary_password: "Test@123" as const, user_id: newId ?? null };
+    return { ok: true, email, temporary_password: tempPassword, user_id: newId ?? null };
   });
 
 export const updateEmployeeProfile = createServerFn({ method: "POST" })

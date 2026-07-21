@@ -319,10 +319,23 @@ function CourseEditor({ course, existingTargets, onClose, onSaved }: { course: C
 // ---------- Review queue ----------
 function ReviewTab() {
   const qc = useQueryClient();
-  const { data: subs = [] } = useQuery({
-    queryKey: ["review-queue"],
-    queryFn: async () => (await supabase.from("course_submissions").select("*").eq("status", "submitted").order("submitted_at", { ascending: true })).data as Submission[] ?? [],
+  const { data: allSubs = [] } = useQuery({
+    queryKey: ["review-queue-all"],
+    queryFn: async () => (await supabase.from("course_submissions").select("*").order("submitted_at", { ascending: false })).data as Submission[] ?? [],
   });
+  // Latest submission per (course_id,user_id). Show it only when latest is 'submitted'.
+  const subs = useMemo(() => {
+    const latest = new Map<string, Submission>();
+    for (const s of allSubs) {
+      const key = `${s.course_id}::${s.user_id}`;
+      if (!latest.has(key)) latest.set(key, s);
+    }
+    return Array.from(latest.values())
+      .filter((s) => s.status === "submitted")
+      .sort((a, b) => a.submitted_at.localeCompare(b.submitted_at));
+  }, [allSubs]);
+  const historyFor = (courseId: string, userId: string) =>
+    allSubs.filter((s) => s.course_id === courseId && s.user_id === userId);
   const { data: courses = [] } = useQuery({
     queryKey: ["admin-courses"],
     queryFn: async () => (await supabase.from("courses").select("id,title,description,resource_url,due_date")).data as Course[] ?? [],
@@ -335,6 +348,7 @@ function ReviewTab() {
   const [preview, setPreview] = useState<{ sub: Submission; urls: { path: string; url: string }[] } | null>(null);
   const [rejecting, setRejecting] = useState<Submission | null>(null);
   const [note, setNote] = useState("");
+
 
   function proofPaths(sub: Submission): string[] {
     const arr = sub.screenshot_paths ?? [];

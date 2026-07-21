@@ -316,7 +316,7 @@ export const bulkProvisionTeam = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const created: string[] = [];
+    const created: { email: string; temporary_password: string }[] = [];
     const updated: string[] = [];
     const errors: { email: string; message: string }[] = [];
 

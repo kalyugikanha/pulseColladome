@@ -428,6 +428,20 @@ function ReviewDialog({ action, task, stage, templateStages, onClose, onDone }: 
               </div>
             </>
           )}
+          {action === "approve" && nextStage && (
+            <div className="space-y-1">
+              <Label className="text-xs">
+                Next stage deadline (days from today){nextStage.name ? ` — ${nextStage.name}` : ""}
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                value={dueOffset}
+                onChange={(e) => { setOffsetTouched(true); setDueOffset(e.target.value); }}
+                placeholder="No auto due date"
+              />
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>

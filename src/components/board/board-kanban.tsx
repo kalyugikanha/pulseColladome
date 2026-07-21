@@ -54,6 +54,7 @@ export type BoardCard = {
   recurrence_freq: string | null;
   recurrence_days: number[] | null;
   recurrence_parent_id: string | null;
+  taskTypes: TaskTypeLite[];
 };
 
 type SortKey = "manual" | "due_asc" | "due_desc" | "priority" | "created_desc";

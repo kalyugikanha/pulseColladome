@@ -27,7 +27,7 @@ export function AccessPage() {
   const bulkProvisionFn = useServerFn(bulkProvisionTeam);
   const syncMissingFn = useServerFn(syncMissingAuthAccounts);
   const [provisioning, setProvisioning] = useState(false);
-  const [provisionResult, setProvisionResult] = useState<{ created: string[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
+  const [provisionResult, setProvisionResult] = useState<{ created: { email: string; temporary_password: string }[]; updated: string[]; errors: { email: string; message: string }[] } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ synced: string[]; alreadyOk: string[]; errors: { email: string; message: string }[] } | null>(null);
 

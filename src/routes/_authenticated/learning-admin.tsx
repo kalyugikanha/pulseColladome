@@ -245,9 +245,12 @@ function CourseEditor({ course, existingTargets, onClose, onSaved }: { course: C
         const { error } = await supabase.from("course_targets").insert(inserts);
         if (error) throw error;
       }
+      // Sync learning tasks: create for new targets + refresh due dates.
+      await supabase.rpc("sync_learning_tasks", { _course_id: courseId! });
       toast.success(course ? "Updated" : "Created");
       onSaved();
       onClose();
+
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {

@@ -269,11 +269,17 @@ function LearningPage() {
       <Dialog open={!!uploadFor} onOpenChange={(o) => { if (!o) { setUploadFor(null); setFiles([]); setComment(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Submit proof — {uploadFor?.title}</DialogTitle>
+            <DialogTitle>Upload completion proof — {uploadFor?.title}</DialogTitle>
+            <p className="text-xs text-muted-foreground pt-1">
+              Share evidence that you finished this course — a screenshot of the completion screen, a certificate, or a PDF — plus a short note on what you learned. A Learning Admin will review your submission and approve or reject it.
+            </p>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Screenshots or PDFs (you can select multiple)</Label>
+              <Label>Completion evidence</Label>
+              <p className="text-[11px] text-muted-foreground">
+                Accepted formats: images (PNG, JPG) or PDF. You can upload multiple files in one submission.
+              </p>
               <Input
                 type="file"
                 accept="image/*,application/pdf"
@@ -293,11 +299,10 @@ function LearningPage() {
                 placeholder="A couple of sentences on your key takeaways…"
               />
             </div>
-            <p className="text-xs text-muted-foreground">A Learning Admin will review and approve or reject.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setUploadFor(null); setFiles([]); setComment(""); }}>Cancel</Button>
-            <Button disabled={files.length === 0 || busy} onClick={submitProof}>{busy ? "Uploading…" : "Submit"}</Button>
+            <Button disabled={files.length === 0 || busy} onClick={submitProof}>{busy ? "Uploading…" : "Submit for review"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -448,9 +448,10 @@ export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
         authId = (existingId as string | null) ?? null;
         alreadyOk.push(em);
       } else {
+        const tempPassword = generateTempPassword();
         const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
           email: em,
-          password: "Test@123",
+          password: tempPassword,
           email_confirm: true,
           user_metadata: { full_name: p.full_name ?? em.split("@")[0] },
         });
@@ -463,7 +464,10 @@ export const syncMissingAuthAccounts = createServerFn({ method: "POST" })
           const { data: lookedUp } = await supabaseAdmin.rpc("find_auth_user_id_by_email", { _email: em });
           authId = (lookedUp as string | null) ?? null;
         }
-        if (authId) synced.push(em);
+        if (authId) {
+          await supabaseAdmin.from("profiles").update({ must_change_password: true }).eq("id", authId);
+          synced.push({ email: em, temporary_password: tempPassword });
+        }
       }
 
       // Re-link profile row to the auth user id (handles placeholder profiles like Anjali).

@@ -76,12 +76,13 @@ export const saveMyStandupSettings = createServerFn({ method: "POST" })
     }
     const meetingLink = (data.meetingLink ?? "").trim() || null;
 
-    const { data: row, error } = await supabase
-      .from("standup_settings" as never)
-      .upsert(
-        { user_id: userId, meeting_link: meetingLink, start_time: startTime, end_time: endTime },
-        { onConflict: "user_id" },
-      )
+    const payload = { user_id: userId, meeting_link: meetingLink, start_time: startTime, end_time: endTime };
+    const { data: row, error } = await (supabase.from("standup_settings" as never) as unknown as {
+      upsert: (v: unknown, o: { onConflict: string }) => {
+        select: (s: string) => { single: () => Promise<{ data: StandupSettings | null; error: { message: string } | null }> };
+      };
+    })
+      .upsert(payload, { onConflict: "user_id" })
       .select("user_id, meeting_link, start_time, end_time, updated_at")
       .single();
     if (error) throw new Error(error.message);

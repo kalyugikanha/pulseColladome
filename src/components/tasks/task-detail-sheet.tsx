@@ -100,6 +100,21 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   });
   const [uploadBusy, setUploadBusy] = useState(false);
 
+  // Fetch task types (Learning, etc.) attached to this task so the header can
+  // render pills — getTaskDetail doesn't return them.
+  const { data: taskTypes } = useQuery({
+    queryKey: ["task-types", taskId ?? null],
+    enabled: !!taskId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("task_task_types")
+        .select("task_type:taxonomy_task_types(id, name)")
+        .eq("task_id", taskId!);
+      const rows = (data ?? []) as unknown as Array<{ task_type: { id: string; name: string } | null }>;
+      return rows.map((r) => r.task_type).filter(Boolean) as TaskTypeLite[];
+    },
+  });
+
   const [commentBody, setCommentBody] = useState("");
   const [reviewNote, setReviewNote] = useState("");
   const [editOpen, setEditOpen] = useState(false);

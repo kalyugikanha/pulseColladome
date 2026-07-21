@@ -371,7 +371,6 @@ export const listTeamCalendarEvents = createServerFn({ method: "POST" })
         meeting_link: null,
         html_link: null,
         organizer_email: null,
-        attendees: null,
       } as CalendarEvent;
     };
     const redactedEvents = (events ?? []).map(redactEvent);

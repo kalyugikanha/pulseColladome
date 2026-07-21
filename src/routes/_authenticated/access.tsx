@@ -194,7 +194,7 @@ export function AccessPage() {
                 <Badge variant="outline">Updated: {provisionResult.updated.length}</Badge>
                 <Badge variant={provisionResult.errors.length ? "destructive" : "outline"}>Errors: {provisionResult.errors.length}</Badge>
               </div>
-              {provisionResult.created.length > 0 && <details><summary className="cursor-pointer text-muted-foreground">Created ({provisionResult.created.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.created.map((e) => <li key={e}>{e}</li>)}</ul></details>}
+              {provisionResult.created.length > 0 && <details open><summary className="cursor-pointer text-muted-foreground">Created ({provisionResult.created.length}) — share each temp password privately</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.created.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span> — temp password: <code className="px-1 rounded bg-muted">{e.temporary_password}</code></li>)}</ul></details>}
               {provisionResult.updated.length > 0 && <details><summary className="cursor-pointer text-muted-foreground">Updated ({provisionResult.updated.length})</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.updated.map((e) => <li key={e}>{e}</li>)}</ul></details>}
               {provisionResult.errors.length > 0 && <details open><summary className="cursor-pointer text-destructive">Errors</summary><ul className="mt-1 pl-4 list-disc text-xs">{provisionResult.errors.map((e) => <li key={e.email}><span className="font-mono">{e.email}</span>: {e.message}</li>)}</ul></details>}
             </div>

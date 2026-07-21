@@ -24,6 +24,7 @@ import { WorkflowTaskPanel } from "./workflow-task-panel";
 import { StandupFlagButton } from "./standup-flag-button";
 import { RecurringBadge, isRecurringTask } from "./recurring-badge";
 import { OverdueBadge } from "./overdue-badge";
+import { TaskTypeBadges, type TaskTypeLite } from "./task-type-badges";
 import {
   getTaskDetail, setTaskStatus, submitReviewDecision, setReviewer,
   addComment, resolveComment,

@@ -410,7 +410,7 @@ function ReviewDialog({ action, task, stage, templateStages, onClose, onDone }: 
             <>
               <div className="space-y-1">
                 <Label className="text-xs">Next branch *</Label>
-                <Select value={branchKey} onValueChange={setBranchKey}>
+                <Select value={branchKey} onValueChange={(v) => { setBranchKey(v); setOffsetTouched(false); }}>
                   <SelectTrigger><SelectValue placeholder="Pick branch" /></SelectTrigger>
                   <SelectContent>
                     {stage.branch_options.map((b) => <SelectItem key={b.key} value={b.key}>{b.label}</SelectItem>)}

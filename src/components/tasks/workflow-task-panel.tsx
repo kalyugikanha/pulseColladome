@@ -220,6 +220,14 @@ function resolveNextStage(
   return templateStages.find((s) => s.position === nextPos) ?? null;
 }
 
+function isTerminalStage(next: WorkflowStageInput, templateStages: WorkflowStageInput[]): boolean {
+  return (
+    (next.branch_options?.length ?? 0) === 0 &&
+    next.next_stage_position == null &&
+    !templateStages.some((s) => s.position > next.position)
+  );
+}
+
 function CloseStageDialog({ task, stage, templateStages, onClose, onDone }: { task: TaskInfo; stage: WorkflowStageInput; templateStages: WorkflowStageInput[]; onClose: () => void; onDone: () => void | Promise<void> }) {
   const close = useServerFn(closeTask);
   const [branchKey, setBranchKey] = useState<string>("");

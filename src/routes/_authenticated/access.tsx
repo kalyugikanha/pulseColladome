@@ -169,7 +169,7 @@ export function AccessPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-display flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Provision team from list</CardTitle>
-          <CardDescription>Creates accounts for the full Colladome roster (temp password <code className="px-1 rounded bg-muted">Test@123</code>) and syncs roles, monthly salaries, and departments. Safe to re-run — existing users are updated, not duplicated.</CardDescription>
+          <CardDescription>Creates accounts for the full Colladome roster (each gets a unique one-time password shown below) and syncs roles, monthly salaries, and departments. Safe to re-run — existing users are updated, not duplicated.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">

@@ -10,9 +10,43 @@ import { transcribeFn } from "@assistant/api/transcribe";
 import type { Proposal } from "@assistant/lib/proposals";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Send, Mic, Square, X, CheckCircle2, Loader2, MessageSquare } from "lucide-react";
+import { Sparkles, Send, Mic, Square, X, CheckCircle2, Loader2, MessageSquare, Copy, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const renderMarkdownComponents: any = {
+  a: ({ node, ...props }: any) => {
+    const href = props.href || "";
+    const isWhatsApp = href.includes("wa.me") || href.includes("api.whatsapp.com");
+    return (
+      <span className="inline-flex items-center gap-1 my-1">
+        <a {...props} target="_blank" rel="noopener noreferrer" className={cn(
+          "inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline",
+          isWhatsApp ? "text-green-600 dark:text-green-500" : "text-primary"
+        )}>
+          {isWhatsApp && <MessageCircle className="w-3.5 h-3.5" />}
+          {props.children}
+        </a>
+        <Button 
+          variant="outline" 
+          size="icon" 
+          className="h-6 w-6 ml-1 rounded hover:bg-black/5 dark:hover:bg-white/10" 
+          onClick={(e) => {
+            e.preventDefault();
+            navigator.clipboard.writeText(href);
+            toast.success("Link copied!");
+          }}
+          title="Copy link"
+        >
+          <Copy className="w-3 h-3 text-muted-foreground" />
+        </Button>
+      </span>
+    );
+  },
+  p: ({ node, ...props }: any) => (
+    <p {...props} className="mb-4 last:mb-0 leading-relaxed whitespace-pre-wrap" />
+  ),
+};
 
 type Msg = {
   id: string;
@@ -294,21 +328,62 @@ export function AssistantDock() {
                   {m.error ? (
                     <div className="text-destructive text-xs">{m.error}</div>
                   ) : m.role === "assistant" ? (
-                    <div className="prose prose-sm max-w-none
-                      prose-p:my-1 prose-p:leading-relaxed
-                      prose-headings:font-semibold prose-headings:text-foreground prose-headings:mt-2 prose-headings:mb-1
-                      prose-h1:text-base prose-h2:text-sm prose-h3:text-sm
-                      prose-strong:text-foreground prose-strong:font-semibold
-                      prose-em:text-muted-foreground
-                      prose-ul:my-1 prose-ul:pl-4 prose-li:my-0.5 prose-li:marker:text-primary
-                      prose-ol:my-1 prose-ol:pl-4
-                      prose-code:bg-black/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-code:text-foreground prose-code:before:content-none prose-code:after:content-none
-                      prose-pre:bg-black/10 prose-pre:rounded-lg prose-pre:text-xs prose-pre:my-1
-                      prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-                      prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-blockquote:my-1
-                      prose-hr:border-border
-                    ">
-                      <ReactMarkdown>{m.text || " "}</ReactMarkdown>
+                    <div className="group relative flex flex-col gap-2">
+                      <div className="prose prose-sm max-w-none
+                        prose-p:mb-4 prose-p:mt-1 last:prose-p:mb-0 prose-p:leading-relaxed
+                        prose-headings:font-semibold prose-headings:text-foreground prose-headings:mt-4 prose-headings:mb-2
+                        prose-h1:text-base prose-h2:text-sm prose-h3:text-sm
+                        prose-strong:text-foreground prose-strong:font-semibold
+                        prose-em:text-muted-foreground
+                        prose-ul:mb-4 prose-ul:mt-1 prose-ul:pl-4 prose-li:my-1 prose-li:marker:text-primary
+                        prose-ol:mb-4 prose-ol:mt-1 prose-ol:pl-4
+                        prose-code:bg-black/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-code:text-foreground prose-code:before:content-none prose-code:after:content-none
+                        prose-pre:bg-black/10 prose-pre:rounded-lg prose-pre:text-xs prose-pre:my-2
+                        prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+                        prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground prose-blockquote:my-2
+                        prose-hr:border-border
+                      ">
+                        <ReactMarkdown components={renderMarkdownComponents}>{m.text || " "}</ReactMarkdown>
+                      </div>
+                      <div className="flex justify-end mt-1">
+                        {(() => {
+                          const text = m.text || "";
+                          const linkMatch = text.match(/🔗 \*\*Full sequence:\*\* (http[^\s]+)/);
+                          
+                          if (linkMatch) {
+                            return (
+                              <Button 
+                                variant="secondary" 
+                                size="sm" 
+                                className="h-6 text-[11px] text-muted-foreground hover:text-foreground gap-1 px-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(linkMatch[1]);
+                                  toast.success("Link copied!");
+                                }}
+                                title="Copy Link"
+                              >
+                                <Copy className="h-3 w-3" /> Copy Link
+                              </Button>
+                            );
+                          }
+
+                          return (
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="h-6 text-[11px] text-muted-foreground hover:text-foreground gap-1 px-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20"
+                              onClick={() => {
+                                const textToCopy = text.split("\n\n---")[0];
+                                navigator.clipboard.writeText(textToCopy);
+                                toast.success("Copied to clipboard!");
+                              }}
+                              title="Copy Output"
+                            >
+                              <Copy className="h-3 w-3" /> Copy Output
+                            </Button>
+                          );
+                        })()}
+                      </div>
                     </div>
                   ) : (
                     <div className="whitespace-pre-wrap">{m.text}</div>

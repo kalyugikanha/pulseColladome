@@ -20,17 +20,20 @@ async function loadHistory(ctx: any, limit = 20): Promise<ChatMessage[]> {
   }));
 }
 
-function isBDERequest(message: string): boolean {
-  const lower = message.toLowerCase();
-  const bdeKeywords = [
-    "linkedin", "outreach", "lead", "sequence", "day 0", "follow up", "follow-up",
-    "requirement", "bde", "client requirement", "looking for", "building a",
-    "need a developer", "need development", "hiring", "project requirement",
-    "tech stack", "we are building", "they need", "post pe", "post mein",
-    "client chahta", "outreach karna", "sequence banana", "message banana",
-    "iska outreach", "is requirement pe", "generate karo", "outreach do"
-  ];
-  return bdeKeywords.some(kw => lower.includes(kw));
+async function isBDERequest(apiKey: string, message: string): Promise<boolean> {
+  const system = `You are an intent classifier for Colladome. Determine if the user's message is a Business Development (BDE) request.
+A BDE request is when a user shares a client requirement, a project description, a LinkedIn post about hiring/building, or asks to generate an outreach sequence/proposal.
+Reply with EXACTLY "true" if it is a BDE request, or "false" if it's a normal chat/internal ops query.`;
+
+  try {
+    const res = await callGemini(apiKey, [{ role: "user", content: message }], system);
+    return res.toLowerCase().includes("true");
+  } catch (e) {
+    // Fallback to basic keywords if API fails
+    const lower = message.toLowerCase();
+    const bdeKeywords = ["linkedin", "outreach", "lead", "sequence", "requirement", "bde", "looking for", "building a", "hiring"];
+    return bdeKeywords.some(kw => lower.includes(kw));
+  }
 }
 
 function extractClientName(text: string): string {
@@ -137,7 +140,7 @@ export const chatFn = createServerFn({ method: "POST" })
 
     const history = await loadHistory(ctx, 20);
     const today = format(new Date(), "dd MMM yyyy");
-    const isBDE = isBDERequest(userMessage);
+    const isBDE = await isBDERequest(key, userMessage);
 
     let system: string;
     if (isBDE) {

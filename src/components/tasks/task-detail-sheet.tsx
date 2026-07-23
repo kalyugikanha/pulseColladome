@@ -132,11 +132,8 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
 
 
-  useEffect(() => {
-    if (!me?.realId) { setMyDept(null); return; }
-    supabase.from("profiles").select("department").eq("id", me.realId).maybeSingle()
-      .then(({ data }) => setMyDept((data?.department as string | null) ?? null));
-  }, [me?.realId]);
+
+
 
   // Auto-open mark-done when the sheet is opened with initialAction="mark-done"
   // (e.g. dropping a non-workflow card onto Done). Only fires once per taskId.

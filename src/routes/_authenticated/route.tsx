@@ -56,6 +56,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
     : [
         { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
         { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
+        { title: "Content Calendar", url: "/content-calendar", icon: CalendarCheck },
         { title: "Stand-up", url: "/standup", icon: ClipboardList },
         { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
         { title: "Events", url: "/events", icon: PartyPopper },

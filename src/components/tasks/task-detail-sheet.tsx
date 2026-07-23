@@ -271,9 +271,11 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   if (!taskId) return null;
 
   const canEditDelete = !!task && !!me && (
-    me.isSuperAdmin || me.isAdmin ||
+    me.isSuperAdmin || me.isAdmin || me.isHrAdmin || me.canManageProjects ||
+    task.assignee_id === me.realId ||
     (task as { created_by?: string }).created_by === me.realId ||
-    (myDept ?? "").toLowerCase() === "marketing"
+    (task as { reviewer_id?: string | null }).reviewer_id === me.realId ||
+    (userScope != null && task.assignee_id != null && userScope.includes(task.assignee_id))
   );
 
   async function doDelete(mode: "single" | "series" = "single") {

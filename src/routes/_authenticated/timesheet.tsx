@@ -760,13 +760,20 @@ function RowMenu({ canApprove, approved, onToggleApproval, onOpenFull }: { canAp
 }
 
 function InlineNumber({ value, disabled, onCommit }: { value: number; disabled?: boolean; onCommit: (v: number) => void }) {
-  const [v, setV] = useState(String(value));
-  useEffect(() => { setV(String(value)); }, [value]);
+  const [v, setV] = useState(() => (value ? String(value) : ""));
+  useEffect(() => { setV(value ? String(value) : ""); }, [value]);
   return (
     <Input
-      type="number" min={0} step={0.25} value={v} disabled={disabled}
+      type="number" min={0} step={0.25} value={v} placeholder="0" disabled={disabled}
       onChange={(e) => setV(e.target.value)}
-      onBlur={() => { const n = Number(v); if (!isNaN(n) && n !== value) onCommit(n); }}
+      onBlur={() => {
+        if (v === "") {
+          if (value !== 0) onCommit(0);
+          return;
+        }
+        const n = Number(v);
+        if (!isNaN(n) && n !== value) onCommit(n);
+      }}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
       className="h-9 text-right text-base font-semibold tabular-nums"
     />

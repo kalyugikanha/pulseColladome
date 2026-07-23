@@ -353,7 +353,7 @@ function MyStandupCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Your meeting link and time window are visible to teammates so they know when to join your stand-up. Start time must be 11:00 AM or later.
+          Your meeting link and time window are visible to teammates so they know when to join your stand-up.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2">
@@ -366,11 +366,10 @@ function MyStandupCard({
             />
           </div>
           <div>
-            <label className="text-xs font-medium">Start time (≥ 11:00 AM)</label>
+            <label className="text-xs font-medium">Start time</label>
             <Input
               className="mt-1"
               type="time"
-              min="11:00"
               value={start}
               onChange={(e) => setStart(e.target.value)}
             />

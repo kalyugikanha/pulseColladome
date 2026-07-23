@@ -1,0 +1,1 @@
+ALTER TABLE public.standup_settings DROP CONSTRAINT IF EXISTS standup_settings_start_time_min;

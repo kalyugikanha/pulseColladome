@@ -270,6 +270,41 @@ export function HrTraineeApplicationsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </AlertDialog>
+
+      <AlertDialog open={!!resetTarget} onOpenChange={(o) => { if (!o) setResetTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset to pending?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {resetTarget && <>Reset the application from <strong>{resetTarget.full_name}</strong> ({resetTarget.email}) back to pending so it can be reviewed again. This does not touch any account that may have been created from a prior approval.</>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirmBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmReset(); }} disabled={confirmBusy}>
+              {confirmBusy ? "Resetting…" : "Reset to pending"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete application?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && <>Permanently delete the application from <strong>{deleteTarget.full_name}</strong> ({deleteTarget.email}). This cannot be undone. Any account previously created from this application is not affected.</>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirmBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmDelete(); }} disabled={confirmBusy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {confirmBusy ? "Deleting…" : "Delete application"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

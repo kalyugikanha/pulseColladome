@@ -214,6 +214,42 @@ export function EditTaskDialog({
             <div className="space-y-1"><Label>Deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
             <div className="space-y-1"><Label>Scheduled post date</Label><Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} /></div>
           </div>
+          <div className="space-y-1">
+            <Label className="flex items-center gap-1.5"><Share2 className="h-3.5 w-3.5" /> Platforms</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full justify-between font-normal">
+                  <span className="truncate text-left">
+                    {platformIds.length === 0
+                      ? <span className="text-muted-foreground">No platforms</span>
+                      : (platforms ?? []).filter((p) => platformIds.includes(p.id)).map((p) => p.name).join(", ")}
+                  </span>
+                  <ChevronDown className="h-4 w-4 opacity-60 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="start">
+                <div className="max-h-64 overflow-y-auto space-y-1">
+                  {(platforms ?? []).length === 0 && <p className="text-xs text-muted-foreground px-2 py-3">No platforms defined. Add them in Taxonomy → Platforms.</p>}
+                  {(platforms ?? []).map((p) => {
+                    const checked = platformIds.includes(p.id);
+                    return (
+                      <label key={p.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
+                        <Checkbox checked={checked} onCheckedChange={() => setPlatformIds((cur) => checked ? cur.filter((x) => x !== p.id) : [...cur, p.id])} />
+                        <span className="text-sm">{p.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {platformIds.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {(platforms ?? []).filter((p) => platformIds.includes(p.id)).map((p) => (
+                  <Badge key={p.id} variant="secondary" className="text-[10px]">{p.name}</Badge>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="space-y-1"><Label>Estimated hours</Label>
             <Input type="number" min={0} step={0.25} value={estimate} onChange={(e) => setEstimate(e.target.value)} placeholder="Optional" />
           </div>

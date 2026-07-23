@@ -35,6 +35,7 @@ import {
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 type Props = { taskId: string | null; onClose: (nextTaskId?: string) => void; initialAction?: "mark-done" | null };
 
@@ -119,7 +120,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const [reviewNote, setReviewNote] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [myDept, setMyDept] = useState<string | null>(null);
+  const { userScope } = useVisibilityScope(me);
   const [refLabel, setRefLabel] = useState("");
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
@@ -131,11 +132,8 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
 
 
 
-  useEffect(() => {
-    if (!me?.realId) { setMyDept(null); return; }
-    supabase.from("profiles").select("department").eq("id", me.realId).maybeSingle()
-      .then(({ data }) => setMyDept((data?.department as string | null) ?? null));
-  }, [me?.realId]);
+
+
 
   // Auto-open mark-done when the sheet is opened with initialAction="mark-done"
   // (e.g. dropping a non-workflow card onto Done). Only fires once per taskId.
@@ -273,9 +271,11 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   if (!taskId) return null;
 
   const canEditDelete = !!task && !!me && (
-    me.isSuperAdmin || me.isAdmin ||
+    me.isSuperAdmin || me.isAdmin || me.isHrAdmin || me.canManageProjects ||
+    task.assignee_id === me.realId ||
     (task as { created_by?: string }).created_by === me.realId ||
-    (myDept ?? "").toLowerCase() === "marketing"
+    (task as { reviewer_id?: string | null }).reviewer_id === me.realId ||
+    (userScope != null && task.assignee_id != null && userScope.includes(task.assignee_id))
   );
 
   async function doDelete(mode: "single" | "series" = "single") {

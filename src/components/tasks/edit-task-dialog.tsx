@@ -119,6 +119,7 @@ export function EditTaskDialog({
           estimated_hours: estNum,
         },
       }});
+      await setPlatformsFn({ data: { taskId: task.id, platformIds } });
       let extraMsg = "";
       if (extraAssignees.length > 0) {
         const cleanLinks = links.filter((l) => l.url.trim());

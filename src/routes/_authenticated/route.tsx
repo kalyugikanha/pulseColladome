@@ -209,6 +209,7 @@ function AuthenticatedLayout() {
       const allowedPrefixes = [
         "/dashboard",
         "/tasks",
+        "/content-calendar",
         "/standup",
         "/attendance",
         "/punch",

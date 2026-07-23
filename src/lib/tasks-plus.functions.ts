@@ -199,7 +199,7 @@ export const duplicateTask = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: src, error: readErr } = await supabase
       .from("tasks")
-      .select("title, description, project_id, priority, due_date, assignee_id, asset_links, department_id, estimated_hours, scheduled_post_date, workflow_instance_id, workflow_template_id, stage_index, stage_snapshot, required_fields_values, review_state, reviewer_id, requester_id, is_recurring_template, recurrence_freq, recurrence_days, task_types:task_task_types(task_type_id)")
+      .select("title, description, project_id, priority, due_date, assignee_id, asset_links, department_id, estimated_hours, scheduled_post_date, workflow_instance_id, workflow_template_id, stage_index, stage_snapshot, required_fields_values, review_state, reviewer_id, requester_id, is_recurring_template, recurrence_freq, recurrence_days, recurrence_day_of_month, task_types:task_task_types(task_type_id)")
       .eq("id", data.id)
       .single();
     if (readErr) throw readErr;

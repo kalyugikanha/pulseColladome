@@ -1,6 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+async function notify(
+  supabase: any,
+  userId: string | null | undefined,
+  kind: string,
+  taskId: string | null,
+  body: string,
+) {
+  if (!userId) return;
+  await supabase.from("notifications").insert({
+    user_id: userId, kind, task_id: taskId, comment_id: null, body,
+  });
+}
+
 export type StandupFlag = {
   id: string;
   task_id: string | null;

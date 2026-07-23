@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,7 +20,6 @@ export const Route = createFileRoute("/change-password")({
 });
 
 function ChangePasswordPage() {
-  const router = useRouter();
   const qc = useQueryClient();
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -40,7 +39,7 @@ function ChangePasswordPage() {
       }
       await qc.invalidateQueries({ queryKey: ["current-user"] });
       toast.success("Password updated.");
-      router.navigate({ to: "/dashboard", replace: true });
+      window.location.href = "/dashboard";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not update password");
     } finally { setLoading(false); }

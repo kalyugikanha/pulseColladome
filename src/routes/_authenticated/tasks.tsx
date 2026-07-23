@@ -284,8 +284,9 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   const [assignees, setAssignees] = useState<string[]>(defaultAssigneeId ? [defaultAssigneeId] : []);
   const [wfMode, setWfMode] = useState(false);
   const [wfTemplateId, setWfTemplateId] = useState<string>("");
-  const [repeat, setRepeat] = useState<"none" | "daily" | "weekly">("none");
+  const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "monthly">("none");
   const [repeatDays, setRepeatDays] = useState<Set<number>>(new Set());
+  const [repeatDayOfMonth, setRepeatDayOfMonth] = useState<number>(new Date().getDate());
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (open) { setAssignees(defaultAssigneeId ? [defaultAssigneeId] : []); } }, [open, defaultAssigneeId]);
 
@@ -318,6 +319,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
     if (!projectId) return toast.error("Project required");
     if (assignees.length === 0) return toast.error("Pick at least one assignee");
     if (repeat === "weekly" && repeatDays.size === 0) return toast.error("Pick at least one weekday");
+    if (repeat === "monthly" && (!Number.isInteger(repeatDayOfMonth) || repeatDayOfMonth < 1 || repeatDayOfMonth > 31)) return toast.error("Pick a day of the month (1–31)");
     const estNum = estimate.trim() === "" ? null : Number(estimate);
     if (estNum !== null && (!Number.isFinite(estNum) || estNum < 0)) {
       return toast.error("Estimated hours must be a positive number.");
@@ -352,7 +354,11 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           estimatedHours: estNum,
           recurrence: repeat === "none"
             ? null
-            : { freq: repeat, days: repeat === "weekly" ? Array.from(repeatDays).sort() : [] },
+            : {
+                freq: repeat,
+                days: repeat === "weekly" ? Array.from(repeatDays).sort() : [],
+                dayOfMonth: repeat === "monthly" ? repeatDayOfMonth : undefined,
+              },
         }});
         if (repeat === "none" && postDate) {
           for (const tid of res.taskIds) {
@@ -371,7 +377,7 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
       }
       setTitle(""); setDesc(""); setDue(""); setPostDate(""); setEstimate(""); setLinks([]);
       setProjectId(""); setWfTemplateId(""); setWfMode(false);
-      setRepeat("none"); setRepeatDays(new Set());
+      setRepeat("none"); setRepeatDays(new Set()); setRepeatDayOfMonth(new Date().getDate());
       onCreated?.();
       onClose();
     } catch (e) {
@@ -477,12 +483,13 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
           </div>
           <div className="space-y-1 rounded-md border border-dashed p-2">
             <Label className="text-xs">Repeat</Label>
-            <Select value={repeat} onValueChange={(v) => setRepeat(v as "none" | "daily" | "weekly")}>
+            <Select value={repeat} onValueChange={(v) => setRepeat(v as "none" | "daily" | "weekly" | "monthly")}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
                 <SelectItem value="daily">Daily</SelectItem>
                 <SelectItem value="weekly">Weekly on specific days</SelectItem>
+                <SelectItem value="monthly">Monthly on a specific date</SelectItem>
               </SelectContent>
             </Select>
             {repeat === "weekly" && (
@@ -496,6 +503,18 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
                     className={`h-7 px-2 rounded text-xs border ${repeatDays.has(d) ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:bg-muted"}`}
                   >{l}</button>
                 ))}
+              </div>
+            )}
+            {repeat === "monthly" && (
+              <div className="flex items-center gap-2 pt-1">
+                <Label className="text-xs">Day of month</Label>
+                <Input
+                  type="number" min={1} max={31} step={1}
+                  className="h-8 w-24"
+                  value={repeatDayOfMonth}
+                  onChange={(e) => setRepeatDayOfMonth(Math.max(1, Math.min(31, Number(e.target.value) || 1)))}
+                />
+                <span className="text-[11px] text-muted-foreground">Shorter months fire on their last day.</span>
               </div>
             )}
             {repeat !== "none" && (

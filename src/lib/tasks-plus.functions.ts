@@ -39,9 +39,11 @@ export const createCustomTaskType = createServerFn({ method: "POST" })
 /** =========== Task create/update ============== */
 type AssetLink = { label: string; url: string };
 export type RecurrenceInput = {
-  freq: "none" | "daily" | "weekly";
+  freq: "none" | "daily" | "weekly" | "monthly";
   /** ISO weekdays: 1=Mon..7=Sun. Only used when freq === "weekly". */
   days?: number[];
+  /** 1..31. Only used when freq === "monthly". Clamps to last day of shorter months. */
+  dayOfMonth?: number;
 };
 type TaskInput = {
   projectId: string;
@@ -106,6 +108,12 @@ async function createOneTaskForAssignee(
   if (isRecurring && rec!.freq === "weekly" && (!rec!.days || rec!.days.length === 0)) {
     throw new Error("Pick at least one weekday for weekly recurrence.");
   }
+  if (isRecurring && rec!.freq === "monthly") {
+    const dom = rec!.dayOfMonth ?? 0;
+    if (!Number.isInteger(dom) || dom < 1 || dom > 31) {
+      throw new Error("Pick a day of the month (1–31) for monthly recurrence.");
+    }
+  }
   const { data: task, error } = await supabase.rpc("create_task_full", {
     _project_id: data.projectId,
     _title: title,
@@ -136,6 +144,7 @@ async function createOneTaskForAssignee(
       is_recurring_template: true,
       recurrence_freq: rec!.freq,
       recurrence_days: rec!.freq === "weekly" ? (rec!.days ?? []) : null,
+      recurrence_day_of_month: rec!.freq === "monthly" ? (rec!.dayOfMonth ?? null) : null,
       due_date: null,
     }) as unknown as { eq: (c: string, v: unknown) => Promise<{ error: unknown }> }).eq("id", taskId);
     if (upErr) throw upErr;
@@ -190,7 +199,7 @@ export const duplicateTask = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: src, error: readErr } = await supabase
       .from("tasks")
-      .select("title, description, project_id, priority, due_date, assignee_id, asset_links, department_id, estimated_hours, scheduled_post_date, workflow_instance_id, workflow_template_id, stage_index, stage_snapshot, required_fields_values, review_state, reviewer_id, requester_id, is_recurring_template, recurrence_freq, recurrence_days, task_types:task_task_types(task_type_id)")
+      .select("title, description, project_id, priority, due_date, assignee_id, asset_links, department_id, estimated_hours, scheduled_post_date, workflow_instance_id, workflow_template_id, stage_index, stage_snapshot, required_fields_values, review_state, reviewer_id, requester_id, is_recurring_template, recurrence_freq, recurrence_days, recurrence_day_of_month, task_types:task_task_types(task_type_id)")
       .eq("id", data.id)
       .single();
     if (readErr) throw readErr;
@@ -222,6 +231,7 @@ export const duplicateTask = createServerFn({ method: "POST" })
         is_recurring_template: src.is_recurring_template ?? false,
         recurrence_freq: src.recurrence_freq ?? "none",
         recurrence_days: src.recurrence_days ?? null,
+        recurrence_day_of_month: (src as { recurrence_day_of_month?: number | null }).recurrence_day_of_month ?? null,
       };
       if (src.review_state && src.review_state !== "none") carry.review_state = src.review_state;
       if (src.reviewer_id) carry.reviewer_id = src.reviewer_id;

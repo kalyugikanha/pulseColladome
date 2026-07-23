@@ -38,6 +38,8 @@ export function HrTraineeApplicationsPage() {
   const listFn = useServerFn(listTraineeApplications);
   const approveFn = useServerFn(approveTraineeApplication);
   const rejectFn = useServerFn(rejectTraineeApplication);
+  const resetFn = useServerFn(resetTraineeApplication);
+  const deleteFn = useServerFn(deleteTraineeApplication);
 
   const canAccess = !!(me?.isSuperAdmin || me?.isHrAdmin);
 
@@ -46,6 +48,9 @@ export function HrTraineeApplicationsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<TraineeApplication | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TraineeApplication | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const { data: apps, isLoading } = useQuery({
     queryKey: ["trainee-applications"],

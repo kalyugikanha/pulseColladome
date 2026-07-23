@@ -111,6 +111,7 @@ function ContentCalendarPage() {
   const [platformSel, setPlatformSel] = useState<Set<string>>(new Set());
   const [ownerSel, setOwnerSel] = useState<Set<string>>(new Set());
   const [statusSel, setStatusSel] = useState<Set<string>>(new Set());
+  const [projectSel, setProjectSel] = useState<Set<string>>(new Set());
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const updateFn = useServerFn(updateTaskFields);
   const setPlatformsFn = useServerFn(setTaskPlatforms);

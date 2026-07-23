@@ -108,9 +108,9 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     queryFn: async () => {
       const { data } = await supabase
         .from("task_task_types")
-        .select("task_type:taxonomy_task_types(id, name)")
+        .select("task_type:taxonomy_task_types(id, name, category)")
         .eq("task_id", taskId!);
-      const rows = (data ?? []) as unknown as Array<{ task_type: { id: string; name: string } | null }>;
+      const rows = (data ?? []) as unknown as Array<{ task_type: { id: string; name: string; category: string | null } | null }>;
       return rows.map((r) => r.task_type).filter(Boolean) as TaskTypeLite[];
     },
   });

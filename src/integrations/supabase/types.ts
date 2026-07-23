@@ -2260,6 +2260,7 @@ export type Database = {
       taxonomy_task_types: {
         Row: {
           active: boolean
+          category: string
           created_at: string
           created_by: string | null
           department_id: string | null
@@ -2270,6 +2271,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          category?: string
           created_at?: string
           created_by?: string | null
           department_id?: string | null
@@ -2280,6 +2282,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          category?: string
           created_at?: string
           created_by?: string | null
           department_id?: string | null
@@ -2706,6 +2709,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          is_content_workflow: boolean
           name: string
           updated_at: string
         }
@@ -2716,6 +2720,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_content_workflow?: boolean
           name: string
           updated_at?: string
         }
@@ -2726,6 +2731,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          is_content_workflow?: boolean
           name?: string
           updated_at?: string
         }

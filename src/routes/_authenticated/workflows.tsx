@@ -29,7 +29,7 @@ function WorkflowsAdmin() {
   const del = useServerFn(deleteWorkflowTemplate);
 
   const { data: templates } = useQuery({ queryKey: ["workflow-templates"], queryFn: () => list() });
-  const [editing, setEditing] = useState<null | { id?: string; name: string; description: string; department: string; is_active: boolean; stages: WorkflowStageInput[] }>(null);
+  const [editing, setEditing] = useState<null | { id?: string; name: string; description: string; department: string; is_active: boolean; is_content_workflow: boolean; stages: WorkflowStageInput[] }>(null);
 
   if (!me?.isAdmin && !me?.isSuperAdmin && !me?.isReportingManager) return <div className="p-8 text-muted-foreground">Access restricted.</div>;
 
@@ -43,7 +43,7 @@ function WorkflowsAdmin() {
           <p className="text-sm text-muted-foreground">Design chained tasks: an assignee closing one stage auto-creates the next task.</p>
         </div>
         <Button className="gradient-primary" onClick={() => setEditing({
-          name: "", description: "", department: "", is_active: true,
+          name: "", description: "", department: "", is_active: true, is_content_workflow: false,
           stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null, project_id: null }],
         })}><Plus className="h-4 w-4 mr-1" /> New template</Button>
       </header>
@@ -53,6 +53,7 @@ function WorkflowsAdmin() {
           <Card key={t.id} className="cursor-pointer hover:border-primary/50" onClick={() => setEditing({
             id: t.id, name: t.name, description: t.description ?? "", department: t.department ?? "",
             is_active: t.is_active,
+            is_content_workflow: (t as { is_content_workflow?: boolean }).is_content_workflow ?? false,
             stages: t.stages.map((s) => ({
               position: s.position, name: s.name, requires_review: s.requires_review,
               default_assignee_id: s.default_assignee_id,
@@ -83,6 +84,7 @@ function WorkflowsAdmin() {
                           description: t.description ?? "",
                           department: t.department ?? "",
                           is_active: true,
+                          is_content_workflow: (t as { is_content_workflow?: boolean }).is_content_workflow ?? false,
                           stages: t.stages.map((s) => ({
                             position: s.position,
                             name: s.name,
@@ -131,15 +133,16 @@ function WorkflowsAdmin() {
 }
 
 function TemplateEditor({ initial, onClose, onSave, onDelete }: {
-  initial: { id?: string; name: string; description: string; department: string; is_active: boolean; stages: WorkflowStageInput[] };
+  initial: { id?: string; name: string; description: string; department: string; is_active: boolean; is_content_workflow: boolean; stages: WorkflowStageInput[] };
   onClose: () => void;
-  onSave: (payload: { id?: string; name: string; description: string; department: string; is_active: boolean; stages: WorkflowStageInput[] }) => Promise<void>;
+  onSave: (payload: { id?: string; name: string; description: string; department: string; is_active: boolean; is_content_workflow: boolean; stages: WorkflowStageInput[] }) => Promise<void>;
   onDelete?: () => Promise<void>;
 }) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
   const [department, setDepartment] = useState(initial.department);
   const [isActive, setIsActive] = useState(initial.is_active);
+  const [isContent, setIsContent] = useState(initial.is_content_workflow);
   const [stages, setStages] = useState<WorkflowStageInput[]>(initial.stages);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; code: string; name: string }>>([]);
@@ -175,7 +178,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
         <div className="flex gap-2">
           {onDelete && <Button size="sm" variant="destructive" onClick={onDelete}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>}
           <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
-          <Button size="sm" className="gradient-primary" onClick={() => onSave({ id: initial.id, name, description, department, is_active: isActive, stages })}>
+          <Button size="sm" className="gradient-primary" onClick={() => onSave({ id: initial.id, name, description, department, is_active: isActive, is_content_workflow: isContent, stages })}>
             <Save className="h-4 w-4 mr-1" /> Save
           </Button>
         </div>
@@ -186,7 +189,12 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
           <div className="space-y-1"><Label>Department (optional)</Label><Input value={department} onChange={(e) => setDepartment(e.target.value)} /></div>
         </div>
         <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
-        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active</label>
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active</label>
+          <label className="text-sm flex items-center gap-2" title="Show this template's tasks on the Content Calendar">
+            <input type="checkbox" checked={isContent} onChange={(e) => setIsContent(e.target.checked)} /> Include in Content Calendar
+          </label>
+        </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">

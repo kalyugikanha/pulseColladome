@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect, Link, useRouter, useRouterState } fr
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard, ClipboardCheck, Star, BarChart3, Briefcase, Megaphone, Workflow, Cpu, PartyPopper, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Clock, ListChecks, FolderKanban, CalendarRange, CalendarDays, BookOpen, Users, LogOut, Shield, Wallet, Flame, Handshake, TableProperties, Video, UserPlus, Repeat, Layers, IdCard, ClipboardCheck, Star, BarChart3, Briefcase, Megaphone, Workflow, Cpu, PartyPopper, ClipboardList, CalendarCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "@/components/top-bar";
 import { ViewAsBanner } from "@/components/view-as-banner";
@@ -45,6 +45,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
     ? [
         { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
         { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
+        { title: "Content Calendar", url: "/content-calendar", icon: CalendarCheck },
         { title: "Stand-up", url: "/standup", icon: ClipboardList },
         { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
         { title: "Events", url: "/events", icon: PartyPopper },
@@ -56,6 +57,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
     : [
         { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
         { title: "Tasks", url: "/tasks", icon: ListChecks, match: "/tasks|/board" },
+        { title: "Content Calendar", url: "/content-calendar", icon: CalendarCheck },
         { title: "Stand-up", url: "/standup", icon: ClipboardList },
         { title: "Attendance", url: "/attendance", icon: Clock, match: "/attendance|/punch|/timesheet|/my-timesheet" },
         { title: "Events", url: "/events", icon: PartyPopper },
@@ -207,6 +209,7 @@ function AuthenticatedLayout() {
       const allowedPrefixes = [
         "/dashboard",
         "/tasks",
+        "/content-calendar",
         "/standup",
         "/attendance",
         "/punch",

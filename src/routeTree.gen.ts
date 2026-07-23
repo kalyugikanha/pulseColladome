@@ -22,6 +22,7 @@ import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_authenticated/complete-onboarding'
+import { Route as AuthenticatedContentCalendarRouteImport } from './routes/_authenticated/content-calendar'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDirectoryRouteImport } from './routes/_authenticated/directory'
 import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
@@ -117,6 +118,12 @@ const AuthenticatedCompleteOnboardingRoute =
   AuthenticatedCompleteOnboardingRouteImport.update({
     id: '/complete-onboarding',
     path: '/complete-onboarding',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedContentCalendarRoute =
+  AuthenticatedContentCalendarRouteImport.update({
+    id: '/content-calendar',
+    path: '/content-calendar',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -295,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
+  '/content-calendar': typeof AuthenticatedContentCalendarRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
   '/events': typeof AuthenticatedEventsRoute
@@ -340,6 +348,7 @@ export interface FileRoutesByTo {
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
+  '/content-calendar': typeof AuthenticatedContentCalendarRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/directory': typeof AuthenticatedDirectoryRoute
   '/events': typeof AuthenticatedEventsRoute
@@ -387,6 +396,7 @@ export interface FileRoutesById {
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
+  '/_authenticated/content-calendar': typeof AuthenticatedContentCalendarRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/directory': typeof AuthenticatedDirectoryRoute
   '/_authenticated/events': typeof AuthenticatedEventsRoute
@@ -434,6 +444,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
+    | '/content-calendar'
     | '/dashboard'
     | '/directory'
     | '/events'
@@ -479,6 +490,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
+    | '/content-calendar'
     | '/dashboard'
     | '/directory'
     | '/events'
@@ -525,6 +537,7 @@ export interface FileRouteTypes {
     | '/_authenticated/attendance'
     | '/_authenticated/calendar'
     | '/_authenticated/complete-onboarding'
+    | '/_authenticated/content-calendar'
     | '/_authenticated/dashboard'
     | '/_authenticated/directory'
     | '/_authenticated/events'
@@ -664,6 +677,13 @@ declare module '@tanstack/react-router' {
       path: '/complete-onboarding'
       fullPath: '/complete-onboarding'
       preLoaderRoute: typeof AuthenticatedCompleteOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/content-calendar': {
+      id: '/_authenticated/content-calendar'
+      path: '/content-calendar'
+      fullPath: '/content-calendar'
+      preLoaderRoute: typeof AuthenticatedContentCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/dashboard': {
@@ -891,6 +911,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedCompleteOnboardingRoute: typeof AuthenticatedCompleteOnboardingRoute
+  AuthenticatedContentCalendarRoute: typeof AuthenticatedContentCalendarRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDirectoryRoute: typeof AuthenticatedDirectoryRoute
   AuthenticatedEventsRoute: typeof AuthenticatedEventsRoute
@@ -925,6 +946,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedCompleteOnboardingRoute: AuthenticatedCompleteOnboardingRoute,
+  AuthenticatedContentCalendarRoute: AuthenticatedContentCalendarRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDirectoryRoute: AuthenticatedDirectoryRoute,
   AuthenticatedEventsRoute: AuthenticatedEventsRoute,

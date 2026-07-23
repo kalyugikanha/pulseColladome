@@ -53,6 +53,7 @@ function WorkflowsAdmin() {
           <Card key={t.id} className="cursor-pointer hover:border-primary/50" onClick={() => setEditing({
             id: t.id, name: t.name, description: t.description ?? "", department: t.department ?? "",
             is_active: t.is_active,
+            is_content_workflow: (t as { is_content_workflow?: boolean }).is_content_workflow ?? false,
             stages: t.stages.map((s) => ({
               position: s.position, name: s.name, requires_review: s.requires_review,
               default_assignee_id: s.default_assignee_id,

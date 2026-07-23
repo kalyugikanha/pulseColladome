@@ -29,7 +29,7 @@ function WorkflowsAdmin() {
   const del = useServerFn(deleteWorkflowTemplate);
 
   const { data: templates } = useQuery({ queryKey: ["workflow-templates"], queryFn: () => list() });
-  const [editing, setEditing] = useState<null | { id?: string; name: string; description: string; department: string; is_active: boolean; stages: WorkflowStageInput[] }>(null);
+  const [editing, setEditing] = useState<null | { id?: string; name: string; description: string; department: string; is_active: boolean; is_content_workflow: boolean; stages: WorkflowStageInput[] }>(null);
 
   if (!me?.isAdmin && !me?.isSuperAdmin && !me?.isReportingManager) return <div className="p-8 text-muted-foreground">Access restricted.</div>;
 

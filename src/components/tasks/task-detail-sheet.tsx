@@ -35,6 +35,7 @@ import {
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useViewAs } from "@/hooks/use-view-as";
+import { useVisibilityScope } from "@/hooks/use-visibility-scope";
 
 type Props = { taskId: string | null; onClose: (nextTaskId?: string) => void; initialAction?: "mark-done" | null };
 

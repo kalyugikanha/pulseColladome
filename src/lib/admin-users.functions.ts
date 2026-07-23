@@ -11,7 +11,7 @@ function generateTempPassword(): string {
   return `A${base.slice(0, 16)}9!`;
 }
 
-type Role = "admin" | "employee" | "project_manager" | "hr_admin" | "learning_admin" | "event_admin" | "trainee";
+type Role = "admin" | "employee" | "project_manager" | "hr_admin" | "learning_admin" | "event_admin" | "finance_admin" | "trainee";
 type EmploymentType = "full_time" | "intern" | "contract" | "consultant";
 type LeaveType = "casual" | "sick" | "earned" | "unpaid";
 

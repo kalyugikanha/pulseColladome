@@ -57,11 +57,15 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
 
     const { data: taskRow } = await supabase
       .from("tasks")
-      .select("assignee_id")
+      .select("assignee_id, reviewer_id")
       .eq("id", data.taskId)
       .maybeSingle();
     const assigneeId = (taskRow as { assignee_id: string | null } | null)?.assignee_id ?? null;
+    const reviewerId = (taskRow as { reviewer_id: string | null } | null)?.reviewer_id ?? null;
     const notifBody = note ? `Flagged for stand-up: "${note}"` : "Flagged for stand-up discussion.";
+    const notifyTargets = Array.from(new Set(
+      [assigneeId, reviewerId].filter((id): id is string => !!id && id !== userId),
+    ));
 
     if (existingId) {
       const { error } = await supabase
@@ -69,8 +73,8 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
         .update({ note } as never)
         .eq("id", existingId);
       if (error) throw new Error(error.message);
-      if (assigneeId && assigneeId !== userId) {
-        await notify(supabase, assigneeId, "standup_flagged", data.taskId, notifBody);
+      for (const target of notifyTargets) {
+        await notify(supabase, target, "standup_flagged", data.taskId, notifBody);
       }
       return { id: existingId };
     }
@@ -81,11 +85,12 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    if (assigneeId && assigneeId !== userId) {
-      await notify(supabase, assigneeId, "standup_flagged", data.taskId, notifBody);
+    for (const target of notifyTargets) {
+      await notify(supabase, target, "standup_flagged", data.taskId, notifBody);
     }
     return { id: (inserted as unknown as { id: string }).id };
   });
+
 
 /** Create a free-form agenda note (no task). Optionally tag an assignee. */
 export const createStandupNote = createServerFn({ method: "POST" })
@@ -160,7 +165,7 @@ export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
         : supabase;
     let q = client
       .from("standup_flags" as never)
-      .select(`id, task_id, title, note, assignee_tag, created_at, resolved_at, flagged_by, flagger:profiles!standup_flags_flagger_profile_fkey(id, full_name, email), task:tasks(id, title, status, assignee_id, assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email))`);
+      .select(`id, task_id, title, note, assignee_tag, created_at, resolved_at, flagged_by, flagger:profiles!standup_flags_flagger_profile_fkey(id, full_name, email), task:tasks(id, title, status, assignee_id, reviewer_id, assignee:profiles!tasks_assignee_profile_fkey(id, full_name, email))`);
     q = data.resolved ? q.not("resolved_at", "is", null) : q.is("resolved_at", null);
     const { data: rows, error } = await q.order("created_at", { ascending: !data.resolved });
     if (error) throw new Error(error.message);
@@ -168,10 +173,11 @@ export const listStandupFlagsForMeAsAssignee = createServerFn({ method: "GET" })
       id: string; task_id: string | null; title: string | null; note: string | null;
       assignee_tag: string | null; created_at: string; resolved_at: string | null; flagged_by: string;
       flagger: { id: string; full_name: string | null; email: string | null } | null;
-      task: { id: string; title: string; status: string; assignee_id: string | null; assignee: { id: string; full_name: string | null; email: string | null } | null } | null;
+      task: { id: string; title: string; status: string; assignee_id: string | null; reviewer_id: string | null; assignee: { id: string; full_name: string | null; email: string | null } | null } | null;
     }>;
-    return list.filter((r) => r.flagged_by !== viewedId && (r.assignee_tag === viewedId || r.task?.assignee_id === viewedId));
+    return list.filter((r) => r.flagged_by !== viewedId && (r.assignee_tag === viewedId || r.task?.assignee_id === viewedId || r.task?.reviewer_id === viewedId));
   });
+
 
 /** Get the active flag for a given task (for the current user), or null. */
 export const getMyStandupFlagForTask = createServerFn({ method: "GET" })

@@ -2928,6 +2928,7 @@ export type Database = {
         | "learning_admin"
         | "event_admin"
         | "trainee"
+        | "finance_admin"
       bd_frequency: "daily" | "weekly"
       bd_log_status: "pending" | "done" | "carried_forward"
       employee_doc_type:
@@ -3105,6 +3106,7 @@ export const Constants = {
         "learning_admin",
         "event_admin",
         "trainee",
+        "finance_admin",
       ],
       bd_frequency: ["daily", "weekly"],
       bd_log_status: ["pending", "done", "carried_forward"],

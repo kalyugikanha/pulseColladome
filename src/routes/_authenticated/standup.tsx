@@ -25,6 +25,8 @@ import {
   listStandupSettings,
 } from "@/lib/standup-settings.functions";
 import { useViewAs } from "@/hooks/use-view-as";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
 
 export const Route = createFileRoute("/_authenticated/standup")({
   component: StandupAgendaPage,
@@ -517,13 +519,20 @@ function AgendaRow({
 type ForMeFlag = Awaited<ReturnType<typeof listStandupFlagsForMeAsAssignee>>[number];
 
 function ForMeRow({ f, settings, muted }: { f: ForMeFlag; settings: TeamSetting | null; muted?: boolean }) {
+  const { viewAsUserId } = useViewAs();
+  const { data: me } = useCurrentUser();
+  const viewerId = viewAsUserId ?? me?.realId ?? me?.id ?? null;
   const isFreeform = !f.task_id;
   const flaggerName = f.flagger?.full_name ?? f.flagger?.email ?? "A teammate";
+  const asAssignee = !!viewerId && (f.task?.assignee_id === viewerId || f.assignee_tag === viewerId);
+  const asReviewer = !!viewerId && !!f.task && (f.task as { reviewer_id?: string | null }).reviewer_id === viewerId;
+  const roleLabel = asAssignee && asReviewer ? "as assignee & reviewer" : asAssignee ? "as assignee" : asReviewer ? "as reviewer" : null;
   return (
     <div className={`border rounded-md p-3 ${muted ? "opacity-70" : ""}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium">{f.task?.title ?? f.title ?? "Agenda item"}</span>
         {isFreeform && <Badge variant="outline" className="text-[10px]">Free-form</Badge>}
+        {roleLabel && <Badge variant="secondary" className="text-[10px]">{roleLabel}</Badge>}
       </div>
       <div className="text-xs text-muted-foreground mt-0.5">
         flagged by <span className="font-medium">{flaggerName}</span>
@@ -539,3 +548,4 @@ function ForMeRow({ f, settings, muted }: { f: ForMeFlag; settings: TeamSetting 
     </div>
   );
 }
+

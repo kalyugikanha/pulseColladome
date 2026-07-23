@@ -2065,6 +2065,7 @@ export type Database = {
           manual_rank: number | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
+          recurrence_day_of_month: number | null
           recurrence_days: number[] | null
           recurrence_freq: string
           recurrence_parent_id: string | null
@@ -2098,6 +2099,7 @@ export type Database = {
           manual_rank?: number | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
+          recurrence_day_of_month?: number | null
           recurrence_days?: number[] | null
           recurrence_freq?: string
           recurrence_parent_id?: string | null
@@ -2131,6 +2133,7 @@ export type Database = {
           manual_rank?: number | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
+          recurrence_day_of_month?: number | null
           recurrence_days?: number[] | null
           recurrence_freq?: string
           recurrence_parent_id?: string | null
@@ -2835,6 +2838,7 @@ export type Database = {
           manual_rank: number | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
+          recurrence_day_of_month: number | null
           recurrence_days: number[] | null
           recurrence_freq: string
           recurrence_parent_id: string | null

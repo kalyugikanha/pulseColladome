@@ -177,7 +177,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
         <div className="flex gap-2">
           {onDelete && <Button size="sm" variant="destructive" onClick={onDelete}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>}
           <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
-          <Button size="sm" className="gradient-primary" onClick={() => onSave({ id: initial.id, name, description, department, is_active: isActive, stages })}>
+          <Button size="sm" className="gradient-primary" onClick={() => onSave({ id: initial.id, name, description, department, is_active: isActive, is_content_workflow: isContent, stages })}>
             <Save className="h-4 w-4 mr-1" /> Save
           </Button>
         </div>

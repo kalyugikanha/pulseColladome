@@ -119,7 +119,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
     setRows((prev) => prev.filter((_, idx) => idx !== i));
   }
   function addRow() {
-    setRows((prev) => [...prev, { project_code: "", project_name: "", task_id: "", task_title: "", hours: 0, comments: "" }]);
+    setRows((prev) => [...prev, { project_code: "", project_name: "", task_id: "", task_title: "", hours: undefined, comments: "" }]);
   }
 
   function cleanRows(): Task[] {

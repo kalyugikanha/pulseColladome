@@ -544,52 +544,66 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
                     <div className="flex-1" />
                   </div>
                   {assetLinks.length > 0 && (
-                    <ul className="pl-6 space-y-1">
+                    <div className="space-y-1">
                       {assetLinks.map((r, i) => {
                         let fallback = r.url;
                         try { fallback = new URL(r.url).hostname.replace(/^www\./, "") + new URL(r.url).pathname.replace(/\/$/, ""); }
                         catch { fallback = r.url; }
                         const display = r.label.trim() || fallback;
                         return (
-                          <li key={`${r.url}-${i}`} className="flex items-center gap-2 text-xs">
-                            <a href={r.url} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-1 truncate flex-1 min-w-0">
-                              <ExternalLink className="h-3 w-3 opacity-60 shrink-0" />
-                              <span className="truncate">{display}</span>
+                          <div key={`${r.url}-${i}`} className="group flex items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-2.5 py-1.5 hover:bg-muted/50 transition-colors">
+                            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <a href={r.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline truncate flex-1 min-w-0">
+                              {display}
                             </a>
-                            <button onClick={() => removeReference(i)} aria-label="Remove link" className="shrink-0">
-                              <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                            <button
+                              onClick={() => removeReference(i)}
+                              aria-label="Remove link"
+                              className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                             </button>
-                          </li>
+                          </div>
                         );
                       })}
-                    </ul>
+                    </div>
                   )}
-                  <div className="flex gap-2 items-start">
-                    <div className="flex-1 space-y-1">
-                      <Label className="text-[11px]">Label</Label>
-                      <Input
-                        placeholder="e.g. Figma file"
-                        value={refLabel}
-                        onChange={(e) => setRefLabel(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") addReference(); }}
-                        className="h-8"
-                      />
+                  {addOpen ? (
+                    <div className="rounded-md border border-dashed border-border p-2 space-y-2">
+                      <div className="grid gap-2 sm:grid-cols-[1fr_2fr]">
+                        <div className="space-y-1">
+                          <Label className="text-[11px]">Label</Label>
+                          <Input
+                            placeholder="e.g. Figma file"
+                            value={refLabel}
+                            onChange={(e) => setRefLabel(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") addReference(); }}
+                            className="h-8"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[11px]">URL</Label>
+                          <Input
+                            placeholder="https://…"
+                            value={refUrl}
+                            onChange={(e) => setRefUrl(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") addReference(); }}
+                            className="h-8"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => { setAddOpen(false); setRefLabel(""); setRefUrl(""); }}>Cancel</Button>
+                        <Button size="sm" onClick={addReference} disabled={refBusy || !refUrl.trim()}>Add link</Button>
+                      </div>
                     </div>
-                    <div className="flex-[2] space-y-1">
-                      <Label className="text-[11px]">Link</Label>
-                      <Input
-                        placeholder="https://…"
-                        value={refUrl}
-                        onChange={(e) => setRefUrl(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") addReference(); }}
-                        className="h-8"
-                      />
-                    </div>
-                    <div className="pt-5">
-                      <Button size="sm" variant="outline" onClick={addReference} disabled={refBusy || !refUrl.trim()}>Add</Button>
-                    </div>
-                  </div>
+                  ) : (
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setAddOpen(true)}>
+                      + Add link
+                    </Button>
+                  )}
                 </div>
+
 
                 {/* Watch toggle + current watchers */}
                 <div className="flex items-center gap-2 flex-wrap">

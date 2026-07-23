@@ -231,6 +231,7 @@ export const duplicateTask = createServerFn({ method: "POST" })
         is_recurring_template: src.is_recurring_template ?? false,
         recurrence_freq: src.recurrence_freq ?? "none",
         recurrence_days: src.recurrence_days ?? null,
+        recurrence_day_of_month: (src as { recurrence_day_of_month?: number | null }).recurrence_day_of_month ?? null,
       };
       if (src.review_state && src.review_state !== "none") carry.review_state = src.review_state;
       if (src.reviewer_id) carry.reviewer_id = src.reviewer_id;

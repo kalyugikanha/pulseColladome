@@ -76,14 +76,22 @@ export function EditTaskDialog({
     setProjectId(task.project_id ?? "");
     setDeadline(task.due_date ?? "");
     setPostDate(task.scheduled_post_date ?? "");
-    
     setLinks(Array.isArray(task.asset_links) ? task.asset_links : []);
     setEstimate(task.estimated_hours == null ? "" : String(task.estimated_hours));
     setExtraAssignees([]);
+    // Load platform IDs currently attached to the task.
+    (async () => {
+      const { data } = await supabase.from("task_task_types")
+        .select("task_type:taxonomy_task_types(id, category)")
+        .eq("task_id", task.id);
+      const rows = (data ?? []) as unknown as Array<{ task_type: { id: string; category: string | null } | null }>;
+      setPlatformIds(rows.filter((r) => r.task_type?.category === "platform").map((r) => r.task_type!.id));
+    })();
   }, [open, task?.id]);
 
   const updateFn = useServerFn(updateTaskFields);
   const createBulkFn = useServerFn(createTasksBulk);
+  const setPlatformsFn = useServerFn(setTaskPlatforms);
   const { viewAsUserId } = useViewAs();
 
   async function submit() {

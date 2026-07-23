@@ -353,7 +353,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                           <div className="flex items-center gap-1">
                             <Input
                               type="number" min={0} step={0.25}
-                              value={r.approved_hours ?? r.hours ?? 0}
+                              value={r.approved_hours ? String(r.approved_hours) : ""}
+                              placeholder="0"
                               onChange={(e) => {
                                 const v = e.target.value;
                                 updateRow(i, { approved_hours: v === "" ? undefined : Number(v) });

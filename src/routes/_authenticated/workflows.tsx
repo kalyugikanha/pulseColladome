@@ -188,7 +188,12 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
           <div className="space-y-1"><Label>Department (optional)</Label><Input value={department} onChange={(e) => setDepartment(e.target.value)} /></div>
         </div>
         <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
-        <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active</label>
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} /> Active</label>
+          <label className="text-sm flex items-center gap-2" title="Show this template's tasks on the Content Calendar">
+            <input type="checkbox" checked={isContent} onChange={(e) => setIsContent(e.target.checked)} /> Include in Content Calendar
+          </label>
+        </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">

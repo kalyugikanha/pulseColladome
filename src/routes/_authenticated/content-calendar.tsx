@@ -111,6 +111,7 @@ function ContentCalendarPage() {
   const [platformSel, setPlatformSel] = useState<Set<string>>(new Set());
   const [ownerSel, setOwnerSel] = useState<Set<string>>(new Set());
   const [statusSel, setStatusSel] = useState<Set<string>>(new Set());
+  const [projectSel, setProjectSel] = useState<Set<string>>(new Set());
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const updateFn = useServerFn(updateTaskFields);
   const setPlatformsFn = useServerFn(setTaskPlatforms);
@@ -133,6 +134,17 @@ function ContentCalendarPage() {
     return Array.from(m.entries()).map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [allTasks]);
 
+  const projects = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of allTasks ?? []) {
+      if (t.project) {
+        const label = t.project.code ? `${t.project.code} — ${t.project.name}` : t.project.name;
+        m.set(t.project.id, label);
+      }
+    }
+    return Array.from(m.entries()).map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [allTasks]);
+
   const filtered = useMemo(() => {
     const rows = allTasks ?? [];
     return rows.filter((t) => {
@@ -141,6 +153,10 @@ function ContentCalendarPage() {
         const own = t.assignee?.id ?? UNASSIGNED;
         if (!ownerSel.has(own)) return false;
       }
+      if (projectSel.size > 0) {
+        const pid = t.project?.id ?? UNASSIGNED;
+        if (!projectSel.has(pid)) return false;
+      }
       if (platformSel.size > 0) {
         const ids = t.platforms.map((p) => p.id);
         if (ids.length === 0) return false;
@@ -148,7 +164,7 @@ function ContentCalendarPage() {
       }
       return true;
     });
-  }, [allTasks, statusSel, ownerSel, platformSel]);
+  }, [allTasks, statusSel, ownerSel, projectSel, platformSel]);
 
   async function invalidate() { await qc.invalidateQueries({ queryKey: ["content-cal-tasks"] }); }
 
@@ -187,6 +203,7 @@ function ContentCalendarPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter label="Platform" options={(platforms ?? []).map((p) => ({ value: p.id, label: p.name }))} selected={platformSel} onChange={setPlatformSel} />
+          <MultiSelectFilter label="Project" options={projects} selected={projectSel} onChange={setProjectSel} includeUnassigned />
           <MultiSelectFilter label="Owner" options={owners} selected={ownerSel} onChange={setOwnerSel} includeUnassigned />
           <MultiSelectFilter label="Status" options={(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => ({ value: s, label: STATUS_LABELS[s] }))} selected={statusSel} onChange={setStatusSel} />
           <div className="inline-flex rounded-md border overflow-hidden">

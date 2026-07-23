@@ -132,15 +132,16 @@ function WorkflowsAdmin() {
 }
 
 function TemplateEditor({ initial, onClose, onSave, onDelete }: {
-  initial: { id?: string; name: string; description: string; department: string; is_active: boolean; stages: WorkflowStageInput[] };
+  initial: { id?: string; name: string; description: string; department: string; is_active: boolean; is_content_workflow: boolean; stages: WorkflowStageInput[] };
   onClose: () => void;
-  onSave: (payload: { id?: string; name: string; description: string; department: string; is_active: boolean; stages: WorkflowStageInput[] }) => Promise<void>;
+  onSave: (payload: { id?: string; name: string; description: string; department: string; is_active: boolean; is_content_workflow: boolean; stages: WorkflowStageInput[] }) => Promise<void>;
   onDelete?: () => Promise<void>;
 }) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
   const [department, setDepartment] = useState(initial.department);
   const [isActive, setIsActive] = useState(initial.is_active);
+  const [isContent, setIsContent] = useState(initial.is_content_workflow);
   const [stages, setStages] = useState<WorkflowStageInput[]>(initial.stages);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string | null; email: string | null }>>([]);
   const [projects, setProjects] = useState<Array<{ id: string; code: string; name: string }>>([]);

@@ -10,8 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { updateTaskFields } from "@/lib/tasks-workflow.functions";
-import { createTasksBulk } from "@/lib/tasks-plus.functions";
+import { createTasksBulk, setTaskPlatforms } from "@/lib/tasks-plus.functions";
 import { AssigneeMultiSelect } from "@/components/tasks/assignee-multi-select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, Share2 } from "lucide-react";
 import { useViewAs } from "@/hooks/use-view-as";
 
 type EditableTask = {

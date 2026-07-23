@@ -6,6 +6,8 @@ import {
   listTraineeApplications,
   approveTraineeApplication,
   rejectTraineeApplication,
+  resetTraineeApplication,
+  deleteTraineeApplication,
   type TraineeApplication,
 } from "@/lib/trainee-applications.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

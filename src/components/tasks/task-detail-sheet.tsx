@@ -228,9 +228,11 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
       await saveAssetLinks([...assetLinks, { label: refLabel.trim(), url }]);
       setRefLabel("");
       setRefUrl("");
+      setAddOpen(false);
     } catch (e) { toast.error((e as Error).message); }
     finally { setRefBusy(false); }
   }
+
 
   async function removeReference(idx: number) {
     try { await saveAssetLinks(assetLinks.filter((_, i) => i !== idx)); }

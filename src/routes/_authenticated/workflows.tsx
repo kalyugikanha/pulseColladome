@@ -84,6 +84,7 @@ function WorkflowsAdmin() {
                           description: t.description ?? "",
                           department: t.department ?? "",
                           is_active: true,
+                          is_content_workflow: (t as { is_content_workflow?: boolean }).is_content_workflow ?? false,
                           stages: t.stages.map((s) => ({
                             position: s.position,
                             name: s.name,

@@ -340,8 +340,9 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                     <TableCell className="text-right">
                       <Input
                         type="number" min={0} step={0.25}
-                        value={r.hours ?? 0}
-                        onChange={(e) => updateRow(i, { hours: Number(e.target.value) })}
+                        value={r.hours ? String(r.hours) : ""}
+                        placeholder="0"
+                        onChange={(e) => updateRow(i, { hours: e.target.value === "" ? undefined : Number(e.target.value) })}
                         disabled={!mayEdit}
                         className="h-8 w-20 px-2 text-sm text-right font-mono tabular-nums"
                       />

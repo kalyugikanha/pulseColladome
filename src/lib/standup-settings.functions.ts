@@ -60,16 +60,13 @@ export const listStandupSettings = createServerFn({ method: "POST" })
     }>;
   });
 
-/** Upsert current user's stand-up settings. start_time must be >= 11:00. */
+/** Upsert current user's stand-up settings. */
 export const saveMyStandupSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { meetingLink?: string | null; startTime: string; endTime?: string | null }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const startTime = normalizeTime(data.startTime);
-    if (timeSeconds(startTime) < timeSeconds("11:00:00")) {
-      throw new Error("Stand-up start time must be at or after 11:00 AM.");
-    }
     const endTime = data.endTime ? normalizeTime(data.endTime) : null;
     if (endTime && timeSeconds(endTime) <= timeSeconds(startTime)) {
       throw new Error("End time must be after start time.");

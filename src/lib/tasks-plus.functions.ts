@@ -39,9 +39,11 @@ export const createCustomTaskType = createServerFn({ method: "POST" })
 /** =========== Task create/update ============== */
 type AssetLink = { label: string; url: string };
 export type RecurrenceInput = {
-  freq: "none" | "daily" | "weekly";
+  freq: "none" | "daily" | "weekly" | "monthly";
   /** ISO weekdays: 1=Mon..7=Sun. Only used when freq === "weekly". */
   days?: number[];
+  /** 1..31. Only used when freq === "monthly". Clamps to last day of shorter months. */
+  dayOfMonth?: number;
 };
 type TaskInput = {
   projectId: string;

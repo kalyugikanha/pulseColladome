@@ -106,6 +106,36 @@ export function HrTraineeApplicationsPage() {
     }
   }
 
+  async function confirmReset() {
+    if (!resetTarget) return;
+    setConfirmBusy(true);
+    try {
+      await resetFn({ data: { id: resetTarget.id } });
+      toast.success("Application reset to pending");
+      setResetTarget(null);
+      qc.invalidateQueries({ queryKey: ["trainee-applications"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reset");
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setConfirmBusy(true);
+    try {
+      await deleteFn({ data: { id: deleteTarget.id } });
+      toast.success("Application deleted");
+      setDeleteTarget(null);
+      qc.invalidateQueries({ queryKey: ["trainee-applications"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete");
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
   const counts = {
     pending: (apps ?? []).filter((a) => a.status === "pending").length,
     approved: (apps ?? []).filter((a) => a.status === "approved").length,

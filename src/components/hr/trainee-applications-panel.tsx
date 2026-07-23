@@ -6,6 +6,8 @@ import {
   listTraineeApplications,
   approveTraineeApplication,
   rejectTraineeApplication,
+  resetTraineeApplication,
+  deleteTraineeApplication,
   type TraineeApplication,
 } from "@/lib/trainee-applications.functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -36,6 +38,8 @@ export function HrTraineeApplicationsPage() {
   const listFn = useServerFn(listTraineeApplications);
   const approveFn = useServerFn(approveTraineeApplication);
   const rejectFn = useServerFn(rejectTraineeApplication);
+  const resetFn = useServerFn(resetTraineeApplication);
+  const deleteFn = useServerFn(deleteTraineeApplication);
 
   const canAccess = !!(me?.isSuperAdmin || me?.isHrAdmin);
 
@@ -44,6 +48,9 @@ export function HrTraineeApplicationsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<TraineeApplication | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TraineeApplication | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const { data: apps, isLoading } = useQuery({
     queryKey: ["trainee-applications"],
@@ -96,6 +103,36 @@ export function HrTraineeApplicationsPage() {
       toast.error(e instanceof Error ? e.message : "Failed to reject");
     } finally {
       setRejecting(false);
+    }
+  }
+
+  async function confirmReset() {
+    if (!resetTarget) return;
+    setConfirmBusy(true);
+    try {
+      await resetFn({ data: { id: resetTarget.id } });
+      toast.success("Application reset to pending");
+      setResetTarget(null);
+      qc.invalidateQueries({ queryKey: ["trainee-applications"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reset");
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setConfirmBusy(true);
+    try {
+      await deleteFn({ data: { id: deleteTarget.id } });
+      toast.success("Application deleted");
+      setDeleteTarget(null);
+      qc.invalidateQueries({ queryKey: ["trainee-applications"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete");
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -166,6 +203,16 @@ export function HrTraineeApplicationsPage() {
                       </Button>
                     </div>
                   )}
+                  {app.status !== "pending" && (
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setResetTarget(app)}>
+                        Reset to pending
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(app)}>
+                        <X className="h-4 w-4 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               {(app.note || app.rejection_reason || app.reviewed_at) && (
@@ -219,6 +266,40 @@ export function HrTraineeApplicationsPage() {
               disabled={rejecting}
             >
               {rejecting ? "Rejecting…" : "Reject application"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!resetTarget} onOpenChange={(o) => { if (!o) setResetTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset to pending?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {resetTarget && <>Reset the application from <strong>{resetTarget.full_name}</strong> ({resetTarget.email}) back to pending so it can be reviewed again. This does not touch any account that may have been created from a prior approval.</>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirmBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmReset(); }} disabled={confirmBusy}>
+              {confirmBusy ? "Resetting…" : "Reset to pending"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete application?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && <>Permanently delete the application from <strong>{deleteTarget.full_name}</strong> ({deleteTarget.email}). This cannot be undone. Any account previously created from this application is not affected.</>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirmBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmDelete(); }} disabled={confirmBusy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {confirmBusy ? "Deleting…" : "Delete application"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -86,18 +86,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
   useEffect(() => {
     if (!open) return;
     const src = ((log?.tasks as Task[] | null) ?? []).map((t) => ({ ...t }));
-    // Pre-fill approved_hours with logged hours for approvers so the field
-    // shows a real, committed starting value rather than an ambiguous placeholder.
-    const prepped = canApprove
-      ? src.map((r) => ({
-          ...r,
-          approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
-            ? Number(r.approved_hours)
-            : (Number(r.hours) || 0),
-        }))
-      : src;
-    setRows(prepped);
-  }, [log, open, canApprove]);
+    setRows(src);
+  }, [log, open]);
 
   const projectByCode = useMemo(() => new Map((projects ?? []).map((p) => [p.code, p])), [projects]);
   
@@ -129,7 +119,7 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
     setRows((prev) => prev.filter((_, idx) => idx !== i));
   }
   function addRow() {
-    setRows((prev) => [...prev, { project_code: "", project_name: "", task_id: "", task_title: "", hours: 0, comments: "" }]);
+    setRows((prev) => [...prev, { project_code: "", project_name: "", task_id: "", task_title: "", hours: undefined, comments: "" }]);
   }
 
   function cleanRows(): Task[] {
@@ -350,8 +340,9 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                     <TableCell className="text-right">
                       <Input
                         type="number" min={0} step={0.25}
-                        value={r.hours ?? 0}
-                        onChange={(e) => updateRow(i, { hours: Number(e.target.value) })}
+                        value={r.hours ? String(r.hours) : ""}
+                        placeholder="0"
+                        onChange={(e) => updateRow(i, { hours: e.target.value === "" ? undefined : Number(e.target.value) })}
                         disabled={!mayEdit}
                         className="h-8 w-20 px-2 text-sm text-right font-mono tabular-nums"
                       />
@@ -362,7 +353,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
                           <div className="flex items-center gap-1">
                             <Input
                               type="number" min={0} step={0.25}
-                              value={r.approved_hours ?? r.hours ?? 0}
+                              value={r.approved_hours ? String(r.approved_hours) : ""}
+                              placeholder="0"
                               onChange={(e) => {
                                 const v = e.target.value;
                                 updateRow(i, { approved_hours: v === "" ? undefined : Number(v) });

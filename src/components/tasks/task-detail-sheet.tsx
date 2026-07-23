@@ -124,6 +124,8 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
   const [refLabel, setRefLabel] = useState("");
   const [refUrl, setRefUrl] = useState("");
   const [refBusy, setRefBusy] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+
   const [markDoneOpen, setMarkDoneOpen] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);

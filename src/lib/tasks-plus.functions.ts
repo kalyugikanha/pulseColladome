@@ -108,6 +108,12 @@ async function createOneTaskForAssignee(
   if (isRecurring && rec!.freq === "weekly" && (!rec!.days || rec!.days.length === 0)) {
     throw new Error("Pick at least one weekday for weekly recurrence.");
   }
+  if (isRecurring && rec!.freq === "monthly") {
+    const dom = rec!.dayOfMonth ?? 0;
+    if (!Number.isInteger(dom) || dom < 1 || dom > 31) {
+      throw new Error("Pick a day of the month (1–31) for monthly recurrence.");
+    }
+  }
   const { data: task, error } = await supabase.rpc("create_task_full", {
     _project_id: data.projectId,
     _title: title,
@@ -138,6 +144,7 @@ async function createOneTaskForAssignee(
       is_recurring_template: true,
       recurrence_freq: rec!.freq,
       recurrence_days: rec!.freq === "weekly" ? (rec!.days ?? []) : null,
+      recurrence_day_of_month: rec!.freq === "monthly" ? (rec!.dayOfMonth ?? null) : null,
       due_date: null,
     }) as unknown as { eq: (c: string, v: unknown) => Promise<{ error: unknown }> }).eq("id", taskId);
     if (upErr) throw upErr;

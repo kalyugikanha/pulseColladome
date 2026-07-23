@@ -775,7 +775,7 @@ function InlineNumber({ value, disabled, onCommit }: { value: number; disabled?:
         if (!isNaN(n) && n !== value) onCommit(n);
       }}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      className="h-9 text-right text-base font-semibold tabular-nums"
+      className="h-9 w-20 px-2 text-right text-base font-semibold tabular-nums"
     />
   );
 }

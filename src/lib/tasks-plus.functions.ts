@@ -374,3 +374,49 @@ export const deleteTaskType = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+/** Create a "Platform" tag (category='platform', no department). */
+export const upsertPlatform = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { id?: string; name: string; active?: boolean }) => d)
+  .handler(async ({ data, context }) => {
+    const payload = {
+      department_id: null,
+      name: data.name.trim(),
+      active: data.active ?? true,
+      category: "platform",
+    } as Record<string, unknown>;
+    if (data.id) {
+      const { error } = await context.supabase.from("taxonomy_task_types").update(payload as never).eq("id", data.id);
+      if (error) throw error;
+      return { id: data.id };
+    }
+    const { data: row, error } = await context.supabase.from("taxonomy_task_types")
+      .insert({ ...payload, is_custom: false } as never).select("id").single();
+    if (error) throw error;
+    return row;
+  });
+
+/** Replace only the PLATFORM-category tags on a task, preserving other task types. */
+export const setTaskPlatforms = createServerFn({ method: "POST" })
+  .middleware([impersonationMiddleware])
+  .inputValidator((d: { taskId: string; platformIds: string[] }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    // Load current task_types with categories, keep non-platform, replace platform set.
+    const { data: existing } = await supabase.from("task_task_types")
+      .select("task_type_id, task_type:taxonomy_task_types(id, category)")
+      .eq("task_id", data.taskId);
+    const rows = ((existing ?? []) as unknown as Array<{ task_type_id: string; task_type: { category: string | null } | null }>);
+    const keep = rows.filter((r) => (r.task_type?.category ?? "general") !== "platform").map((r) => r.task_type_id);
+    await supabase.from("task_task_types").delete().eq("task_id", data.taskId);
+    const finalIds = Array.from(new Set([...keep, ...data.platformIds]));
+    if (finalIds.length > 0) {
+      const { error } = await supabase.from("task_task_types").insert(
+        finalIds.map((tt) => ({ task_id: data.taskId, task_type_id: tt }))
+      );
+      if (error) throw error;
+    }
+    return { ok: true };
+  });
+

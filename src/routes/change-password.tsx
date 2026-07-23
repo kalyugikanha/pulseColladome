@@ -40,7 +40,7 @@ function ChangePasswordPage() {
       }
       await qc.invalidateQueries({ queryKey: ["current-user"] });
       toast.success("Password updated.");
-      router.navigate({ to: "/dashboard", replace: true });
+      window.location.href = "/dashboard";
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not update password");
     } finally { setLoading(false); }

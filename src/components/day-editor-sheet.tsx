@@ -86,18 +86,8 @@ export function DayEditorSheet({ open, onOpenChange, userId, userName, date, can
   useEffect(() => {
     if (!open) return;
     const src = ((log?.tasks as Task[] | null) ?? []).map((t) => ({ ...t }));
-    // Pre-fill approved_hours with logged hours for approvers so the field
-    // shows a real, committed starting value rather than an ambiguous placeholder.
-    const prepped = canApprove
-      ? src.map((r) => ({
-          ...r,
-          approved_hours: r.approved_hours != null && !Number.isNaN(Number(r.approved_hours))
-            ? Number(r.approved_hours)
-            : (Number(r.hours) || 0),
-        }))
-      : src;
-    setRows(prepped);
-  }, [log, open, canApprove]);
+    setRows(src);
+  }, [log, open]);
 
   const projectByCode = useMemo(() => new Map((projects ?? []).map((p) => [p.code, p])), [projects]);
   

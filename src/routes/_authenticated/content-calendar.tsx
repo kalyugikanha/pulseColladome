@@ -134,6 +134,17 @@ function ContentCalendarPage() {
     return Array.from(m.entries()).map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [allTasks]);
 
+  const projects = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of allTasks ?? []) {
+      if (t.project) {
+        const label = t.project.code ? `${t.project.code} — ${t.project.name}` : t.project.name;
+        m.set(t.project.id, label);
+      }
+    }
+    return Array.from(m.entries()).map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [allTasks]);
+
   const filtered = useMemo(() => {
     const rows = allTasks ?? [];
     return rows.filter((t) => {
@@ -142,6 +153,10 @@ function ContentCalendarPage() {
         const own = t.assignee?.id ?? UNASSIGNED;
         if (!ownerSel.has(own)) return false;
       }
+      if (projectSel.size > 0) {
+        const pid = t.project?.id ?? UNASSIGNED;
+        if (!projectSel.has(pid)) return false;
+      }
       if (platformSel.size > 0) {
         const ids = t.platforms.map((p) => p.id);
         if (ids.length === 0) return false;
@@ -149,7 +164,7 @@ function ContentCalendarPage() {
       }
       return true;
     });
-  }, [allTasks, statusSel, ownerSel, platformSel]);
+  }, [allTasks, statusSel, ownerSel, projectSel, platformSel]);
 
   async function invalidate() { await qc.invalidateQueries({ queryKey: ["content-cal-tasks"] }); }
 

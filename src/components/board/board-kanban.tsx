@@ -521,12 +521,12 @@ export async function fetchBoardCards(filter: { assigneeId?: string; department?
   const typesByTask = new Map<string, TaskTypeLite[]>();
   if (taskIds.length) {
     const { data: tt } = await supabase.from("task_task_types")
-      .select("task_id, task_type:taxonomy_task_types(id, name)")
+      .select("task_id, task_type:taxonomy_task_types(id, name, category)")
       .in("task_id", taskIds);
-    for (const row of ((tt ?? []) as unknown as Array<{ task_id: string; task_type: { id: string; name: string } | null }>)) {
+    for (const row of ((tt ?? []) as unknown as Array<{ task_id: string; task_type: { id: string; name: string; category: string | null } | null }>)) {
       if (!row.task_type) continue;
       const list = typesByTask.get(row.task_id) ?? [];
-      list.push({ id: row.task_type.id, name: row.task_type.name });
+      list.push({ id: row.task_type.id, name: row.task_type.name, category: row.task_type.category });
       typesByTask.set(row.task_id, list);
     }
   }

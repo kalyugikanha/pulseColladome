@@ -34,10 +34,11 @@ export const listWorkflowTemplates = createServerFn({ method: "GET" })
       supabase.from("workflow_templates" as never).select("*").order("name"),
       supabase.from("workflow_template_stages" as never).select("*").order("position"),
     ]);
-    const templates = ((t.data as unknown as Array<{ id: string; name: string; description: string | null; department: string | null; is_active: boolean }>) ?? []);
+    const templates = ((t.data as unknown as Array<{ id: string; name: string; description: string | null; department: string | null; is_active: boolean; is_content_workflow?: boolean | null }>) ?? []);
     const stages = ((s.data as unknown as Array<WorkflowStageInput & { id: string; template_id: string }>) ?? []);
     return templates.map((tpl) => ({
       ...tpl,
+      is_content_workflow: tpl.is_content_workflow ?? false,
       stages: stages.filter((st) => st.template_id === tpl.id).sort((a, b) => a.position - b.position),
     }));
   });

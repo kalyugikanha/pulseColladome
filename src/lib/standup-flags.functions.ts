@@ -54,12 +54,24 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
       .maybeSingle();
 
     const existingId = (existing as unknown as { id: string } | null)?.id ?? null;
+
+    const { data: taskRow } = await supabase
+      .from("tasks")
+      .select("assignee_id")
+      .eq("id", data.taskId)
+      .maybeSingle();
+    const assigneeId = (taskRow as { assignee_id: string | null } | null)?.assignee_id ?? null;
+    const notifBody = note ? `Flagged for stand-up: "${note}"` : "Flagged for stand-up discussion.";
+
     if (existingId) {
       const { error } = await supabase
         .from("standup_flags" as never)
         .update({ note } as never)
         .eq("id", existingId);
       if (error) throw new Error(error.message);
+      if (assigneeId && assigneeId !== userId) {
+        await notify(supabase, assigneeId, "standup_flagged", data.taskId, notifBody);
+      }
       return { id: existingId };
     }
 
@@ -69,6 +81,9 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+    if (assigneeId && assigneeId !== userId) {
+      await notify(supabase, assigneeId, "standup_flagged", data.taskId, notifBody);
+    }
     return { id: (inserted as unknown as { id: string }).id };
   });
 
@@ -89,6 +104,10 @@ export const createStandupNote = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+    if (assignee_tag && assignee_tag !== userId) {
+      const body = `Flagged for stand-up: ${title}${note ? ` — "${note}"` : ""}`;
+      await notify(supabase, assignee_tag, "standup_flagged", null, body);
+    }
     return { id: (inserted as unknown as { id: string }).id };
   });
 

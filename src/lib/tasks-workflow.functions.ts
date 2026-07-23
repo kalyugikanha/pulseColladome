@@ -213,9 +213,16 @@ export const setReviewer = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const actingUserId = context.actingUserId;
-    const { data: prev } = await supabase.from("tasks").select("reviewer_id").eq("id", data.taskId).maybeSingle();
+    const { data: prev } = await supabase.from("tasks").select("reviewer_id, recurrence_parent_id").eq("id", data.taskId).maybeSingle();
     const { error } = await supabase.from("tasks").update({ reviewer_id: data.reviewerId }).eq("id", data.taskId);
     if (error) throw error;
+    // Propagate to the recurring template so future occurrences inherit this
+    // reviewer (reviewer_id only — do not touch assignee_id, which would
+    // re-fire trg_tasks_auto_reviewer and clobber the value).
+    const parentId = (prev as { recurrence_parent_id: string | null } | null)?.recurrence_parent_id ?? null;
+    if (parentId) {
+      await supabase.from("tasks").update({ reviewer_id: data.reviewerId }).eq("id", parentId);
+    }
     await logActivity(supabase, data.taskId, actingUserId, "reviewer_changed", prev?.reviewer_id ?? null, data.reviewerId);
     if (data.reviewerId) await notify(supabase, data.reviewerId, "reviewer_assigned", data.taskId, null, "You were added as reviewer on a task.");
     return { ok: true };

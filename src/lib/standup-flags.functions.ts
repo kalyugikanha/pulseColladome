@@ -57,11 +57,15 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
 
     const { data: taskRow } = await supabase
       .from("tasks")
-      .select("assignee_id")
+      .select("assignee_id, reviewer_id")
       .eq("id", data.taskId)
       .maybeSingle();
     const assigneeId = (taskRow as { assignee_id: string | null } | null)?.assignee_id ?? null;
+    const reviewerId = (taskRow as { reviewer_id: string | null } | null)?.reviewer_id ?? null;
     const notifBody = note ? `Flagged for stand-up: "${note}"` : "Flagged for stand-up discussion.";
+    const notifyTargets = Array.from(new Set(
+      [assigneeId, reviewerId].filter((id): id is string => !!id && id !== userId),
+    ));
 
     if (existingId) {
       const { error } = await supabase
@@ -69,8 +73,8 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
         .update({ note } as never)
         .eq("id", existingId);
       if (error) throw new Error(error.message);
-      if (assigneeId && assigneeId !== userId) {
-        await notify(supabase, assigneeId, "standup_flagged", data.taskId, notifBody);
+      for (const target of notifyTargets) {
+        await notify(supabase, target, "standup_flagged", data.taskId, notifBody);
       }
       return { id: existingId };
     }
@@ -81,11 +85,12 @@ export const flagTaskForStandup = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-    if (assigneeId && assigneeId !== userId) {
-      await notify(supabase, assigneeId, "standup_flagged", data.taskId, notifBody);
+    for (const target of notifyTargets) {
+      await notify(supabase, target, "standup_flagged", data.taskId, notifBody);
     }
     return { id: (inserted as unknown as { id: string }).id };
   });
+
 
 /** Create a free-form agenda note (no task). Optionally tag an assignee. */
 export const createStandupNote = createServerFn({ method: "POST" })

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useViewAs } from "./use-view-as";
 
-const FINANCE_EMAILS = ["shubham@colladome.com"];
+
 
 export type CurrentUser = {
   id: string;

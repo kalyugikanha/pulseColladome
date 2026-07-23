@@ -203,6 +203,16 @@ export function HrTraineeApplicationsPage() {
                       </Button>
                     </div>
                   )}
+                  {app.status !== "pending" && (
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setResetTarget(app)}>
+                        Reset to pending
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(app)}>
+                        <X className="h-4 w-4 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               {(app.note || app.rejection_reason || app.reviewed_at) && (

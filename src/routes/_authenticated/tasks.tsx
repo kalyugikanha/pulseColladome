@@ -284,8 +284,9 @@ export function NewTaskDialog({ open, onClose, defaultAssigneeId, defaultDepartm
   const [assignees, setAssignees] = useState<string[]>(defaultAssigneeId ? [defaultAssigneeId] : []);
   const [wfMode, setWfMode] = useState(false);
   const [wfTemplateId, setWfTemplateId] = useState<string>("");
-  const [repeat, setRepeat] = useState<"none" | "daily" | "weekly">("none");
+  const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "monthly">("none");
   const [repeatDays, setRepeatDays] = useState<Set<number>>(new Set());
+  const [repeatDayOfMonth, setRepeatDayOfMonth] = useState<number>(new Date().getDate());
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (open) { setAssignees(defaultAssigneeId ? [defaultAssigneeId] : []); } }, [open, defaultAssigneeId]);
 

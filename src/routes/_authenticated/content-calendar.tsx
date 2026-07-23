@@ -203,6 +203,7 @@ function ContentCalendarPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter label="Platform" options={(platforms ?? []).map((p) => ({ value: p.id, label: p.name }))} selected={platformSel} onChange={setPlatformSel} />
+          <MultiSelectFilter label="Project" options={projects} selected={projectSel} onChange={setProjectSel} includeUnassigned />
           <MultiSelectFilter label="Owner" options={owners} selected={ownerSel} onChange={setOwnerSel} includeUnassigned />
           <MultiSelectFilter label="Status" options={(Object.keys(STATUS_LABELS) as TaskStatus[]).map((s) => ({ value: s, label: STATUS_LABELS[s] }))} selected={statusSel} onChange={setStatusSel} />
           <div className="inline-flex rounded-md border overflow-hidden">

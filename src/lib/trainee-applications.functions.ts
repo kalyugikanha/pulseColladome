@@ -94,8 +94,7 @@ export const approveTraineeApplication = createServerFn({ method: "POST" })
       );
     if (grantErr) throw new Error(grantErr.message);
 
-    const { randomBytes } = await import("crypto");
-    const tempPassword = `A${randomBytes(15).toString("base64url").replace(/[^A-Za-z0-9]/g, "").slice(0, 16)}9!`;
+    const tempPassword = "Test@123";
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,

@@ -25,6 +25,8 @@ import {
   listStandupSettings,
 } from "@/lib/standup-settings.functions";
 import { useViewAs } from "@/hooks/use-view-as";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
 
 export const Route = createFileRoute("/_authenticated/standup")({
   component: StandupAgendaPage,

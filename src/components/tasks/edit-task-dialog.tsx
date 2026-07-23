@@ -52,10 +52,19 @@ export function EditTaskDialog({
   const [estimate, setEstimate] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [extraAssignees, setExtraAssignees] = useState<string[]>([]);
+  const [platformIds, setPlatformIds] = useState<string[]>([]);
 
   const { data: projects } = useQuery({
     queryKey: ["projects-active"], enabled: open,
     queryFn: async () => (await supabase.from("projects").select("id, code, name").eq("status", "active").order("name")).data ?? [],
+  });
+  const { data: platforms } = useQuery({
+    queryKey: ["taxonomy-platforms"], enabled: open,
+    queryFn: async () => {
+      const { data } = await supabase.from("taxonomy_task_types")
+        .select("id, name").eq("active", true).eq("category" as never, "platform" as never).order("name");
+      return (data ?? []) as Array<{ id: string; name: string }>;
+    },
   });
 
   useEffect(() => {

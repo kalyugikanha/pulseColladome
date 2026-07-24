@@ -284,11 +284,57 @@ export const updateTaskAssetLinks = createServerFn({ method: "POST" })
     if (!canView) throw new Error("You can't edit this task.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // If this task belongs to a workflow instance, share asset_links across all sibling stage tasks
+    // so links added on a superseded stage don't get stranded.
+    const { data: selfRow } = await supabaseAdmin
+      .from("tasks")
+      .select("workflow_instance_id")
+      .eq("id", data.taskId)
+      .maybeSingle();
+    const wfId = (selfRow as { workflow_instance_id: string | null } | null)?.workflow_instance_id ?? null;
+
+    let merged = clean;
+    let siblingIds: string[] = [];
+    if (wfId) {
+      const { data: siblings } = await supabaseAdmin
+        .from("tasks")
+        .select("id, asset_links")
+        .eq("workflow_instance_id", wfId)
+        .neq("id", data.taskId);
+      const byUrl = new Map<string, { label: string; url: string }>();
+      // seed with clean first so its labels win on collision
+      for (const l of clean) {
+        const k = l.url.trim().toLowerCase();
+        if (k && !byUrl.has(k)) byUrl.set(k, l);
+      }
+      for (const s of (siblings ?? []) as Array<{ id: string; asset_links: { label: string; url: string }[] | null }>) {
+        siblingIds.push(s.id);
+        for (const l of s.asset_links ?? []) {
+          const url = String(l?.url ?? "").trim();
+          const label = String(l?.label ?? "").trim();
+          const k = url.toLowerCase();
+          if (!k) continue;
+          if (!byUrl.has(k)) byUrl.set(k, { label, url });
+        }
+      }
+      merged = Array.from(byUrl.values());
+    }
+
     const { error } = await supabaseAdmin
       .from("tasks")
-      .update({ asset_links: clean as never } as never)
+      .update({ asset_links: merged as never } as never)
       .eq("id", data.taskId);
     if (error) throw error;
+
+    if (wfId && siblingIds.length > 0) {
+      const { error: sibErr } = await supabaseAdmin
+        .from("tasks")
+        .update({ asset_links: merged as never } as never)
+        .in("id", siblingIds);
+      if (sibErr) throw sibErr;
+    }
+
 
     await logActivity(supabaseAdmin, data.taskId, actingUserId, "references_updated", null, null,
       `${clean.length} reference${clean.length === 1 ? "" : "s"}`);

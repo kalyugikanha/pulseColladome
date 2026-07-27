@@ -313,6 +313,8 @@ function StandupAgendaPage() {
           )}
         </CardContent>
       </Card>
+
+      {openTaskId && <TaskDetailSheet taskId={openTaskId} onClose={(next) => setOpenTaskId(next ?? null)} />}
     </div>
   );
 }

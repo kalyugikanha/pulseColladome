@@ -485,17 +485,25 @@ function AgendaRow({
   f,
   settings,
   onDiscussed,
+  onOpenTask,
 }: {
   f: StandupFlag;
   settings: TeamSetting | null;
   onDiscussed: () => void;
+  onOpenTask?: (taskId: string) => void;
 }) {
   const isFreeform = !f.task_id;
   const assignee = f.task?.assignee ?? f.tagged ?? null;
   const assigneeName = assignee?.full_name ?? assignee?.email ?? null;
+  const clickable = !!f.task_id;
 
   return (
-    <div className="border rounded-md p-3 flex items-start justify-between gap-3">
+    <div
+      className={`border rounded-md p-3 flex items-start justify-between gap-3 ${clickable ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""}`}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onOpenTask?.(f.task_id!) : undefined}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{f.task?.title ?? f.title ?? "Agenda item"}</span>
@@ -514,7 +522,7 @@ function AgendaRow({
         </div>
         {assignee && <StandupLink settings={settings} label={assigneeName ?? "Assignee"} />}
       </div>
-      <Button size="sm" variant="outline" className="gap-1 shrink-0" onClick={onDiscussed}>
+      <Button size="sm" variant="outline" className="gap-1 shrink-0" onClick={(e) => { e.stopPropagation(); onDiscussed(); }}>
         <Check className="h-3.5 w-3.5" /> Mark discussed
       </Button>
     </div>

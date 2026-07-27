@@ -2640,6 +2640,7 @@ export type Database = {
           required_fields: Json
           requires_review: boolean
           template_id: string
+          use_post_date_as_deadline: boolean
         }
         Insert: {
           branch_options?: Json
@@ -2656,6 +2657,7 @@ export type Database = {
           required_fields?: Json
           requires_review?: boolean
           template_id: string
+          use_post_date_as_deadline?: boolean
         }
         Update: {
           branch_options?: Json
@@ -2672,6 +2674,7 @@ export type Database = {
           required_fields?: Json
           requires_review?: boolean
           template_id?: string
+          use_post_date_as_deadline?: boolean
         }
         Relationships: [
           {

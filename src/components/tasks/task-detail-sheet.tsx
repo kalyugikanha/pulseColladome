@@ -258,7 +258,8 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
       if (trimmedNote) {
         await addCommentFn({ data: { taskId: taskId!, body: trimmedNote } });
       }
-      if (v.handoffId && v.handoffId !== data?.task.reviewer_id) {
+      const currentReviewerId = task ? (task as { reviewer_id: string | null }).reviewer_id : null;
+      if (v.handoffId && v.handoffId !== currentReviewerId) {
         await setReviewerFn({ data: { taskId: taskId!, reviewerId: v.handoffId } });
       }
       setMarkDoneOpen(false);

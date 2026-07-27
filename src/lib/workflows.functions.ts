@@ -96,6 +96,7 @@ export const saveWorkflowTemplate = createServerFn({ method: "POST" })
         default_assignee_id: s.default_assignee_id,
         default_reviewer_id: s.default_reviewer_id,
         default_due_offset_days: s.default_due_offset_days,
+        use_post_date_as_deadline: s.use_post_date_as_deadline ?? false,
         required_fields: s.required_fields,
         branch_options: s.branch_options,
         branch_target_map: s.branch_target_map,

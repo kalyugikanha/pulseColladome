@@ -44,9 +44,13 @@ export const getMyStandupSettings = createServerFn({ method: "GET" })
 export const listStandupSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { userIds?: string[] | null }) => d)
-  .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    let q = supabase
+  .handler(async ({ data }) => {
+    // Stand-up schedule (name, email, department, meeting link/time) is
+    // intentionally company-wide so anyone can join a teammate's stand-up.
+    // Use the admin client to bypass profiles RLS, which would otherwise
+    // null out the joined profile for non-admin/non-manager callers.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin
       .from("standup_settings" as never)
       .select("user_id, meeting_link, start_time, end_time, updated_at, profile:profiles!standup_settings_user_id_fkey(id, full_name, email, department)")
       .order("start_time", { ascending: true });

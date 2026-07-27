@@ -242,7 +242,7 @@ function StandupAgendaPage() {
             </div>
           ) : (
             (forMeActive ?? []).map((f) => (
-              <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} />
+              <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} onOpenTask={(id) => setOpenTaskId(id)} />
             ))
           )}
           {(forMeHistory?.length ?? 0) > 0 && (

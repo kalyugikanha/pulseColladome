@@ -252,7 +252,7 @@ function StandupAgendaPage() {
               </summary>
               <div className="space-y-2 mt-2">
                 {forMeHistory!.slice(0, 20).map((f) => (
-                  <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} muted />
+                  <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} muted onOpenTask={(id) => setOpenTaskId(id)} />
                 ))}
               </div>
             </details>

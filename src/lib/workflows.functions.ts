@@ -18,6 +18,7 @@ export type WorkflowStageInput = {
   default_assignee_id: string | null;
   default_reviewer_id: string | null;
   default_due_offset_days: number | null;
+  use_post_date_as_deadline: boolean;
   required_fields: WorkflowRequiredField[];
   branch_options: WorkflowBranchOption[];
   branch_target_map: Record<string, number>;

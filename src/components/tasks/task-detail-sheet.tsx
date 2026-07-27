@@ -251,14 +251,22 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
     } catch (e) { toast.error((e as Error).message); }
   }
 
-  async function confirmMarkDone() {
+  async function confirmMarkDone(v: { hours: number; note?: string; handoffId?: string | null }) {
     try {
       await setStatusFn({ data: { taskId: taskId!, status: "done" } });
+      const trimmedNote = v.note?.trim();
+      if (trimmedNote) {
+        await addCommentFn({ data: { taskId: taskId!, body: trimmedNote } });
+      }
+      if (v.handoffId && v.handoffId !== data?.task.reviewer_id) {
+        await setReviewerFn({ data: { taskId: taskId!, reviewerId: v.handoffId } });
+      }
       setMarkDoneOpen(false);
       toast.success("Marked done");
       await refresh();
     } catch (e) { toast.error((e as Error).message); }
   }
+
 
   async function doReview(decision: "approve" | "request_changes" | "reject") {
     if (reviewBusy) return;

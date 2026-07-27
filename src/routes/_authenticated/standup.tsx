@@ -531,7 +531,7 @@ function AgendaRow({
 
 type ForMeFlag = Awaited<ReturnType<typeof listStandupFlagsForMeAsAssignee>>[number];
 
-function ForMeRow({ f, settings, muted }: { f: ForMeFlag; settings: TeamSetting | null; muted?: boolean }) {
+function ForMeRow({ f, settings, muted, onOpenTask }: { f: ForMeFlag; settings: TeamSetting | null; muted?: boolean; onOpenTask?: (taskId: string) => void }) {
   const { viewAsUserId } = useViewAs();
   const { data: me } = useCurrentUser();
   const viewerId = viewAsUserId ?? me?.realId ?? me?.id ?? null;
@@ -540,8 +540,14 @@ function ForMeRow({ f, settings, muted }: { f: ForMeFlag; settings: TeamSetting 
   const asAssignee = !!viewerId && (f.task?.assignee_id === viewerId || f.assignee_tag === viewerId);
   const asReviewer = !!viewerId && !!f.task && (f.task as { reviewer_id?: string | null }).reviewer_id === viewerId;
   const roleLabel = asAssignee && asReviewer ? "as assignee & reviewer" : asAssignee ? "as assignee" : asReviewer ? "as reviewer" : null;
+  const clickable = !!f.task_id;
   return (
-    <div className={`border rounded-md p-3 ${muted ? "opacity-70" : ""}`}>
+    <div
+      className={`border rounded-md p-3 ${muted ? "opacity-70" : ""} ${clickable ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""}`}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onOpenTask?.(f.task_id!) : undefined}
+    >
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium">{f.task?.title ?? f.title ?? "Agenda item"}</span>
         {isFreeform && <Badge variant="outline" className="text-[10px]">Free-form</Badge>}

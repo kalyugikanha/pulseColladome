@@ -44,7 +44,7 @@ function WorkflowsAdmin() {
         </div>
         <Button className="gradient-primary" onClick={() => setEditing({
           name: "", description: "", department: "", is_active: true, is_content_workflow: false,
-          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null, project_id: null }],
+          stages: [{ position: 1, name: "Stage 1", requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, use_post_date_as_deadline: false, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null, project_id: null }],
         })}><Plus className="h-4 w-4 mr-1" /> New template</Button>
       </header>
 
@@ -59,6 +59,7 @@ function WorkflowsAdmin() {
               default_assignee_id: s.default_assignee_id,
               default_reviewer_id: (s as { default_reviewer_id?: string | null }).default_reviewer_id ?? null,
               default_due_offset_days: s.default_due_offset_days,
+              use_post_date_as_deadline: (s as { use_post_date_as_deadline?: boolean }).use_post_date_as_deadline ?? false,
               required_fields: s.required_fields as WorkflowRequiredField[],
               branch_options: s.branch_options as WorkflowBranchOption[],
               branch_target_map: s.branch_target_map as Record<string, number>,
@@ -92,6 +93,7 @@ function WorkflowsAdmin() {
                             default_assignee_id: s.default_assignee_id,
                             default_reviewer_id: (s as { default_reviewer_id?: string | null }).default_reviewer_id ?? null,
                             default_due_offset_days: s.default_due_offset_days,
+                            use_post_date_as_deadline: (s as { use_post_date_as_deadline?: boolean }).use_post_date_as_deadline ?? false,
                             required_fields: s.required_fields as WorkflowRequiredField[],
                             branch_options: s.branch_options as WorkflowBranchOption[],
                             branch_target_map: s.branch_target_map as Record<string, number>,
@@ -155,7 +157,7 @@ function TemplateEditor({ initial, onClose, onSave, onDelete }: {
 
   function addStage() {
     const pos = stages.length + 1;
-    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null, project_id: null }]);
+    setStages([...stages, { position: pos, name: `Stage ${pos}`, requires_review: false, default_assignee_id: null, default_reviewer_id: null, default_due_offset_days: null, use_post_date_as_deadline: false, required_fields: [], branch_options: [], branch_target_map: {}, next_stage_position: null, project_id: null }]);
   }
   function moveStage(idx: number, dir: -1 | 1) {
     const target = idx + dir;
@@ -296,13 +298,23 @@ function StageEditor({ stage, index, totalStages, allStages, people, projects, o
                 min={0}
                 className="h-8"
                 placeholder="No auto due date"
+                disabled={stage.use_post_date_as_deadline ?? false}
                 value={stage.default_due_offset_days ?? ""}
                 onChange={(e) => {
                   const v = e.target.value;
                   onChange({ default_due_offset_days: v === "" ? null : Math.max(0, Number(v)) });
                 }}
               />
+              <label className="text-xs flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  checked={stage.use_post_date_as_deadline ?? false}
+                  onChange={(e) => onChange({ use_post_date_as_deadline: e.target.checked })}
+                />
+                Use the task's scheduled post date as the deadline (ignores the days field above)
+              </label>
             </div>
+
           </div>
 
           <div className="space-y-1">

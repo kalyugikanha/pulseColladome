@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import {
   listMyStandupFlags,
   listStandupFlagsForMeAsAssignee,
@@ -133,6 +134,7 @@ function StandupAgendaPage() {
   const [note, setNote] = useState("");
   const [assigneeTag, setAssigneeTag] = useState<string>("none");
   const [saving, setSaving] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   async function addNote() {
     if (!title.trim()) return;
@@ -240,7 +242,7 @@ function StandupAgendaPage() {
             </div>
           ) : (
             (forMeActive ?? []).map((f) => (
-              <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} />
+              <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} onOpenTask={(id) => setOpenTaskId(id)} />
             ))
           )}
           {(forMeHistory?.length ?? 0) > 0 && (
@@ -250,7 +252,7 @@ function StandupAgendaPage() {
               </summary>
               <div className="space-y-2 mt-2">
                 {forMeHistory!.slice(0, 20).map((f) => (
-                  <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} muted />
+                  <ForMeRow key={f.id} f={f} settings={f.flagger?.id ? settingsByUser.get(f.flagger.id) ?? null : null} muted onOpenTask={(id) => setOpenTaskId(id)} />
                 ))}
               </div>
             </details>
@@ -279,7 +281,7 @@ function StandupAgendaPage() {
               const uid = f.task?.assignee?.id ?? f.tagged?.id ?? null;
               const s = uid ? settingsByUser.get(uid) ?? null : null;
               return (
-                <AgendaRow key={f.id} f={f} settings={s} onDiscussed={() => markDiscussed(f.id)} />
+                <AgendaRow key={f.id} f={f} settings={s} onDiscussed={() => markDiscussed(f.id)} onOpenTask={(id) => setOpenTaskId(id)} />
               );
             })
           )}
@@ -311,6 +313,8 @@ function StandupAgendaPage() {
           )}
         </CardContent>
       </Card>
+
+      {openTaskId && <TaskDetailSheet taskId={openTaskId} onClose={(next) => setOpenTaskId(next ?? null)} />}
     </div>
   );
 }
@@ -465,6 +469,7 @@ function StandupLink({ settings, label }: { settings: TeamSetting | null; label:
           href={settings.meeting_link}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
           className="inline-flex items-center gap-1 text-primary hover:underline"
         >
           <Video className="h-3 w-3" /> Join
@@ -480,17 +485,25 @@ function AgendaRow({
   f,
   settings,
   onDiscussed,
+  onOpenTask,
 }: {
   f: StandupFlag;
   settings: TeamSetting | null;
   onDiscussed: () => void;
+  onOpenTask?: (taskId: string) => void;
 }) {
   const isFreeform = !f.task_id;
   const assignee = f.task?.assignee ?? f.tagged ?? null;
   const assigneeName = assignee?.full_name ?? assignee?.email ?? null;
+  const clickable = !!f.task_id;
 
   return (
-    <div className="border rounded-md p-3 flex items-start justify-between gap-3">
+    <div
+      className={`border rounded-md p-3 flex items-start justify-between gap-3 ${clickable ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""}`}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onOpenTask?.(f.task_id!) : undefined}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium">{f.task?.title ?? f.title ?? "Agenda item"}</span>
@@ -509,7 +522,7 @@ function AgendaRow({
         </div>
         {assignee && <StandupLink settings={settings} label={assigneeName ?? "Assignee"} />}
       </div>
-      <Button size="sm" variant="outline" className="gap-1 shrink-0" onClick={onDiscussed}>
+      <Button size="sm" variant="outline" className="gap-1 shrink-0" onClick={(e) => { e.stopPropagation(); onDiscussed(); }}>
         <Check className="h-3.5 w-3.5" /> Mark discussed
       </Button>
     </div>
@@ -518,7 +531,7 @@ function AgendaRow({
 
 type ForMeFlag = Awaited<ReturnType<typeof listStandupFlagsForMeAsAssignee>>[number];
 
-function ForMeRow({ f, settings, muted }: { f: ForMeFlag; settings: TeamSetting | null; muted?: boolean }) {
+function ForMeRow({ f, settings, muted, onOpenTask }: { f: ForMeFlag; settings: TeamSetting | null; muted?: boolean; onOpenTask?: (taskId: string) => void }) {
   const { viewAsUserId } = useViewAs();
   const { data: me } = useCurrentUser();
   const viewerId = viewAsUserId ?? me?.realId ?? me?.id ?? null;
@@ -527,8 +540,14 @@ function ForMeRow({ f, settings, muted }: { f: ForMeFlag; settings: TeamSetting 
   const asAssignee = !!viewerId && (f.task?.assignee_id === viewerId || f.assignee_tag === viewerId);
   const asReviewer = !!viewerId && !!f.task && (f.task as { reviewer_id?: string | null }).reviewer_id === viewerId;
   const roleLabel = asAssignee && asReviewer ? "as assignee & reviewer" : asAssignee ? "as assignee" : asReviewer ? "as reviewer" : null;
+  const clickable = !!f.task_id;
   return (
-    <div className={`border rounded-md p-3 ${muted ? "opacity-70" : ""}`}>
+    <div
+      className={`border rounded-md p-3 ${muted ? "opacity-70" : ""} ${clickable ? "cursor-pointer hover:bg-accent/50 transition-colors" : ""}`}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onOpenTask?.(f.task_id!) : undefined}
+    >
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium">{f.task?.title ?? f.title ?? "Agenda item"}</span>
         {isFreeform && <Badge variant="outline" className="text-[10px]">Free-form</Badge>}

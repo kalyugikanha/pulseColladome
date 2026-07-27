@@ -134,6 +134,7 @@ function StandupAgendaPage() {
   const [note, setNote] = useState("");
   const [assigneeTag, setAssigneeTag] = useState<string>("none");
   const [saving, setSaving] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   async function addNote() {
     if (!title.trim()) return;

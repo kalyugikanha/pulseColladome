@@ -93,6 +93,7 @@ function WorkflowsAdmin() {
                             default_assignee_id: s.default_assignee_id,
                             default_reviewer_id: (s as { default_reviewer_id?: string | null }).default_reviewer_id ?? null,
                             default_due_offset_days: s.default_due_offset_days,
+                            use_post_date_as_deadline: (s as { use_post_date_as_deadline?: boolean }).use_post_date_as_deadline ?? false,
                             required_fields: s.required_fields as WorkflowRequiredField[],
                             branch_options: s.branch_options as WorkflowBranchOption[],
                             branch_target_map: s.branch_target_map as Record<string, number>,

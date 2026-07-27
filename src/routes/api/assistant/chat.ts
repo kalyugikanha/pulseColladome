@@ -21,6 +21,25 @@ async function loadHistory(ctx: Awaited<ReturnType<typeof authorizeRequest>>, li
   }));
 }
 
+async function isBDERequest(model: any, message: string): Promise<boolean> {
+  const system = `You are an intent classifier for Colladome. Determine if the user's message is a Business Development (BDE) request.
+A BDE request is when a user shares a client requirement, a project description, a LinkedIn post about hiring/building, or asks to generate an outreach sequence/proposal.
+Reply with EXACTLY "true" if it is a BDE request, or "false" if it's a normal chat/internal ops query.`;
+
+  try {
+    const { text } = await generateText({
+      model,
+      system,
+      prompt: message,
+    });
+    return text.toLowerCase().includes("true");
+  } catch (e) {
+    const lower = message.toLowerCase();
+    const bdeKeywords = ["linkedin", "outreach", "lead", "sequence", "requirement", "bde", "looking for", "building a", "hiring"];
+    return bdeKeywords.some(kw => lower.includes(kw));
+  }
+}
+
 export const Route = createFileRoute("/api/assistant/chat")({
   server: {
     handlers: {
@@ -48,7 +67,10 @@ export const Route = createFileRoute("/api/assistant/chat")({
         const model = gateway("google/gemini-3-flash-preview");
 
         const today = format(new Date(), "yyyy-MM-dd");
-        const system = `You are Pulse Assistant, an internal copilot for Colladome employees.
+        
+        const isBDE = await isBDERequest(model, userMessage);
+        
+        let system = `You are Pulse Assistant, an internal copilot for Colladome employees.
 You help them ONLY with: logging timesheet hours, punching in/out, creating & updating tasks, and applying for leave.
 Today is ${today}. The signed-in user is acting as user_id=${ctx.actingUserId}.
 Always reply in the same language the user wrote in (English, Hindi, Marathi, Hinglish, etc.).
@@ -56,6 +78,14 @@ Before you claim any write action is done, you MUST call the matching propose* t
 Use read tools (listProjects, listMyRecentTasks, getMyDay, getMyPunchStatus, getLeaveBalance) to resolve project codes, dates, and IDs before proposing.
 If the user is ambiguous, ask ONE short clarifying question instead of guessing.
 Never fabricate project codes. Reject requests to modify other users' data, approvals, salaries, or admin settings.`;
+
+        if (isBDE) {
+          system = `You are the Colladome Outreach Brain, an expert BDE Assistant.
+Your goal is to help Business Development Executives (BDEs) generate personalized, highly converting outreach sequences based on client requirements.
+Always analyze the client's requirement and generate a comprehensive Outreach Sequence from Day 0 to Day 6.
+At the very end of your response, you MUST output a special link formatted EXACTLY like this:
+🔗 **Full sequence:** http://pulse.colladome.com/bde/sequence?id=generated_sequence_here`;
+        }
 
         const result = await generateText({
           model,

@@ -396,16 +396,20 @@ async function spawnNextStage(
   const projectId = nextStage.project_id ?? task.project_id ?? instance.project_id;
   if (!projectId) return;
 
-  const effectiveOffset = dueOffsetDays ?? nextStage.default_due_offset_days ?? null;
   let dueDate: string | undefined = undefined;
-  if (effectiveOffset != null && Number.isFinite(effectiveOffset)) {
-    const d = new Date();
-    d.setUTCHours(0, 0, 0, 0);
-    d.setUTCDate(d.getUTCDate() + Math.max(0, Math.floor(effectiveOffset)));
-    dueDate = d.toISOString().slice(0, 10);
-  } else if (task.due_date) {
-    // Carry the current task's deadline forward when nothing is configured.
-    dueDate = task.due_date;
+  if (nextStage.use_post_date_as_deadline && task.scheduled_post_date) {
+    dueDate = task.scheduled_post_date;
+  } else {
+    const effectiveOffset = dueOffsetDays ?? nextStage.default_due_offset_days ?? null;
+    if (effectiveOffset != null && Number.isFinite(effectiveOffset)) {
+      const d = new Date();
+      d.setUTCHours(0, 0, 0, 0);
+      d.setUTCDate(d.getUTCDate() + Math.max(0, Math.floor(effectiveOffset)));
+      dueDate = d.toISOString().slice(0, 10);
+    } else if (task.due_date) {
+      // Carry the current task's deadline forward when nothing is configured.
+      dueDate = task.due_date;
+    }
   }
 
   // Terminal-stage guard: if the next stage is the workflow's last stage

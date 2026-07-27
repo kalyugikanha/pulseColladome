@@ -360,7 +360,7 @@ export const reviewTask = createServerFn({ method: "POST" })
 /** ---------- helpers ---------- */
 async function spawnNextStage(
   supabase: any,
-  task: { id: string; title: string; workflow_instance_id: string | null; stage_snapshot: WorkflowStageInput | null; project_id?: string; asset_links?: any[] | null; due_date?: string | null },
+  task: { id: string; title: string; workflow_instance_id: string | null; stage_snapshot: WorkflowStageInput | null; project_id?: string; asset_links?: any[] | null; due_date?: string | null; scheduled_post_date?: string | null },
   stage: WorkflowStageInput | null,
   branchKey: string | null,
   nextAssigneeId: string | null,

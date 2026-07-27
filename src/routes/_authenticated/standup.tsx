@@ -281,7 +281,7 @@ function StandupAgendaPage() {
               const uid = f.task?.assignee?.id ?? f.tagged?.id ?? null;
               const s = uid ? settingsByUser.get(uid) ?? null : null;
               return (
-                <AgendaRow key={f.id} f={f} settings={s} onDiscussed={() => markDiscussed(f.id)} />
+                <AgendaRow key={f.id} f={f} settings={s} onDiscussed={() => markDiscussed(f.id)} onOpenTask={(id) => setOpenTaskId(id)} />
               );
             })
           )}

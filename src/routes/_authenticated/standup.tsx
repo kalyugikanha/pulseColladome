@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import {
   listMyStandupFlags,
   listStandupFlagsForMeAsAssignee,

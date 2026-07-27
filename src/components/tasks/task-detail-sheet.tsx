@@ -846,7 +846,7 @@ export function TaskDetailSheet({ taskId, onClose, initialAction = null }: Props
             creatorId: (task as { created_by?: string | null }).created_by ?? null,
           } : null}
           onClose={() => setMarkDoneOpen(false)}
-          onConfirm={() => confirmMarkDone()}
+          onConfirm={(v) => confirmMarkDone(v)}
         />
       </SheetContent>
     </Sheet>

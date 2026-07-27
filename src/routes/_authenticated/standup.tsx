@@ -469,6 +469,7 @@ function StandupLink({ settings, label }: { settings: TeamSetting | null; label:
           href={settings.meeting_link}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
           className="inline-flex items-center gap-1 text-primary hover:underline"
         >
           <Video className="h-3 w-3" /> Join

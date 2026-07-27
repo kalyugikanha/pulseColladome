@@ -298,13 +298,23 @@ function StageEditor({ stage, index, totalStages, allStages, people, projects, o
                 min={0}
                 className="h-8"
                 placeholder="No auto due date"
+                disabled={stage.use_post_date_as_deadline ?? false}
                 value={stage.default_due_offset_days ?? ""}
                 onChange={(e) => {
                   const v = e.target.value;
                   onChange({ default_due_offset_days: v === "" ? null : Math.max(0, Number(v)) });
                 }}
               />
+              <label className="text-xs flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  checked={stage.use_post_date_as_deadline ?? false}
+                  onChange={(e) => onChange({ use_post_date_as_deadline: e.target.checked })}
+                />
+                Use the task's scheduled post date as the deadline (ignores the days field above)
+              </label>
             </div>
+
           </div>
 
           <div className="space-y-1">

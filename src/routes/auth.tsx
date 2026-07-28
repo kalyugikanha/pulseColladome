@@ -26,18 +26,20 @@ function AuthPage() {
 
   async function handleGoogle() {
     setLoading(true);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth/callback`,
-      extraParams: { prompt: "select_account" },
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: "select_account" },
+      }
     });
-    if (result.error) {
-      const msg = result.error.message || "Google sign-in failed";
-      toast.error(msg);
+    
+    if (error) {
+      toast.error(error.message || "Google sign-in failed");
       setLoading(false);
       return;
     }
-    if (result.redirected) return;
-    router.navigate({ to: "/dashboard", replace: true });
+    // redirect is handled automatically by Supabase OAuth
   }
 
   async function handlePassword(e: React.FormEvent) {

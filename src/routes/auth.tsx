@@ -26,6 +26,26 @@ function AuthPage() {
 
   async function handleGoogle() {
     setLoading(true);
+
+    // 1. Production / Lovable Editor (Use Lovable's Magic Auth)
+    // This ensures your main production (pulse.colladome.com) remains 100% unaffected.
+    if (window.location.hostname.includes("lovable") || window.location.hostname === "pulse.colladome.com") {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: `${window.location.origin}/auth/callback`,
+        extraParams: { prompt: "select_account" },
+      });
+      if (result.error) {
+        toast.error(result.error.message || "Google sign-in failed");
+        setLoading(false);
+      }
+      if (!result.redirected) {
+        router.navigate({ to: "/dashboard", replace: true });
+      }
+      return;
+    }
+
+    // 2. UAT / Custom Domains (Use Native Supabase Auth)
+    // This requires Google Credentials in Supabase, but will not impact Production.
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -39,7 +59,6 @@ function AuthPage() {
       setLoading(false);
       return;
     }
-    // redirect is handled automatically by Supabase OAuth
   }
 
   async function handlePassword(e: React.FormEvent) {

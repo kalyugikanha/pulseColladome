@@ -10,14 +10,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-view-as-user",
 };
 
-export function createLovableAiGatewayProvider(lovableApiKey: string) {
-  return createOpenAICompatible({
-    name: "lovable",
-    baseURL: "https://ai.gateway.lovable.dev/v1",
-    headers: {
-      "Lovable-API-Key": lovableApiKey,
-      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
-    },
+import { createGoogleGenerativeAI } from "npm:@ai-sdk/google@0.0.52"
+
+export function createGeminiProvider(geminiApiKey: string) {
+  return createGoogleGenerativeAI({
+    apiKey: geminiApiKey,
   });
 }
 
@@ -89,8 +86,8 @@ serve(async (req) => {
     const viewAs = req.headers.get("x-view-as-user")?.trim() || null;
     const actingUserId = isSuperAdmin && viewAs ? viewAs : userId;
 
-    const key = Deno.env.get("LOVABLE_API_KEY");
-    if (!key) return new Response(JSON.stringify({ error: "LOVABLE_API_KEY missing" }), { status: 500, headers: { ...corsHeaders, "content-type": "application/json" } });
+    const key = Deno.env.get("GEMINI_API_KEY");
+    if (!key) return new Response(JSON.stringify({ error: "GEMINI_API_KEY missing" }), { status: 500, headers: { ...corsHeaders, "content-type": "application/json" } });
 
     const body = await req.json().catch(() => ({}));
     const userMessage: string = String(body?.message ?? "").slice(0, 4000);
@@ -104,8 +101,8 @@ serve(async (req) => {
     const history = await loadHistory(supabase, userId, 30);
     const proposals: unknown[] = [];
 
-    const gateway = createLovableAiGatewayProvider(key);
-    const model = gateway("google/gemini-3-flash-preview");
+    const provider = createGeminiProvider(key);
+    const model = provider("models/gemini-1.5-flash");
 
     const today = format(new Date(), "yyyy-MM-dd");
     

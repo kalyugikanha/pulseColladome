@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/ai-chats")({
 
 function AIChatsAdminPage() {
   const { user } = useCurrentUser();
-  const isAuthorized = !!user?.isSuperAdmin || !!user?.isAdmin || user?.email === "project@colladome.com";
+  const isAuthorized = !!user?.isSuperAdmin || !!user?.isAdmin || user?.email?.toLowerCase() === "project@colladome.com";
   
   const { data: messages, isLoading } = useQuery({
     queryKey: ["admin-ai-chats"],

@@ -12,6 +12,7 @@ export const Route = createFileRoute("/_authenticated/ai-chats")({
 
 function AIChatsAdminPage() {
   const { user } = useCurrentUser();
+  const isAuthorized = !!user?.isSuperAdmin || !!user?.isAdmin || user?.email === "project@colladome.com";
   
   const { data: messages, isLoading } = useQuery({
     queryKey: ["admin-ai-chats"],
@@ -28,7 +29,7 @@ function AIChatsAdminPage() {
       if (error) throw error;
       return data;
     },
-    enabled: !!user?.isSuperAdmin || !!user?.isAdmin,
+    enabled: isAuthorized,
   });
 
   // Fetch profiles separately if we need names and the join is tricky
@@ -38,10 +39,10 @@ function AIChatsAdminPage() {
       const { data } = await supabase.from("profiles").select("id, full_name, email");
       return data || [];
     },
-    enabled: !!user?.isSuperAdmin || !!user?.isAdmin,
+    enabled: isAuthorized,
   });
 
-  if (!user?.isSuperAdmin && !user?.isAdmin) {
+  if (!isAuthorized) {
     return <div className="p-8 text-center text-red-500 font-bold">Access Denied. You must be an Admin.</div>;
   }
 

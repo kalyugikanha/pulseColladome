@@ -128,13 +128,15 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
                 )}
 
 
+                {(isSuperAdmin || email === 'project@colladome.com') && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/ai-chats")}>
+                      <Link to="/ai-chats"><Cpu /><span>AI Assistant Chats</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 {isSuperAdmin && (
                   <>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild isActive={pathname.startsWith("/ai-chats")}>
-                        <Link to="/ai-chats"><Cpu /><span>AI Assistant Chats</span></Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={pathname.startsWith("/meetings")}>
                         <Link to="/meetings"><Video /><span>Team Meetings</span></Link>

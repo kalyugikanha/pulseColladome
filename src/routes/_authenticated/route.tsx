@@ -128,7 +128,7 @@ function AppSidebar({ isAdmin, isSuperAdmin, isFinanceAdmin, isHrAdmin, isLearni
                 )}
 
 
-                {(isSuperAdmin || email?.toLowerCase() === 'project@colladome.com') && (
+                {(isAdmin || isSuperAdmin || email?.toLowerCase() === 'project@colladome.com') && (
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname.startsWith("/ai-chats")}>
                       <Link to="/ai-chats"><Cpu /><span>AI Assistant Chats</span></Link>

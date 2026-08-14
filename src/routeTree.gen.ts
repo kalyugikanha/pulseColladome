@@ -42,7 +42,9 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCompleteOnboardingRouteImport } from './routes/_authenticated/complete-onboarding'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
+import { Route as AuthenticatedAiChatsRouteImport } from './routes/_authenticated/ai-chats'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
+import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as AuthenticatedHrOnboardingRouteImport } from './routes/_authenticated/hr.onboarding'
 import { Route as AuthenticatedHrLeaveRouteImport } from './routes/_authenticated/hr.leave'
 import { Route as AuthenticatedBoardDeptRouteImport } from './routes/_authenticated/board.$dept'
@@ -219,10 +221,20 @@ const AuthenticatedAttendanceRoute = AuthenticatedAttendanceRouteImport.update({
   path: '/attendance',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAiChatsRoute = AuthenticatedAiChatsRouteImport.update({
+  id: '/ai-chats',
+  path: '/ai-chats',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
   id: '/access',
   path: '/access',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
+  id: '/api/assistant/chat',
+  path: '/api/assistant/chat',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedHrOnboardingRoute =
   AuthenticatedHrOnboardingRouteImport.update({
@@ -260,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/access': typeof AuthenticatedAccessRoute
+  '/ai-chats': typeof AuthenticatedAiChatsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
@@ -290,6 +303,7 @@ export interface FileRoutesByFullPath {
   '/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -300,6 +314,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/access': typeof AuthenticatedAccessRoute
+  '/ai-chats': typeof AuthenticatedAiChatsRoute
   '/attendance': typeof AuthenticatedAttendanceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
   '/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
@@ -330,6 +345,7 @@ export interface FileRoutesByTo {
   '/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesById {
@@ -342,6 +358,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/_authenticated/access': typeof AuthenticatedAccessRoute
+  '/_authenticated/ai-chats': typeof AuthenticatedAiChatsRoute
   '/_authenticated/attendance': typeof AuthenticatedAttendanceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/complete-onboarding': typeof AuthenticatedCompleteOnboardingRoute
@@ -372,6 +389,7 @@ export interface FileRoutesById {
   '/_authenticated/board/$dept': typeof AuthenticatedBoardDeptRoute
   '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/_authenticated/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRouteTypes {
@@ -384,6 +402,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/access'
+    | '/ai-chats'
     | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
@@ -414,6 +433,7 @@ export interface FileRouteTypes {
     | '/board/$dept'
     | '/hr/leave'
     | '/hr/onboarding'
+    | '/api/assistant/chat'
     | '/api/public/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -424,6 +444,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/access'
+    | '/ai-chats'
     | '/attendance'
     | '/calendar'
     | '/complete-onboarding'
@@ -454,6 +475,7 @@ export interface FileRouteTypes {
     | '/board/$dept'
     | '/hr/leave'
     | '/hr/onboarding'
+    | '/api/assistant/chat'
     | '/api/public/google/callback'
   id:
     | '__root__'
@@ -465,6 +487,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/_authenticated/access'
+    | '/_authenticated/ai-chats'
     | '/_authenticated/attendance'
     | '/_authenticated/calendar'
     | '/_authenticated/complete-onboarding'
@@ -495,6 +518,7 @@ export interface FileRouteTypes {
     | '/_authenticated/board/$dept'
     | '/_authenticated/hr/leave'
     | '/_authenticated/hr/onboarding'
+    | '/api/assistant/chat'
     | '/api/public/google/callback'
   fileRoutesById: FileRoutesById
 }
@@ -507,6 +531,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   OutreachIdRoute: typeof OutreachIdRoute
+  ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiPublicGoogleCallbackRoute: typeof ApiPublicGoogleCallbackRoute
 }
 
@@ -743,12 +768,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAttendanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ai-chats': {
+      id: '/_authenticated/ai-chats'
+      path: '/ai-chats'
+      fullPath: '/ai-chats'
+      preLoaderRoute: typeof AuthenticatedAiChatsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/access': {
       id: '/_authenticated/access'
       path: '/access'
       fullPath: '/access'
       preLoaderRoute: typeof AuthenticatedAccessRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/assistant/chat': {
+      id: '/api/assistant/chat'
+      path: '/api/assistant/chat'
+      fullPath: '/api/assistant/chat'
+      preLoaderRoute: typeof ApiAssistantChatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/hr/onboarding': {
       id: '/_authenticated/hr/onboarding'
@@ -790,6 +829,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccessRoute: typeof AuthenticatedAccessRoute
+  AuthenticatedAiChatsRoute: typeof AuthenticatedAiChatsRoute
   AuthenticatedAttendanceRoute: typeof AuthenticatedAttendanceRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedCompleteOnboardingRoute: typeof AuthenticatedCompleteOnboardingRoute
@@ -822,6 +862,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccessRoute: AuthenticatedAccessRoute,
+  AuthenticatedAiChatsRoute: AuthenticatedAiChatsRoute,
   AuthenticatedAttendanceRoute: AuthenticatedAttendanceRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedCompleteOnboardingRoute: AuthenticatedCompleteOnboardingRoute,
@@ -874,6 +915,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   OutreachIdRoute: OutreachIdRoute,
+  ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiPublicGoogleCallbackRoute: ApiPublicGoogleCallbackRoute,
 }
 export const routeTree = rootRouteImport

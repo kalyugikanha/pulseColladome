@@ -44,7 +44,6 @@ import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAttendanceRouteImport } from './routes/_authenticated/attendance'
 import { Route as AuthenticatedAiChatsRouteImport } from './routes/_authenticated/ai-chats'
 import { Route as AuthenticatedAccessRouteImport } from './routes/_authenticated/access'
-import { Route as ApiWebhookAiChatRouteImport } from './routes/api/webhook/ai-chat'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as AuthenticatedHrOnboardingRouteImport } from './routes/_authenticated/hr.onboarding'
 import { Route as AuthenticatedHrLeaveRouteImport } from './routes/_authenticated/hr.leave'
@@ -232,11 +231,6 @@ const AuthenticatedAccessRoute = AuthenticatedAccessRouteImport.update({
   path: '/access',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ApiWebhookAiChatRoute = ApiWebhookAiChatRouteImport.update({
-  id: '/api/webhook/ai-chat',
-  path: '/api/webhook/ai-chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   id: '/api/assistant/chat',
   path: '/api/assistant/chat',
@@ -310,7 +304,6 @@ export interface FileRoutesByFullPath {
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/webhook/ai-chat': typeof ApiWebhookAiChatRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -353,7 +346,6 @@ export interface FileRoutesByTo {
   '/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/webhook/ai-chat': typeof ApiWebhookAiChatRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRoutesById {
@@ -398,7 +390,6 @@ export interface FileRoutesById {
   '/_authenticated/hr/leave': typeof AuthenticatedHrLeaveRoute
   '/_authenticated/hr/onboarding': typeof AuthenticatedHrOnboardingRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/webhook/ai-chat': typeof ApiWebhookAiChatRoute
   '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
 }
 export interface FileRouteTypes {
@@ -443,7 +434,6 @@ export interface FileRouteTypes {
     | '/hr/leave'
     | '/hr/onboarding'
     | '/api/assistant/chat'
-    | '/api/webhook/ai-chat'
     | '/api/public/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -486,7 +476,6 @@ export interface FileRouteTypes {
     | '/hr/leave'
     | '/hr/onboarding'
     | '/api/assistant/chat'
-    | '/api/webhook/ai-chat'
     | '/api/public/google/callback'
   id:
     | '__root__'
@@ -530,7 +519,6 @@ export interface FileRouteTypes {
     | '/_authenticated/hr/leave'
     | '/_authenticated/hr/onboarding'
     | '/api/assistant/chat'
-    | '/api/webhook/ai-chat'
     | '/api/public/google/callback'
   fileRoutesById: FileRoutesById
 }
@@ -544,7 +532,6 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   OutreachIdRoute: typeof OutreachIdRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
-  ApiWebhookAiChatRoute: typeof ApiWebhookAiChatRoute
   ApiPublicGoogleCallbackRoute: typeof ApiPublicGoogleCallbackRoute
 }
 
@@ -795,13 +782,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAccessRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/webhook/ai-chat': {
-      id: '/api/webhook/ai-chat'
-      path: '/api/webhook/ai-chat'
-      fullPath: '/api/webhook/ai-chat'
-      preLoaderRoute: typeof ApiWebhookAiChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/assistant/chat': {
       id: '/api/assistant/chat'
       path: '/api/assistant/chat'
@@ -936,7 +916,6 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   OutreachIdRoute: OutreachIdRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
-  ApiWebhookAiChatRoute: ApiWebhookAiChatRoute,
   ApiPublicGoogleCallbackRoute: ApiPublicGoogleCallbackRoute,
 }
 export const routeTree = rootRouteImport
